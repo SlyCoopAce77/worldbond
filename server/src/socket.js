@@ -14,6 +14,12 @@ const { toggleLike, addComment, deletePhoto, getPhotos } = require('./photos');
 const { getStoriesGrouped, viewStory, deleteStory } = require('./stories');
 const { followUser, unfollowUser, getFollowing, getFollowers, isFollowing } = require('./follows');
 
+// Bond ghost score — only loaded when DB is available
+let recordResponse = null;
+if (process.env.DATABASE_URL) {
+  try { ({ recordResponse } = require('./ghostScore/ghostScore.service')); } catch {}
+}
+
 const connectedUsers = {};
 const directMessageHistory = {};
 const randomConnectQueue = []; // users waiting for a random match
@@ -27,8 +33,16 @@ function setupSocket(io) {
     console.log(`User connected: ${socket.id}`);
 
     // Register user with name, language, and optional social links
-    socket.on('register', ({ username, language, country, socials }) => {
-      connectedUsers[socket.id] = { username, language, country, socials: socials || {}, socketId: socket.id };
+    socket.on('register', ({ username, display_name, language, country, socials, userId, photo_url }) => {
+      connectedUsers[socket.id] = {
+        username:     display_name || username,
+        display_name: display_name || username,
+        language, country,
+        socials:    socials || {},
+        socketId:   socket.id,
+        userId,
+        photo_url,
+      };
       socket.emit('registered', { socketId: socket.id });
       io.emit('user_list', Object.values(connectedUsers));
       console.log(`Registered: ${username} (${language}, ${country})`);
@@ -45,22 +59,50 @@ function setupSocket(io) {
     });
 
     // Join a group room
-    socket.on('join_group', ({ categoryId, roomName }) => {
+    socket.on('join_group', async ({ categoryId, roomName }) => {
       const roomKey = `${categoryId}:${roomName}`;
       socket.join(roomKey);
       const history = getRoomHistory(categoryId, roomName);
       socket.emit('group_history', { categoryId, roomName, messages: history });
-      console.log(`${connectedUsers[socket.id]?.username} joined group ${roomKey}`);
+
+      // Broadcast updated member list to everyone in the room
+      const sockets  = await io.in(roomKey).fetchSockets();
+      const members  = sockets.map(s => connectedUsers[s.id]).filter(Boolean);
+      io.to(roomKey).emit('room_members', { categoryId, roomName, members });
     });
 
     // Leave a group room
-    socket.on('leave_group', ({ categoryId, roomName }) => {
+    socket.on('leave_group', async ({ categoryId, roomName }) => {
       const roomKey = `${categoryId}:${roomName}`;
       socket.leave(roomKey);
+      // Broadcast updated member list after leave
+      const sockets = await io.in(roomKey).fetchSockets();
+      const members = sockets.map(s => connectedUsers[s.id]).filter(Boolean);
+      io.to(roomKey).emit('room_members', { categoryId, roomName, members });
+    });
+
+    // Fetch room members on demand
+    socket.on('get_room_members', async ({ categoryId, roomName }) => {
+      const roomKey = `${categoryId}:${roomName}`;
+      const sockets = await io.in(roomKey).fetchSockets();
+      const members = sockets.map(s => connectedUsers[s.id]).filter(Boolean);
+      socket.emit('room_members', { categoryId, roomName, members });
+    });
+
+    // Group typing indicators
+    socket.on('group_typing', ({ categoryId, roomName }) => {
+      const sender = connectedUsers[socket.id];
+      if (!sender) return;
+      const roomKey = `${categoryId}:${roomName}`;
+      socket.to(roomKey).emit('group_user_typing', { socketId: socket.id, name: sender.username });
+    });
+    socket.on('group_stop_typing', ({ categoryId, roomName }) => {
+      const roomKey = `${categoryId}:${roomName}`;
+      socket.to(roomKey).emit('group_user_stopped_typing', { socketId: socket.id });
     });
 
     // Send message to group room
-    socket.on('group_message', async ({ categoryId, roomName, text }) => {
+    socket.on('group_message', async ({ categoryId, roomName, text, imageUrl }) => {
       const sender = connectedUsers[socket.id];
       if (!sender) return;
 
@@ -70,8 +112,10 @@ function setupSocket(io) {
         senderName: sender.username,
         senderCountry: sender.country,
         senderLanguage: sender.language,
+        senderPhoto: sender.photo_url,
         originalText: text,
         timestamp: Date.now(),
+        ...(imageUrl && { imageUrl }),
       };
 
       addMessageToRoom(categoryId, roomName, message);
@@ -97,11 +141,24 @@ function setupSocket(io) {
       }
     });
 
+    // Typing indicators — forward to the target user only
+    socket.on('typing', ({ toSocketId }) => {
+      io.to(toSocketId).emit('user_typing', { fromSocketId: socket.id });
+    });
+    socket.on('stop_typing', ({ toSocketId }) => {
+      io.to(toSocketId).emit('user_stopped_typing', { fromSocketId: socket.id });
+    });
+
     // Send direct message to another user
-    socket.on('direct_message', async ({ toSocketId, text }) => {
+    socket.on('direct_message', async ({ toSocketId, text, matchId, replyTo, imageUrl }) => {
       const sender = connectedUsers[socket.id];
       const recipient = connectedUsers[toSocketId];
       if (!sender || !recipient) return;
+
+      // Update ghost score when a user responds to a match
+      if (matchId && recordResponse && sender.userId) {
+        recordResponse(sender.userId, matchId).catch(() => {});
+      }
 
       let translatedText = text;
       if (recipient.language && recipient.language !== sender.language) {
@@ -118,6 +175,8 @@ function setupSocket(io) {
         text: translatedText,
         wasTranslated: translatedText !== text,
         timestamp: Date.now(),
+        ...(replyTo  && { replyTo }),
+        ...(imageUrl && { imageUrl }),
       };
 
       const dmKey = getDMKey(socket.id, toSocketId);
@@ -578,6 +637,8 @@ function setupSocket(io) {
     socket.on('disconnect', () => {
       delete connectedUsers[socket.id];
       io.emit('user_list', Object.values(connectedUsers));
+      const qIdx = randomConnectQueue.indexOf(socket.id);
+      if (qIdx !== -1) randomConnectQueue.splice(qIdx, 1);
       console.log(`User disconnected: ${socket.id}`);
     });
   });

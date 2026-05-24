@@ -2,7 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const photos = [];
 
-function addPhoto({ userId, username, country, language, mood, imageUrl, caption }) {
+function addPhoto({ userId, username, country, language, mood, imageUrl, caption, filter }) {
   const photo = {
     id: uuidv4(),
     userId,
@@ -12,6 +12,7 @@ function addPhoto({ userId, username, country, language, mood, imageUrl, caption
     mood: mood || '',
     imageUrl,
     caption: caption || '',
+    filter: filter || 'normal',
     likes: [],        // array of { userId, username }
     comments: [],     // array of { id, userId, username, country, text, createdAt }
     createdAt: Date.now(),

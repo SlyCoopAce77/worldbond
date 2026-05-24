@@ -11,6 +11,14 @@ const { getCountries, getCitiesInCountry, getPlacesInCity, PLACE_TYPES } = requi
 const { addPhoto, getPhotos } = require('./photos');
 const { addStory, getStoriesGrouped } = require('./stories');
 const { isConfigured: cloudinaryEnabled, uploadBuffer } = require('./cloudinary');
+const { requireAuth } = require('./auth/auth.middleware');
+
+// Bond platform — persistent services
+const { runMigrations } = require('./database/db');
+const authRoutes        = require('./auth/auth.routes');
+const profileRoutes     = require('./profiles/profiles.routes');
+const experienceRoutes  = require('./experiences/experiences.routes');
+const matchingRoutes    = require('./matching/matching.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -58,6 +66,12 @@ async function resolveImageUrl(req, folder) {
   return `http://${HOST}:${PORT}/uploads/${req.file.filename}`;
 }
 
+// Bond platform routes
+app.use('/api/auth',        authRoutes);
+app.use('/api/profiles',    profileRoutes);
+app.use('/api/experiences', experienceRoutes);
+app.use('/api/matches',     matchingRoutes);
+
 // REST endpoints
 app.get('/health', (req, res) => res.json({ status: 'WorldBond server running' }));
 app.get('/api/groups', (req, res) => res.json(GROUP_CATEGORIES));
@@ -72,7 +86,7 @@ app.get('/api/photos', (req, res) => res.json(getPhotos()));
 app.get('/api/stories', (req, res) => res.json(getStoriesGrouped()));
 
 // Photo upload
-app.post('/api/photos/upload', upload.single('photo'), async (req, res) => {
+app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
   try {
@@ -92,7 +106,7 @@ app.post('/api/photos/upload', upload.single('photo'), async (req, res) => {
 });
 
 // Story upload
-app.post('/api/stories/upload', upload.single('photo'), async (req, res) => {
+app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
   try {
@@ -113,9 +127,23 @@ app.post('/api/stories/upload', upload.single('photo'), async (req, res) => {
 setupSocket(io);
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`WorldBond server running on port ${PORT}`);
-  if (!cloudinaryEnabled) {
-    console.log(`Uploads served at http://localhost:${PORT}/uploads`);
+
+async function start() {
+  if (process.env.DATABASE_URL) {
+    try {
+      await runMigrations();
+    } catch (err) {
+      console.error('[DB] Migration failed:', err.message);
+    }
+  } else {
+    console.warn('[DB] DATABASE_URL not set — Bond persistent features disabled');
   }
-});
+  server.listen(PORT, () => {
+    console.log(`WorldBond server running on port ${PORT}`);
+    if (!cloudinaryEnabled) {
+      console.log(`Uploads served at http://localhost:${PORT}/uploads`);
+    }
+  });
+}
+
+start();
