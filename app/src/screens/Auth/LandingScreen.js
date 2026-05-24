@@ -17,7 +17,7 @@ const FEATURES = [
 const STEPS = [
   { icon: '📝', text: 'Create your profile' },
   { icon: '✨', text: 'Get your daily matches' },
-  { icon: '🔗', text: 'Bond with real people' },
+  { icon: '🫂', text: 'Bond with real people' },
 ];
 
 export default function LandingScreen({ onGetStarted, onSignIn }) {
@@ -76,7 +76,7 @@ export default function LandingScreen({ onGetStarted, onSignIn }) {
                 colors={['#6875f5', '#5865f2', '#4752c4']}
                 style={styles.logoInner}
               >
-                <Text style={styles.logoEmoji}>🔗</Text>
+                <Text style={styles.logoEmoji}>🫂</Text>
               </LinearGradient>
             </Animated.View>
           </View>

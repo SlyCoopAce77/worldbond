@@ -406,7 +406,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   style={s.nextGrad}
                 >
                   <Text style={s.nextText}>
-                    {step === TOTAL_STEPS ? 'Enter Bond 🔗' : 'Continue →'}
+                    {step === TOTAL_STEPS ? 'Enter Bond 🫂' : 'Continue →'}
                   </Text>
                 </LinearGradient>
               )}
