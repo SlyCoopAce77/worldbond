@@ -1,34 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { StatusBar } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StatusBar, View, ActivityIndicator, StyleSheet } from 'react-native';
 import AuthScreen from './src/screens/AuthScreen';
 import AppNavigator from './src/navigation/AppNavigator';
 import { getSocket, disconnectSocket } from './src/services/socket';
+import { isAuthenticated, getSavedProfile, logout } from './src/services/authApi';
 import { PremiumProvider } from './src/context/PremiumContext';
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem('worldbond_user').then(stored => {
-      if (stored) setUser(JSON.parse(stored));
-      setLoading(false);
-    });
+    async function restoreSession() {
+      try {
+        const authed  = await isAuthenticated();
+        const profile = await getSavedProfile();
+
+        if (authed && profile) {
+          // Fully authenticated with a completed profile — auto-login
+          setUser(profile);
+          const socket = getSocket();
+          socket.emit('register', profile);
+        }
+        // If only one is present (partial state), show auth screens
+      } catch {
+        // Storage read error — show auth screens
+      } finally {
+        setLoading(false);
+      }
+    }
+    restoreSession();
   }, []);
 
-  function handleLogin(userData) {
-    setUser(userData);
+  function handleLogin(socketProfile) {
+    setUser(socketProfile);
     const socket = getSocket();
-    socket.emit('register', userData);
+    socket.emit('register', socketProfile);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    await logout();
     disconnectSocket();
     setUser(null);
   }
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <View style={styles.splash}>
+        <StatusBar barStyle="light-content" backgroundColor="#0f0f1a" />
+        <ActivityIndicator size="large" color="#5865f2" />
+      </View>
+    );
+  }
 
   return (
     <PremiumProvider>
@@ -41,3 +64,7 @@ export default function App() {
     </PremiumProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: { flex: 1, backgroundColor: '#0f0f1a', alignItems: 'center', justifyContent: 'center' },
+});

@@ -43,8 +43,8 @@ const styles = StyleSheet.create({
     width: 68, height: 68, borderRadius: 12,
     overflow: 'hidden', borderWidth: 2, borderColor: 'transparent',
   },
-  thumbActive: { borderColor: '#6c63ff' },
+  thumbActive: { borderColor: '#5865f2' },
   thumbImage: { width: '100%', height: '100%' },
   name: { color: '#666', fontSize: 10 },
-  nameActive: { color: '#6c63ff', fontWeight: '700' },
+  nameActive: { color: '#5865f2', fontWeight: '700' },
 });

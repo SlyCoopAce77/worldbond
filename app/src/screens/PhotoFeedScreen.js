@@ -7,6 +7,7 @@ import {
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
+import { getAccessToken } from '../services/authApi';
 import FilteredImage from '../components/FilteredImage';
 import FilterPicker from '../components/FilterPicker';
 import StoriesBar from '../components/StoriesBar';
@@ -100,7 +101,7 @@ function CommentsModal({ visible, photo, user, onClose }) {
           />
           <View style={cStyles.inputRow}>
             <View style={[cStyles.myAvatar, { backgroundColor: stringToColor(user.username) }]}>
-              <Text style={cStyles.myAvatarText}>{user.username[0].toUpperCase()}</Text>
+              <Text style={cStyles.myAvatarText}>{user.username?.[0]?.toUpperCase() || '?'}</Text>
             </View>
             <TextInput
               style={cStyles.input}
@@ -151,11 +152,11 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
     if (!imageUri) return;
     setUploading(true);
     try {
-      const socket = getSocket();
+      const token = await getAccessToken();
       const formData = new FormData();
       formData.append('photo', { uri: imageUri, type: 'image/jpeg', name: 'photo.jpg' });
       formData.append('username', user.username);
-      formData.append('userId', socket.id);
+      formData.append('userId', user.userId || user.id || '');
       formData.append('country', user.country);
       formData.append('language', user.language);
       formData.append('mood', user.mood || '');
@@ -164,7 +165,8 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
 
       const endpoint = isStory ? '/api/stories/upload' : '/api/photos/upload';
       await axios.post(`${SERVER_URL}${endpoint}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
+        timeout: 30000,
       });
       reset();
       onClose();
@@ -382,9 +384,13 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const socket = getSocket();
 
   useEffect(() => {
-    socket.emit('get_photos');
-    socket.emit('get_stories');
-    socket.emit('get_following', { userId: socket.id });
+    function fetchFeed() {
+      socket.emit('get_photos');
+      socket.emit('get_stories');
+      socket.emit('get_following', { userId: socket.id });
+    }
+    if (socket.connected) fetchFeed();
+    else socket.once('connect', fetchFeed);
 
     socket.on('photos_feed', setPhotos);
     socket.on('new_photo', photo => setPhotos(prev => [photo, ...prev]));
@@ -540,7 +546,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 26, fontWeight: 'bold', color: '#fff' },
   subtitle: { color: '#888', fontSize: 13, marginTop: 3 },
-  uploadBtn: { backgroundColor: '#6c63ff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  uploadBtn: { backgroundColor: '#5865f2', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   uploadBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   photoCard: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
   photoHeader: {
@@ -554,11 +560,11 @@ const styles = StyleSheet.create({
   photoUsername: { color: '#fff', fontWeight: '700', fontSize: 14 },
   photoCountry: { color: '#888', fontSize: 11, marginTop: 1 },
   followBtn: {
-    borderWidth: 1, borderColor: '#6c63ff', borderRadius: 14,
+    borderWidth: 1, borderColor: '#5865f2', borderRadius: 14,
     paddingHorizontal: 12, paddingVertical: 4,
   },
-  followBtnActive: { backgroundColor: '#6c63ff', borderColor: '#6c63ff' },
-  followBtnText: { color: '#6c63ff', fontSize: 12, fontWeight: '700' },
+  followBtnActive: { backgroundColor: '#5865f2', borderColor: '#5865f2' },
+  followBtnText: { color: '#5865f2', fontSize: 12, fontWeight: '700' },
   followBtnTextActive: { color: '#fff' },
   photoTime: { color: '#555', fontSize: 11 },
   photoWrap: { position: 'relative' },
@@ -591,7 +597,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 56 },
   emptyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
   emptySub: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
-  emptyBtn: { backgroundColor: '#6c63ff', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 },
+  emptyBtn: { backgroundColor: '#5865f2', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
@@ -625,7 +631,7 @@ const cStyles = StyleSheet.create({
     flex: 1, backgroundColor: '#0f0f1a', color: '#fff', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, maxHeight: 80,
   },
-  sendBtn: { backgroundColor: '#6c63ff', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: '#5865f2', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   sendBtnOff: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 16 },
 });
@@ -649,13 +655,13 @@ const upStyles = StyleSheet.create({
   preview: { alignItems: 'center', marginBottom: 14, gap: 8 },
   previewImage: { width: '100%', height: 220, borderRadius: 16 },
   changeBtn: { paddingVertical: 6 },
-  changeBtnText: { color: '#6c63ff', fontSize: 13, fontWeight: '600' },
+  changeBtnText: { color: '#5865f2', fontSize: 13, fontWeight: '600' },
   captionInput: {
     backgroundColor: '#0f0f1a', color: '#fff', borderRadius: 12,
     padding: 14, fontSize: 14, minHeight: 60, textAlignVertical: 'top',
     borderWidth: 1, borderColor: '#2a2a4a', marginBottom: 14, marginTop: 12,
   },
-  uploadBtn: { backgroundColor: '#6c63ff', borderRadius: 14, padding: 16, alignItems: 'center' },
+  uploadBtn: { backgroundColor: '#5865f2', borderRadius: 14, padding: 16, alignItems: 'center' },
   uploadBtnOff: { backgroundColor: '#333' },
   uploadBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

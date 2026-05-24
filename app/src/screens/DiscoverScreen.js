@@ -1,27 +1,72 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, Animated,
+  TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
+  Platform, Animated, Image, RefreshControl, ActivityIndicator,
+  Dimensions,
 } from 'react-native';
-import { getSocket } from '../services/socket';
+import LinearGradient from 'react-native-linear-gradient';
+import { getAccessToken } from '../services/authApi';
+import axios from 'axios';
+import { getSocket, SERVER_URL } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
 
-// ─── DAILY ICEBREAKER ───────────────────────────────────────────────────────
+const { width } = Dimensions.get('window');
+const TABS = [
+  { id: 'icebreaker', icon: '💡', label: 'Icebreaker' },
+  { id: 'random',     icon: '🌀', label: 'Random'     },
+  { id: 'language',   icon: '🗣️', label: 'Language'   },
+  { id: 'people',     icon: '👥', label: 'People'     },
+];
+const TAB_W = width / TABS.length;
 
-function IcebreakerSection({ user }) {
+const LANG_FLAGS = { en:'🇺🇸', ja:'🇯🇵', es:'🇪🇸', fr:'🇫🇷', de:'🇩🇪', pt:'🇧🇷', zh:'🇨🇳', ko:'🇰🇷', ar:'🇸🇦', hi:'🇮🇳', th:'🇹🇭', ru:'🇷🇺' };
+const LANG_NAMES = { en:'English', ja:'Japanese', es:'Spanish', fr:'French', de:'German', pt:'Portuguese', zh:'Chinese', ko:'Korean', ar:'Arabic', hi:'Hindi', th:'Thai', ru:'Russian' };
+
+const CT_META = {
+  dating:           { emoji:'❤️',  label:'Dating',    color:'#e91e63' },
+  friendship:       { emoji:'🤝',  label:'Friends',   color:'#2196f3' },
+  travel:           { emoji:'✈️',  label:'Travel',    color:'#ff9800' },
+  language_exchange:{ emoji:'🗣️', label:'Language',  color:'#26c6da' },
+  mentorship:       { emoji:'🎓',  label:'Mentorship',color:'#57f287' },
+};
+
+async function authHeader() {
+  const token = await getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function stringToColor(str = '') {
+  const p = ['#e57373','#ba68c8','#4fc3f7','#81c784','#ffb74d','#f06292','#4db6ac','#7986cb'];
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+  return p[Math.abs(h) % p.length];
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function Avatar({ photo_url, name, size = 44 }) {
+  const color = stringToColor(name || '');
+  if (photo_url) return <Image source={{ uri: photo_url }} style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: '#fff', fontWeight: '900', fontSize: size * 0.42 }}>{(name || '?')[0].toUpperCase()}</Text>
+    </View>
+  );
+}
+
+// ─── Icebreaker tab ───────────────────────────────────────────────────────────
+function IcebreakerTab({ user }) {
   const { tierInfo, isPremium } = usePremium();
-  const [question, setQuestion] = useState('');
+  const [question,  setQuestion]  = useState('');
   const [responses, setResponses] = useState([]);
-  const [myAnswer, setMyAnswer] = useState('');
+  const [myAnswer,  setMyAnswer]  = useState('');
   const [submitted, setSubmitted] = useState(false);
   const socket = getSocket();
 
   useEffect(() => {
-    socket.emit('get_icebreaker');
-    socket.on('icebreaker_data', ({ question: q, responses: r }) => {
-      setQuestion(q);
-      setResponses(r);
-    });
+    if (socket.connected) socket.emit('get_icebreaker');
+    else socket.once('connect', () => socket.emit('get_icebreaker'));
+    socket.on('icebreaker_data', ({ question: q, responses: r }) => { setQuestion(q); setResponses(r); });
     socket.on('icebreaker_responses', ({ responses: r }) => setResponses(r));
     return () => { socket.off('icebreaker_data'); socket.off('icebreaker_responses'); };
   }, []);
@@ -32,168 +77,234 @@ function IcebreakerSection({ user }) {
     setSubmitted(true);
   }
 
-  const visibleResponses = isPremium ? responses : responses.slice(0, tierInfo.icebreakerResponses);
+  const visible = isPremium ? responses : responses.slice(0, tierInfo?.icebreakerResponses ?? 3);
 
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionIcon}>💡</Text>
-        <View>
-          <Text style={styles.sectionTitle}>Today's Icebreaker</Text>
-          <Text style={styles.sectionSub}>{responses.length} people answered worldwide</Text>
+    <ScrollView contentContainerStyle={tab.scroll} showsVerticalScrollIndicator={false}>
+      {/* Question card */}
+      <LinearGradient colors={['#1a1442', '#0a0a18']} style={tab.questionCard}>
+        <View style={tab.questionTop}>
+          <View style={tab.questionBadge}>
+            <View style={tab.questionDot} />
+            <Text style={tab.questionBadgeText}>Today's Question</Text>
+          </View>
+          <Text style={tab.responseCount}>{responses.length} answered 🌍</Text>
         </View>
-      </View>
+        <Text style={tab.questionText}>"{question || 'Loading today\'s question…'}"</Text>
+      </LinearGradient>
 
-      <View style={styles.questionCard}>
-        <Text style={styles.questionText}>"{question}"</Text>
-      </View>
-
+      {/* Answer box */}
       {!submitted ? (
-        <View style={styles.answerBox}>
+        <View style={tab.answerWrap}>
           <TextInput
-            style={styles.answerInput}
-            placeholder="Share your answer with the world..."
-            placeholderTextColor="#555"
+            style={tab.answerInput}
+            placeholder="Share your honest answer with people worldwide…"
+            placeholderTextColor="#444"
             value={myAnswer}
             onChangeText={setMyAnswer}
             multiline
             maxLength={200}
           />
-          <TouchableOpacity
-            style={[styles.submitBtn, !myAnswer.trim() && styles.submitBtnDisabled]}
-            onPress={submit}
-            disabled={!myAnswer.trim()}
-          >
-            <Text style={styles.submitBtnText}>Share Answer 🌍</Text>
-          </TouchableOpacity>
+          <View style={tab.answerFooter}>
+            <Text style={tab.charCount}>{myAnswer.length}/200</Text>
+            <TouchableOpacity
+              style={[tab.submitBtn, !myAnswer.trim() && { opacity: 0.4 }]}
+              onPress={submit}
+              disabled={!myAnswer.trim()}
+              activeOpacity={0.85}
+            >
+              <LinearGradient colors={['#5865f2', '#4752c4']} style={tab.submitGrad}>
+                <Text style={tab.submitText}>Share with the World 🌍</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
-        <View style={styles.submittedBanner}>
-          <Text style={styles.submittedText}>✓ Your answer is live! Read what others said below.</Text>
+        <View style={tab.submitted}>
+          <Text style={{ fontSize: 20 }}>✅</Text>
+          <Text style={tab.submittedText}>Your answer is live! See what others said below.</Text>
         </View>
       )}
 
-      {visibleResponses.map(r => (
-        <View key={r.id} style={styles.responseCard}>
-          <View style={styles.responseHeader}>
-            <Text style={styles.responseFlag}>{r.country?.split(' ')[0]}</Text>
-            <Text style={styles.responseName}>{r.username}</Text>
-            <Text style={styles.responseCountry}>{r.country?.split(' ').slice(1).join(' ')}</Text>
-          </View>
-          <Text style={styles.responseText}>{r.text}</Text>
-        </View>
-      ))}
-
-      {!isPremium && responses.length > tierInfo.icebreakerResponses && (
-        <View style={styles.lockedMore}>
-          <Text style={styles.lockedMoreText}>
-            +{responses.length - tierInfo.icebreakerResponses} more responses — upgrade to Plus to read all
-          </Text>
+      {/* Responses */}
+      {visible.length > 0 && (
+        <View style={tab.responsesWrap}>
+          <Text style={tab.responsesLabel}>What people said</Text>
+          {visible.map((r, i) => (
+            <Animated.View key={r.id} style={tab.responseCard}>
+              <View style={tab.responseTop}>
+                <Text style={{ fontSize: 20 }}>{r.country?.split(' ')[0] || '🌍'}</Text>
+                <Text style={tab.responseName}>{r.username}</Text>
+                <Text style={tab.responseCountry}>{r.country?.split(' ').slice(1).join(' ')}</Text>
+              </View>
+              <Text style={tab.responseText}>{r.text}</Text>
+            </Animated.View>
+          ))}
         </View>
       )}
-    </View>
+
+      {!isPremium && responses.length > (tierInfo?.icebreakerResponses ?? 3) && (
+        <View style={tab.lockedMore}>
+          <Text style={tab.lockedText}>🔒  +{responses.length - (tierInfo?.icebreakerResponses ?? 3)} more responses</Text>
+          <Text style={tab.lockedSub}>Upgrade to Bond Plus to read all answers</Text>
+        </View>
+      )}
+    </ScrollView>
   );
 }
+const tab = StyleSheet.create({
+  scroll:          { padding: 20, gap: 16, paddingBottom: 50 },
+  questionCard:    { borderRadius: 22, padding: 22, gap: 14, borderWidth: 1, borderColor: '#5865f230' },
+  questionTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  questionBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  questionDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: '#5865f2' },
+  questionBadgeText:{ color: '#5865f2', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  responseCount:   { color: '#555', fontSize: 12 },
+  questionText:    { color: '#fff', fontSize: 18, lineHeight: 28, fontStyle: 'italic', fontWeight: '500' },
+  answerWrap:      { gap: 10 },
+  answerInput:     { backgroundColor: '#12122a', color: '#fff', borderRadius: 16, padding: 16, fontSize: 14, minHeight: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#1e1e38', lineHeight: 22 },
+  answerFooter:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  charCount:       { color: '#444', fontSize: 11 },
+  submitBtn:       { borderRadius: 14, overflow: 'hidden' },
+  submitGrad:      { paddingHorizontal: 20, paddingVertical: 12 },
+  submitText:      { color: '#fff', fontSize: 14, fontWeight: '800' },
+  submitted:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#57f28715', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#57f28730' },
+  submittedText:   { color: '#57f287', fontSize: 13, fontWeight: '600', flex: 1 },
+  responsesWrap:   { gap: 10 },
+  responsesLabel:  { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  responseCard:    { backgroundColor: '#12122a', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#1e1e38', gap: 8 },
+  responseTop:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  responseName:    { color: '#fff', fontSize: 13, fontWeight: '700' },
+  responseCountry: { color: '#555', fontSize: 11 },
+  responseText:    { color: '#bbb', fontSize: 14, lineHeight: 21 },
+  lockedMore:      { backgroundColor: '#5865f210', borderRadius: 18, padding: 18, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#5865f230', borderStyle: 'dashed' },
+  lockedText:      { color: '#5865f2', fontSize: 14, fontWeight: '800' },
+  lockedSub:       { color: '#5865f288', fontSize: 12 },
+});
 
-// ─── RANDOM WORLD CONNECT ────────────────────────────────────────────────────
-
-function RandomConnectSection({ user, navigation }) {
-  const [state, setState] = useState('idle'); // 'idle' | 'waiting' | 'connected'
+// ─── Random connect tab ───────────────────────────────────────────────────────
+function RandomTab({ user, navigation }) {
+  const [state,       setState]       = useState('idle');
   const [matchedUser, setMatchedUser] = useState(null);
-  const [roomKey, setRoomKey] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [text, setText] = useState('');
-  const flatRef = useRef(null);
-  const socket = getSocket();
+  const [roomKey,     setRoomKey]     = useState(null);
+  const [messages,    setMessages]    = useState([]);
+  const [text,        setText]        = useState('');
+  const flatRef   = useRef(null);
+  const socket    = getSocket();
+  const ring1     = useRef(new Animated.Value(1)).current;
+  const ring2     = useRef(new Animated.Value(1)).current;
+  const ring3     = useRef(new Animated.Value(1)).current;
+  const op1       = useRef(new Animated.Value(0.5)).current;
+  const op2       = useRef(new Animated.Value(0.35)).current;
+  const op3       = useRef(new Animated.Value(0.2)).current;
 
   useEffect(() => {
-    socket.on('random_match', ({ matchedUser: mu, roomKey: rk }) => {
-      setMatchedUser(mu);
-      setRoomKey(rk);
-      setState('connected');
-      setMessages([]);
+    socket.on('random_match',     ({ matchedUser: mu, roomKey: rk }) => {
+      setMatchedUser(mu); setRoomKey(rk); setState('connected'); setMessages([]);
     });
-    socket.on('random_waiting', () => setState('waiting'));
+    socket.on('random_waiting',   () => setState('waiting'));
     socket.on('random_cancelled', () => setState('idle'));
-    socket.on('random_message', msg => setMessages(prev => [...prev, msg]));
+    socket.on('random_message',   msg => setMessages(prev => [...prev, msg]));
     return () => {
-      socket.off('random_match');
-      socket.off('random_waiting');
-      socket.off('random_cancelled');
-      socket.off('random_message');
+      socket.off('random_match'); socket.off('random_waiting');
+      socket.off('random_cancelled'); socket.off('random_message');
     };
   }, []);
+
+  useEffect(() => {
+    if (state !== 'waiting') { [ring1,ring2,ring3].forEach(r => r.setValue(1)); return; }
+    const anims = [ring1,ring2,ring3].map((r, i) =>
+      Animated.loop(Animated.parallel([
+        Animated.sequence([
+          Animated.delay(i * 500),
+          Animated.timing(r, { toValue: 2.4, duration: 1800, useNativeDriver: true }),
+          Animated.timing(r, { toValue: 1,   duration: 0,    useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.delay(i * 500),
+          Animated.timing([op1,op2,op3][i], { toValue: 0, duration: 1800, useNativeDriver: true }),
+          Animated.timing([op1,op2,op3][i], { toValue: [0.5,0.35,0.2][i], duration: 0, useNativeDriver: true }),
+        ]),
+      ]))
+    );
+    anims.forEach(a => a.start());
+    return () => anims.forEach(a => a.stop());
+  }, [state]);
 
   useEffect(() => {
     if (messages.length > 0) flatRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  function connect() {
-    setState('waiting');
-    socket.emit('join_random_connect');
-  }
-
+  function connect()    { setState('waiting'); socket.emit('join_random_connect'); }
   function disconnect() {
     socket.emit('leave_random_connect');
-    setState('idle');
-    setMatchedUser(null);
-    setRoomKey(null);
-    setMessages([]);
+    setState('idle'); setMatchedUser(null); setRoomKey(null); setMessages([]);
   }
-
   function sendMsg() {
     if (!text.trim() || !roomKey) return;
     socket.emit('random_message', { roomKey, text: text.trim() });
     setText('');
   }
 
+  // Connected: full chat
   if (state === 'connected' && matchedUser) {
     return (
-      <View style={[styles.section, { flex: 1 }]}>
-        <View style={styles.randomConnectedHeader}>
-          <View style={styles.randomMatchAvatar}>
-            <Text style={styles.randomMatchAvatarText}>{matchedUser.username[0].toUpperCase()}</Text>
+      <View style={{ flex: 1 }}>
+        <LinearGradient colors={['#0e2414', '#0a0a18']} style={rc.connHeader}>
+          <View style={rc.connAvatar}>
+            <Avatar photo_url={matchedUser.photo_url} name={matchedUser.display_name || matchedUser.username} size={44} />
+            <View style={rc.onlineDot} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.randomMatchName}>{matchedUser.username}</Text>
-            <Text style={styles.randomMatchCountry}>{matchedUser.country}</Text>
+            <Text style={rc.connName}>{matchedUser.display_name || matchedUser.username}</Text>
+            <Text style={rc.connCountry}>{matchedUser.country} · Random Connect 🌀</Text>
           </View>
-          <TouchableOpacity style={styles.disconnectBtn} onPress={disconnect}>
-            <Text style={styles.disconnectBtnText}>End</Text>
+          <TouchableOpacity style={rc.endBtn} onPress={disconnect}>
+            <Text style={rc.endText}>End</Text>
           </TouchableOpacity>
-        </View>
-        <View style={styles.randomChatBox}>
-          <FlatList
-            ref={flatRef}
-            data={messages}
-            keyExtractor={m => m.id}
-            contentContainerStyle={{ padding: 10, gap: 8 }}
-            ListEmptyComponent={<Text style={styles.randomChatEmpty}>Say hello! 👋</Text>}
-            renderItem={({ item }) => {
-              const isMine = item.senderId === socket.id;
-              return (
-                <View style={[styles.rndRow, isMine && styles.rndRowRight]}>
-                  <View style={[styles.rndBubble, isMine ? styles.rndBubbleMine : styles.rndBubbleOther]}>
-                    <Text style={styles.rndText}>{item.text}</Text>
-                    {item.wasTranslated && <Text style={styles.translatedTag}>🌐 translated</Text>}
-                  </View>
+        </LinearGradient>
+        <FlatList
+          ref={flatRef}
+          data={messages}
+          keyExtractor={m => m.id}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, gap: 8 }}
+          ListEmptyComponent={
+            <View style={rc.emptyChat}>
+              <Text style={{ fontSize: 36 }}>👋</Text>
+              <Text style={rc.emptyChatText}>Say hello to someone from {matchedUser.country}!</Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const isMine = item.senderId === socket.id;
+            return (
+              <View style={[rc.msgRow, isMine && rc.msgRowMine]}>
+                <View style={[rc.bubble, isMine ? rc.bubbleMine : rc.bubbleOther]}>
+                  <Text style={rc.msgText}>{item.text}</Text>
+                  {item.wasTranslated && <Text style={rc.translated}>🌐 translated</Text>}
                 </View>
-              );
-            }}
-            onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
-          />
-        </View>
+              </View>
+            );
+          }}
+          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
+        />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.rndInputRow}>
+          <View style={rc.inputRow}>
             <TextInput
-              style={styles.rndInput}
-              placeholder="Say something..."
-              placeholderTextColor="#888"
+              style={rc.input}
+              placeholder="Say something…"
+              placeholderTextColor="#444"
               value={text}
               onChangeText={setText}
+              returnKeyType="send"
+              onSubmitEditing={sendMsg}
             />
-            <TouchableOpacity style={[styles.rndSendBtn, !text.trim() && styles.rndSendBtnOff]} onPress={sendMsg} disabled={!text.trim()}>
-              <Text style={styles.rndSendText}>➤</Text>
+            <TouchableOpacity
+              style={[rc.sendBtn, { backgroundColor: text.trim() ? '#4caf50' : '#1e1e38' }]}
+              onPress={sendMsg}
+              disabled={!text.trim()}
+            >
+              <Text style={rc.sendIcon}>➤</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -202,232 +313,499 @@ function RandomConnectSection({ user, navigation }) {
   }
 
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionIcon}>🌀</Text>
-        <View>
-          <Text style={styles.sectionTitle}>Random World Connect</Text>
-          <Text style={styles.sectionSub}>Meet a stranger from another country</Text>
-        </View>
-      </View>
-      <View style={styles.randomCard}>
-        <Text style={styles.randomCardTitle}>
-          {state === 'waiting' ? 'Finding someone for you...' : 'Ready to meet the world?'}
-        </Text>
-        <Text style={styles.randomCardSub}>
-          {state === 'waiting'
-            ? 'Matching you with someone from a different country 🌍'
-            : 'Tap below to be matched with a random person from a different country. Messages auto-translate!'}
-        </Text>
-        {state === 'waiting' ? (
-          <TouchableOpacity style={styles.cancelBtn} onPress={disconnect}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.connectBtn} onPress={connect}>
-            <Text style={styles.connectBtnText}>🌀 Connect with a Stranger</Text>
-          </TouchableOpacity>
+    <ScrollView contentContainerStyle={rc.scroll} showsVerticalScrollIndicator={false}>
+      {/* Orb */}
+      <View style={rc.orbWrap}>
+        {state === 'waiting' && (
+          <>
+            {[ring1, ring2, ring3].map((r, i) => (
+              <Animated.View key={i} style={[rc.ring, { transform: [{ scale: r }], opacity: [op1,op2,op3][i] }]} />
+            ))}
+          </>
         )}
+        <LinearGradient
+          colors={state === 'waiting' ? ['#1a3a1a', '#0e2010'] : ['#1a1442', '#0e0a2e']}
+          style={rc.orb}
+        >
+          <Text style={{ fontSize: 52 }}>{state === 'waiting' ? '🔍' : '🌀'}</Text>
+        </LinearGradient>
       </View>
-    </View>
+
+      <Text style={rc.title}>
+        {state === 'waiting' ? 'Finding someone for you…' : 'Random World Connect'}
+      </Text>
+      <Text style={rc.sub}>
+        {state === 'waiting'
+          ? 'Matching you with someone from a different country 🌍'
+          : 'Meet a stranger from anywhere on Earth. Messages auto-translate in real time.'}
+      </Text>
+
+      {state === 'waiting' ? (
+        <TouchableOpacity style={rc.cancelBtn} onPress={disconnect}>
+          <Text style={rc.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={connect} activeOpacity={0.85} style={rc.connectWrap}>
+          <LinearGradient colors={['#5865f2', '#7289da']} style={rc.connectBtn}>
+            <Text style={rc.connectText}>🌀  Connect with a Stranger</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
+      {state === 'idle' && <Text style={rc.hint}>Average wait: under 10 seconds</Text>}
+
+      {/* Stats */}
+      <View style={rc.statsRow}>
+        {[
+          { emoji: '🌍', label: 'Countries', value: '195' },
+          { emoji: '⚡', label: 'Avg Wait',  value: '<10s' },
+          { emoji: '🌐', label: 'Translated',value: 'Auto' },
+        ].map(s => (
+          <View key={s.label} style={rc.statCard}>
+            <Text style={{ fontSize: 22 }}>{s.emoji}</Text>
+            <Text style={rc.statVal}>{s.value}</Text>
+            <Text style={rc.statLbl}>{s.label}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
+const rc = StyleSheet.create({
+  scroll:       { padding: 24, alignItems: 'center', gap: 18, paddingBottom: 50 },
+  orbWrap:      { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  ring:         { position: 'absolute', width: 140, height: 140, borderRadius: 70, borderWidth: 1.5, borderColor: '#57f28755' },
+  orb:          { width: 120, height: 120, borderRadius: 60, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ffffff15' },
+  title:        { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.3 },
+  sub:          { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
+  connectWrap:  { borderRadius: 18, overflow: 'hidden', width: '100%' },
+  connectBtn:   { paddingVertical: 16, alignItems: 'center' },
+  connectText:  { color: '#fff', fontSize: 16, fontWeight: '800' },
+  cancelBtn:    { backgroundColor: '#12122a', borderRadius: 18, paddingVertical: 16, paddingHorizontal: 40, borderWidth: 1, borderColor: '#1e1e38' },
+  cancelText:   { color: '#aaa', fontSize: 15, fontWeight: '700' },
+  hint:         { color: '#444', fontSize: 12 },
+  statsRow:     { flexDirection: 'row', gap: 12, width: '100%', marginTop: 8 },
+  statCard:     { flex: 1, backgroundColor: '#12122a', borderRadius: 18, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#1e1e38' },
+  statVal:      { color: '#fff', fontSize: 16, fontWeight: '900' },
+  statLbl:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  connHeader:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#1e1e38' },
+  connAvatar:   { position: 'relative' },
+  onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#0a0a18' },
+  connName:     { color: '#fff', fontSize: 16, fontWeight: '800' },
+  connCountry:  { color: '#555', fontSize: 12, marginTop: 2 },
+  endBtn:       { backgroundColor: '#e5393522', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#e5393540' },
+  endText:      { color: '#e53935', fontSize: 13, fontWeight: '800' },
+  emptyChat:    { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyChatText:{ color: '#555', fontSize: 14, textAlign: 'center' },
+  msgRow:       { flexDirection: 'row' },
+  msgRowMine:   { justifyContent: 'flex-end' },
+  bubble:       { maxWidth: width * 0.72, borderRadius: 18, padding: 12 },
+  bubbleMine:   { backgroundColor: '#5865f2', borderBottomRightRadius: 4 },
+  bubbleOther:  { backgroundColor: '#12122a', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e1e38' },
+  msgText:      { color: '#fff', fontSize: 14, lineHeight: 20 },
+  translated:   { color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop: 2 },
+  inputRow:     { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#1e1e38', gap: 10, alignItems: 'flex-end' },
+  input:        { flex: 1, backgroundColor: '#12122a', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#1e1e38' },
+  sendBtn:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  sendIcon:     { color: '#fff', fontSize: 18 },
+});
 
-// ─── LANGUAGE EXCHANGE ───────────────────────────────────────────────────────
-
-function LanguageExchangeSection({ user, navigation }) {
-  const [matches, setMatches] = useState([]);
+// ─── Language exchange tab ────────────────────────────────────────────────────
+function LanguageTab({ user, navigation }) {
+  const { isPremium } = usePremium();
+  const [partners, setPartners] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [online,   setOnline]   = useState({});
   const socket = getSocket();
-  const { isPro } = usePremium();
+
+  const fetchPartners = useCallback(async () => {
+    setLoading(true);
+    try {
+      const headers = await authHeader();
+      const { data } = await axios.get(`${SERVER_URL}/api/profiles`, { headers, params: { limit: 30 }, timeout: 8000 });
+      const profiles = (data.profiles || data || []).filter(
+        p => p.language && p.language !== (user.language || user.lang)
+      );
+      setPartners(profiles);
+    } catch {
+      socket.emit('get_users');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    fetchPartners();
     socket.on('user_list', users => {
-      const me = users.find(u => u.socketId === socket.id);
-      if (!me) return;
-      // Find people who speak my target language and want to learn mine
-      const found = users.filter(u =>
-        u.socketId !== socket.id &&
-        u.language !== me.language
-      ).slice(0, 10);
-      setMatches(found);
+      const map = {};
+      users.forEach(u => { if (u.userId) map[u.userId] = true; });
+      setOnline(map);
     });
-    socket.emit('get_users');
+    if (socket.connected) socket.emit('get_users');
+    else socket.once('connect', () => socket.emit('get_users'));
     return () => socket.off('user_list');
   }, []);
 
+  const myLang = user.language || user.lang || 'en';
+  const myFlag = LANG_FLAGS[myLang] || '🌐';
+  const myName = LANG_NAMES[myLang] || myLang.toUpperCase();
+
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionIcon}>🗣️</Text>
-        <View>
-          <Text style={styles.sectionTitle}>Language Exchange</Text>
-          <Text style={styles.sectionSub}>Practice with native speakers</Text>
+    <ScrollView contentContainerStyle={lx.scroll} showsVerticalScrollIndicator={false}>
+      {/* Your language */}
+      <LinearGradient colors={['#1a1442', '#0a0a18']} style={lx.myBadge}>
+        <Text style={{ fontSize: 36 }}>{myFlag}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={lx.myTitle}>You speak {myName}</Text>
+          <Text style={lx.mySub}>Find partners who can teach you a new language 🌍</Text>
         </View>
-      </View>
-      {!isPro && (
-        <View style={styles.proGate}>
-          <Text style={styles.proGateText}>🌟 Pro feature — upgrade to get language exchange matching</Text>
+      </LinearGradient>
+
+      {!isPremium && (
+        <View style={lx.proGate}>
+          <Text style={{ fontSize: 20 }}>🌟</Text>
+          <Text style={lx.proText}>Upgrade to Bond Plus for unlimited language matching</Text>
         </View>
       )}
-      {matches.length === 0 ? (
-        <Text style={styles.noMatchText}>No language partners online right now</Text>
+
+      <Text style={lx.sectionLabel}>Available Partners</Text>
+
+      {loading ? (
+        <View style={lx.loading}>
+          <ActivityIndicator color="#5865f2" />
+          <Text style={lx.loadingText}>Finding language partners…</Text>
+        </View>
+      ) : partners.length === 0 ? (
+        <View style={lx.loading}>
+          <Text style={{ fontSize: 36 }}>🗣️</Text>
+          <Text style={lx.emptyTitle}>No partners online right now</Text>
+          <Text style={lx.emptyText}>Check back soon — people join from all over the world</Text>
+        </View>
       ) : (
-        matches.map(u => (
-          <TouchableOpacity
-            key={u.socketId}
-            style={styles.langCard}
-            onPress={() => navigation.navigate('Chat', { otherUser: u, currentUser: user })}
-          >
-            <View style={styles.langAvatar}>
-              <Text style={styles.langAvatarText}>{u.username[0].toUpperCase()}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.langName}>{u.username}</Text>
-              <Text style={styles.langDetail}>{u.country} · speaks {u.language?.toUpperCase()}</Text>
-            </View>
-            <View style={styles.langExchangeBadge}>
-              <Text style={styles.langExchangeText}>{user.language?.toUpperCase()} ↔ {u.language?.toUpperCase()}</Text>
-            </View>
+        partners.map(p => {
+          const theirLang = p.language || 'en';
+          const theirFlag = LANG_FLAGS[theirLang] || '🌐';
+          const theirName = LANG_NAMES[theirLang] || theirLang.toUpperCase();
+          const isOnline  = online[p.user_id];
+          return (
+            <TouchableOpacity
+              key={p.user_id}
+              style={lx.card}
+              onPress={() => navigation.navigate('Profile', {
+                profileUser: { userId: p.user_id, username: p.display_name, photo_url: p.photo_url, country: p.country, language: p.language },
+                bondUserId: p.user_id,
+              })}
+              activeOpacity={0.85}
+            >
+              <View style={{ position: 'relative' }}>
+                <Avatar photo_url={p.photo_url} name={p.display_name} size={50} />
+                {isOnline && <View style={lx.onlineDot} />}
+              </View>
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={lx.name}>{p.display_name}{p.age ? `, ${p.age}` : ''}</Text>
+                <Text style={lx.country}>{p.country}</Text>
+              </View>
+              <View style={lx.exchangeBadge}>
+                <Text style={lx.exchangeFlags}>{myFlag} ↔ {theirFlag}</Text>
+                <Text style={lx.exchangeNames}>{myName} / {theirName}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })
+      )}
+    </ScrollView>
+  );
+}
+const lx = StyleSheet.create({
+  scroll:        { padding: 20, gap: 12, paddingBottom: 50 },
+  myBadge:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#5865f230' },
+  myTitle:       { color: '#fff', fontSize: 16, fontWeight: '800' },
+  mySub:         { color: '#ffffff66', fontSize: 12, marginTop: 3, lineHeight: 18 },
+  proGate:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f59e0b15', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#f59e0b30' },
+  proText:       { color: '#f59e0b', fontSize: 13, fontWeight: '600', flex: 1 },
+  sectionLabel:  { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  loading:       { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  loadingText:   { color: '#555', fontSize: 14 },
+  emptyTitle:    { color: '#fff', fontSize: 17, fontWeight: '700' },
+  emptyText:     { color: '#555', fontSize: 13, textAlign: 'center' },
+  card:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#1e1e38', gap: 14 },
+  onlineDot:     { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#0a0a18' },
+  name:          { color: '#fff', fontSize: 15, fontWeight: '700' },
+  country:       { color: '#555', fontSize: 12 },
+  exchangeBadge: { backgroundColor: '#5865f218', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#5865f235' },
+  exchangeFlags: { color: '#5865f2', fontSize: 15, fontWeight: '800' },
+  exchangeNames: { color: '#5865f288', fontSize: 9, fontWeight: '700' },
+});
+
+// ─── People tab ───────────────────────────────────────────────────────────────
+function PeopleTab({ user, navigation }) {
+  const [profiles,   setProfiles]   = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [search,     setSearch]     = useState('');
+  const [ctFilter,   setCtFilter]   = useState(null);
+  const [online,     setOnline]     = useState({});
+  const socket = getSocket();
+
+  const CT_FILTERS = [
+    { id: null,               label: 'All',      emoji: '🌍' },
+    { id: 'dating',           label: 'Dating',   emoji: '❤️'  },
+    { id: 'friendship',       label: 'Friends',  emoji: '🤝'  },
+    { id: 'travel',           label: 'Travel',   emoji: '✈️'  },
+    { id: 'language_exchange',label: 'Language', emoji: '🗣️' },
+    { id: 'mentorship',       label: 'Mentor',   emoji: '🎓'  },
+  ];
+
+  const fetchProfiles = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
+    try {
+      const headers = await authHeader();
+      const params  = { limit: 30 };
+      if (ctFilter) params.connection_type = ctFilter;
+      if (search.trim()) params.search = search.trim();
+      const { data } = await axios.get(`${SERVER_URL}/api/profiles`, { headers, params, timeout: 8000 });
+      setProfiles(data.profiles || data || []);
+    } catch {
+      setProfiles([]);
+    } finally {
+      setLoading(false); setRefreshing(false);
+    }
+  }, [ctFilter, search]);
+
+  useEffect(() => { fetchProfiles(); }, [ctFilter]);
+
+  useEffect(() => {
+    socket.on('user_list', users => {
+      const map = {};
+      users.forEach(u => { if (u.userId) map[u.userId] = true; });
+      setOnline(map);
+    });
+    if (socket.connected) socket.emit('get_users');
+    else socket.once('connect', () => socket.emit('get_users'));
+    return () => socket.off('user_list');
+  }, []);
+
+  function ghostColor(s) {
+    if (!s) return '#555';
+    if (s >= 4.5) return '#ffd700';
+    if (s >= 3.5) return '#57f287';
+    if (s >= 2.5) return '#57c4ff';
+    return '#fee75c';
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Search */}
+      <View style={pe.searchWrap}>
+        <Text style={pe.searchIcon}>🔍</Text>
+        <TextInput
+          style={pe.searchInput}
+          placeholder="Search by name or city…"
+          placeholderTextColor="#444"
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          onSubmitEditing={() => fetchProfiles()}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => { setSearch(''); fetchProfiles(); }}>
+            <Text style={pe.searchClear}>✕</Text>
           </TouchableOpacity>
-        ))
+        )}
+      </View>
+
+      {/* CT Filters */}
+      <FlatList
+        data={CT_FILTERS}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={f => String(f.id)}
+        contentContainerStyle={pe.filtersRow}
+        renderItem={({ item: f }) => {
+          const meta   = f.id ? CT_META[f.id] : null;
+          const active = ctFilter === f.id;
+          return (
+            <TouchableOpacity
+              style={[
+                pe.chip,
+                active && meta  && { backgroundColor: meta.color + '20', borderColor: meta.color + '55' },
+                active && !meta && { backgroundColor: '#5865f220', borderColor: '#5865f255' },
+              ]}
+              onPress={() => setCtFilter(f.id)}
+            >
+              <Text style={{ fontSize: 13 }}>{f.emoji}</Text>
+              <Text style={[pe.chipText, active && { color: meta ? meta.color : '#5865f2' }]}>{f.label}</Text>
+            </TouchableOpacity>
+          );
+        }}
+        style={{ flexGrow: 0, marginBottom: 4 }}
+      />
+
+      {loading ? (
+        <View style={pe.loading}>
+          <ActivityIndicator color="#5865f2" />
+          <Text style={pe.loadingText}>Loading people…</Text>
+        </View>
+      ) : profiles.length === 0 ? (
+        <View style={pe.loading}>
+          <Text style={{ fontSize: 48 }}>🌍</Text>
+          <Text style={pe.emptyTitle}>No profiles found</Text>
+          <Text style={pe.emptySub}>Try a different filter or check back later</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={profiles}
+          keyExtractor={p => String(p.user_id)}
+          contentContainerStyle={pe.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} tintColor="#5865f2" />}
+          renderItem={({ item: p }) => {
+            const isOnline = online[p.user_id];
+            const cts      = p.connection_types || [];
+            return (
+              <TouchableOpacity
+                style={pe.card}
+                onPress={() => navigation.navigate('Profile', {
+                  profileUser: { userId: p.user_id, username: p.display_name, photo_url: p.photo_url, country: p.country, language: p.language },
+                  bondUserId: p.user_id,
+                })}
+                activeOpacity={0.85}
+              >
+                <View style={{ position: 'relative' }}>
+                  <Avatar photo_url={p.photo_url} name={p.display_name} size={58} />
+                  {isOnline && <View style={pe.onlineDot} />}
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={pe.nameRow}>
+                    <Text style={pe.name}>{p.display_name}</Text>
+                    {p.age ? <Text style={pe.age}>{p.age}</Text> : null}
+                    {p.ghost_score != null && (
+                      <View style={[pe.ghostPill, { backgroundColor: ghostColor(p.ghost_score) + '20', borderColor: ghostColor(p.ghost_score) + '55' }]}>
+                        <Text style={[pe.ghostText, { color: ghostColor(p.ghost_score) }]}>⭐ {Number(p.ghost_score).toFixed(1)}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={pe.location}>
+                    {[LANG_FLAGS[p.language] || '🌐', p.city, p.country].filter(Boolean).join('  ')}
+                  </Text>
+                  {cts.length > 0 && (
+                    <View style={pe.ctRow}>
+                      {cts.slice(0, 3).map(ct => {
+                        const m = CT_META[ct];
+                        if (!m) return null;
+                        return (
+                          <View key={ct} style={[pe.ctPill, { backgroundColor: m.color + '18', borderColor: m.color + '40' }]}>
+                            <Text style={{ fontSize: 10 }}>{m.emoji}</Text>
+                            <Text style={[pe.ctText, { color: m.color }]}>{m.label}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+                <Text style={pe.arrow}>›</Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
       )}
     </View>
   );
 }
+const pe = StyleSheet.create({
+  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, marginBottom: 8, backgroundColor: '#12122a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#1e1e38' },
+  searchIcon:  { fontSize: 16 },
+  searchInput: { flex: 1, color: '#fff', fontSize: 15 },
+  searchClear: { color: '#444', fontSize: 15, paddingHorizontal: 4 },
+  filtersRow:  { paddingHorizontal: 20, gap: 8 },
+  chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
+  chipText:    { color: '#555', fontSize: 12, fontWeight: '700' },
+  loading:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { color: '#555', fontSize: 14 },
+  emptyTitle:  { color: '#fff', fontSize: 17, fontWeight: '700' },
+  emptySub:    { color: '#555', fontSize: 13, textAlign: 'center' },
+  list:        { padding: 16, gap: 10, paddingBottom: 60 },
+  card:        { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#12122a', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#1e1e38' },
+  onlineDot:   { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#0a0a18' },
+  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  name:        { color: '#fff', fontSize: 16, fontWeight: '800' },
+  age:         { color: '#555', fontSize: 14 },
+  ghostPill:   { borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1 },
+  ghostText:   { fontSize: 10, fontWeight: '800' },
+  location:    { color: '#555', fontSize: 12 },
+  ctRow:       { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
+  ctPill:      { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1 },
+  ctText:      { fontSize: 10, fontWeight: '700' },
+  arrow:       { color: '#333', fontSize: 22, fontWeight: '300' },
+});
 
-// ─── MAIN DISCOVER SCREEN ────────────────────────────────────────────────────
-
+// ─── Main screen ──────────────────────────────────────────────────────────────
 export default function DiscoverScreen({ navigation, user }) {
-  const [tab, setTab] = useState('icebreaker');
+  const [activeTab, setActiveTab] = useState('icebreaker');
+  const indicatorX = useRef(new Animated.Value(0)).current;
+  const headerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+  }, []);
+
+  function switchTab(id) {
+    const idx = TABS.findIndex(t => t.id === id);
+    Animated.spring(indicatorX, { toValue: idx * TAB_W, friction: 8, tension: 60, useNativeDriver: true }).start();
+    setActiveTab(id);
+  }
+
+  const headerSlide = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] });
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Discover 🔍</Text>
-        <Text style={styles.subtitle}>New ways to connect with the world</Text>
-      </View>
-
-      <View style={styles.tabs}>
-        {[
-          { id: 'icebreaker', label: '💡 Icebreaker' },
-          { id: 'random', label: '🌀 Random' },
-          { id: 'language', label: '🗣️ Language' },
-        ].map(t => (
-          <TouchableOpacity
-            key={t.id}
-            style={[styles.tab, tab === t.id && styles.tabActive]}
-            onPress={() => setTab(t.id)}
-          >
-            <Text style={[styles.tabText, tab === t.id && styles.tabTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {tab === 'icebreaker' && (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <IcebreakerSection user={user} />
-        </ScrollView>
-      )}
-      {tab === 'random' && (
-        <View style={{ flex: 1 }}>
-          <RandomConnectSection user={user} navigation={navigation} />
+      {/* ── Header ── */}
+      <Animated.View style={[styles.header, { opacity: headerAnim, transform: [{ translateY: headerSlide }] }]}>
+        <View>
+          <Text style={styles.title}>Discover</Text>
+          <Text style={styles.subtitle}>New ways to connect with the world</Text>
         </View>
-      )}
-      {tab === 'language' && (
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <LanguageExchangeSection user={user} navigation={navigation} />
-        </ScrollView>
-      )}
+      </Animated.View>
+
+      {/* ── Tab bar ── */}
+      <View style={styles.tabBar}>
+        {TABS.map(t => {
+          const active = activeTab === t.id;
+          return (
+            <TouchableOpacity
+              key={t.id}
+              style={styles.tabItem}
+              onPress={() => switchTab(t.id)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.tabIcon}>{t.icon}</Text>
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        <Animated.View style={[styles.tabIndicator, { transform: [{ translateX: indicatorX }], width: TAB_W }]} />
+      </View>
+
+      {/* ── Content ── */}
+      {activeTab === 'icebreaker' && <IcebreakerTab user={user} />}
+      {activeTab === 'random'     && <RandomTab user={user} navigation={navigation} />}
+      {activeTab === 'language'   && <LanguageTab user={user} navigation={navigation} />}
+      {activeTab === 'people'     && <PeopleTab user={user} navigation={navigation} />}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f1a' },
-  header: { padding: 20, paddingBottom: 8 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#fff' },
-  subtitle: { color: '#888', fontSize: 13, marginTop: 3 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#6c63ff' },
-  tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#6c63ff' },
-  scroll: { padding: 16, gap: 20, paddingBottom: 40 },
-  section: { gap: 12 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sectionIcon: { fontSize: 28 },
-  sectionTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  sectionSub: { color: '#888', fontSize: 12, marginTop: 2 },
-  questionCard: {
-    backgroundColor: '#1a1a3e', borderRadius: 16, padding: 18,
-    borderWidth: 1, borderColor: '#6c63ff44',
-  },
-  questionText: { color: '#fff', fontSize: 16, lineHeight: 24, fontStyle: 'italic' },
-  answerBox: { gap: 10 },
-  answerInput: {
-    backgroundColor: '#1a1a2e', color: '#fff', borderRadius: 12,
-    padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top',
-    borderWidth: 1, borderColor: '#2a2a4a',
-  },
-  submitBtn: { backgroundColor: '#6c63ff', borderRadius: 12, padding: 14, alignItems: 'center' },
-  submitBtnDisabled: { backgroundColor: '#333' },
-  submitBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  submittedBanner: { backgroundColor: '#1a3a1a', borderRadius: 12, padding: 12 },
-  submittedText: { color: '#4caf50', fontSize: 13, fontWeight: '600' },
-  responseCard: {
-    backgroundColor: '#1a1a2e', borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#2a2a4a', gap: 8,
-  },
-  responseHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  responseFlag: { fontSize: 20 },
-  responseName: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  responseCountry: { color: '#888', fontSize: 11 },
-  responseText: { color: '#ccc', fontSize: 14, lineHeight: 20 },
-  lockedMore: { backgroundColor: '#1a1a2e', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: '#6c63ff44' },
-  lockedMoreText: { color: '#6c63ff', fontSize: 13, textAlign: 'center' },
-  randomCard: {
-    backgroundColor: '#1a1a2e', borderRadius: 20, padding: 24,
-    alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#2a2a4a',
-  },
-  randomCardTitle: { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  randomCardSub: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  connectBtn: { backgroundColor: '#6c63ff', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14 },
-  connectBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  cancelBtn: { backgroundColor: '#333', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14 },
-  cancelBtnText: { color: '#fff', fontSize: 15 },
-  randomConnectedHeader: {
-    flexDirection: 'row', alignItems: 'center', padding: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a2e', gap: 10, margin: 16, marginBottom: 0,
-    backgroundColor: '#1a1a2e', borderRadius: 14,
-  },
-  randomMatchAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6c63ff', alignItems: 'center', justifyContent: 'center' },
-  randomMatchAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  randomMatchName: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  randomMatchCountry: { color: '#888', fontSize: 12 },
-  disconnectBtn: { backgroundColor: '#e53935', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  disconnectBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  randomChatBox: { flex: 1, marginTop: 10 },
-  randomChatEmpty: { color: '#888', textAlign: 'center', paddingTop: 30, fontSize: 15 },
-  rndRow: { flexDirection: 'row', marginBottom: 6 },
-  rndRowRight: { justifyContent: 'flex-end' },
-  rndBubble: { maxWidth: '75%', borderRadius: 14, padding: 10 },
-  rndBubbleMine: { backgroundColor: '#6c63ff' },
-  rndBubbleOther: { backgroundColor: '#1a1a2e' },
-  rndText: { color: '#fff', fontSize: 14 },
-  translatedTag: { color: 'rgba(255,255,255,0.5)', fontSize: 9, marginTop: 3 },
-  rndInputRow: { flexDirection: 'row', padding: 12, gap: 8, borderTopWidth: 1, borderTopColor: '#1a1a2e' },
-  rndInput: { flex: 1, backgroundColor: '#1a1a2e', color: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14 },
-  rndSendBtn: { backgroundColor: '#6c63ff', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  rndSendBtnOff: { backgroundColor: '#333' },
-  rndSendText: { color: '#fff', fontSize: 18 },
-  proGate: { backgroundColor: '#2a1a0e', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#f59e0b44' },
-  proGateText: { color: '#f59e0b', fontSize: 13, textAlign: 'center' },
-  noMatchText: { color: '#888', fontSize: 14, textAlign: 'center', paddingTop: 20 },
-  langCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#2a2a4a', gap: 12 },
-  langAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#6c63ff', alignItems: 'center', justifyContent: 'center' },
-  langAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  langName: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  langDetail: { color: '#888', fontSize: 12, marginTop: 2 },
-  langExchangeBadge: { backgroundColor: '#6c63ff22', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  langExchangeText: { color: '#6c63ff', fontSize: 11, fontWeight: '700' },
+  container:     { flex: 1, backgroundColor: '#0a0a18' },
+
+  header:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
+  title:         { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  subtitle:      { color: '#444', fontSize: 13, marginTop: 3 },
+
+  tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1e1e38', position: 'relative' },
+  tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 3 },
+  tabIcon:       { fontSize: 18 },
+  tabLabel:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  tabLabelActive:{ color: '#5865f2' },
+  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#5865f2', borderRadius: 2 },
 });

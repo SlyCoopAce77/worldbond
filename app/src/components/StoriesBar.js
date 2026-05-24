@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   ring: {
     width: BUBBLE + 4, height: BUBBLE + 4, borderRadius: (BUBBLE + 4) / 2,
     padding: 2,
-    borderWidth: 2, borderColor: '#6c63ff',
+    borderWidth: 2, borderColor: '#5865f2',
   },
   addRing: { borderColor: '#333', borderStyle: 'dashed' },
   ownRing: { borderColor: '#e91e63' },
@@ -69,6 +69,6 @@ const styles = StyleSheet.create({
   },
   avatarImg: { width: '100%', height: '100%' },
   avatarEmoji: { fontSize: 26 },
-  plus: { fontSize: 28, color: '#6c63ff' },
+  plus: { fontSize: 28, color: '#5865f2' },
   name: { color: '#aaa', fontSize: 10, maxWidth: BUBBLE + 4, textAlign: 'center' },
 });

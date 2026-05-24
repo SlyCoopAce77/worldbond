@@ -21,8 +21,12 @@ export default function PlaceDetailScreen({ route, navigation }) {
   const socket = getSocket();
 
   useEffect(() => {
-    socket.emit('get_place_checkins', { placeId: place.id });
-    socket.emit('get_reviews', { placeId: place.id });
+    function fetchPlaceData() {
+      socket.emit('get_place_checkins', { placeId: place.id });
+      socket.emit('get_reviews', { placeId: place.id });
+    }
+    if (socket.connected) fetchPlaceData();
+    else socket.once('connect', fetchPlaceData);
 
     socket.on('place_checkins', ({ placeId, checkins: c }) => {
       if (placeId === place.id) setCheckins(c);
@@ -360,7 +364,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1a1a2e', gap: 10,
   },
   backBtn: { padding: 6 },
-  backText: { color: '#6c63ff', fontSize: 22 },
+  backText: { color: '#5865f2', fontSize: 22 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIcon: { fontSize: 28 },
   headerName: { color: '#fff', fontSize: 15, fontWeight: '700', maxWidth: 160 },
@@ -369,7 +373,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e', borderRadius: 20, paddingHorizontal: 12,
     paddingVertical: 7, borderWidth: 1, borderColor: '#2a2a4a',
   },
-  checkinBtnActive: { backgroundColor: '#6c63ff', borderColor: '#6c63ff' },
+  checkinBtnActive: { backgroundColor: '#5865f2', borderColor: '#5865f2' },
   checkinBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   liveBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20,
@@ -379,9 +383,9 @@ const styles = StyleSheet.create({
   liveText: { color: '#4caf50', fontSize: 13, fontWeight: '600' },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#6c63ff' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: '#5865f2' },
   tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#6c63ff' },
+  tabTextActive: { color: '#5865f2' },
   infoScroll: { padding: 20, gap: 16 },
   infoCard: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2a2a4a' },
   infoDesc: { color: '#ccc', fontSize: 15, lineHeight: 22 },
@@ -391,10 +395,10 @@ const styles = StyleSheet.create({
   infoItemValue: { color: '#fff', fontSize: 14, fontWeight: '600' },
   infoSectionLabel: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { backgroundColor: '#6c63ff22', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  tagText: { color: '#6c63ff', fontSize: 13 },
+  tag: { backgroundColor: '#5865f222', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { color: '#5865f2', fontSize: 13 },
   bigCheckinBtn: {
-    backgroundColor: '#6c63ff', borderRadius: 14, padding: 16,
+    backgroundColor: '#5865f2', borderRadius: 14, padding: 16,
     alignItems: 'center', marginTop: 8,
   },
   bigCheckinBtnActive: { backgroundColor: '#333' },
@@ -406,7 +410,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2a2a4a',
   },
   lockedText: { color: '#aaa', fontSize: 13, flex: 1 },
-  lockedBtn: { backgroundColor: '#6c63ff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
+  lockedBtn: { backgroundColor: '#5865f2', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
   lockedBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   messageList: { padding: 14, gap: 10, flexGrow: 1 },
   emptyChatWrap: { flex: 1, alignItems: 'center', paddingTop: 60, gap: 10 },
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   avatarText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 12 },
-  bubbleMine: { backgroundColor: '#6c63ff', borderBottomRightRadius: 4 },
+  bubbleMine: { backgroundColor: '#5865f2', borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: '#1a1a2e', borderBottomLeftRadius: 4 },
   senderRow: { flexDirection: 'row', gap: 6, marginBottom: 4, alignItems: 'center' },
   senderName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
@@ -434,7 +438,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#1a1a2e', color: '#fff', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100,
   },
-  sendBtn: { backgroundColor: '#6c63ff', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: '#5865f2', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 18 },
   peopleList: { padding: 16, gap: 10 },
@@ -450,8 +454,8 @@ const styles = StyleSheet.create({
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { color: '#fff', fontSize: 15, fontWeight: '600' },
   personCountry: { color: '#888', fontSize: 12, marginTop: 2 },
-  personLang: { backgroundColor: '#6c63ff33', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  personLangText: { color: '#6c63ff', fontSize: 12, fontWeight: '700' },
+  personLang: { backgroundColor: '#5865f233', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  personLangText: { color: '#5865f2', fontSize: 12, fontWeight: '700' },
 
   // Rating strip
   ratingStrip: {
@@ -479,7 +483,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2a2a4a',
   },
   submitReviewBtn: {
-    backgroundColor: '#6c63ff', borderRadius: 12, padding: 14, alignItems: 'center',
+    backgroundColor: '#5865f2', borderRadius: 12, padding: 14, alignItems: 'center',
   },
   submitReviewBtnDisabled: { backgroundColor: '#333' },
   submitReviewBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
