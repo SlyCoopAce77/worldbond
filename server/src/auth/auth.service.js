@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database/db');
@@ -78,4 +79,50 @@ async function logout(refreshToken) {
   await query('DELETE FROM refresh_tokens WHERE token = $1', [refreshToken]);
 }
 
-module.exports = { register, login, refreshAccess, logout };
+async function forgotPassword({ email }) {
+  const { rows } = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+  if (!rows.length) return; // silently succeed — don't reveal whether email exists
+
+  const userId = rows[0].id;
+  const code   = String(Math.floor(100000 + Math.random() * 900000));
+  const hash   = crypto.createHash('sha256').update(code).digest('hex');
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+  await query(
+    'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+    [userId, hash, expiresAt]
+  );
+
+  const { sendPasswordReset } = require('../email');
+  await sendPasswordReset(email.toLowerCase(), code);
+}
+
+async function resetPassword({ email, code, newPassword }) {
+  if (!email || !code || !newPassword)
+    throw Object.assign(new Error('All fields required'), { status: 400 });
+  if (newPassword.length < 8)
+    throw Object.assign(new Error('Password must be at least 8 characters'), { status: 400 });
+
+  const userRes = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+  if (!userRes.rows.length)
+    throw Object.assign(new Error('Invalid or expired code'), { status: 400 });
+
+  const userId  = userRes.rows[0].id;
+  const hash    = crypto.createHash('sha256').update(code.trim()).digest('hex');
+
+  const tokenRes = await query(
+    `SELECT id FROM password_reset_tokens
+     WHERE user_id = $1 AND token_hash = $2 AND expires_at > NOW() AND used = FALSE`,
+    [userId, hash]
+  );
+  if (!tokenRes.rows.length)
+    throw Object.assign(new Error('Invalid or expired code'), { status: 400 });
+
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, userId]);
+  await query('UPDATE password_reset_tokens SET used = TRUE WHERE id = $1', [tokenRes.rows[0].id]);
+  await query('DELETE FROM refresh_tokens WHERE user_id = $1', [userId]);
+}
+
+module.exports = { register, login, refreshAccess, logout, forgotPassword, resetPassword };

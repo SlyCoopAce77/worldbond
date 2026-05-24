@@ -3,22 +3,27 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import axios from 'axios';
 import { SERVER_URL } from '../services/socket';
 import { finalizeProfile } from '../services/authApi';
-import LandingScreen    from './Auth/LandingScreen';
-import LoginScreen      from './Auth/LoginScreen';
-import RegisterScreen   from './Auth/RegisterScreen';
-import OnboardingScreen from './Auth/OnboardingScreen';
+import LandingScreen         from './Auth/LandingScreen';
+import LoginScreen           from './Auth/LoginScreen';
+import RegisterScreen        from './Auth/RegisterScreen';
+import OnboardingScreen      from './Auth/OnboardingScreen';
+import ForgotPasswordScreen  from './Auth/ForgotPasswordScreen';
+import ResetPasswordScreen   from './Auth/ResetPasswordScreen';
 
 const SCREENS = {
-  LANDING:    'landing',
-  LOGIN:      'login',
-  REGISTER:   'register',
-  ONBOARDING: 'onboarding',
-  LOADING:    'loading',
+  LANDING:        'landing',
+  LOGIN:          'login',
+  REGISTER:       'register',
+  ONBOARDING:     'onboarding',
+  LOADING:        'loading',
+  FORGOT_PASSWORD:'forgot_password',
+  RESET_PASSWORD: 'reset_password',
 };
 
 export default function AuthScreen({ onLogin }) {
-  const [screen, setScreen] = useState(SCREENS.LANDING);
-  const [userId, setUserId] = useState(null);
+  const [screen,       setScreen]       = useState(SCREENS.LANDING);
+  const [userId,       setUserId]       = useState(null);
+  const [resetEmail,   setResetEmail]   = useState('');
 
   async function handleLoginSuccess({ userId: id, access }) {
     setUserId(id);
@@ -78,8 +83,26 @@ export default function AuthScreen({ onLogin }) {
       return (
         <LoginScreen
           onSuccess={handleLoginSuccess}
-          onBack={()        => setScreen(SCREENS.LANDING)}
+          onBack={()            => setScreen(SCREENS.LANDING)}
           onGoRegister={() => setScreen(SCREENS.REGISTER)}
+          onForgotPassword={() => setScreen(SCREENS.FORGOT_PASSWORD)}
+        />
+      );
+
+    case SCREENS.FORGOT_PASSWORD:
+      return (
+        <ForgotPasswordScreen
+          onBack={() => setScreen(SCREENS.LOGIN)}
+          onCodeSent={email => { setResetEmail(email); setScreen(SCREENS.RESET_PASSWORD); }}
+        />
+      );
+
+    case SCREENS.RESET_PASSWORD:
+      return (
+        <ResetPasswordScreen
+          email={resetEmail}
+          onBack={() => setScreen(SCREENS.FORGOT_PASSWORD)}
+          onSuccess={() => setScreen(SCREENS.LOGIN)}
         />
       );
 

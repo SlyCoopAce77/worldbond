@@ -7,7 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { login } from '../../services/authApi';
 
-export default function LoginScreen({ onSuccess, onBack, onGoRegister }) {
+export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotPassword }) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -94,7 +94,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister }) {
               <View style={styles.fieldGroup}>
                 <View style={styles.labelRow}>
                   <Text style={styles.label}>Password</Text>
-                  <TouchableOpacity>
+                  <TouchableOpacity onPress={onForgotPassword}>
                     <Text style={styles.forgotLink}>Forgot?</Text>
                   </TouchableOpacity>
                 </View>
