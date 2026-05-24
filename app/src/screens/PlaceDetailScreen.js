@@ -17,8 +17,9 @@ export default function PlaceDetailScreen({ route, navigation }) {
   const [myRating, setMyRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-  const flatRef = useRef(null);
-  const socket = getSocket();
+  const flatRef      = useRef(null);
+  const checkedInRef = useRef(false);
+  const socket       = getSocket();
 
   useEffect(() => {
     function fetchPlaceData() {
@@ -42,7 +43,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
     });
 
     return () => {
-      if (checkedIn) socket.emit('checkout_place', { placeId: place.id });
+      if (checkedInRef.current) socket.emit('checkout_place', { placeId: place.id });
       socket.off('place_checkins');
       socket.off('place_reviews');
       socket.off('place_history');
@@ -60,9 +61,11 @@ export default function PlaceDetailScreen({ route, navigation }) {
     if (checkedIn) {
       socket.emit('checkout_place', { placeId: place.id });
       setCheckedIn(false);
+      checkedInRef.current = false;
     } else {
       socket.emit('checkin_place', { placeId: place.id });
       setCheckedIn(true);
+      checkedInRef.current = true;
       setTab('chat');
     }
   }
@@ -87,7 +90,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
       <View style={[styles.messageRow, isMine && styles.messageRowRight]}>
         {!isMine && (
           <View style={[styles.avatar, { backgroundColor: stringToColor(item.senderName) }]}>
-            <Text style={styles.avatarText}>{item.senderName[0].toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{(item.senderName?.[0] ?? '?').toUpperCase()}</Text>
           </View>
         )}
         <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>

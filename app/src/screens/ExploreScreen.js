@@ -324,7 +324,7 @@ export default function ExploreScreen({ navigation, user }) {
     return (
       <SafeAreaView style={styles.container}>
         <Animated.View style={[styles.header, headerAnim]}>
-          <Breadcrumb country={selCountry} onCountry={goToCountries} onCity={() => {}} />
+          <Breadcrumb country={selCountry} onCountry={goToCountries} onCity={null} />
           <Text style={styles.title}>{selCountry?.split(' ').slice(1).join(' ')}</Text>
           <Text style={styles.subtitle}>Choose a city to explore</Text>
         </Animated.View>

@@ -328,8 +328,9 @@ function EventChatModal({ visible, event, onClose, user }) {
   const [messages, setMessages] = useState([]);
   const [text,     setText]     = useState('');
   const [joined,   setJoined]   = useState(false);
-  const flatRef = useRef(null);
-  const socket  = getSocket();
+  const joinedRef = useRef(false);
+  const flatRef   = useRef(null);
+  const socket    = getSocket();
   const meta    = event ? (TYPE_META[event.type] || TYPE_META.just_chill) : TYPE_META.just_chill;
 
   useEffect(() => {
@@ -337,10 +338,12 @@ function EventChatModal({ visible, event, onClose, user }) {
     if (socket.connected) socket.emit('join_event', { eventId: event.id });
     else socket.once('connect', () => socket.emit('join_event', { eventId: event.id }));
     setJoined(true);
+    joinedRef.current = true;
     socket.on('event_history', ({ messages: hist }) => setMessages(hist || []));
     socket.on('event_message', msg => setMessages(prev => [...prev, msg]));
     return () => {
-      if (joined) socket.emit('leave_event', { eventId: event?.id });
+      if (joinedRef.current) socket.emit('leave_event', { eventId: event?.id });
+      joinedRef.current = false;
       socket.off('event_history');
       socket.off('event_message');
     };

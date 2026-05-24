@@ -78,7 +78,9 @@ function computeScore(p1, p2, exps1, exps2) {
   };
 
   // Activity recency multiplier (0.8–1.0)
-  const daysSinceActive = (Date.now() - new Date(p2.last_active).getTime()) / (1000 * 60 * 60 * 24);
+  const daysSinceActive = p2.last_active
+    ? (Date.now() - new Date(p2.last_active).getTime()) / (1000 * 60 * 60 * 24)
+    : 999;
   const activityMult = daysSinceActive < 1 ? 1.0 : daysSinceActive < 7 ? 0.95 : 0.85;
 
   const raw = Object.entries(WEIGHTS).reduce((sum, [k, w]) => sum + w * breakdown[k], 0);
@@ -181,8 +183,8 @@ async function createMatch(userId, targetUserId, connectionType, experienceId) {
   if (rows[0]) {
     // Seed interaction tracking for both users
     await query(`
-      INSERT INTO interaction_tracking (user_id, match_id) VALUES ($1,$2),($3,$2)
-    `, [u1, rows[0].id, u2]);
+      INSERT INTO interaction_tracking (user_id, match_id) VALUES ($1,$2),($3,$4)
+    `, [u1, rows[0].id, u2, rows[0].id]);
   }
   return rows[0] || null;
 }

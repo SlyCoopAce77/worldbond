@@ -284,7 +284,7 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds }
       {/* Header */}
       <TouchableOpacity style={styles.photoHeader} onPress={() => onProfile(photo)}>
         <View style={[styles.photoAvatar, { backgroundColor: stringToColor(photo.username) }]}>
-          <Text style={styles.photoAvatarText}>{photo.username[0].toUpperCase()}</Text>
+          <Text style={styles.photoAvatarText}>{(photo.username?.[0] ?? '?').toUpperCase()}</Text>
           {photo.mood && <Text style={styles.photoMoodBubble}>{photo.mood}</Text>}
         </View>
         <View style={styles.photoHeaderInfo}>

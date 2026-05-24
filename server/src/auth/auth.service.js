@@ -95,7 +95,11 @@ async function forgotPassword({ email }) {
   );
 
   const { sendPasswordReset } = require('../email');
-  await sendPasswordReset(email.toLowerCase(), code);
+  try {
+    await sendPasswordReset(email.toLowerCase(), code);
+  } catch (emailErr) {
+    console.error('[auth] Password reset email failed:', emailErr.message);
+  }
 }
 
 async function resetPassword({ email, code, newPassword }) {

@@ -34,6 +34,7 @@ const TABS = [
   { name: 'Home',     icon: '🌍', label: 'Home' },
   { name: 'Discover', icon: '🔍', label: 'Discover' },
   { name: 'Groups',   icon: '💬', label: 'Chats' },
+  { name: 'Photos',   icon: '📸', label: 'Photos' },
   { name: 'Explore',  icon: '✈️', label: 'Explore' },
   { name: 'Me',       icon: '👤', label: 'Me' },
 ];
