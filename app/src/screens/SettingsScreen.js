@@ -252,7 +252,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
           <NavRow
             icon="🔑"
             label="Change Password"
-            onPress={() => Alert.alert('Change Password', 'Password reset email will be sent to ' + email + '.')}
+            onPress={() => navigation.navigate('ChangePassword', { email: profile?.email || '' })}
           />
           <Divider />
           <NavRow
@@ -386,7 +386,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
           <NavRow
             icon="❓"
             label="Help Center"
-            onPress={() => Linking.openURL('https://bond.app/help')}
+            onPress={() => Linking.openURL('mailto:support@bond.app?subject=Help')}
           />
           <Divider />
           <NavRow
@@ -398,13 +398,13 @@ export default function SettingsScreen({ navigation, onLogout }) {
           <NavRow
             icon="📄"
             label="Terms of Service"
-            onPress={() => Linking.openURL('https://bond.app/terms')}
+            onPress={() => navigation.navigate('Legal', { type: 'terms' })}
           />
           <Divider />
           <NavRow
             icon="🔒"
             label="Privacy Policy"
-            onPress={() => Linking.openURL('https://bond.app/privacy')}
+            onPress={() => navigation.navigate('Legal', { type: 'privacy' })}
           />
           <Divider />
           <NavRow

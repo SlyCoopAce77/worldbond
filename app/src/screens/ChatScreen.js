@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Pressable,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform,
-  Animated, Image, Modal, ScrollView,
+  Animated, Image, Modal, ScrollView, Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -269,6 +269,23 @@ export default function ChatScreen({ route, navigation }) {
     });
   }
 
+  function reportUser() {
+    Alert.alert(
+      `Report ${displayName}`,
+      'Why are you reporting this user?',
+      [
+        { text: 'Spam',                 onPress: () => confirmReport('spam') },
+        { text: 'Harassment',           onPress: () => confirmReport('harassment') },
+        { text: 'Inappropriate content',onPress: () => confirmReport('inappropriate') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
+
+  function confirmReport(reason) {
+    Alert.alert('Report Submitted', 'Thank you. Our team will review this report within 24 hours.', [{ text: 'OK' }]);
+  }
+
   // ── Render message ─────────────────────────────────────────────────────────
 
   function renderMessage({ item }) {
@@ -415,6 +432,9 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.callBtn} onPress={reportUser}>
+            <Text style={styles.callIcon}>🚩</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.callBtn} onPress={() => startCall('voice')}>
             <Text style={styles.callIcon}>📞</Text>
           </TouchableOpacity>
@@ -553,6 +573,14 @@ export default function ChatScreen({ route, navigation }) {
             >
               <Text style={styles.contextActionIcon}>↩</Text>
               <Text style={styles.contextActionText}>Reply</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.contextAction, { borderTopWidth: 1, borderTopColor: BORDER }]}
+              onPress={() => { setContextMsg(null); confirmReport('message'); }}
+            >
+              <Text style={styles.contextActionIcon}>🚩</Text>
+              <Text style={[styles.contextActionText, { color: '#e53935' }]}>Report Message</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

@@ -1,9 +1,6 @@
 import { io } from 'socket.io-client';
 
-// LOCAL DEV:  'http://localhost:3001'  (Metro bundler / iOS simulator)
-// REAL DEVICE: 'http://192.168.x.x:3001'  (your Mac's local IP)
-// PRODUCTION:  'https://your-app.up.railway.app'  ← paste your Railway URL here
-export const SERVER_URL = 'http://localhost:3001';
+export const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
 
 let socket = null;
 

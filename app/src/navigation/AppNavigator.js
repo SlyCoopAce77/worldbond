@@ -26,6 +26,8 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LiveScreen from '../screens/LiveScreen';
 import LiveWatchScreen from '../screens/LiveWatchScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import LegalScreen from '../screens/LegalScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -149,6 +151,10 @@ export default function AppNavigator({ user, onLogout }) {
         {/* Live */}
         <Stack.Screen name="Live"      component={LiveScreen}      options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="LiveWatch" component={LiveWatchScreen} options={{ presentation: 'fullScreenModal' }} />
+
+        {/* Settings sub-screens */}
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        <Stack.Screen name="Legal"          component={LegalScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

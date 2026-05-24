@@ -8,6 +8,9 @@ import { usePremium, TIERS } from '../context/PremiumContext';
 
 const { width } = Dimensions.get('window');
 
+// Set to false when real StoreKit IAP is integrated
+const IS_BETA = true;
+
 const FEATURES = {
   free: [
     { label: 'Direct messaging + translation', has: true },
@@ -60,11 +63,13 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
 
   const monthlyPrice = isFree ? 0 : parseFloat(t.price.replace('$', '').replace('/mo', ''));
   const displayPrice = isFree
-    ? '$0'
+    ? 'Free'
+    : IS_BETA
+    ? 'Free during beta'
     : billing === 'yearly'
     ? `$${(monthlyPrice * (1 - YEARLY_DISCOUNT)).toFixed(2)}/mo`
     : t.price;
-  const yearlyTotal = isFree ? null : billing === 'yearly'
+  const yearlyTotal = (isFree || IS_BETA) ? null : billing === 'yearly'
     ? `$${(monthlyPrice * (1 - YEARLY_DISCOUNT) * 12).toFixed(0)}/yr`
     : null;
 
@@ -80,6 +85,8 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
     ? 'Current Plan'
     : isFree
     ? 'Downgrade to Free'
+    : IS_BETA
+    ? `Activate ${t.label.replace('WorldBond ', 'Bond ')} Free`
     : `Get ${t.label.replace('WorldBond ', '')}`;
 
   return (
@@ -255,31 +262,39 @@ export default function SubscriptionScreen({ navigation }) {
           </LinearGradient>
         </Animated.View>
 
-        {/* Billing Toggle */}
-        <View style={styles.toggleWrap}>
-          <TouchableOpacity onPress={() => toggleBilling('monthly')} style={styles.toggleLabel}>
-            <Text style={[styles.toggleText, billing === 'monthly' && styles.toggleTextActive]}>
-              Monthly
-            </Text>
-          </TouchableOpacity>
+        {/* Billing Toggle (hidden during beta) */}
+        {!IS_BETA && (
+          <View style={styles.toggleWrap}>
+            <TouchableOpacity onPress={() => toggleBilling('monthly')} style={styles.toggleLabel}>
+              <Text style={[styles.toggleText, billing === 'monthly' && styles.toggleTextActive]}>
+                Monthly
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.toggleTrack}
-            onPress={() => toggleBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
-            activeOpacity={0.8}
-          >
-            <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: toggleKnobX }] }]} />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.toggleTrack}
+              onPress={() => toggleBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
+              activeOpacity={0.8}
+            >
+              <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: toggleKnobX }] }]} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => toggleBilling('yearly')} style={styles.toggleLabel}>
-            <Text style={[styles.toggleText, billing === 'yearly' && styles.toggleTextActive]}>
-              Yearly
-            </Text>
-            <View style={styles.savePill}>
-              <Text style={styles.savePillText}>-35%</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity onPress={() => toggleBilling('yearly')} style={styles.toggleLabel}>
+              <Text style={[styles.toggleText, billing === 'yearly' && styles.toggleTextActive]}>
+                Yearly
+              </Text>
+              <View style={styles.savePill}>
+                <Text style={styles.savePillText}>-35%</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {IS_BETA && (
+          <View style={styles.betaBanner}>
+            <Text style={styles.betaBannerText}>All features are free during beta!</Text>
+          </View>
+        )}
 
         {/* Cards */}
         {['free', 'plus', 'pro'].map((tierId, i) => (
@@ -296,8 +311,10 @@ export default function SubscriptionScreen({ navigation }) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerLine}>🔒  Payments secured by App Store / Google Play</Text>
-          <Text style={styles.footerLine}>Cancel anytime · No hidden fees</Text>
+          {IS_BETA
+            ? <Text style={styles.footerLine}>Free during beta · Subscription pricing coming soon</Text>
+            : <Text style={styles.footerLine}>🔒  Payments secured by App Store · Cancel anytime</Text>
+          }
           <Text style={styles.footerBrand}>Bond — connecting humanity, one conversation at a time 🌍</Text>
         </View>
 
@@ -393,6 +410,13 @@ const styles = StyleSheet.create({
     borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
   },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+
+  betaBanner: {
+    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#5865f218',
+    borderWidth: 1, borderColor: '#5865f240', borderRadius: 14,
+    paddingVertical: 10, alignItems: 'center',
+  },
+  betaBannerText: { color: '#5865f2', fontSize: 13, fontWeight: '700' },
 
   footer: { alignItems: 'center', gap: 6, paddingHorizontal: 24, marginTop: 8 },
   footerLine: { color: '#444', fontSize: 12, textAlign: 'center' },
