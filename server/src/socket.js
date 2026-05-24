@@ -23,6 +23,7 @@ if (process.env.DATABASE_URL) {
 const connectedUsers = {};
 const directMessageHistory = {};
 const randomConnectQueue = []; // users waiting for a random match
+const liveStreams = {};        // streamId -> stream object
 
 function getDMKey(userA, userB) {
   return [userA, userB].sort().join('::');
@@ -596,6 +597,138 @@ function setupSocket(io) {
       if (deleted) io.emit('stories_updated', getStoriesGrouped());
     });
 
+    // ── LIVE STREAMS ──
+
+    socket.on('get_live_streams', () => {
+      socket.emit('live_streams', Object.values(liveStreams).map(s => ({
+        ...s, viewerCount: s.viewerIds.size,
+      })));
+    });
+
+    socket.on('go_live', async ({ title, category, thumbnail }) => {
+      const user = connectedUsers[socket.id];
+      if (!user) return;
+
+      // End any existing stream from this socket
+      if (liveStreams[socket.id]) {
+        const prev = liveStreams[socket.id];
+        io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
+        delete liveStreams[socket.id];
+        // Remove old viewers from room
+        const prevSockets = await io.in(`live:${socket.id}`).fetchSockets();
+        prevSockets.forEach(s => s.leave(`live:${socket.id}`));
+      }
+
+      liveStreams[socket.id] = {
+        streamId:    socket.id,
+        hostSocketId: socket.id,
+        hostName:    user.username,
+        hostCountry: user.country,
+        hostPhoto:   user.photo_url || null,
+        title:       title || `${user.username}'s Live`,
+        category:    category || 'general',
+        thumbnail:   thumbnail || null,
+        viewerIds:   new Set(),
+        messages:    [],
+        startedAt:   Date.now(),
+      };
+
+      socket.join(`live:${socket.id}`);
+      io.emit('live_streams', Object.values(liveStreams).map(s => ({
+        ...s, viewerCount: s.viewerIds.size,
+      })));
+      socket.emit('live_started', { streamId: socket.id });
+      console.log(`[Live] ${user.username} went live`);
+    });
+
+    socket.on('end_live', () => {
+      const stream = liveStreams[socket.id];
+      if (!stream) return;
+      io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
+      delete liveStreams[socket.id];
+      io.emit('live_streams', Object.values(liveStreams).map(s => ({
+        ...s, viewerCount: s.viewerIds.size,
+      })));
+      console.log(`[Live] ${connectedUsers[socket.id]?.username} ended live`);
+    });
+
+    socket.on('join_live', ({ streamId }) => {
+      const stream = liveStreams[streamId];
+      if (!stream) return socket.emit('live_error', 'Stream not found or ended');
+      stream.viewerIds.add(socket.id);
+      socket.join(`live:${streamId}`);
+
+      // Send recent messages + stream info
+      socket.emit('live_joined', {
+        stream: { ...stream, viewerCount: stream.viewerIds.size },
+        messages: stream.messages.slice(-50),
+      });
+
+      // Notify everyone of updated viewer count
+      io.to(`live:${streamId}`).emit('live_viewer_count', {
+        streamId, count: stream.viewerIds.size,
+      });
+
+      // Tell host someone joined
+      io.to(streamId).emit('live_viewer_joined', {
+        viewerName: connectedUsers[socket.id]?.username || 'Someone',
+        viewerCountry: connectedUsers[socket.id]?.country || '',
+        count: stream.viewerIds.size,
+      });
+    });
+
+    socket.on('leave_live', ({ streamId }) => {
+      const stream = liveStreams[streamId];
+      if (stream) {
+        stream.viewerIds.delete(socket.id);
+        io.to(`live:${streamId}`).emit('live_viewer_count', {
+          streamId, count: stream.viewerIds.size,
+        });
+      }
+      socket.leave(`live:${streamId}`);
+    });
+
+    socket.on('live_message', async ({ streamId, text }) => {
+      const sender = connectedUsers[socket.id];
+      const stream = liveStreams[streamId];
+      if (!sender || !stream || !text?.trim()) return;
+
+      const message = {
+        id:           uuidv4(),
+        senderId:     socket.id,
+        senderName:   sender.username,
+        senderCountry:sender.country,
+        originalText: text.trim(),
+        timestamp:    Date.now(),
+      };
+
+      stream.messages.push(message);
+      if (stream.messages.length > 200) stream.messages.shift();
+
+      // Translate for each recipient in the room
+      const socketsInRoom = await io.in(`live:${streamId}`).fetchSockets();
+      for (const s of socketsInRoom) {
+        const recipient = connectedUsers[s.id];
+        if (!recipient) continue;
+        let displayText = message.originalText;
+        if (recipient.language && recipient.language !== sender.language) {
+          const result = await translateText(message.originalText, recipient.language);
+          displayText = result.translatedText;
+        }
+        s.emit('live_message', { ...message, text: displayText, wasTranslated: displayText !== message.originalText });
+      }
+    });
+
+    socket.on('live_reaction', ({ streamId, emoji }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !liveStreams[streamId]) return;
+      io.to(`live:${streamId}`).emit('live_reaction', {
+        emoji,
+        fromName: user.username,
+        fromSocketId: socket.id,
+      });
+    });
+
     // ── FOLLOWS ──
 
     socket.on('follow_user', ({ targetUserId }) => {
@@ -635,6 +768,23 @@ function setupSocket(io) {
     // Disconnect
 
     socket.on('disconnect', () => {
+      // End live stream if host disconnects
+      if (liveStreams[socket.id]) {
+        io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
+        delete liveStreams[socket.id];
+        io.emit('live_streams', Object.values(liveStreams).map(s => ({
+          ...s, viewerCount: s.viewerIds.size,
+        })));
+      }
+      // Remove as viewer from any stream
+      Object.values(liveStreams).forEach(stream => {
+        if (stream.viewerIds.has(socket.id)) {
+          stream.viewerIds.delete(socket.id);
+          io.to(`live:${stream.streamId}`).emit('live_viewer_count', {
+            streamId: stream.streamId, count: stream.viewerIds.size,
+          });
+        }
+      });
       delete connectedUsers[socket.id];
       io.emit('user_list', Object.values(connectedUsers));
       const qIdx = randomConnectQueue.indexOf(socket.id);

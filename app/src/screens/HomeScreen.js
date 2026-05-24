@@ -340,6 +340,7 @@ export default function HomeScreen({ navigation, user }) {
   const [dailyMatches,  setDailyMatches]  = useState([]);
   const [experiences,   setExperiences]   = useState([]);
   const [icebreaker,    setIcebreaker]    = useState({ question: '', responseCount: 0 });
+  const [liveStreams,   setLiveStreams]   = useState([]);
   const [loadingMatches,setLoadingM]      = useState(true);
   const [loadingExps,   setLoadingE]      = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -405,12 +406,15 @@ export default function HomeScreen({ navigation, user }) {
     socket.on('incoming_call', ({ from, callerName, callerCountry, offer, callType }) => {
       navigation.navigate('Call', { mode: 'incoming', from, callerName, callerCountry, offer, callType });
     });
+    socket.on('live_streams', streams => setLiveStreams(streams));
+    socket.emit('get_live_streams');
 
     fetchBondData();
     return () => {
       socket.off('user_list');
       socket.off('icebreaker_data');
       socket.off('incoming_call');
+      socket.off('live_streams');
     };
   }, [fetchBondData]);
 
@@ -419,6 +423,7 @@ export default function HomeScreen({ navigation, user }) {
     if (socket.connected) {
       socket.emit('get_users');
       socket.emit('get_icebreaker');
+      socket.emit('get_live_streams');
     }
     await fetchBondData();
     setRefreshing(false);
@@ -518,13 +523,49 @@ export default function HomeScreen({ navigation, user }) {
             <QuickTile emoji="✨" label="Matches"  colors={['#1a1a42', '#12122e']} onPress={() => navigation.navigate('Bond')} />
             <QuickTile emoji="💬" label="Chats"    colors={['#0d1e2e', '#091520']} onPress={() => navigation.navigate('Groups')} />
             <QuickTile emoji="🎉" label="Events"   colors={['#2a1a0e', '#1a0e06']} onPress={() => navigation.navigate('Events')} />
-            <QuickTile emoji="🌟" label="Journeys" colors={['#1a2a1a', '#101a10']} onPress={() => navigation.navigate('Experiences')} />
+            <QuickTile emoji="🔴" label="Go Live"  colors={['#2a0a0a', '#1a0606']} onPress={() => navigation.navigate('Live', { user, streamId: null })} />
           </View>
         </Animated.View>
 
+        {/* ── Live Now ── */}
+        {liveStreams.length > 0 && (
+          <Animated.View style={[styles.section, sectionStyle(1)]}>
+            <SectionHead title="Live Now" sub={`${liveStreams.length} stream${liveStreams.length > 1 ? 's' : ''} happening`} />
+            <FlatList
+              horizontal
+              data={liveStreams}
+              keyExtractor={s => s.streamId}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10 }}
+              renderItem={({ item: s }) => (
+                <TouchableOpacity
+                  style={styles.liveCard}
+                  onPress={() => navigation.navigate('LiveWatch', { stream: s, currentUser: user })}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient colors={['#2a0a0a', '#1a0606']} style={styles.liveCardBg}>
+                    <View style={styles.liveBadgeSmall}>
+                      <View style={styles.liveDotSmall} />
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                    <Text style={styles.liveCardEmoji}>
+                      {s.hostCountry?.split(' ')[0] || '🌍'}
+                    </Text>
+                    <Text style={styles.liveCardName} numberOfLines={1}>{s.hostName}</Text>
+                    <Text style={styles.liveCardTitle} numberOfLines={1}>{s.title}</Text>
+                    <View style={styles.liveViewerRow}>
+                      <Text style={styles.liveViewerText}>👁 {s.viewerCount}</Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            />
+          </Animated.View>
+        )}
+
         {/* ── Online now (stories) ── */}
         {onlineUsers.length > 0 && (
-          <Animated.View style={[styles.section, sectionStyle(1)]}>
+          <Animated.View style={[styles.section, sectionStyle(liveStreams.length > 0 ? 2 : 1)]}>
             <SectionHead
               title="Online Now"
               sub={`${onlineUsers.length} people live around the world`}
@@ -684,4 +725,15 @@ const styles = StyleSheet.create({
 
   seeMoreBtn:      { backgroundColor: '#13132a', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#1e1e38' },
   seeMoreText:     { color: '#5865f2', fontSize: 14, fontWeight: '600' },
+
+  liveCard:        { width: 130, borderRadius: 18, overflow: 'hidden' },
+  liveCardBg:      { padding: 14, gap: 6, minHeight: 140, justifyContent: 'flex-end', borderWidth: 1, borderColor: '#e5393530' },
+  liveBadgeSmall:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start', position: 'absolute', top: 10, left: 10 },
+  liveDotSmall:    { width: 5, height: 5, borderRadius: 3, backgroundColor: '#fff' },
+  liveBadgeText:   { color: '#fff', fontWeight: '900', fontSize: 9, letterSpacing: 1 },
+  liveCardEmoji:   { fontSize: 30, marginTop: 28 },
+  liveCardName:    { color: '#fff', fontWeight: '800', fontSize: 13 },
+  liveCardTitle:   { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  liveViewerRow:   { flexDirection: 'row', alignItems: 'center' },
+  liveViewerText:  { color: '#e57373', fontSize: 11, fontWeight: '700' },
 });
