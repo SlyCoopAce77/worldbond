@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database/db');
 
+if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET env var is required');
+
 const ACCESS_TTL  = '15m';
 const REFRESH_TTL = '30d';
 

@@ -384,6 +384,7 @@ export default function HomeScreen({ navigation, user }) {
   }, [user?.country]);
 
   useEffect(() => {
+    if (!user) return;
     function registerAndFetch() {
       socket.emit('register', {
         username:     user.username,

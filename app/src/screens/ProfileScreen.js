@@ -213,24 +213,27 @@ export default function ProfileScreen({ route, navigation }) {
   }, []);
 
   useEffect(() => {
-    if (!isOwnProfile && profileUser?.socketId) {
-      const emit = () => socket.emit('get_follow_status', { targetUserId: profileUser.socketId });
+    const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
+    if (!isOwnProfile && targetId) {
+      const emit = () => socket.emit('get_follow_status', { targetUserId: targetId });
       if (socket.connected) emit();
       else socket.once('connect', emit);
     }
     function onFollowStatus({ targetUserId, following: f, followersCount: fc, followingCount: fgc }) {
-      if (targetUserId === profileUser?.socketId) {
+      const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
+      if (targetUserId === targetId) {
         setFollowing(f);
         setFollowCounts({ followers: fc ?? 0, following: fgc ?? 0 });
       }
     }
     socket.on('follow_status', onFollowStatus);
     return () => socket.off('follow_status', onFollowStatus);
-  }, [profileUser?.socketId]);
+  }, [bondUserId, profileUser?.userId]);
 
   function toggleFollow() {
-    if (!profileUser?.socketId) return;
-    socket.emit(following ? 'unfollow_user' : 'follow_user', { targetUserId: profileUser.socketId });
+    const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
+    if (!targetId) return;
+    socket.emit(following ? 'unfollow_user' : 'follow_user', { targetUserId: targetId });
     setFollowing(f => !f);
     setFollowCounts(c => ({
       ...c,

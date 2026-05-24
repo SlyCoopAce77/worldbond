@@ -45,7 +45,7 @@ export default function LiveWatchScreen({ route, navigation }) {
   const [floats,      setFloats]      = useState([]);
   const [text,        setText]        = useState('');
   const [ended,       setEnded]       = useState(false);
-  const [elapsed,     setElapsed]     = useState(Math.floor((Date.now() - stream.startedAt) / 1000));
+  const [elapsed,     setElapsed]     = useState(stream?.startedAt ? Math.floor((Date.now() - stream.startedAt) / 1000) : 0);
 
   const flatRef  = useRef(null);
   const timerRef = useRef(null);

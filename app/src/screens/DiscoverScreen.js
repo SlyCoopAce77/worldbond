@@ -27,7 +27,7 @@ const CT_META = {
   dating:           { emoji:'❤️',  label:'Dating',    color:'#e91e63' },
   friendship:       { emoji:'🤝',  label:'Friends',   color:'#2196f3' },
   travel:           { emoji:'✈️',  label:'Travel',    color:'#ff9800' },
-  language_exchange:{ emoji:'🗣️', label:'Language',  color:'#26c6da' },
+  language:         { emoji:'🗣️', label:'Language',  color:'#26c6da' },
   mentorship:       { emoji:'🎓',  label:'Mentorship',color:'#57f287' },
 };
 
@@ -552,7 +552,7 @@ function PeopleTab({ user, navigation }) {
     { id: 'dating',           label: 'Dating',   emoji: '❤️'  },
     { id: 'friendship',       label: 'Friends',  emoji: '🤝'  },
     { id: 'travel',           label: 'Travel',   emoji: '✈️'  },
-    { id: 'language_exchange',label: 'Language', emoji: '🗣️' },
+    { id: 'language',         label: 'Language', emoji: '🗣️' },
     { id: 'mentorship',       label: 'Mentor',   emoji: '🎓'  },
   ];
 

@@ -58,6 +58,7 @@ export default function LiveScreen({ route, navigation }) {
   const [floats,        setFloats]        = useState([]);
   const [elapsed,       setElapsed]       = useState(0);
   const [viewerJoined,  setViewerJoined]  = useState(null);
+  const [isEnding,      setIsEnding]      = useState(false);
 
   const flatRef      = useRef(null);
   const timerRef     = useRef(null);

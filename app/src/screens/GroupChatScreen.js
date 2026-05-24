@@ -208,7 +208,7 @@ export default function GroupChatScreen({ route, navigation }) {
     });
 
     return () => {
-      socket.emit('leave_group', { categoryId: category.id, roomName: activeRoom });
+      socket.emit('leave_group', { categoryId: category.id, roomName: activeRoomRef.current });
       socket.off('group_history');
       socket.off('group_message');
       socket.off('room_members');
@@ -284,7 +284,7 @@ export default function GroupChatScreen({ route, navigation }) {
         categoryId: category.id,
         roomName: activeRoom,
         text: '📷 Photo',
-        imageUrl: data.url,
+        imageUrl: data.imageUrl,
       });
     } catch {
       // upload failure — don't break the chat

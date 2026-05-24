@@ -420,7 +420,11 @@ function setupSocket(io) {
       if (matchIndex !== -1) {
         const matchedId = randomConnectQueue.splice(matchIndex, 1)[0];
         const matched = connectedUsers[matchedId];
-        if (!matched) return;
+        if (!matched) {
+          if (!randomConnectQueue.includes(socket.id)) randomConnectQueue.push(socket.id);
+          socket.emit('random_waiting');
+          return;
+        }
 
         const roomKey = `random:${[socket.id, matchedId].sort().join(':')}`;
         socket.join(roomKey);

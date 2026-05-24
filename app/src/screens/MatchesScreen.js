@@ -7,7 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { getAccessToken } from '../services/authApi';
-import { SERVER_URL } from '../services/socket';
+import { SERVER_URL, getSocket } from '../services/socket';
 
 const { width } = Dimensions.get('window');
 
@@ -344,12 +344,14 @@ const cr = StyleSheet.create({
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 export default function MatchesScreen({ navigation }) {
-  const [tab,        setTab]        = useState('daily');
-  const [daily,      setDaily]      = useState([]);
-  const [confirmed,  setConfirmed]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [tab,         setTab]         = useState('daily');
+  const [daily,       setDaily]       = useState([]);
+  const [confirmed,   setConfirmed]   = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState([]);
 
+  const socket  = getSocket();
   const tabAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
@@ -366,6 +368,12 @@ export default function MatchesScreen({ navigation }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    socket.on('user_list', list => setOnlineUsers(list));
+    socket.emit('get_users');
+    return () => socket.off('user_list');
+  }, []);
 
   function switchTab(t) {
     setTab(t);
@@ -403,11 +411,14 @@ export default function MatchesScreen({ navigation }) {
 
   function openChat(item) {
     if (!navigation) return;
+    const targetUserId = item.matched_user_id || item.user_id;
+    const online = onlineUsers.find(u => u.userId === targetUserId);
     navigation.navigate('Chat', {
       otherUser: {
-        userId:       item.matched_user_id || item.user_id,
+        userId:       targetUserId,
         display_name: item.display_name,
         photo_url:    item.photo_url,
+        socketId:     online?.socketId,
       },
       currentUser: {},
     });

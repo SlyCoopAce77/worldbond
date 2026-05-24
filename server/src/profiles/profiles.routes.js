@@ -1,7 +1,16 @@
 const { Router } = require('express');
+const multer = require('multer');
 const { requireAuth } = require('../auth/auth.middleware');
 const { getProfile, upsertProfile, updateVoiceNote, listProfiles } = require('./profiles.service');
 const { uploadBuffer } = require('../cloudinary');
+
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, file.mimetype.startsWith('audio/'));
+  },
+});
 
 const router = Router();
 
@@ -49,7 +58,7 @@ router.get('/:userId', async (req, res) => {
 });
 
 // Voice note upload — expects multipart/form-data field "audio"
-router.post('/me/voice-note', async (req, res) => {
+router.post('/me/voice-note', audioUpload.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
   try {
     let url;

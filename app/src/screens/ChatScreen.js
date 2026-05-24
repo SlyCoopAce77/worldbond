@@ -260,6 +260,7 @@ export default function ChatScreen({ route, navigation }) {
   }
 
   function startCall(callType) {
+    socket.emit('call_user', { toSocketId: otherUser.socketId, callType });
     navigation.navigate('Call', {
       mode: 'outgoing',
       toSocketId: otherUser.socketId,
