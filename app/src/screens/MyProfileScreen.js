@@ -631,7 +631,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
                   <Text style={[styles.subTierName, { color: tierColor }]}>
                     {tier === 'plus' ? '💜 Bond Plus' : '⭐ Bond Pro'}
                   </Text>
-                  <Text style={styles.subPrice}>{tierInfo?.price}</Text>
+                  <Text style={styles.subPrice}>Free during beta</Text>
                 </View>
                 <TouchableOpacity
                   style={[styles.manageBtn, { backgroundColor: tierColor + '22', borderColor: tierColor + '66' }]}
