@@ -127,7 +127,7 @@ export default function CallScreen({ route, navigation }) {
     mode, toSocketId, toName, toPhoto,
     callType = 'voice',
     from, callerName, callerCountry, callerPhoto, offer,
-  } = route.params;
+  } = route.params || {};
 
   const socket = getSocket();
 
@@ -189,7 +189,7 @@ export default function CallScreen({ route, navigation }) {
     <View style={styles.container}>
       {/* Full-screen gradient background */}
       <LinearGradient
-        colors={[avatarColor + 'ff', avatarColor + 'aa', '#0a0a18']}
+        colors={[avatarColor + 'ff', avatarColor + 'aa', '#000000']}
         locations={[0, 0.4, 1]}
         style={styles.bg}
       />
@@ -306,7 +306,7 @@ export default function CallScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#0a0a18' },
+  container:       { flex: 1, backgroundColor: '#000000' },
   bg:              { position: 'absolute', width, height },
   overlay:         { position: 'absolute', width, height, backgroundColor: '#00000066' },
 

@@ -79,7 +79,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                   <TextInput
                     style={styles.input}
                     placeholder="you@example.com"
-                    placeholderTextColor="#3a3a5a"
+                    placeholderTextColor="#536471"
                     value={email}
                     onChangeText={t => { setEmail(t); setError(''); }}
                     keyboardType="email-address"
@@ -104,7 +104,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                     ref={passwordRef}
                     style={styles.input}
                     placeholder="Your password"
-                    placeholderTextColor="#3a3a5a"
+                    placeholderTextColor="#536471"
                     value={password}
                     onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPass}
@@ -129,7 +129,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                 <ActivityIndicator color="#fff" />
               ) : (
                 <LinearGradient
-                  colors={['#6875f5', '#5865f2', '#4752c4']}
+                  colors={['#E8003D', '#E8003D', '#C7003A']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.submitGrad}
                 >
@@ -161,16 +161,16 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#0a0a18' },
+  container:       { flex: 1, backgroundColor: '#000000' },
   scroll:          { flexGrow: 1, padding: 24, paddingTop: 16 },
 
   backBtn:         { marginBottom: 28, alignSelf: 'flex-start' },
-  backBtnInner:    { width: 40, height: 40, borderRadius: 12, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38', alignItems: 'center', justifyContent: 'center' },
+  backBtnInner:    { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
   backIcon:        { color: '#fff', fontSize: 26, lineHeight: 30 },
 
   header:          { marginBottom: 32 },
   title:           { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
-  subtitle:        { fontSize: 15, color: '#555577', marginTop: 6 },
+  subtitle:        { fontSize: 15, color: '#536471', marginTop: 6 },
 
   errorBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
   errorIcon:       { fontSize: 16 },
@@ -179,15 +179,15 @@ const styles = StyleSheet.create({
   form:            { gap: 20 },
   fieldGroup:      { gap: 8 },
   labelRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label:           { color: '#555577', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  forgotLink:      { color: '#5865f2', fontSize: 13, fontWeight: '600' },
+  label:           { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  forgotLink:      { color: '#E8003D', fontSize: 13, fontWeight: '600' },
 
-  inputWrap:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 16, borderWidth: 1, borderColor: '#1e1e38', paddingHorizontal: 16 },
-  inputWrapFocused:{ borderColor: '#5865f240' },
+  inputWrap:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
+  inputWrapFocused:{ borderColor: '#E8003D40' },
   inputIcon:       { fontSize: 16, marginRight: 10 },
   input:           { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
   showHide:        { paddingLeft: 8 },
-  showHideText:    { color: '#5865f2', fontSize: 13, fontWeight: '700' },
+  showHideText:    { color: '#E8003D', fontSize: 13, fontWeight: '700' },
 
   submitBtn:       { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
   submitBtnOff:    { opacity: 0.45 },
@@ -195,10 +195,10 @@ const styles = StyleSheet.create({
   submitText:      { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
 
   divider:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
-  dividerLine:     { flex: 1, height: 1, backgroundColor: '#1e1e38' },
-  dividerText:     { color: '#2a2a4a', fontSize: 13, fontWeight: '600' },
+  dividerLine:     { flex: 1, height: 1, backgroundColor: '#2F3336' },
+  dividerText:     { color: '#2F3336', fontSize: 13, fontWeight: '600' },
 
   footerRow:       { flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
   footerText:      { color: '#555', fontSize: 15 },
-  footerLink:      { color: '#5865f2', fontSize: 15, fontWeight: '700' },
+  footerLink:      { color: '#E8003D', fontSize: 15, fontWeight: '700' },
 });

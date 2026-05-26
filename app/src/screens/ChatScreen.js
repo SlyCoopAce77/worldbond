@@ -11,10 +11,10 @@ import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import GiftPicker from '../components/GiftPicker';
 
-const ACCENT  = '#5865f2';
-const BG      = '#0f0f1a';
-const CARD    = '#1a1a2e';
-const BORDER  = '#2a2a4a';
+const ACCENT  = '#E8003D';
+const BG      = '#000000';
+const CARD    = '#1C1F23';
+const BORDER  = '#2F3336';
 const REACTIONS = ['❤️', '🔥', '😂', '👍', '😮'];
 
 const STARTERS = [
@@ -102,7 +102,7 @@ function TypingBubble({ name }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function ChatScreen({ route, navigation }) {
-  const { otherUser, currentUser, matchId, compatibilityScore } = route.params;
+  const { otherUser, currentUser, matchId, compatibilityScore } = route.params || {};
 
   const [messages,    setMessages]    = useState([]);
   const [text,        setText]        = useState('');
@@ -121,11 +121,12 @@ export default function ChatScreen({ route, navigation }) {
   const typingTimer = useRef(null);
   const socket      = getSocket();
 
-  const displayName = otherUser.display_name || otherUser.username || 'Someone';
+  const displayName = otherUser?.display_name || otherUser?.username || 'Someone';
 
   // ── Socket listeners ───────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!otherUser?.socketId) return;
     socket.emit('get_dm_history', { otherSocketId: otherUser.socketId });
 
     socket.on('dm_history', msgs => setMessages(msgs || []));
@@ -165,7 +166,7 @@ export default function ChatScreen({ route, navigation }) {
       socket.off('user_list');
       clearTimeout(typingTimer.current);
     };
-  }, [otherUser.socketId]);
+  }, [otherUser?.socketId]);
 
   useEffect(() => {
     if (messages.length > 0 || otherTyping) {
@@ -227,7 +228,7 @@ export default function ChatScreen({ route, navigation }) {
         name: asset.fileName || 'photo.jpg',
       });
       const { data } = await axios.post(`${SERVER_URL}/api/photos/upload`, formData, {
-        headers: { ...headers, 'Content-Type': 'multipart/form-data' }, timeout: 30000,
+        headers: { ...headers }, timeout: 30000,
       });
       socket.emit('direct_message', {
         toSocketId: otherUser.socketId,
@@ -524,7 +525,7 @@ export default function ChatScreen({ route, navigation }) {
           />
           {text.trim() ? (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
-              <LinearGradient colors={[ACCENT, '#7289da']} style={styles.sendBtn}>
+              <LinearGradient colors={[ACCENT, '#E8003D']} style={styles.sendBtn}>
                 <Text style={styles.sendIcon}>➤</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -612,7 +613,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a2e',
+    borderBottomWidth: 1, borderBottomColor: '#1C1F23',
     gap: 10,
   },
   backBtn:    { padding: 4 },
@@ -730,7 +731,7 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
     padding: 10, gap: 8,
-    borderTopWidth: 1, borderTopColor: '#1a1a2e',
+    borderTopWidth: 1, borderTopColor: '#1C1F23',
     backgroundColor: BG,
   },
   inputAction: {

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -31,10 +32,10 @@ const CATEGORY_ACCENT = {
 };
 
 function getColors(id) {
-  return CATEGORY_COLORS[id] || { from: '#1a1a3a', to: '#12122a' };
+  return CATEGORY_COLORS[id] || { from: '#1a1a3a', to: '#16181C' };
 }
 function getAccent(id) {
-  return CATEGORY_ACCENT[id] || '#5865f2';
+  return CATEGORY_ACCENT[id] || '#E8003D';
 }
 
 // ─── Room chip ────────────────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ function ActiveRoomCard({ categoryId, room, count, icon, accent, onPress }) {
   );
 }
 const ar = StyleSheet.create({
-  card:    { width: 100, backgroundColor: '#12122a', borderRadius: 18, padding: 14, alignItems: 'center', gap: 8, borderWidth: 1 },
+  card:    { width: 100, backgroundColor: '#16181C', borderRadius: 18, padding: 14, alignItems: 'center', gap: 8, borderWidth: 1 },
   iconWrap:{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   room:    { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   countRow:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -150,6 +151,7 @@ const ar = StyleSheet.create({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function GroupsScreen({ navigation, user }) {
+  const { colors } = useTheme();
   const socket = getSocket();
 
   const [categories,    setCategories]   = useState([]);
@@ -219,14 +221,14 @@ export default function GroupsScreen({ navigation, user }) {
   const headerSlide   = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── Header ── */}
         <Animated.View style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerSlide }] }]}>
           <View>
-            <Text style={styles.title}>Chats</Text>
-            <Text style={styles.subtitle}>Find your community worldwide</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Chats</Text>
+            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Find your community worldwide</Text>
           </View>
           {totalOnline > 0 && (
             <View style={styles.onlinePill}>
@@ -237,12 +239,12 @@ export default function GroupsScreen({ navigation, user }) {
         </Animated.View>
 
         {/* ── Search ── */}
-        <View style={styles.searchWrap}>
+        <View style={[styles.searchWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search rooms…"
-            placeholderTextColor="#444"
+            placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
             autoCapitalize="none"
@@ -258,7 +260,7 @@ export default function GroupsScreen({ navigation, user }) {
         {activeRooms.length > 0 && !search && (
           <View style={styles.section}>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>🔥 Active Right Now</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>🔥 Active Right Now</Text>
               <View style={styles.liveBadge}>
                 <View style={styles.liveDot} />
                 <Text style={styles.liveText}>live</Text>
@@ -311,7 +313,7 @@ export default function GroupsScreen({ navigation, user }) {
 }
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#0a0a18' },
+  container:   { flex: 1, backgroundColor: '#000000' },
   scroll:      { paddingBottom: 60, gap: 24 },
 
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 16 },
@@ -321,7 +323,7 @@ const styles = StyleSheet.create({
   onlineDot:   { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#57f287' },
   onlineText:  { color: '#57f287', fontSize: 12, fontWeight: '700' },
 
-  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, backgroundColor: '#12122a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#1e1e38' },
+  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336' },
   searchIcon:  { fontSize: 16 },
   searchInput: { flex: 1, color: '#fff', fontSize: 15 },
   searchClear: { color: '#444', fontSize: 16, paddingHorizontal: 4 },

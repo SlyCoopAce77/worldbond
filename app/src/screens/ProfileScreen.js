@@ -89,12 +89,12 @@ function VoiceNotePlayer({ url }) {
 const vStyles = StyleSheet.create({
   section:   { gap: 10 },
   label:     { color: '#666', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#5865f212', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#5865f230' },
-  btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: '#5865f2', alignItems: 'center', justifyContent: 'center' },
-  btnActive: { backgroundColor: '#4752c4' },
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8003D12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#E8003D30' },
+  btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
+  btnActive: { backgroundColor: '#C7003A' },
   btnIcon:   { color: '#fff', fontSize: 16 },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2, height: 44 },
-  bar:       { width: 3, borderRadius: 2, backgroundColor: '#5865f2' },
+  bar:       { width: 3, borderRadius: 2, backgroundColor: '#E8003D' },
   dur:       { color: '#666', fontSize: 12 },
   hint:      { color: '#555', fontSize: 12, textAlign: 'center' },
 });
@@ -146,7 +146,7 @@ function CompatBreakdown({ score, breakdown }) {
   );
 }
 const cStyles = StyleSheet.create({
-  card:      { backgroundColor: '#1a1a2e', borderRadius: 20, padding: 20, gap: 16, borderWidth: 1, borderColor: '#2a2a4a' },
+  card:      { backgroundColor: '#1C1F23', borderRadius: 20, padding: 20, gap: 16, borderWidth: 1, borderColor: '#2F3336' },
   top:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title:     { color: '#fff', fontSize: 16, fontWeight: '800' },
   sub:       { color: '#555', fontSize: 12, marginTop: 2 },
@@ -156,14 +156,14 @@ const cStyles = StyleSheet.create({
   bars:      { gap: 12 },
   row:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowLabel:  { color: '#888', fontSize: 12, width: 120 },
-  track:     { flex: 1, height: 4, backgroundColor: '#2a2a4a', borderRadius: 2, overflow: 'hidden' },
-  fill:      { height: '100%', backgroundColor: '#5865f2', borderRadius: 2 },
-  pct:       { color: '#5865f2', fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
+  track:     { flex: 1, height: 4, backgroundColor: '#2F3336', borderRadius: 2, overflow: 'hidden' },
+  fill:      { height: '100%', backgroundColor: '#E8003D', borderRadius: 2 },
+  pct:       { color: '#E8003D', fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
 });
 
 // ─── Main screen ───────────────────────────────────────────────────────────
 export default function ProfileScreen({ route, navigation }) {
-  const { profileUser, bondUserId, compatibilityScore, scoreBreakdown } = route.params;
+  const { profileUser, bondUserId, compatibilityScore, scoreBreakdown } = route.params || {};
   const socket        = getSocket();
   const isOwnProfile  = profileUser?.socketId === socket.id;
 
@@ -292,14 +292,14 @@ export default function ProfileScreen({ route, navigation }) {
           {hasPhoto ? (
             <Image source={{ uri: bondProfile.photo_url }} style={styles.coverImg} />
           ) : (
-            <LinearGradient colors={[avatarColor + 'cc', avatarColor + '33', '#0f0f1a']} style={styles.coverImg}>
+            <LinearGradient colors={[avatarColor + 'cc', avatarColor + '33', '#000000']} style={styles.coverImg}>
               <Text style={styles.coverInitial}>{displayName[0]?.toUpperCase()}</Text>
             </LinearGradient>
           )}
 
           {/* Gradient overlay */}
           <LinearGradient
-            colors={['transparent', 'transparent', '#0f0f1acc', '#0f0f1a']}
+            colors={['transparent', 'transparent', '#000000cc', '#000000']}
             style={styles.coverOverlay}
           />
 
@@ -360,7 +360,7 @@ export default function ProfileScreen({ route, navigation }) {
 
           {loadingBond && (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color="#5865f2" size="small" />
+              <ActivityIndicator color="#E8003D" size="small" />
               <Text style={styles.loadingText}>Loading profile…</Text>
             </View>
           )}
@@ -491,7 +491,7 @@ export default function ProfileScreen({ route, navigation }) {
               </View>
             ) : (
               <LinearGradient
-                colors={['#5865f2', '#4752c4']}
+                colors={['#E8003D', '#C7003A']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.bondBtn}
               >
@@ -515,7 +515,7 @@ export default function ProfileScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#0f0f1a' },
+  container:       { flex: 1, backgroundColor: '#000000' },
   scroll:          { paddingBottom: 0 },
 
   cover:           { width, height: COVER_HEIGHT, position: 'relative', justifyContent: 'flex-end' },
@@ -535,15 +535,15 @@ const styles = StyleSheet.create({
 
   body:            { paddingTop: 20, gap: 28, paddingHorizontal: 20 },
 
-  followRow:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 18, padding: 16, gap: 16, borderWidth: 1, borderColor: '#2a2a4a' },
+  followRow:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1F23', borderRadius: 18, padding: 16, gap: 16, borderWidth: 1, borderColor: '#2F3336' },
   followStat:      { alignItems: 'center', gap: 2 },
   followNum:       { color: '#fff', fontSize: 20, fontWeight: '800' },
   followLabel:     { color: '#555', fontSize: 11 },
-  followDivider:   { width: 1, height: 32, backgroundColor: '#2a2a4a' },
-  followBtn:       { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#5865f2' },
-  followBtnActive: { backgroundColor: '#5865f220' },
-  followBtnText:   { color: '#5865f2', fontSize: 13, fontWeight: '700' },
-  followBtnTextActive: { color: '#5865f2' },
+  followDivider:   { width: 1, height: 32, backgroundColor: '#2F3336' },
+  followBtn:       { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#E8003D' },
+  followBtnActive: { backgroundColor: '#E8003D20' },
+  followBtnText:   { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  followBtnTextActive: { color: '#E8003D' },
 
   loadingRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
   loadingText:     { color: '#555', fontSize: 13 },
@@ -555,25 +555,25 @@ const styles = StyleSheet.create({
   ctBadge:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22, borderWidth: 1 },
   ctLabel:         { fontSize: 13, fontWeight: '700' },
 
-  bioCard:         { backgroundColor: '#1a1a2e', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#2a2a4a' },
+  bioCard:         { backgroundColor: '#1C1F23', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#2F3336' },
   bioText:         { color: '#ccc', fontSize: 15, lineHeight: 26 },
 
-  expCard:         { backgroundColor: '#1a1a2e', borderRadius: 18, padding: 16, gap: 14, borderWidth: 1, borderColor: '#2a2a4a' },
+  expCard:         { backgroundColor: '#1C1F23', borderRadius: 18, padding: 16, gap: 14, borderWidth: 1, borderColor: '#2F3336' },
   expIcon:         { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   expTitle:        { color: '#fff', fontSize: 15, fontWeight: '700' },
   expDesc:         { color: '#666', fontSize: 13, marginTop: 4, lineHeight: 18 },
-  interestBtn:     { backgroundColor: '#5865f2', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  interestBtn:     { backgroundColor: '#E8003D', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   interestBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  socialCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2a2a4a', gap: 12 },
+  socialCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1F23', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336', gap: 12 },
   socialIcon:      { fontSize: 26 },
   socialPlatform:  { color: '#555', fontSize: 11, marginBottom: 2 },
   socialHandle:    { color: '#fff', fontSize: 14, fontWeight: '600' },
-  socialArrow:     { color: '#5865f2', fontSize: 20, fontWeight: '700' },
+  socialArrow:     { color: '#E8003D', fontSize: 20, fontWeight: '700' },
 
-  actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 34, backgroundColor: '#0f0f1af2', borderTopWidth: 1, borderTopColor: '#1a1a2e' },
-  messageBtn:      { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#5865f2' },
-  messageBtnText:  { color: '#5865f2', fontSize: 14, fontWeight: '700' },
+  actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 34, backgroundColor: '#000000f2', borderTopWidth: 1, borderTopColor: '#1C1F23' },
+  messageBtn:      { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E8003D' },
+  messageBtnText:  { color: '#E8003D', fontSize: 14, fontWeight: '700' },
   bondBtn:         { flex: 2, borderRadius: 18, overflow: 'hidden' },
   bondBtnInner:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },

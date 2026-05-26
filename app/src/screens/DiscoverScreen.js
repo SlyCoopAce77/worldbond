@@ -10,6 +10,7 @@ import { getAccessToken } from '../services/authApi';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const TABS = [
@@ -82,7 +83,7 @@ function IcebreakerTab({ user }) {
   return (
     <ScrollView contentContainerStyle={tab.scroll} showsVerticalScrollIndicator={false}>
       {/* Question card */}
-      <LinearGradient colors={['#1a1442', '#0a0a18']} style={tab.questionCard}>
+      <LinearGradient colors={['#16181C', '#000000']} style={tab.questionCard}>
         <View style={tab.questionTop}>
           <View style={tab.questionBadge}>
             <View style={tab.questionDot} />
@@ -113,7 +114,7 @@ function IcebreakerTab({ user }) {
               disabled={!myAnswer.trim()}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#5865f2', '#4752c4']} style={tab.submitGrad}>
+              <LinearGradient colors={['#E8003D', '#C7003A']} style={tab.submitGrad}>
                 <Text style={tab.submitText}>Share with the World 🌍</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -154,15 +155,15 @@ function IcebreakerTab({ user }) {
 }
 const tab = StyleSheet.create({
   scroll:          { padding: 20, gap: 16, paddingBottom: 50 },
-  questionCard:    { borderRadius: 22, padding: 22, gap: 14, borderWidth: 1, borderColor: '#5865f230' },
+  questionCard:    { borderRadius: 22, padding: 22, gap: 14, borderWidth: 1, borderColor: '#E8003D30' },
   questionTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   questionBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  questionDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: '#5865f2' },
-  questionBadgeText:{ color: '#5865f2', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  questionDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E8003D' },
+  questionBadgeText:{ color: '#E8003D', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
   responseCount:   { color: '#555', fontSize: 12 },
   questionText:    { color: '#fff', fontSize: 18, lineHeight: 28, fontStyle: 'italic', fontWeight: '500' },
   answerWrap:      { gap: 10 },
-  answerInput:     { backgroundColor: '#12122a', color: '#fff', borderRadius: 16, padding: 16, fontSize: 14, minHeight: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#1e1e38', lineHeight: 22 },
+  answerInput:     { backgroundColor: '#16181C', color: '#fff', borderRadius: 16, padding: 16, fontSize: 14, minHeight: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2F3336', lineHeight: 22 },
   answerFooter:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   charCount:       { color: '#444', fontSize: 11 },
   submitBtn:       { borderRadius: 14, overflow: 'hidden' },
@@ -172,14 +173,14 @@ const tab = StyleSheet.create({
   submittedText:   { color: '#57f287', fontSize: 13, fontWeight: '600', flex: 1 },
   responsesWrap:   { gap: 10 },
   responsesLabel:  { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  responseCard:    { backgroundColor: '#12122a', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#1e1e38', gap: 8 },
+  responseCard:    { backgroundColor: '#16181C', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2F3336', gap: 8 },
   responseTop:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   responseName:    { color: '#fff', fontSize: 13, fontWeight: '700' },
   responseCountry: { color: '#555', fontSize: 11 },
   responseText:    { color: '#bbb', fontSize: 14, lineHeight: 21 },
-  lockedMore:      { backgroundColor: '#5865f210', borderRadius: 18, padding: 18, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#5865f230', borderStyle: 'dashed' },
-  lockedText:      { color: '#5865f2', fontSize: 14, fontWeight: '800' },
-  lockedSub:       { color: '#5865f288', fontSize: 12 },
+  lockedMore:      { backgroundColor: '#E8003D10', borderRadius: 18, padding: 18, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#E8003D30', borderStyle: 'dashed' },
+  lockedText:      { color: '#E8003D', fontSize: 14, fontWeight: '800' },
+  lockedSub:       { color: '#E8003D88', fontSize: 12 },
 });
 
 // ─── Random connect tab ───────────────────────────────────────────────────────
@@ -204,10 +205,12 @@ function RandomTab({ user, navigation }) {
     });
     socket.on('random_waiting',   () => setState('waiting'));
     socket.on('random_cancelled', () => setState('idle'));
+    socket.on('random_timeout',   () => setState('timeout'));
     socket.on('random_message',   msg => setMessages(prev => [...prev, msg]));
     return () => {
       socket.off('random_match'); socket.off('random_waiting');
-      socket.off('random_cancelled'); socket.off('random_message');
+      socket.off('random_cancelled'); socket.off('random_timeout');
+      socket.off('random_message');
     };
   }, []);
 
@@ -250,7 +253,7 @@ function RandomTab({ user, navigation }) {
   if (state === 'connected' && matchedUser) {
     return (
       <View style={{ flex: 1 }}>
-        <LinearGradient colors={['#0e2414', '#0a0a18']} style={rc.connHeader}>
+        <LinearGradient colors={['#000000', '#000000']} style={rc.connHeader}>
           <View style={rc.connAvatar}>
             <Avatar photo_url={matchedUser.photo_url} name={matchedUser.display_name || matchedUser.username} size={44} />
             <View style={rc.onlineDot} />
@@ -300,7 +303,7 @@ function RandomTab({ user, navigation }) {
               onSubmitEditing={sendMsg}
             />
             <TouchableOpacity
-              style={[rc.sendBtn, { backgroundColor: text.trim() ? '#4caf50' : '#1e1e38' }]}
+              style={[rc.sendBtn, { backgroundColor: text.trim() ? '#4caf50' : '#2F3336' }]}
               onPress={sendMsg}
               disabled={!text.trim()}
             >
@@ -324,19 +327,21 @@ function RandomTab({ user, navigation }) {
           </>
         )}
         <LinearGradient
-          colors={state === 'waiting' ? ['#1a3a1a', '#0e2010'] : ['#1a1442', '#0e0a2e']}
+          colors={state === 'waiting' ? ['#1a3a1a', '#000000'] : state === 'timeout' ? ['#3a1a1a', '#000000'] : ['#16181C', '#000000']}
           style={rc.orb}
         >
-          <Text style={{ fontSize: 52 }}>{state === 'waiting' ? '🔍' : '🌀'}</Text>
+          <Text style={{ fontSize: 52 }}>{state === 'waiting' ? '🔍' : state === 'timeout' ? '😔' : '🌀'}</Text>
         </LinearGradient>
       </View>
 
       <Text style={rc.title}>
-        {state === 'waiting' ? 'Finding someone for you…' : 'Random World Connect'}
+        {state === 'waiting' ? 'Finding someone for you…' : state === 'timeout' ? 'No one available right now' : 'Random World Connect'}
       </Text>
       <Text style={rc.sub}>
         {state === 'waiting'
           ? 'Matching you with someone from a different country 🌍'
+          : state === 'timeout'
+          ? 'Nobody from another country is online right now. Try again in a moment!'
           : 'Meet a stranger from anywhere on Earth. Messages auto-translate in real time.'}
       </Text>
 
@@ -346,13 +351,14 @@ function RandomTab({ user, navigation }) {
         </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={connect} activeOpacity={0.85} style={rc.connectWrap}>
-          <LinearGradient colors={['#5865f2', '#7289da']} style={rc.connectBtn}>
-            <Text style={rc.connectText}>🌀  Connect with a Stranger</Text>
+          <LinearGradient colors={['#E8003D', '#E8003D']} style={rc.connectBtn}>
+            <Text style={rc.connectText}>{state === 'timeout' ? '🔄  Try Again' : '🌀  Connect with a Stranger'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       )}
 
       {state === 'idle' && <Text style={rc.hint}>Average wait: under 10 seconds</Text>}
+      {state === 'timeout' && <Text style={rc.hint}>Searched for 30 seconds — no match found</Text>}
 
       {/* Stats */}
       <View style={rc.statsRow}>
@@ -381,16 +387,16 @@ const rc = StyleSheet.create({
   connectWrap:  { borderRadius: 18, overflow: 'hidden', width: '100%' },
   connectBtn:   { paddingVertical: 16, alignItems: 'center' },
   connectText:  { color: '#fff', fontSize: 16, fontWeight: '800' },
-  cancelBtn:    { backgroundColor: '#12122a', borderRadius: 18, paddingVertical: 16, paddingHorizontal: 40, borderWidth: 1, borderColor: '#1e1e38' },
+  cancelBtn:    { backgroundColor: '#16181C', borderRadius: 18, paddingVertical: 16, paddingHorizontal: 40, borderWidth: 1, borderColor: '#2F3336' },
   cancelText:   { color: '#aaa', fontSize: 15, fontWeight: '700' },
   hint:         { color: '#444', fontSize: 12 },
   statsRow:     { flexDirection: 'row', gap: 12, width: '100%', marginTop: 8 },
-  statCard:     { flex: 1, backgroundColor: '#12122a', borderRadius: 18, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#1e1e38' },
+  statCard:     { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#2F3336' },
   statVal:      { color: '#fff', fontSize: 16, fontWeight: '900' },
   statLbl:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  connHeader:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#1e1e38' },
+  connHeader:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
   connAvatar:   { position: 'relative' },
-  onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#0a0a18' },
+  onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
   connName:     { color: '#fff', fontSize: 16, fontWeight: '800' },
   connCountry:  { color: '#555', fontSize: 12, marginTop: 2 },
   endBtn:       { backgroundColor: '#e5393522', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#e5393540' },
@@ -400,12 +406,12 @@ const rc = StyleSheet.create({
   msgRow:       { flexDirection: 'row' },
   msgRowMine:   { justifyContent: 'flex-end' },
   bubble:       { maxWidth: width * 0.72, borderRadius: 18, padding: 12 },
-  bubbleMine:   { backgroundColor: '#5865f2', borderBottomRightRadius: 4 },
-  bubbleOther:  { backgroundColor: '#12122a', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e1e38' },
+  bubbleMine:   { backgroundColor: '#E8003D', borderBottomRightRadius: 4 },
+  bubbleOther:  { backgroundColor: '#16181C', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2F3336' },
   msgText:      { color: '#fff', fontSize: 14, lineHeight: 20 },
   translated:   { color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop: 2 },
-  inputRow:     { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#1e1e38', gap: 10, alignItems: 'flex-end' },
-  input:        { flex: 1, backgroundColor: '#12122a', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#1e1e38' },
+  inputRow:     { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#2F3336', gap: 10, alignItems: 'flex-end' },
+  input:        { flex: 1, backgroundColor: '#16181C', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#2F3336' },
   sendBtn:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 });
@@ -453,7 +459,7 @@ function LanguageTab({ user, navigation }) {
   return (
     <ScrollView contentContainerStyle={lx.scroll} showsVerticalScrollIndicator={false}>
       {/* Your language */}
-      <LinearGradient colors={['#1a1442', '#0a0a18']} style={lx.myBadge}>
+      <LinearGradient colors={['#16181C', '#000000']} style={lx.myBadge}>
         <Text style={{ fontSize: 36 }}>{myFlag}</Text>
         <View style={{ flex: 1 }}>
           <Text style={lx.myTitle}>You speak {myName}</Text>
@@ -472,7 +478,7 @@ function LanguageTab({ user, navigation }) {
 
       {loading ? (
         <View style={lx.loading}>
-          <ActivityIndicator color="#5865f2" />
+          <ActivityIndicator color="#E8003D" />
           <Text style={lx.loadingText}>Finding language partners…</Text>
         </View>
       ) : partners.length === 0 ? (
@@ -518,7 +524,7 @@ function LanguageTab({ user, navigation }) {
 }
 const lx = StyleSheet.create({
   scroll:        { padding: 20, gap: 12, paddingBottom: 50 },
-  myBadge:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#5865f230' },
+  myBadge:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#E8003D30' },
   myTitle:       { color: '#fff', fontSize: 16, fontWeight: '800' },
   mySub:         { color: '#ffffff66', fontSize: 12, marginTop: 3, lineHeight: 18 },
   proGate:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f59e0b15', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#f59e0b30' },
@@ -528,13 +534,13 @@ const lx = StyleSheet.create({
   loadingText:   { color: '#555', fontSize: 14 },
   emptyTitle:    { color: '#fff', fontSize: 17, fontWeight: '700' },
   emptyText:     { color: '#555', fontSize: 13, textAlign: 'center' },
-  card:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#1e1e38', gap: 14 },
-  onlineDot:     { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#0a0a18' },
+  card:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2F3336', gap: 14 },
+  onlineDot:     { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
   name:          { color: '#fff', fontSize: 15, fontWeight: '700' },
   country:       { color: '#555', fontSize: 12 },
-  exchangeBadge: { backgroundColor: '#5865f218', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#5865f235' },
-  exchangeFlags: { color: '#5865f2', fontSize: 15, fontWeight: '800' },
-  exchangeNames: { color: '#5865f288', fontSize: 9, fontWeight: '700' },
+  exchangeBadge: { backgroundColor: '#E8003D18', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E8003D35' },
+  exchangeFlags: { color: '#E8003D', fontSize: 15, fontWeight: '800' },
+  exchangeNames: { color: '#E8003D88', fontSize: 9, fontWeight: '700' },
 });
 
 // ─── People tab ───────────────────────────────────────────────────────────────
@@ -629,12 +635,12 @@ function PeopleTab({ user, navigation }) {
               style={[
                 pe.chip,
                 active && meta  && { backgroundColor: meta.color + '20', borderColor: meta.color + '55' },
-                active && !meta && { backgroundColor: '#5865f220', borderColor: '#5865f255' },
+                active && !meta && { backgroundColor: '#E8003D20', borderColor: '#E8003D55' },
               ]}
               onPress={() => setCtFilter(f.id)}
             >
               <Text style={{ fontSize: 13 }}>{f.emoji}</Text>
-              <Text style={[pe.chipText, active && { color: meta ? meta.color : '#5865f2' }]}>{f.label}</Text>
+              <Text style={[pe.chipText, active && { color: meta ? meta.color : '#E8003D' }]}>{f.label}</Text>
             </TouchableOpacity>
           );
         }}
@@ -643,7 +649,7 @@ function PeopleTab({ user, navigation }) {
 
       {loading ? (
         <View style={pe.loading}>
-          <ActivityIndicator color="#5865f2" />
+          <ActivityIndicator color="#E8003D" />
           <Text style={pe.loadingText}>Loading people…</Text>
         </View>
       ) : profiles.length === 0 ? (
@@ -658,7 +664,7 @@ function PeopleTab({ user, navigation }) {
           keyExtractor={p => String(p.user_id)}
           contentContainerStyle={pe.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} tintColor="#5865f2" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} tintColor="#E8003D" />}
           renderItem={({ item: p }) => {
             const isOnline = online[p.user_id];
             const cts      = p.connection_types || [];
@@ -713,20 +719,20 @@ function PeopleTab({ user, navigation }) {
   );
 }
 const pe = StyleSheet.create({
-  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, marginBottom: 8, backgroundColor: '#12122a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#1e1e38' },
+  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, marginBottom: 8, backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336' },
   searchIcon:  { fontSize: 16 },
   searchInput: { flex: 1, color: '#fff', fontSize: 15 },
   searchClear: { color: '#444', fontSize: 15, paddingHorizontal: 4 },
   filtersRow:  { paddingHorizontal: 20, gap: 8 },
-  chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
+  chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
   chipText:    { color: '#555', fontSize: 12, fontWeight: '700' },
   loading:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { color: '#555', fontSize: 14 },
   emptyTitle:  { color: '#fff', fontSize: 17, fontWeight: '700' },
   emptySub:    { color: '#555', fontSize: 13, textAlign: 'center' },
   list:        { padding: 16, gap: 10, paddingBottom: 60 },
-  card:        { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#12122a', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#1e1e38' },
-  onlineDot:   { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#0a0a18' },
+  card:        { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#16181C', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
+  onlineDot:   { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
   nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
   name:        { color: '#fff', fontSize: 16, fontWeight: '800' },
   age:         { color: '#555', fontSize: 14 },
@@ -741,6 +747,7 @@ const pe = StyleSheet.create({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function DiscoverScreen({ navigation, user }) {
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState('icebreaker');
   const indicatorX = useRef(new Animated.Value(0)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -758,17 +765,17 @@ export default function DiscoverScreen({ navigation, user }) {
   const headerSlide = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* ── Header ── */}
       <Animated.View style={[styles.header, { opacity: headerAnim, transform: [{ translateY: headerSlide }] }]}>
         <View>
-          <Text style={styles.title}>Discover</Text>
-          <Text style={styles.subtitle}>New ways to connect with the world</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Discover</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>New ways to connect with the world</Text>
         </View>
       </Animated.View>
 
       {/* ── Tab bar ── */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
         {TABS.map(t => {
           const active = activeTab === t.id;
           return (
@@ -796,16 +803,16 @@ export default function DiscoverScreen({ navigation, user }) {
 }
 
 const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: '#0a0a18' },
+  container:     { flex: 1, backgroundColor: '#000000' },
 
   header:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
   title:         { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   subtitle:      { color: '#444', fontSize: 13, marginTop: 3 },
 
-  tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1e1e38', position: 'relative' },
+  tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2F3336', position: 'relative' },
   tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 3 },
   tabIcon:       { fontSize: 18 },
   tabLabel:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  tabLabelActive:{ color: '#5865f2' },
-  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#5865f2', borderRadius: 2 },
+  tabLabelActive:{ color: '#E8003D' },
+  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#E8003D', borderRadius: 2 },
 });

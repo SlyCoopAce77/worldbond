@@ -6,7 +6,7 @@ import {
 import { getSocket } from '../services/socket';
 
 export default function PlaceDetailScreen({ route, navigation }) {
-  const { place, user } = route.params;
+  const { place, user } = route.params || {};
   const [checkins, setCheckins] = useState([]);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -361,22 +361,22 @@ function stringToColor(str = '') {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f1a' },
+  container: { flex: 1, backgroundColor: '#000000' },
   header: {
     flexDirection: 'row', alignItems: 'center', padding: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a2e', gap: 10,
+    borderBottomWidth: 1, borderBottomColor: '#1C1F23', gap: 10,
   },
   backBtn: { padding: 6 },
-  backText: { color: '#5865f2', fontSize: 22 },
+  backText: { color: '#E8003D', fontSize: 22 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIcon: { fontSize: 28 },
   headerName: { color: '#fff', fontSize: 15, fontWeight: '700', maxWidth: 160 },
   headerCity: { color: '#888', fontSize: 11, marginTop: 2 },
   checkinBtn: {
-    backgroundColor: '#1a1a2e', borderRadius: 20, paddingHorizontal: 12,
-    paddingVertical: 7, borderWidth: 1, borderColor: '#2a2a4a',
+    backgroundColor: '#1C1F23', borderRadius: 20, paddingHorizontal: 12,
+    paddingVertical: 7, borderWidth: 1, borderColor: '#2F3336',
   },
-  checkinBtnActive: { backgroundColor: '#5865f2', borderColor: '#5865f2' },
+  checkinBtnActive: { backgroundColor: '#E8003D', borderColor: '#E8003D' },
   checkinBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   liveBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20,
@@ -384,24 +384,24 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4caf50' },
   liveText: { color: '#4caf50', fontSize: 13, fontWeight: '600' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
+  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#5865f2' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: '#E8003D' },
   tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#5865f2' },
+  tabTextActive: { color: '#E8003D' },
   infoScroll: { padding: 20, gap: 16 },
-  infoCard: { backgroundColor: '#1a1a2e', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2a2a4a' },
+  infoCard: { backgroundColor: '#1C1F23', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
   infoDesc: { color: '#ccc', fontSize: 15, lineHeight: 22 },
   infoRow: { flexDirection: 'row', gap: 12 },
-  infoItem: { flex: 1, backgroundColor: '#1a1a2e', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2a2a4a' },
+  infoItem: { flex: 1, backgroundColor: '#1C1F23', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
   infoItemLabel: { color: '#888', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
   infoItemValue: { color: '#fff', fontSize: 14, fontWeight: '600' },
   infoSectionLabel: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { backgroundColor: '#5865f222', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  tagText: { color: '#5865f2', fontSize: 13 },
+  tag: { backgroundColor: '#E8003D22', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { color: '#E8003D', fontSize: 13 },
   bigCheckinBtn: {
-    backgroundColor: '#5865f2', borderRadius: 14, padding: 16,
+    backgroundColor: '#E8003D', borderRadius: 14, padding: 16,
     alignItems: 'center', marginTop: 8,
   },
   bigCheckinBtnActive: { backgroundColor: '#333' },
@@ -409,11 +409,11 @@ const styles = StyleSheet.create({
   checkinHint: { color: '#888', fontSize: 12, textAlign: 'center', marginTop: 8 },
   lockedBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1a1a2e', padding: 14, margin: 16, borderRadius: 12,
-    borderWidth: 1, borderColor: '#2a2a4a',
+    backgroundColor: '#1C1F23', padding: 14, margin: 16, borderRadius: 12,
+    borderWidth: 1, borderColor: '#2F3336',
   },
   lockedText: { color: '#aaa', fontSize: 13, flex: 1 },
-  lockedBtn: { backgroundColor: '#5865f2', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
+  lockedBtn: { backgroundColor: '#E8003D', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
   lockedBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   messageList: { padding: 14, gap: 10, flexGrow: 1 },
   emptyChatWrap: { flex: 1, alignItems: 'center', paddingTop: 60, gap: 10 },
@@ -425,8 +425,8 @@ const styles = StyleSheet.create({
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   avatarText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 12 },
-  bubbleMine: { backgroundColor: '#5865f2', borderBottomRightRadius: 4 },
-  bubbleOther: { backgroundColor: '#1a1a2e', borderBottomLeftRadius: 4 },
+  bubbleMine: { backgroundColor: '#E8003D', borderBottomRightRadius: 4 },
+  bubbleOther: { backgroundColor: '#1C1F23', borderBottomLeftRadius: 4 },
   senderRow: { flexDirection: 'row', gap: 6, marginBottom: 4, alignItems: 'center' },
   senderName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
   senderCountry: { color: '#666', fontSize: 10 },
@@ -435,13 +435,13 @@ const styles = StyleSheet.create({
   timestamp: { color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', padding: 12,
-    borderTopWidth: 1, borderTopColor: '#1a1a2e', gap: 10,
+    borderTopWidth: 1, borderTopColor: '#1C1F23', gap: 10,
   },
   input: {
-    flex: 1, backgroundColor: '#1a1a2e', color: '#fff', borderRadius: 20,
+    flex: 1, backgroundColor: '#1C1F23', color: '#fff', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100,
   },
-  sendBtn: { backgroundColor: '#5865f2', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: '#E8003D', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 18 },
   peopleList: { padding: 16, gap: 10 },
@@ -449,16 +449,16 @@ const styles = StyleSheet.create({
   emptyPeopleText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   emptyPeopleSub: { color: '#888', fontSize: 13 },
   personCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a2e',
-    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#2a2a4a',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1F23',
+    borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#2F3336',
   },
   personAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   personAvatarText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { color: '#fff', fontSize: 15, fontWeight: '600' },
   personCountry: { color: '#888', fontSize: 12, marginTop: 2 },
-  personLang: { backgroundColor: '#5865f233', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  personLangText: { color: '#5865f2', fontSize: 12, fontWeight: '700' },
+  personLang: { backgroundColor: '#E8003D33', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  personLangText: { color: '#E8003D', fontSize: 12, fontWeight: '700' },
 
   // Rating strip
   ratingStrip: {
@@ -472,8 +472,8 @@ const styles = StyleSheet.create({
   // Reviews tab
   reviewsScroll: { padding: 16, gap: 16 },
   reviewForm: {
-    backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#2a2a4a', gap: 12,
+    backgroundColor: '#1C1F23', borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: '#2F3336', gap: 12,
   },
   reviewFormTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   starsRow: { flexDirection: 'row', gap: 8 },
@@ -481,12 +481,12 @@ const styles = StyleSheet.create({
   starIcon: { fontSize: 32, color: '#444' },
   starIconFilled: { color: '#f59e0b' },
   reviewInput: {
-    backgroundColor: '#0f0f1a', color: '#fff', borderRadius: 10,
+    backgroundColor: '#000000', color: '#fff', borderRadius: 10,
     padding: 12, fontSize: 14, minHeight: 80, textAlignVertical: 'top',
-    borderWidth: 1, borderColor: '#2a2a4a',
+    borderWidth: 1, borderColor: '#2F3336',
   },
   submitReviewBtn: {
-    backgroundColor: '#5865f2', borderRadius: 12, padding: 14, alignItems: 'center',
+    backgroundColor: '#E8003D', borderRadius: 12, padding: 14, alignItems: 'center',
   },
   submitReviewBtnDisabled: { backgroundColor: '#333' },
   submitReviewBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
@@ -494,8 +494,8 @@ const styles = StyleSheet.create({
   emptyReviewsText: { color: '#fff', fontSize: 17, fontWeight: '600' },
   emptyReviewsSub: { color: '#888', fontSize: 13 },
   reviewCard: {
-    backgroundColor: '#1a1a2e', borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: '#2a2a4a', gap: 10,
+    backgroundColor: '#1C1F23', borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: '#2F3336', gap: 10,
   },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   reviewAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

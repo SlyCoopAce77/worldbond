@@ -37,11 +37,11 @@ function FloatingReaction({ emoji, id, onDone }) {
 }
 
 export default function LiveWatchScreen({ route, navigation }) {
-  const { stream, currentUser } = route.params;
+  const { stream, currentUser } = route.params || {};
   const socket = getSocket();
 
   const [messages,    setMessages]    = useState([]);
-  const [viewerCount, setViewerCount] = useState(stream.viewerCount || 0);
+  const [viewerCount, setViewerCount] = useState(stream?.viewerCount || 0);
   const [floats,      setFloats]      = useState([]);
   const [text,        setText]        = useState('');
   const [ended,       setEnded]       = useState(false);
@@ -117,7 +117,7 @@ export default function LiveWatchScreen({ route, navigation }) {
   if (ended) {
     return (
       <View style={styles.endedScreen}>
-        <LinearGradient colors={['#1a0a2e', '#0a0a18']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['#1a0a2e', '#000000']} style={StyleSheet.absoluteFill} />
         <Text style={{ fontSize: 52, marginBottom: 20 }}>📴</Text>
         <Text style={styles.endedTitle}>Live ended</Text>
         <Text style={styles.endedSub}>{stream.hostName} ended their stream</Text>
@@ -133,7 +133,7 @@ export default function LiveWatchScreen({ route, navigation }) {
       <StatusBar hidden />
 
       {/* Background */}
-      <LinearGradient colors={['#1a0a2e', '#0a0a18', '#001a0a']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#1a0a2e', '#000000', '#001a0a']} style={StyleSheet.absoluteFill} />
 
       {/* Host visual */}
       <View style={styles.centerAvatar}>
@@ -268,8 +268,8 @@ const styles = StyleSheet.create({
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
-  msgRowMine:   { borderLeftWidth: 2, borderLeftColor: '#5865f2' },
-  msgName:      { color: '#5865f2', fontWeight: '700', fontSize: 13 },
+  msgRowMine:   { borderLeftWidth: 2, borderLeftColor: '#E8003D' },
+  msgName:      { color: '#E8003D', fontWeight: '700', fontSize: 13 },
   msgText:      { color: '#fff', fontSize: 13 },
   translated:   { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
@@ -279,12 +279,12 @@ const styles = StyleSheet.create({
 
   inputBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   input:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#5865f2', alignItems: 'center', justifyContent: 'center' },
+  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
   endedScreen:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   endedTitle:   { color: '#fff', fontSize: 24, fontWeight: '900' },
   endedSub:     { color: '#666', fontSize: 14, marginBottom: 20 },
-  endedBtn:     { backgroundColor: '#5865f2', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
+  endedBtn:     { backgroundColor: '#E8003D', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
   endedBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

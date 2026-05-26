@@ -68,12 +68,12 @@ function VoiceNote() {
   );
 }
 const vn = StyleSheet.create({
-  row:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#5865f215', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: '#5865f230' },
-  btn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#5865f2', alignItems: 'center', justifyContent: 'center' },
-  btnOn:{ backgroundColor: '#4752c4' },
+  row:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8003D15', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: '#E8003D30' },
+  btn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
+  btnOn:{ backgroundColor: '#C7003A' },
   btnIcon: { color: '#fff', fontSize: 12 },
   wave: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  bar:  { width: 3, borderRadius: 2, backgroundColor: '#5865f2' },
+  bar:  { width: 3, borderRadius: 2, backgroundColor: '#E8003D' },
   dur:  { color: '#555', fontSize: 11 },
 });
 
@@ -89,7 +89,7 @@ function ScoreRing({ score }) {
   );
 }
 const ring = StyleSheet.create({
-  wrap: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f0f1a' },
+  wrap: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
   num:  { fontSize: 18, fontWeight: '800' },
   lbl:  { color: '#555', fontSize: 9, marginTop: -2 },
 });
@@ -121,7 +121,7 @@ const bd = StyleSheet.create({
   title: { color: '#555', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 },
   row:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   label: { color: '#666', fontSize: 11, width: 110 },
-  track: { flex: 1, height: 3, backgroundColor: '#1e1e3a', borderRadius: 2, overflow: 'hidden' },
+  track: { flex: 1, height: 3, backgroundColor: '#2F3336', borderRadius: 2, overflow: 'hidden' },
   fill:  { height: '100%', borderRadius: 2 },
   pct:   { fontSize: 11, fontWeight: '700', width: 30, textAlign: 'right' },
 });
@@ -173,7 +173,7 @@ function DailyCard({ item, onConnect, onPass, onProfile, index }) {
               <Text style={dc.photoInitial}>{name[0]?.toUpperCase()}</Text>
             </LinearGradient>
           )}
-          <LinearGradient colors={['transparent', 'transparent', '#0f0f1a']} style={dc.photoOverlay} />
+          <LinearGradient colors={['transparent', 'transparent', '#000000']} style={dc.photoOverlay} />
 
           {/* Score ring */}
           <View style={dc.ringWrap}>
@@ -250,7 +250,7 @@ function DailyCard({ item, onConnect, onPass, onProfile, index }) {
 
 const dc = StyleSheet.create({
   wrap:          { marginBottom: 20 },
-  card:          { backgroundColor: '#12122a', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#1e1e38' },
+  card:          { backgroundColor: '#16181C', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336' },
   photoArea:     { height: 260, position: 'relative' },
   photo:         { position: 'absolute', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   photoInitial:  { color: '#fff', fontSize: 80, fontWeight: '800', opacity: 0.7 },
@@ -264,9 +264,9 @@ const dc = StyleSheet.create({
   body:          { padding: 18, gap: 14 },
   bio:           { color: '#aaa', fontSize: 14, lineHeight: 22 },
   breakdownToggle:{ alignSelf: 'flex-start' },
-  breakdownToggleText: { color: '#5865f2', fontSize: 12, fontWeight: '600' },
+  breakdownToggleText: { color: '#E8003D', fontSize: 12, fontWeight: '600' },
   actions:       { flexDirection: 'row', gap: 10, marginTop: 4 },
-  passBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 16, backgroundColor: '#1e1e38', borderWidth: 1, borderColor: '#2a2a4a' },
+  passBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 16, backgroundColor: '#2F3336', borderWidth: 1, borderColor: '#2F3336' },
   passIcon:      { color: '#555', fontSize: 14, fontWeight: '700' },
   passText:      { color: '#555', fontSize: 14, fontWeight: '700' },
   connectGrad:   { flex: 2, borderRadius: 16, overflow: 'hidden' },
@@ -318,7 +318,7 @@ function ConnectionRow({ item, onChat, onProfile, index }) {
         </View>
 
         <TouchableOpacity style={cr.chatBtn} onPress={onChat}>
-          <LinearGradient colors={['#5865f2', '#4752c4']} style={cr.chatGrad}>
+          <LinearGradient colors={['#E8003D', '#C7003A']} style={cr.chatGrad}>
             <Text style={cr.chatIcon}>💬</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -327,12 +327,12 @@ function ConnectionRow({ item, onChat, onProfile, index }) {
   );
 }
 const cr = StyleSheet.create({
-  row:           { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 20, padding: 14, gap: 14, marginBottom: 10, borderWidth: 1, borderColor: '#1e1e38' },
+  row:           { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 20, padding: 14, gap: 14, marginBottom: 10, borderWidth: 1, borderColor: '#2F3336' },
   avatarWrap:    { position: 'relative' },
   avatar:        { width: 58, height: 58, borderRadius: 29 },
   avatarFallback:{ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  ctDot:         { position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#0a0a18' },
+  ctDot:         { position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000000' },
   name:          { color: '#fff', fontSize: 16, fontWeight: '700' },
   meta:          { color: '#555', fontSize: 12 },
   badge:         { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, marginTop: 2 },
@@ -460,7 +460,7 @@ export default function MatchesScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator color="#5865f2" size="large" />
+          <ActivityIndicator color="#E8003D" size="large" />
           <Text style={styles.loadingText}>Finding your matches…</Text>
         </View>
       ) : (
@@ -473,7 +473,7 @@ export default function MatchesScreen({ navigation }) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); load(); }}
-              tintColor="#5865f2"
+              tintColor="#E8003D"
             />
           }
           renderItem={({ item, index }) =>
@@ -496,7 +496,7 @@ export default function MatchesScreen({ navigation }) {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <LinearGradient colors={['#1a1a38', '#12122a']} style={styles.emptyCard}>
+              <LinearGradient colors={['#1C1F23', '#16181C']} style={styles.emptyCard}>
                 <Text style={styles.emptyEmoji}>{tab === 'daily' ? '✨' : '💛'}</Text>
                 <Text style={styles.emptyTitle}>
                   {tab === 'daily' ? 'No matches yet' : 'No connections yet'}
@@ -524,20 +524,20 @@ export default function MatchesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#0a0a18' },
+  container:   { flex: 1, backgroundColor: '#000000' },
 
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10 },
   headerTitle: { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   countPills:  { flexDirection: 'row', gap: 8 },
-  pill:        { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#5865f215', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#5865f240' },
-  pillNum:     { color: '#5865f2', fontSize: 15, fontWeight: '800' },
+  pill:        { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E8003D15', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#E8003D40' },
+  pillNum:     { color: '#E8003D', fontSize: 15, fontWeight: '800' },
   pillLabel:   { color: '#555', fontSize: 10 },
 
-  tabBar:      { flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, backgroundColor: '#12122a', borderRadius: 16, padding: 4, position: 'relative', overflow: 'hidden' },
+  tabBar:      { flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, backgroundColor: '#16181C', borderRadius: 16, padding: 4, position: 'relative', overflow: 'hidden' },
   tabBtn:      { flex: 1, paddingVertical: 11, alignItems: 'center', zIndex: 1 },
   tabText:     { color: '#555', fontSize: 13, fontWeight: '700' },
   tabTextOn:   { color: '#fff' },
-  tabIndicator:{ position: 'absolute', top: 4, bottom: 4, left: 4, width: '50%', backgroundColor: '#5865f2', borderRadius: 12 },
+  tabIndicator:{ position: 'absolute', top: 4, bottom: 4, left: 4, width: '50%', backgroundColor: '#E8003D', borderRadius: 12 },
 
   list:        { paddingHorizontal: 20, paddingBottom: 60 },
 
@@ -545,10 +545,10 @@ const styles = StyleSheet.create({
   loadingText: { color: '#555', fontSize: 14 },
 
   empty:       { paddingTop: 40 },
-  emptyCard:   { borderRadius: 24, padding: 32, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#5865f220' },
+  emptyCard:   { borderRadius: 24, padding: 32, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#E8003D20' },
   emptyEmoji:  { fontSize: 50 },
   emptyTitle:  { color: '#fff', fontSize: 20, fontWeight: '800' },
   emptySub:    { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  emptyBtn:    { marginTop: 6, backgroundColor: '#5865f2', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13 },
+  emptyBtn:    { marginTop: 6, backgroundColor: '#E8003D', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13 },
   emptyBtnText:{ color: '#fff', fontSize: 14, fontWeight: '700' },
 });

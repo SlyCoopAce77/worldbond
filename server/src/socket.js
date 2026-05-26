@@ -23,6 +23,7 @@ if (process.env.DATABASE_URL) {
 const connectedUsers = {};
 const directMessageHistory = {};
 const randomConnectQueue = []; // users waiting for a random match
+const randomConnectTimers = {}; // socketId -> timeout handle
 const liveStreams = {};        // streamId -> stream object
 
 function getDMKey(userA, userB) {
@@ -407,6 +408,13 @@ function setupSocket(io) {
 
     // ── RANDOM WORLD CONNECT ──
 
+    function cancelRandomSearch(id) {
+      const idx = randomConnectQueue.indexOf(id);
+      if (idx !== -1) randomConnectQueue.splice(idx, 1);
+      clearTimeout(randomConnectTimers[id]);
+      delete randomConnectTimers[id];
+    }
+
     socket.on('join_random_connect', () => {
       const user = connectedUsers[socket.id];
       if (!user) return;
@@ -419,6 +427,9 @@ function setupSocket(io) {
 
       if (matchIndex !== -1) {
         const matchedId = randomConnectQueue.splice(matchIndex, 1)[0];
+        clearTimeout(randomConnectTimers[matchedId]);
+        delete randomConnectTimers[matchedId];
+
         const matched = connectedUsers[matchedId];
         if (!matched) {
           if (!randomConnectQueue.includes(socket.id)) randomConnectQueue.push(socket.id);
@@ -433,15 +444,19 @@ function setupSocket(io) {
         socket.emit('random_match', { matchedUser: matched, roomKey });
         io.to(matchedId).emit('random_match', { matchedUser: user, roomKey });
       } else {
-        // Add to queue
+        // Add to queue and start a 30-second timeout
         if (!randomConnectQueue.includes(socket.id)) randomConnectQueue.push(socket.id);
         socket.emit('random_waiting');
+
+        randomConnectTimers[socket.id] = setTimeout(() => {
+          cancelRandomSearch(socket.id);
+          socket.emit('random_timeout');
+        }, 30000);
       }
     });
 
     socket.on('leave_random_connect', () => {
-      const idx = randomConnectQueue.indexOf(socket.id);
-      if (idx !== -1) randomConnectQueue.splice(idx, 1);
+      cancelRandomSearch(socket.id);
       socket.emit('random_cancelled');
     });
 

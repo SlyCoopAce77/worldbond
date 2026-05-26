@@ -13,10 +13,10 @@ import { getSocket, SERVER_URL } from '../services/socket';
 const { width: SCREEN_W } = Dimensions.get('window');
 const PANEL_W = Math.min(SCREEN_W * 0.78, 320);
 
-const ACCENT  = '#5865f2';
-const BG      = '#0f0f1a';
-const CARD    = '#1a1a2e';
-const BORDER  = '#2a2a4a';
+const ACCENT  = '#E8003D';
+const BG      = '#000000';
+const CARD    = '#1C1F23';
+const BORDER  = '#2F3336';
 const REACTIONS = ['❤️', '🔥', '😂', '👍', '😮', '😢'];
 
 // Deterministic color per username (stable across renders)
@@ -174,9 +174,9 @@ function MembersPanel({ visible, members, category, activeRoom, onClose }) {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function GroupChatScreen({ route, navigation }) {
-  const { category, user } = route.params;
+  const { category, user } = route.params || {};
 
-  const [activeRoom,   setActiveRoom]   = useState(category.rooms[0]);
+  const [activeRoom,   setActiveRoom]   = useState(category?.rooms?.[0]);
   const [messages,     setMessages]     = useState([]);
   const [text,         setText]         = useState('');
   const [members,      setMembers]      = useState([]);
@@ -278,7 +278,7 @@ export default function GroupChatScreen({ route, navigation }) {
       const formData = new FormData();
       formData.append('photo', { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'photo.jpg' });
       const { data } = await axios.post(`${SERVER_URL}/api/photos/upload`, formData, {
-        headers: { ...headers, 'Content-Type': 'multipart/form-data' }, timeout: 30000,
+        headers: { ...headers }, timeout: 30000,
       });
       socket.emit('group_message', {
         categoryId: category.id,
@@ -480,7 +480,7 @@ export default function GroupChatScreen({ route, navigation }) {
 
           {text.trim() ? (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
-              <LinearGradient colors={[ACCENT, '#7289da']} style={styles.sendBtn}>
+              <LinearGradient colors={[ACCENT, '#E8003D']} style={styles.sendBtn}>
                 <Text style={styles.sendIcon}>➤</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a2e', gap: 10,
+    borderBottomWidth: 1, borderBottomColor: '#1C1F23', gap: 10,
   },
   backBtn:    { padding: 4 },
   backArrow:  { color: ACCENT, fontSize: 24 },
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   membersBtnCount: { color: ACCENT, fontSize: 13, fontWeight: '800' },
 
   // Room tabs
-  roomTabsBar:     { maxHeight: 46, borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
+  roomTabsBar:     { maxHeight: 46, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
   roomTabsContent: { paddingHorizontal: 12, gap: 8, alignItems: 'center', paddingVertical: 8 },
   roomTab:         { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 16, backgroundColor: CARD },
   roomTabActive:   { backgroundColor: ACCENT },
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
     padding: 10, gap: 8,
-    borderTopWidth: 1, borderTopColor: '#1a1a2e',
+    borderTopWidth: 1, borderTopColor: '#1C1F23',
     backgroundColor: BG,
   },
   inputAction:     { width: 40, height: 40, borderRadius: 20, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },

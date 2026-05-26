@@ -9,7 +9,7 @@ const { width } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 const TYPES = {
-  match:     { icon: '🌍', label: 'Match',    color: '#5865f2', bg: '#5865f215', border: '#5865f240' },
+  match:     { icon: '🌍', label: 'Match',    color: '#E8003D', bg: '#E8003D15', border: '#E8003D40' },
   message:   { icon: '💬', label: 'Message',  color: '#26c6da', bg: '#26c6da15', border: '#26c6da40' },
   missed:    { icon: '📵', label: 'Missed',   color: '#e53935', bg: '#e5393515', border: '#e5393540' },
   bond:      { icon: '🤝', label: 'Bond',     color: '#57f287', bg: '#57f28715', border: '#57f28740' },
@@ -115,7 +115,7 @@ function NotifRow({ item, index, onPress, onDismiss }) {
 }
 
 const nr = StyleSheet.create({
-  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#1e1e38', marginBottom: 10 },
+  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#2F3336', marginBottom: 10 },
   iconWrap:    { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
   iconText:    { fontSize: 22 },
   body:        { flex: 1, gap: 3 },
@@ -142,10 +142,10 @@ function FilterChip({ label, active, onPress }) {
   );
 }
 const fc = StyleSheet.create({
-  chip:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
-  chipActive: { backgroundColor: '#5865f222', borderColor: '#5865f255' },
+  chip:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  chipActive: { backgroundColor: '#E8003D22', borderColor: '#E8003D55' },
   text:       { color: '#555', fontSize: 13, fontWeight: '600' },
-  textActive: { color: '#5865f2' },
+  textActive: { color: '#E8003D' },
 });
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ function StatsRow({ items }) {
   const bonds   = items.filter(n => n.type === 'bond').length;
 
   const stats = [
-    { label: 'Unread',  value: unread,  color: '#5865f2' },
+    { label: 'Unread',  value: unread,  color: '#E8003D' },
     { label: 'Matches', value: matches, color: '#f59e0b' },
     { label: 'Bonds',   value: bonds,   color: '#57f287' },
   ];
@@ -192,7 +192,7 @@ function StatsRow({ items }) {
   );
 }
 const sr = StyleSheet.create({
-  row:  { flexDirection: 'row', backgroundColor: '#12122a', borderRadius: 18, borderWidth: 1, borderColor: '#1e1e38', marginHorizontal: 20, marginBottom: 16 },
+  row:  { flexDirection: 'row', backgroundColor: '#16181C', borderRadius: 18, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 16 },
   stat: { flex: 1, alignItems: 'center', paddingVertical: 14 },
   val:  { fontSize: 22, fontWeight: '900' },
   lbl:  { color: '#555', fontSize: 11, fontWeight: '600', marginTop: 2 },
@@ -305,17 +305,17 @@ export default function NotificationsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#0a0a18' },
+  container:       { flex: 1, backgroundColor: '#000000' },
 
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
-  backBtn:         { width: 40, height: 40, borderRadius: 12, backgroundColor: '#12122a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e1e38' },
+  backBtn:         { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2F3336' },
   backIcon:        { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
   headerCenter:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:           { color: '#fff', fontSize: 20, fontWeight: '900' },
-  unreadBadge:     { backgroundColor: '#5865f2', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  unreadBadge:     { backgroundColor: '#E8003D', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   unreadBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  markAllBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: '#5865f218', borderWidth: 1, borderColor: '#5865f240' },
-  markAllText:     { color: '#5865f2', fontSize: 12, fontWeight: '700' },
+  markAllBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: '#E8003D18', borderWidth: 1, borderColor: '#E8003D40' },
+  markAllText:     { color: '#E8003D', fontSize: 12, fontWeight: '700' },
 
   filtersRow:      { paddingHorizontal: 20, gap: 8 },
 

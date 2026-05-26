@@ -46,7 +46,7 @@ function FloatingReaction({ emoji, id, onDone }) {
 }
 
 export default function LiveScreen({ route, navigation }) {
-  const { user } = route.params;
+  const { user } = route.params || {};
   const socket = getSocket();
 
   const [phase,         setPhase]         = useState('lobby'); // 'lobby' | 'live'
@@ -155,7 +155,7 @@ export default function LiveScreen({ route, navigation }) {
     return (
       <View style={styles.container}>
         <StatusBar hidden />
-        <LinearGradient colors={['#1a0a2e', '#0a0a18']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['#1a0a2e', '#000000']} style={StyleSheet.absoluteFill} />
         <SafeAreaView style={{ flex: 1 }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
             <TouchableOpacity style={styles.lobbyBack} onPress={() => navigation.goBack()}>
@@ -209,7 +209,7 @@ export default function LiveScreen({ route, navigation }) {
       <StatusBar hidden />
 
       {/* Background — gradient with avatar overlay */}
-      <LinearGradient colors={['#1a0a2e', '#0a0a18', '#001a0a']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#1a0a2e', '#000000', '#001a0a']} style={StyleSheet.absoluteFill} />
 
       {/* Avatar / thumbnail center */}
       <View style={styles.centerAvatar}>
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
-  msgName:      { color: '#5865f2', fontWeight: '700', fontSize: 13 },
+  msgName:      { color: '#E8003D', fontWeight: '700', fontSize: 13 },
   msgText:      { color: '#fff', fontSize: 13 },
   translated:   { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
 
   inputBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   input:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#5865f2', alignItems: 'center', justifyContent: 'center' },
+  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
   // Lobby
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   lobbyLivePill:   { position: 'absolute', bottom: -8, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   lobbyTitle:      { color: '#fff', fontSize: 24, fontWeight: '900', textAlign: 'center' },
   lobbySub:        { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 21 },
-  lobbyInput:      { width: '100%', backgroundColor: '#12122a', color: '#fff', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, fontSize: 15, borderWidth: 1, borderColor: '#1e1e38', marginTop: 8 },
+  lobbyInput:      { width: '100%', backgroundColor: '#16181C', color: '#fff', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, fontSize: 15, borderWidth: 1, borderColor: '#2F3336', marginTop: 8 },
   goLiveBtn:       { width: '100%', borderRadius: 18, overflow: 'hidden', marginTop: 4 },
   goLiveBtnGrad:   { paddingVertical: 18, alignItems: 'center' },
   goLiveBtnText:   { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 0.3 },

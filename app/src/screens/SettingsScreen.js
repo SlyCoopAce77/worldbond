@@ -9,84 +9,85 @@ import axios from 'axios';
 import { getAccessToken, logout } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
+import { useTheme } from '../context/ThemeContext';
 
 const SETTINGS_KEY = 'bond_settings';
 
 const DEFAULTS = {
-  // Privacy
   showInDiscovery:   true,
   showOnlineStatus:  true,
   readReceipts:      true,
-  // Notifications
   notifMatches:      true,
   notifMessages:     true,
   notifBondRequests: true,
   notifEvents:       true,
   notifCalls:        true,
   emailDigest:       false,
-  // Discovery
   autoTranslate:     true,
   safeSearch:        true,
-  // Who can message
-  whoCanMessage:     'everyone', // 'everyone' | 'bonds' | 'nobody'
+  whoCanMessage:     'everyone',
 };
 
-// ─── Section header ───────────────────────────────────────────────────────────
 function Section({ title }) {
-  return <Text style={styles.sectionHeader}>{title}</Text>;
+  const { colors } = useTheme();
+  return <Text style={[s.sectionHeader, { color: colors.textMuted }]}>{title}</Text>;
 }
 
-// ─── Toggle row ───────────────────────────────────────────────────────────────
 function ToggleRow({ icon, label, sublabel, value, onToggle, disabled }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.row}>
-      <View style={styles.rowIcon}><Text style={{ fontSize: 18 }}>{icon}</Text></View>
+    <View style={[s.row, { borderColor: colors.border }]}>
+      <View style={[s.rowIcon, { backgroundColor: colors.accentFaint }]}>
+        <Text style={{ fontSize: 18 }}>{icon}</Text>
+      </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {sublabel ? <Text style={styles.rowSub}>{sublabel}</Text> : null}
+        <Text style={[s.rowLabel, { color: colors.text }]}>{label}</Text>
+        {sublabel ? <Text style={[s.rowSub, { color: colors.textMuted }]}>{sublabel}</Text> : null}
       </View>
       <Switch
         value={value}
         onValueChange={onToggle}
         disabled={disabled}
-        trackColor={{ false: '#1e1e38', true: '#5865f255' }}
-        thumbColor={value ? '#5865f2' : '#444'}
-        ios_backgroundColor="#1e1e38"
+        trackColor={{ false: colors.border, true: '#E8003D55' }}
+        thumbColor={value ? '#E8003D' : colors.textMuted}
+        ios_backgroundColor={colors.border}
       />
     </View>
   );
 }
 
-// ─── Navigation row ───────────────────────────────────────────────────────────
 function NavRow({ icon, label, sublabel, value, onPress, danger }) {
+  const { colors } = useTheme();
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.rowIcon, danger && { backgroundColor: '#e5393518' }]}>
+    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.7}>
+      <View style={[s.rowIcon, { backgroundColor: danger ? '#e5393518' : colors.accentFaint }]}>
         <Text style={{ fontSize: 18 }}>{icon}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.rowLabel, danger && { color: '#e53935' }]}>{label}</Text>
-        {sublabel ? <Text style={styles.rowSub}>{sublabel}</Text> : null}
+        <Text style={[s.rowLabel, { color: danger ? '#e53935' : colors.text }]}>{label}</Text>
+        {sublabel ? <Text style={[s.rowSub, { color: colors.textMuted }]}>{sublabel}</Text> : null}
       </View>
-      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-      <Text style={[styles.chevron, danger && { color: '#e53935' }]}>›</Text>
+      {value ? <Text style={s.rowValue}>{value}</Text> : null}
+      <Text style={[s.chevron, { color: danger ? '#e53935' : colors.textMuted }]}>›</Text>
     </TouchableOpacity>
   );
 }
 
-// ─── Radio row ────────────────────────────────────────────────────────────────
 function RadioGroup({ label, options, value, onChange }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.radioGroup}>
-      <Text style={styles.radioLabel}>{label}</Text>
-      <View style={styles.radioOptions}>
+    <View style={s.radioGroup}>
+      <Text style={[s.radioLabel, { color: colors.text }]}>{label}</Text>
+      <View style={s.radioOptions}>
         {options.map(opt => (
           <TouchableOpacity
             key={opt.value}
-            style={[styles.radioBtn, value === opt.value && styles.radioBtnOn]}
+            style={[s.radioBtn, { backgroundColor: colors.bg, borderColor: colors.border },
+              value === opt.value && { backgroundColor: '#E8003D18', borderColor: '#E8003D55' }]}
             onPress={() => onChange(opt.value)}
           >
-            <Text style={[styles.radioBtnText, value === opt.value && styles.radioBtnTextOn]}>
+            <Text style={[s.radioBtnText, { color: colors.textMuted },
+              value === opt.value && { color: '#E8003D' }]}>
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -96,18 +97,19 @@ function RadioGroup({ label, options, value, onChange }) {
   );
 }
 
-// ─── Card wrapper ─────────────────────────────────────────────────────────────
 function Card({ children }) {
-  return <View style={styles.card}>{children}</View>;
+  const { colors } = useTheme();
+  return <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>{children}</View>;
 }
 
 function Divider() {
-  return <View style={styles.divider} />;
+  const { colors } = useTheme();
+  return <View style={[s.divider, { backgroundColor: colors.border }]} />;
 }
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
 export default function SettingsScreen({ navigation, onLogout }) {
   const { tier, tierInfo } = usePremium();
+  const { colors, isDark, toggleTheme } = useTheme();
   const [settings, setSettings] = useState(DEFAULTS);
   const [saving, setSaving]     = useState(false);
   const [profile, setProfile]   = useState(null);
@@ -205,32 +207,45 @@ export default function SettingsScreen({ navigation, onLogout }) {
     ]);
   }
 
-  const tierColor = tierInfo?.color || '#5865f2';
   const email = profile?.email || '—';
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>‹</Text>
+    <SafeAreaView style={[s.container, { backgroundColor: colors.bg }]}>
+      <View style={[s.header, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={[s.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={[s.backIcon, { color: colors.text }]}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={[s.headerTitle, { color: colors.text }]}>Settings</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {saving && (
-        <View style={styles.savingBanner}>
-          <ActivityIndicator size="small" color="#5865f2" />
-          <Text style={styles.savingText}>Processing…</Text>
+        <View style={s.savingBanner}>
+          <ActivityIndicator size="small" color="#E8003D" />
+          <Text style={s.savingText}>Processing…</Text>
         </View>
       )}
 
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
+
+        {/* ── Appearance ───────────────────────────────────────── */}
+        <Section title="Appearance" />
+        <Card>
+          <ToggleRow
+            icon={isDark ? '🌙' : '☀️'}
+            label="Dark Mode"
+            sublabel={isDark ? 'Dark Mode' : 'Light Mode'}
+            value={isDark}
+            onToggle={toggleTheme}
+          />
+        </Card>
 
         {/* ── Account ──────────────────────────────────────────── */}
         <Section title="Account" />
@@ -448,36 +463,33 @@ export default function SettingsScreen({ navigation, onLogout }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#0a0a18' },
+const s = StyleSheet.create({
+  container:    { flex: 1 },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1 },
+  backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1 },
+  backIcon:     { fontSize: 26, lineHeight: 30 },
+  headerTitle:  { fontSize: 20, fontWeight: '900' },
 
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 },
-  backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12122a', borderRadius: 12, borderWidth: 1, borderColor: '#1e1e38' },
-  backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
-  headerTitle:  { color: '#fff', fontSize: 20, fontWeight: '900' },
-
-  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#5865f215', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#5865f230' },
-  savingText:   { color: '#5865f2', fontSize: 13, fontWeight: '600' },
+  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#E8003D15', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#E8003D30' },
+  savingText:   { color: '#E8003D', fontSize: 13, fontWeight: '600' },
 
   scroll:       { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
 
-  sectionHeader:{ color: '#555', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 16, marginBottom: 6, marginLeft: 4 },
+  sectionHeader:{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 16, marginBottom: 6, marginLeft: 4 },
 
-  card:         { backgroundColor: '#12122a', borderRadius: 20, borderWidth: 1, borderColor: '#1e1e38', overflow: 'hidden' },
-  divider:      { height: 1, backgroundColor: '#1e1e38', marginHorizontal: 16 },
+  card:         { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  divider:      { height: 1, marginHorizontal: 16 },
 
   row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 14 },
-  rowIcon:      { width: 36, height: 36, borderRadius: 10, backgroundColor: '#5865f210', alignItems: 'center', justifyContent: 'center' },
-  rowLabel:     { color: '#e0e0f0', fontSize: 15, fontWeight: '600' },
-  rowSub:       { color: '#555', fontSize: 12, marginTop: 2 },
-  rowValue:     { color: '#5865f2', fontSize: 13, fontWeight: '700' },
-  chevron:      { color: '#333', fontSize: 22, fontWeight: '300' },
+  rowIcon:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  rowLabel:     { fontSize: 15, fontWeight: '600' },
+  rowSub:       { fontSize: 12, marginTop: 2 },
+  rowValue:     { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  chevron:      { fontSize: 22, fontWeight: '300' },
 
   radioGroup:   { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
-  radioLabel:   { color: '#e0e0f0', fontSize: 15, fontWeight: '600' },
+  radioLabel:   { fontSize: 15, fontWeight: '600' },
   radioOptions: { flexDirection: 'row', gap: 8 },
-  radioBtn:     { flex: 1, paddingVertical: 9, borderRadius: 12, backgroundColor: '#0a0a18', borderWidth: 1, borderColor: '#1e1e38', alignItems: 'center' },
-  radioBtnOn:   { backgroundColor: '#5865f218', borderColor: '#5865f255' },
-  radioBtnText: { color: '#555', fontSize: 13, fontWeight: '700' },
-  radioBtnTextOn:{ color: '#5865f2' },
+  radioBtn:     { flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
+  radioBtnText: { fontSize: 13, fontWeight: '700' },
 });

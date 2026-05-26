@@ -54,18 +54,18 @@ function FilterChip({ ct, active, onPress }) {
       style={[
         fc.chip,
         active && !isAll && { backgroundColor: ct.color + '20', borderColor: ct.color + '55' },
-        active && isAll  && { backgroundColor: '#5865f220', borderColor: '#5865f255' },
+        active && isAll  && { backgroundColor: '#E8003D20', borderColor: '#E8003D55' },
       ]}
     >
       {ct && <Text style={{ fontSize: 14 }}>{ct.emoji}</Text>}
-      <Text style={[fc.text, active && { color: ct ? ct.color : '#5865f2' }]}>
+      <Text style={[fc.text, active && { color: ct ? ct.color : '#E8003D' }]}>
         {ct ? ct.label : 'All'}
       </Text>
     </TouchableOpacity>
   );
 }
 const fc = StyleSheet.create({
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
   text: { color: '#555', fontSize: 12, fontWeight: '700' },
 });
 
@@ -146,7 +146,7 @@ function ExpCard({ item, index, onApply }) {
   );
 }
 const card = StyleSheet.create({
-  wrap:      { backgroundColor: '#12122a', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#1e1e38', marginBottom: 12 },
+  wrap:      { backgroundColor: '#16181C', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336', marginBottom: 12 },
   header:    { flexDirection: 'row', alignItems: 'flex-start', padding: 16, gap: 12 },
   catEmoji:  { fontSize: 34, marginTop: 2 },
   title:     { color: '#fff', fontSize: 15, fontWeight: '800', lineHeight: 22 },
@@ -156,7 +156,7 @@ const card = StyleSheet.create({
   body:      { padding: 16, gap: 12 },
   desc:      { color: '#888', fontSize: 13, lineHeight: 20 },
   tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1e1e38', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#2a2a4a' },
+  tag:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2F3336', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#2F3336' },
   tagText:   { color: '#888', fontSize: 11, fontWeight: '600' },
   applyWrap: { borderRadius: 14, overflow: 'hidden' },
   applyGrad: { paddingVertical: 12, alignItems: 'center' },
@@ -270,7 +270,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 onPress={() => update('is_global', !form.is_global)}
               >
                 <Text style={cm.globalIcon}>{form.is_global ? '🌍' : '📍'}</Text>
-                <Text style={[cm.globalText, form.is_global && { color: '#5865f2' }]}>
+                <Text style={[cm.globalText, form.is_global && { color: '#E8003D' }]}>
                   {form.is_global ? 'Global — visible to anyone worldwide' : 'Local — visible to people near you'}
                 </Text>
               </TouchableOpacity>
@@ -283,7 +283,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={form.connection_type ? [ct.color, ct.color + 'bb'] : ['#5865f2', '#4752c4']}
+                  colors={form.connection_type ? [ct.color, ct.color + 'bb'] : ['#E8003D', '#C7003A']}
                   style={cm.submitGrad}
                 >
                   <Text style={cm.submitText}>{loading ? 'Posting…' : 'Post Experience 🌍'}</Text>
@@ -298,22 +298,22 @@ function CreateModal({ visible, onClose, user, onCreated }) {
 }
 const cm = StyleSheet.create({
   overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  sheet:        { backgroundColor: '#0d0d1f', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '92%', borderWidth: 1, borderColor: '#1e1e38' },
-  handle:       { width: 40, height: 4, backgroundColor: '#2a2a4a', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  sheet:        { backgroundColor: '#000000', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '92%', borderWidth: 1, borderColor: '#2F3336' },
+  handle:       { width: 40, height: 4, backgroundColor: '#2F3336', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   headerRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   title:        { color: '#fff', fontSize: 22, fontWeight: '900' },
-  closeBtn:     { width: 34, height: 34, borderRadius: 10, backgroundColor: '#12122a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e1e38' },
+  closeBtn:     { width: 34, height: 34, borderRadius: 10, backgroundColor: '#16181C', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2F3336' },
   closeIcon:    { color: '#555', fontSize: 14 },
   label:        { color: '#555', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
-  input:        { backgroundColor: '#12122a', color: '#fff', borderRadius: 14, padding: 14, fontSize: 15, borderWidth: 1, borderColor: '#1e1e38' },
-  typeChip:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
+  input:        { backgroundColor: '#16181C', color: '#fff', borderRadius: 14, padding: 14, fontSize: 15, borderWidth: 1, borderColor: '#2F3336' },
+  typeChip:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
   typeText:     { color: '#555', fontSize: 12, fontWeight: '700' },
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  catChip:      { width: (width - 48 - 20) / 3, backgroundColor: '#12122a', borderRadius: 16, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#1e1e38' },
-  catChipActive:{ backgroundColor: '#5865f222', borderColor: '#5865f255' },
+  catChip:      { width: (width - 48 - 20) / 3, backgroundColor: '#16181C', borderRadius: 16, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#2F3336' },
+  catChipActive:{ backgroundColor: '#E8003D22', borderColor: '#E8003D55' },
   catLabel:     { color: '#555', fontSize: 11, fontWeight: '700' },
-  globalBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#12122a', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#1e1e38' },
-  globalBtnActive:{ backgroundColor: '#5865f218', borderColor: '#5865f240' },
+  globalBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#16181C', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
+  globalBtnActive:{ backgroundColor: '#E8003D18', borderColor: '#E8003D40' },
   globalIcon:   { fontSize: 20 },
   globalText:   { color: '#555', fontSize: 13, fontWeight: '600', flex: 1 },
   submitWrap:   { borderRadius: 16, overflow: 'hidden' },
@@ -372,7 +372,7 @@ export default function ExperiencesScreen({ navigation, user }) {
           )}
         </View>
         <TouchableOpacity style={styles.postBtn} onPress={() => setShowCreate(true)}>
-          <LinearGradient colors={['#5865f2', '#4752c4']} style={styles.postGrad}>
+          <LinearGradient colors={['#E8003D', '#C7003A']} style={styles.postGrad}>
             <Text style={styles.postText}>+ Post</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -431,15 +431,15 @@ export default function ExperiencesScreen({ navigation, user }) {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#0a0a18' },
+  container:    { flex: 1, backgroundColor: '#000000' },
 
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
-  backBtn:      { width: 40, height: 40, borderRadius: 12, backgroundColor: '#12122a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e1e38' },
+  backBtn:      { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2F3336' },
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:        { color: '#fff', fontSize: 22, fontWeight: '900' },
-  countPill:    { backgroundColor: '#5865f222', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#5865f240' },
-  countText:    { color: '#5865f2', fontSize: 12, fontWeight: '800' },
+  countPill:    { backgroundColor: '#E8003D22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#E8003D40' },
+  countText:    { color: '#E8003D', fontSize: 12, fontWeight: '800' },
   postBtn:      { borderRadius: 14, overflow: 'hidden' },
   postGrad:     { paddingHorizontal: 16, paddingVertical: 9 },
   postText:     { color: '#fff', fontSize: 14, fontWeight: '800' },

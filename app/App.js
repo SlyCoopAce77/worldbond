@@ -5,9 +5,11 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { getSocket, disconnectSocket } from './src/services/socket';
 import { isAuthenticated, getSavedProfile, logout } from './src/services/authApi';
 import { PremiumProvider } from './src/context/PremiumContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
-export default function App() {
-  const [user, setUser]       = useState(null);
+function Inner() {
+  const { colors, isDark } = useTheme();
+  const [user, setUser]   = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,25 +48,35 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={styles.splash}>
-        <StatusBar barStyle="light-content" backgroundColor="#0f0f1a" />
-        <ActivityIndicator size="large" color="#5865f2" />
+      <View style={[styles.splash, { backgroundColor: colors.bg }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
+        <ActivityIndicator size="large" color="#1D9BF0" />
       </View>
     );
   }
 
   return (
-    <PremiumProvider>
-      <StatusBar barStyle="light-content" backgroundColor="#0f0f1a" />
+    <>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
       {user ? (
         <AppNavigator user={user} onLogout={handleLogout} />
       ) : (
         <AuthScreen onLogin={handleLogin} />
       )}
-    </PremiumProvider>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <PremiumProvider>
+        <Inner />
+      </PremiumProvider>
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  splash: { flex: 1, backgroundColor: '#0f0f1a', alignItems: 'center', justifyContent: 'center' },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

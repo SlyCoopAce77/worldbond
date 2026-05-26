@@ -11,7 +11,7 @@ export const FILTERS = [
   { id: 'rose',    name: 'Rose',    overlay: { color: '#e91e63', opacity: 0.18 } },
   { id: 'mint',    name: 'Mint',    overlay: { color: '#4db6ac', opacity: 0.22 } },
   { id: 'vintage', name: 'Vintage', overlay: { color: '#8d6e63', opacity: 0.30 } },
-  { id: 'vivid',   name: 'Vivid',   overlay: { color: '#5865f2', opacity: 0.14 } },
+  { id: 'vivid',   name: 'Vivid',   overlay: { color: '#E8003D', opacity: 0.14 } },
   { id: 'golden',  name: 'Golden',  overlay: { color: '#ffd600', opacity: 0.20 } },
   { id: 'dusk',    name: 'Dusk',    overlay: { color: '#6a1b9a', opacity: 0.22 } },
 ];

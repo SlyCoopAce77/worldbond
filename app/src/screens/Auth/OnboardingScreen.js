@@ -71,8 +71,8 @@ function StepBar({ step }) {
 }
 const bar = StyleSheet.create({
   container: { flexDirection: 'row', gap: 6, marginBottom: 28 },
-  seg:       { flex: 1, height: 4, borderRadius: 2, backgroundColor: '#1e1e38' },
-  segOn:     { backgroundColor: '#5865f2' },
+  seg:       { flex: 1, height: 4, borderRadius: 2, backgroundColor: '#2F3336' },
+  segOn:     { backgroundColor: '#E8003D' },
   segActive: { backgroundColor: '#7c87f5' },
 });
 
@@ -154,11 +154,15 @@ export default function OnboardingScreen({ userId, onComplete }) {
         form.append('country',  country.name);
         form.append('language', language);
         try {
-          const { data } = await axios.post(`${SERVER_URL}/api/photos/upload`, form, {
-            headers: { ...headers, 'Content-Type': 'multipart/form-data' },
-            timeout: 20000,
+          const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: form,
           });
-          photoUrl = data.imageUrl;
+          if (uploadRes.ok) {
+            const data = await uploadRes.json();
+            photoUrl = data.imageUrl;
+          }
         } catch {}
       }
 
@@ -223,7 +227,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   <TextInput
                     style={s.input}
                     placeholder="What should people call you?"
-                    placeholderTextColor="#3a3a5a"
+                    placeholderTextColor="#536471"
                     value={displayName}
                     onChangeText={setDisplayName}
                     maxLength={30}
@@ -236,7 +240,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                     <TextInput
                       style={s.input}
                       placeholder="18+"
-                      placeholderTextColor="#3a3a5a"
+                      placeholderTextColor="#536471"
                       value={age}
                       onChangeText={setAge}
                       keyboardType="number-pad"
@@ -288,7 +292,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   <TextInput
                     style={s.input}
                     placeholder="e.g. Tokyo, Bangkok, New York"
-                    placeholderTextColor="#3a3a5a"
+                    placeholderTextColor="#536471"
                     value={city}
                     onChangeText={setCity}
                   />
@@ -304,7 +308,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                         onPress={() => setLanguage(l.code)}
                       >
                         <Text style={{ fontSize: 15 }}>{l.flag}</Text>
-                        <Text style={[s.langText, language === l.code && { color: '#5865f2', fontWeight: '700' }]}>
+                        <Text style={[s.langText, language === l.code && { color: '#E8003D', fontWeight: '700' }]}>
                           {l.label}
                         </Text>
                       </TouchableOpacity>
@@ -355,7 +359,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                       </View>
                     </>
                   ) : (
-                    <LinearGradient colors={['#12122a', '#0a0a18']} style={s.photoPlaceholder}>
+                    <LinearGradient colors={['#16181C', '#000000']} style={s.photoPlaceholder}>
                       <Text style={{ fontSize: 44 }}>📷</Text>
                       <Text style={s.photoPlaceholderTitle}>Add a profile photo</Text>
                       <Text style={s.photoPlaceholderSub}>Gets 3× more Bonds</Text>
@@ -376,7 +380,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   <TextInput
                     style={[s.input, s.bioInput]}
                     placeholder="What makes you interesting? A joke, a dream, a quirk..."
-                    placeholderTextColor="#3a3a5a"
+                    placeholderTextColor="#536471"
                     value={bio}
                     onChangeText={setBio}
                     multiline
@@ -401,7 +405,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                 <View style={s.nextGrad}><ActivityIndicator color="#fff" /></View>
               ) : (
                 <LinearGradient
-                  colors={['#6875f5', '#5865f2', '#4752c4']}
+                  colors={['#E8003D', '#E8003D', '#C7003A']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={s.nextGrad}
                 >
@@ -432,15 +436,15 @@ export default function OnboardingScreen({ userId, onComplete }) {
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#0a0a18' },
+  container:  { flex: 1, backgroundColor: '#000000' },
   scroll:     { flexGrow: 1, padding: 24, paddingTop: 20, paddingBottom: 50 },
 
   stepHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 28 },
-  stepIconBadge:{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#5865f218', borderWidth: 1, borderColor: '#5865f230', alignItems: 'center', justifyContent: 'center' },
+  stepIconBadge:{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#E8003D18', borderWidth: 1, borderColor: '#E8003D30', alignItems: 'center', justifyContent: 'center' },
   stepIconText: { fontSize: 26 },
-  stepCount:  { color: '#5865f2', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3 },
+  stepCount:  { color: '#E8003D', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3 },
   stepTitle:  { fontSize: 26, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
-  stepSub:    { fontSize: 13, color: '#555577', marginTop: 4 },
+  stepSub:    { fontSize: 13, color: '#536471', marginTop: 4 },
 
   content:    {},
 
@@ -448,37 +452,37 @@ const s = StyleSheet.create({
   row:        { flexDirection: 'row', gap: 14 },
   field:      { gap: 8 },
   labelRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label:      { color: '#555577', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  label:      { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   optional:   { color: '#333355', fontSize: 12 },
 
-  input:      { backgroundColor: '#12122a', color: '#fff', fontSize: 16, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e1e38' },
+  input:      { backgroundColor: '#16181C', color: '#fff', fontSize: 16, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
   bioInput:   { minHeight: 110, textAlignVertical: 'top' },
 
   chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 14, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
-  chipOn:     { backgroundColor: '#5865f220', borderColor: '#5865f2' },
-  chipText:   { color: '#555577', fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: '#5865f2', fontWeight: '700' },
+  chip:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 14, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  chipOn:     { backgroundColor: '#E8003D20', borderColor: '#E8003D' },
+  chipText:   { color: '#536471', fontSize: 13, fontWeight: '600' },
+  chipTextOn: { color: '#E8003D', fontWeight: '700' },
 
-  listBox:    { backgroundColor: '#12122a', borderRadius: 16, borderWidth: 1, borderColor: '#1e1e38', maxHeight: 220 },
+  listBox:    { backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', maxHeight: 220 },
   listItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a30' },
-  listItemOn: { backgroundColor: '#5865f215' },
+  listItemOn: { backgroundColor: '#E8003D15' },
   listItemText:{ flex: 1, color: '#aaa', fontSize: 15 },
-  check:      { color: '#5865f2', fontSize: 16, fontWeight: '800' },
+  check:      { color: '#E8003D', fontSize: 16, fontWeight: '800' },
 
   langGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  langChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
-  langChipOn: { backgroundColor: '#5865f218', borderColor: '#5865f255' },
-  langText:   { color: '#555577', fontSize: 13, fontWeight: '600' },
+  langChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  langChipOn: { backgroundColor: '#E8003D18', borderColor: '#E8003D55' },
+  langText:   { color: '#536471', fontSize: 13, fontWeight: '600' },
 
   ctList:     { gap: 10 },
-  ctCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, backgroundColor: '#12122a', borderRadius: 18, borderWidth: 1.5, borderColor: '#1e1e38' },
+  ctCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, backgroundColor: '#16181C', borderRadius: 18, borderWidth: 1.5, borderColor: '#2F3336' },
   ctIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   ctTitle:    { color: '#aaa', fontSize: 16, fontWeight: '700' },
   ctDesc:     { color: '#444', fontSize: 13, marginTop: 2 },
-  ctCheck:    { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#1e1e38', alignItems: 'center', justifyContent: 'center' },
+  ctCheck:    { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
 
-  photoBox:       { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#1e1e38', borderStyle: 'dashed', height: 200 },
+  photoBox:       { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed', height: 200 },
   photoPreview:   { width: '100%', height: '100%', resizeMode: 'cover' },
   photoOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: '#00000055', alignItems: 'center', justifyContent: 'center', gap: 6 },
   photoOverlayText:{ color: '#fff', fontWeight: '700', fontSize: 14 },
@@ -490,10 +494,10 @@ const s = StyleSheet.create({
 
   btnArea:    { marginTop: 32, gap: 6 },
   nextBtn:    { borderRadius: 18, overflow: 'hidden' },
-  nextGrad:   { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: '#5865f2' },
+  nextGrad:   { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: '#E8003D' },
   nextText:   { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
   skipBtn:    { paddingVertical: 14, alignItems: 'center' },
   skipText:   { color: '#333355', fontSize: 15 },
   backBtn:    { paddingVertical: 12, alignItems: 'center' },
-  backText:   { color: '#5865f2', fontSize: 15, fontWeight: '700' },
+  backText:   { color: '#E8003D', fontSize: 15, fontWeight: '700' },
 });

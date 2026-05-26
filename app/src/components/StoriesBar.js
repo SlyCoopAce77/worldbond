@@ -57,18 +57,18 @@ const styles = StyleSheet.create({
   ring: {
     width: BUBBLE + 4, height: BUBBLE + 4, borderRadius: (BUBBLE + 4) / 2,
     padding: 2,
-    borderWidth: 2, borderColor: '#5865f2',
+    borderWidth: 2, borderColor: '#E8003D',
   },
   addRing: { borderColor: '#333', borderStyle: 'dashed' },
   ownRing: { borderColor: '#e91e63' },
   avatar: {
     flex: 1, borderRadius: BUBBLE / 2,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#1C1F23',
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
   avatarImg: { width: '100%', height: '100%' },
   avatarEmoji: { fontSize: 26 },
-  plus: { fontSize: 28, color: '#5865f2' },
+  plus: { fontSize: 28, color: '#E8003D' },
   name: { color: '#aaa', fontSize: 10, maxWidth: BUBBLE + 4, textAlign: 'center' },
 });

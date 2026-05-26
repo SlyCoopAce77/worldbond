@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   userInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarCircle: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: '#1a1a2e',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#1C1F23',
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff',
   },
   avatarMood: { fontSize: 20 },

@@ -13,6 +13,7 @@ import { getSocket } from '../services/socket';
 import { logout, getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { usePremium, TIERS } from '../context/PremiumContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -90,12 +91,12 @@ function VoiceNotePlayer({ url }) {
   );
 }
 const vStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#5865f212', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#5865f230' },
-  btn:       { width: 42, height: 42, borderRadius: 21, backgroundColor: '#5865f2', alignItems: 'center', justifyContent: 'center' },
-  btnActive: { backgroundColor: '#4752c4' },
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8003D12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#E8003D30' },
+  btn:       { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
+  btnActive: { backgroundColor: '#C7003A' },
   btnIcon:   { color: '#fff', fontSize: 14 },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  bar:       { width: 3, borderRadius: 2, backgroundColor: '#5865f2' },
+  bar:       { width: 3, borderRadius: 2, backgroundColor: '#E8003D' },
   dur:       { color: '#666', fontSize: 12 },
 });
 
@@ -146,7 +147,7 @@ function EditModal({ visible, profile, onSave, onClose }) {
           </TouchableOpacity>
           <Text style={eStyles.title}>Edit Profile</Text>
           <TouchableOpacity onPress={save} disabled={saving}>
-            {saving ? <ActivityIndicator color="#5865f2" /> : <Text style={eStyles.save}>Save</Text>}
+            {saving ? <ActivityIndicator color="#E8003D" /> : <Text style={eStyles.save}>Save</Text>}
           </TouchableOpacity>
         </View>
 
@@ -206,7 +207,7 @@ function EditModal({ visible, profile, onSave, onClose }) {
                     onPress={() => setForm(f => ({ ...f, language: l.code }))}
                   >
                     <Text>{l.flag}</Text>
-                    <Text style={[eStyles.chipText, form.language === l.code && { color: '#5865f2', fontWeight: '700' }]}>{l.label}</Text>
+                    <Text style={[eStyles.chipText, form.language === l.code && { color: '#E8003D', fontWeight: '700' }]}>{l.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -240,27 +241,28 @@ function EditModal({ visible, profile, onSave, onClose }) {
 }
 
 const eStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a18' },
-  header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#1e1e38' },
+  container: { flex: 1, backgroundColor: '#000000' },
+  header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
   cancel:    { color: '#555', fontSize: 16, fontWeight: '600' },
   title:     { color: '#fff', fontSize: 18, fontWeight: '900' },
-  save:      { color: '#5865f2', fontSize: 16, fontWeight: '800' },
+  save:      { color: '#E8003D', fontSize: 16, fontWeight: '800' },
   body:      { padding: 20, gap: 22, paddingBottom: 60 },
   row:       { flexDirection: 'row', gap: 12 },
   group:     { gap: 8 },
   label:     { color: '#555', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
-  input:     { backgroundColor: '#12122a', color: '#fff', fontSize: 15, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#1e1e38' },
-  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
-  chipOn:    { backgroundColor: '#5865f218', borderColor: '#5865f255' },
+  input:     { backgroundColor: '#16181C', color: '#fff', fontSize: 15, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
+  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  chipOn:    { backgroundColor: '#E8003D18', borderColor: '#E8003D55' },
   chipText:  { color: '#666', fontSize: 13, fontWeight: '600' },
   ctGrid:    { gap: 10 },
-  ctCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 18, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
+  ctCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
   ctLabel:   { color: '#666', fontSize: 14, fontWeight: '700' },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { tier, tierInfo, isPremium } = usePremium();
+  const { colors } = useTheme();
   const socket = getSocket();
 
   const [profile, setProfile]       = useState(null);
@@ -323,17 +325,22 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
     try {
       const token = await getAccessToken();
       const form  = new FormData();
-      form.append('photo',    { uri: asset.uri, type: asset.type, name: asset.fileName || 'photo.jpg' });
+      form.append('photo',    { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'photo.jpg' });
       form.append('userId',   user?.userId || '');
       form.append('username', profile?.display_name || user?.username || '');
       form.append('country',  profile?.country || user?.country || '');
       form.append('language', profile?.language || 'en');
-      const { data } = await axios.post(`${SERVER_URL}/api/photos/upload`, form, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
-        timeout: 30000,
+      const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
       });
-      await axios.put(`${SERVER_URL}/api/profiles/me`, { photo_url: data.imageUrl }, {
-        headers: { Authorization: `Bearer ${token}` }, timeout: 10000,
+      if (!uploadRes.ok) throw new Error('upload failed');
+      const data = await uploadRes.json();
+      await fetch(`${SERVER_URL}/api/profiles/me`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_url: data.imageUrl }),
       });
       setProfile(p => ({ ...p, photo_url: data.imageUrl }));
     } catch {
@@ -375,19 +382,19 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const pct         = completionPct(profile);
   const rel         = getReliability(profile?.ghost_score);
   const displayName = profile?.display_name || user?.username || 'You';
-  const tierColor   = tierInfo?.color || '#5865f2';
+  const tierColor   = tierInfo?.color || '#E8003D';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Top bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>My Profile</Text>
+      <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.topBarTitle, { color: colors.text }]}>My Profile</Text>
         <View style={styles.topBarActions}>
           <TouchableOpacity style={styles.editBtn} onPress={() => setShowEdit(true)}>
             <Text style={styles.editBtnText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.settingsBtn}
+            style={[styles.settingsBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => navigation.navigate('Settings')}
           >
             <Text style={styles.settingsBtnText}>⚙️</Text>
@@ -396,14 +403,14 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       </View>
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
         {[{ key: 'bond', label: '✨ Bond' }, { key: 'culture', label: '🌍 Culture' }].map(t => (
           <TouchableOpacity
             key={t.key}
             style={[styles.tab, tab === t.key && styles.tabActive]}
             onPress={() => setTab(t.key)}
           >
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Text style={[styles.tabText, { color: colors.textMuted }, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -417,13 +424,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Hero banner ─────────────────────────────────── */}
           <View style={styles.heroBanner}>
             <LinearGradient
-              colors={[tierColor + '55', tierColor + '22', '#0a0a18']}
+              colors={[tierColor + '55', tierColor + '22', colors.bg]}
               style={styles.bannerGradient}
             />
 
             <View style={styles.avatarArea}>
               <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85}>
-                <View style={[styles.avatarRing, { borderColor: tierColor }]}>
+                <View style={[styles.avatarRing, { borderColor: tierColor, backgroundColor: colors.bg }]}>
                   {profile?.photo_url ? (
                     <Image source={{ uri: profile.photo_url }} style={styles.avatar} />
                   ) : (
@@ -443,11 +450,11 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.heroName}>
+            <Text style={[styles.heroName, { color: colors.text }]}>
               {displayName}{profile?.age ? `, ${profile.age}` : ''}
             </Text>
-            {profile?.gender ? <Text style={styles.heroGender}>{profile.gender}</Text> : null}
-            <Text style={styles.heroLocation}>
+            {profile?.gender ? <Text style={[styles.heroGender, { color: colors.textSub }]}>{profile.gender}</Text> : null}
+            <Text style={[styles.heroLocation, { color: colors.textMuted }]}>
               {[profile?.city, profile?.country].filter(Boolean).join(', ') || user?.country || ''}
             </Text>
 
@@ -474,14 +481,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Stats row ────────────────────────────────────── */}
           <View style={styles.statsRow}>
             {[
-              { emoji: '✨', value: matchCount,          label: 'Bonds' },
-              { emoji: '🌟', value: myExps.length,       label: 'Experiences' },
-              { emoji: '⭐', value: rel.label,            label: 'Reliability', color: rel.color },
+              { value: matchCount,      label: 'Bonds' },
+              { value: myExps.length,   label: 'Experiences' },
+              { value: rel.label,       label: 'Reliability', color: rel.color },
             ].map(s => (
-              <View key={s.label} style={styles.statCard}>
-                <Text style={styles.statEmoji}>{s.emoji}</Text>
-                <Text style={[styles.statValue, s.color && { color: s.color }]}>{s.value ?? '—'}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
+              <View key={s.label} style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.statValue, { color: colors.text }, s.color && { color: s.color }]}>{s.value ?? '—'}</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>{s.label}</Text>
               </View>
             ))}
           </View>
@@ -507,28 +513,28 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
           {/* ── Voice note ───────────────────────────────────── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Voice Note</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Voice Note</Text>
             {profile?.voice_note_url ? (
               <VoiceNotePlayer url={profile.voice_note_url} />
             ) : (
-              <View style={styles.voiceEmpty}>
+              <View style={[styles.voiceEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={{ fontSize: 36 }}>🎙️</Text>
-                <Text style={styles.voiceEmptyTitle}>No voice note yet</Text>
-                <Text style={styles.voiceEmptyHint}>Add one to get 2× more matches</Text>
+                <Text style={[styles.voiceEmptyTitle, { color: colors.textSub }]}>No voice note yet</Text>
+                <Text style={[styles.voiceEmptyHint, { color: colors.textMuted }]}>Add one to get 2× more matches</Text>
               </View>
             )}
             <TouchableOpacity
-              style={styles.ghostBtn}
+              style={[styles.ghostBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => Alert.alert('Coming soon', 'Voice recording will be available in the next update.')}
             >
-              <Text style={styles.ghostBtnText}>🎙  {profile?.voice_note_url ? 'Record New Note' : 'Record Voice Note'}</Text>
+              <Text style={[styles.ghostBtnText, { color: colors.textSub }]}>🎙  {profile?.voice_note_url ? 'Record New Note' : 'Record Voice Note'}</Text>
             </TouchableOpacity>
           </View>
 
           {/* ── Reliability bar ──────────────────────────────── */}
           <View style={styles.section}>
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Reliability</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Reliability</Text>
               <Text style={[styles.relLabel, { color: rel.color }]}>{rel.label}</Text>
             </View>
             <View style={styles.relTrack}>
@@ -540,18 +546,18 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Bio ──────────────────────────────────────────── */}
           <View style={styles.section}>
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>About</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>About</Text>
               <TouchableOpacity onPress={() => setShowEdit(true)}>
                 <Text style={styles.editLink}>Edit</Text>
               </TouchableOpacity>
             </View>
             {profile?.bio ? (
-              <View style={styles.bioCard}>
-                <Text style={styles.bioText}>{profile.bio}</Text>
+              <View style={[styles.bioCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.bioText, { color: colors.textSub }]}>{profile.bio}</Text>
               </View>
             ) : (
-              <TouchableOpacity style={styles.dashedCard} onPress={() => setShowEdit(true)}>
-                <Text style={styles.dashedCardText}>+ Add a bio</Text>
+              <TouchableOpacity style={[styles.dashedCard, { backgroundColor: colors.cardAlt, borderColor: colors.border }]} onPress={() => setShowEdit(true)}>
+                <Text style={[styles.dashedCardText, { color: colors.textMuted }]}>+ Add a bio</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -559,7 +565,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Here For ─────────────────────────────────────── */}
           <View style={styles.section}>
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Here For</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Here For</Text>
               <TouchableOpacity onPress={() => setShowEdit(true)}>
                 <Text style={styles.editLink}>Edit</Text>
               </TouchableOpacity>
@@ -578,24 +584,24 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
                 })}
               </View>
             ) : (
-              <TouchableOpacity style={styles.dashedCard} onPress={() => setShowEdit(true)}>
-                <Text style={styles.dashedCardText}>+ Choose what you're here for</Text>
+              <TouchableOpacity style={[styles.dashedCard, { backgroundColor: colors.cardAlt, borderColor: colors.border }]} onPress={() => setShowEdit(true)}>
+                <Text style={[styles.dashedCardText, { color: colors.textMuted }]}>+ Choose what you're here for</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* ── Mood ─────────────────────────────────────────── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Right Now</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Right Now</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
               {MOODS.map(m => (
                 <TouchableOpacity
                   key={m.emoji}
-                  style={[styles.moodChip, mood?.emoji === m.emoji && styles.moodChipActive]}
+                  style={[styles.moodChip, { backgroundColor: colors.card, borderColor: colors.border }, mood?.emoji === m.emoji && styles.moodChipActive]}
                   onPress={() => setMood(m)}
                 >
                   <Text style={{ fontSize: 22 }}>{m.emoji}</Text>
-                  <Text style={[styles.moodText, mood?.emoji === m.emoji && { color: '#5865f2' }]}>{m.label}</Text>
+                  <Text style={[styles.moodText, mood?.emoji === m.emoji && { color: '#E8003D' }]}>{m.label}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -604,10 +610,10 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── My Experiences ───────────────────────────────── */}
           {myExps.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>My Experiences</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>My Experiences</Text>
               {myExps.map(exp => (
-                <View key={exp.id} style={styles.expCard}>
-                  <Text style={styles.expTitle}>{exp.title}</Text>
+                <View key={exp.id} style={[styles.expCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.expTitle, { color: colors.text }]}>{exp.title}</Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={styles.expCat}>{exp.category}</Text>
                     <View style={[styles.expStatus, { backgroundColor: exp.status === 'active' ? '#57f28720' : '#88888820' }]}>
@@ -621,10 +627,10 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
           {/* ── Subscription card ────────────────────────────── */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Subscription</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Subscription</Text>
             {isPremium ? (
               <LinearGradient
-                colors={tier === 'pro' ? ['#1a1500', '#2a2000'] : ['#0d0f22', '#141726']}
+                colors={tier === 'pro' ? ['#1C1F23', '#1C1F23'] : ['#000000', '#16181C']}
                 style={[styles.subCard, { borderColor: tierColor + '55' }]}
               >
                 <View>
@@ -647,7 +653,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={['#5865f2', '#4752c4']}
+                  colors={['#E8003D', '#C7003A']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={styles.upgradeCardInner}
                 >
@@ -666,13 +672,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
       {tab === 'culture' && (
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.cultureForm}>
-            <Text style={styles.cultureFormTitle}>🌍 Share something about your culture</Text>
+          <View style={[styles.cultureForm, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.cultureFormTitle, { color: colors.text }]}>🌍 Share something about your culture</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               {CULTURE_EMOJIS.map(e => (
                 <TouchableOpacity
                   key={e}
-                  style={[styles.emojiBtn, cultureEmoji === e && styles.emojiBtnOn]}
+                  style={[styles.emojiBtn, { backgroundColor: colors.cardAlt, borderColor: colors.border }, cultureEmoji === e && styles.emojiBtnOn]}
                   onPress={() => setCultureEmoji(e)}
                 >
                   <Text style={{ fontSize: 22 }}>{e}</Text>
@@ -683,17 +689,17 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
               {CULTURE_CATS.map(c => (
                 <TouchableOpacity
                   key={c}
-                  style={[styles.catChip, cultureCat === c && styles.catChipOn]}
+                  style={[styles.catChip, { backgroundColor: colors.cardAlt, borderColor: colors.border }, cultureCat === c && styles.catChipOn]}
                   onPress={() => setCultureCat(c)}
                 >
-                  <Text style={[styles.catChipText, cultureCat === c && { color: '#fff', fontWeight: '700' }]}>{c}</Text>
+                  <Text style={[styles.catChipText, { color: colors.textSub }, cultureCat === c && { color: '#fff', fontWeight: '700' }]}>{c}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <TextInput
-              style={styles.cultureInput}
+              style={[styles.cultureInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.text }]}
               placeholder={`${cultureEmoji} Tell the world something about your culture...`}
-              placeholderTextColor="#555"
+              placeholderTextColor={colors.textMuted}
               value={cultureText} onChangeText={setCultureText}
               multiline maxLength={280}
             />
@@ -711,11 +717,11 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             scrollEnabled={false}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, gap: 12 }}
             renderItem={({ item }) => (
-              <View style={styles.postCard}>
+              <View style={[styles.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.postHeader}>
                   <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.postUser}>{item.username} · {item.country}</Text>
+                    <Text style={[styles.postUser, { color: colors.text }]}>{item.username} · {item.country}</Text>
                     <View style={styles.postCatBadge}>
                       <Text style={styles.postCatText}>{item.category}</Text>
                     </View>
@@ -728,11 +734,11 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
                     <Text style={{ color: '#e57373', fontSize: 11, fontWeight: '700' }}>{item.likes}</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.postText}>{item.text}</Text>
+                <Text style={[styles.postText, { color: colors.textSub }]}>{item.text}</Text>
               </View>
             )}
             ListEmptyComponent={
-              <Text style={{ color: '#555', textAlign: 'center', marginTop: 40, fontSize: 15 }}>
+              <Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 40, fontSize: 15 }}>
                 No posts yet — be the first! 🌍
               </Text>
             }
@@ -749,7 +755,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="none">
-          <ActivityIndicator color="#5865f2" size="large" />
+          <ActivityIndicator color="#E8003D" size="large" />
         </View>
       )}
     </SafeAreaView>
@@ -757,24 +763,24 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 }
 
 const styles = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: '#0a0a18' },
-  loadingOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: '#0a0a18cc', alignItems: 'center', justifyContent: 'center' },
+  container:        { flex: 1, backgroundColor: '#000000' },
+  loadingOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000cc', alignItems: 'center', justifyContent: 'center' },
 
   topBar:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
   topBarTitle:      { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   topBarActions:    { flexDirection: 'row', gap: 8 },
-  editBtn:          { backgroundColor: '#5865f218', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#5865f240' },
-  editBtnText:      { color: '#5865f2', fontSize: 13, fontWeight: '700' },
+  editBtn:          { backgroundColor: '#E8003D18', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#E8003D40' },
+  editBtnText:      { color: '#E8003D', fontSize: 13, fontWeight: '700' },
   logoutBtn:        { backgroundColor: '#e5393518', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#e5393530' },
   logoutBtnText:    { color: '#e53935', fontSize: 13, fontWeight: '700' },
-  settingsBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38', alignItems: 'center', justifyContent: 'center' },
+  settingsBtn:      { width: 38, height: 38, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
   settingsBtnText:  { fontSize: 18 },
 
-  tabBar:           { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1e1e38', marginHorizontal: 20 },
+  tabBar:           { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2F3336', marginHorizontal: 20 },
   tab:              { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  tabActive:        { borderBottomWidth: 2, borderBottomColor: '#5865f2' },
+  tabActive:        { borderBottomWidth: 2, borderBottomColor: '#E8003D' },
   tabText:          { color: '#444', fontSize: 13, fontWeight: '700' },
-  tabTextActive:    { color: '#5865f2' },
+  tabTextActive:    { color: '#E8003D' },
 
   scroll:           { paddingBottom: 80, gap: 24 },
 
@@ -782,13 +788,13 @@ const styles = StyleSheet.create({
   bannerGradient:   { position: 'absolute', top: 0, left: 0, right: 0, height: 200 },
 
   avatarArea:       { marginBottom: 14 },
-  avatarRing:       { width: 118, height: 118, borderRadius: 59, borderWidth: 3, padding: 3, backgroundColor: '#0a0a18' },
+  avatarRing:       { width: 118, height: 118, borderRadius: 59, borderWidth: 3, padding: 3, backgroundColor: '#000000' },
   avatar:           { width: '100%', height: '100%', borderRadius: 53 },
   avatarFallback:   { width: '100%', height: '100%', borderRadius: 53, alignItems: 'center', justifyContent: 'center' },
   avatarInitial:    { color: '#fff', fontSize: 48, fontWeight: '900' },
-  cameraBtn:        { position: 'absolute', bottom: 2, right: 2, width: 32, height: 32, borderRadius: 16, backgroundColor: '#12122a', borderWidth: 2, borderColor: '#0a0a18', alignItems: 'center', justifyContent: 'center' },
+  cameraBtn:        { position: 'absolute', bottom: 2, right: 2, width: 32, height: 32, borderRadius: 16, backgroundColor: '#16181C', borderWidth: 2, borderColor: '#000000', alignItems: 'center', justifyContent: 'center' },
   cameraIcon:       { fontSize: 14 },
-  moodDot:          { position: 'absolute', top: 0, right: 0, backgroundColor: '#12122a', borderRadius: 14, padding: 3, borderWidth: 2, borderColor: '#0a0a18' },
+  moodDot:          { position: 'absolute', top: 0, right: 0, backgroundColor: '#16181C', borderRadius: 14, padding: 3, borderWidth: 2, borderColor: '#000000' },
 
   heroName:         { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   heroGender:       { color: '#666', fontSize: 14, marginTop: 2 },
@@ -796,49 +802,49 @@ const styles = StyleSheet.create({
   tierPill:         { marginTop: 12, borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6 },
   tierPillText:     { fontSize: 13, fontWeight: '700' },
 
-  completionCard:   { marginHorizontal: 20, backgroundColor: '#5865f210', borderRadius: 18, padding: 16, gap: 10, borderWidth: 1, borderColor: '#5865f230' },
+  completionCard:   { marginHorizontal: 20, backgroundColor: '#E8003D10', borderRadius: 18, padding: 16, gap: 10, borderWidth: 1, borderColor: '#E8003D30' },
   completionRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  completionLabel:  { color: '#5865f2', fontSize: 14, fontWeight: '800' },
-  completionHint:   { color: '#5865f2aa', fontSize: 11, fontWeight: '600' },
-  completionTrack:  { height: 5, backgroundColor: '#1e1e38', borderRadius: 3, overflow: 'hidden' },
-  completionFill:   { height: '100%', backgroundColor: '#5865f2', borderRadius: 3 },
+  completionLabel:  { color: '#E8003D', fontSize: 14, fontWeight: '800' },
+  completionHint:   { color: '#E8003Daa', fontSize: 11, fontWeight: '600' },
+  completionTrack:  { height: 5, backgroundColor: '#2F3336', borderRadius: 3, overflow: 'hidden' },
+  completionFill:   { height: '100%', backgroundColor: '#E8003D', borderRadius: 3 },
 
   statsRow:         { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
-  statCard:         { flex: 1, backgroundColor: '#12122a', borderRadius: 20, padding: 16, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#1e1e38' },
+  statCard:         { flex: 1, backgroundColor: '#16181C', borderRadius: 20, padding: 16, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#2F3336' },
   statEmoji:        { fontSize: 22 },
-  statValue:        { color: '#fff', fontSize: 18, fontWeight: '900' },
+  statValue:        { color: '#fff', fontSize: 16, fontWeight: '900', textAlign: 'center' },
   statLabel:        { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
 
   section:          { paddingHorizontal: 20, gap: 12 },
-  sectionTitle:     { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
+  sectionTitle:     { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
   sectionRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  editLink:         { color: '#5865f2', fontSize: 13, fontWeight: '700' },
+  editLink:         { color: '#E8003D', fontSize: 13, fontWeight: '700' },
 
-  voiceEmpty:       { backgroundColor: '#12122a', borderRadius: 18, padding: 28, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#1e1e38' },
+  voiceEmpty:       { backgroundColor: '#16181C', borderRadius: 18, padding: 28, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2F3336' },
   voiceEmptyTitle:  { color: '#888', fontSize: 15, fontWeight: '700' },
   voiceEmptyHint:   { color: '#555', fontSize: 13 },
-  ghostBtn:         { backgroundColor: '#12122a', borderRadius: 16, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#1e1e38' },
+  ghostBtn:         { backgroundColor: '#16181C', borderRadius: 16, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#2F3336' },
   ghostBtnText:     { color: '#666', fontSize: 14, fontWeight: '700' },
 
   relLabel:         { fontSize: 13, fontWeight: '700' },
-  relTrack:         { height: 6, backgroundColor: '#1e1e38', borderRadius: 3, overflow: 'hidden' },
+  relTrack:         { height: 6, backgroundColor: '#2F3336', borderRadius: 3, overflow: 'hidden' },
   relFill:          { height: '100%', borderRadius: 3 },
   relHint:          { color: '#444', fontSize: 11 },
 
-  bioCard:          { backgroundColor: '#12122a', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#1e1e38' },
+  bioCard:          { backgroundColor: '#16181C', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#2F3336' },
   bioText:          { color: '#bbb', fontSize: 15, lineHeight: 24 },
-  dashedCard:       { backgroundColor: '#12122a', borderRadius: 16, paddingVertical: 20, alignItems: 'center', borderWidth: 1, borderColor: '#1e1e38', borderStyle: 'dashed' },
+  dashedCard:       { backgroundColor: '#16181C', borderRadius: 16, paddingVertical: 20, alignItems: 'center', borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed' },
   dashedCardText:   { color: '#444', fontSize: 14, fontWeight: '600' },
 
   ctWrap:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   ctBadge:          { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1 },
   ctBadgeText:      { fontSize: 13, fontWeight: '700' },
 
-  moodChip:         { alignItems: 'center', backgroundColor: '#12122a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#1e1e38', gap: 5 },
-  moodChipActive:   { backgroundColor: '#5865f218', borderColor: '#5865f255' },
+  moodChip:         { alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#2F3336', gap: 5 },
+  moodChipActive:   { backgroundColor: '#E8003D18', borderColor: '#E8003D55' },
   moodText:         { color: '#555', fontSize: 10, fontWeight: '700' },
 
-  expCard:          { backgroundColor: '#12122a', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e1e38', gap: 8 },
+  expCard:          { backgroundColor: '#16181C', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2F3336', gap: 8 },
   expTitle:         { color: '#fff', fontSize: 14, fontWeight: '700' },
   expCat:           { color: '#555', fontSize: 12 },
   expStatus:        { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
@@ -855,23 +861,23 @@ const styles = StyleSheet.create({
   upgradeCardSub:   { color: '#ffffff88', fontSize: 12, marginTop: 4, lineHeight: 18 },
   upgradeCardArrow: { color: '#fff', fontSize: 24, fontWeight: '200' },
 
-  cultureForm:      { backgroundColor: '#12122a', margin: 16, borderRadius: 20, padding: 18, gap: 14, borderWidth: 1, borderColor: '#1e1e38' },
+  cultureForm:      { backgroundColor: '#16181C', margin: 16, borderRadius: 20, padding: 18, gap: 14, borderWidth: 1, borderColor: '#2F3336' },
   cultureFormTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  emojiBtn:         { width: 42, height: 42, borderRadius: 12, backgroundColor: '#0a0a18', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e1e38' },
-  emojiBtnOn:       { backgroundColor: '#5865f225', borderColor: '#5865f255' },
-  catChip:          { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: '#0a0a18', borderWidth: 1, borderColor: '#1e1e38' },
-  catChipOn:        { backgroundColor: '#5865f2', borderColor: '#5865f2' },
+  emojiBtn:         { width: 42, height: 42, borderRadius: 12, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2F3336' },
+  emojiBtnOn:       { backgroundColor: '#E8003D25', borderColor: '#E8003D55' },
+  catChip:          { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: '#000000', borderWidth: 1, borderColor: '#2F3336' },
+  catChipOn:        { backgroundColor: '#E8003D', borderColor: '#E8003D' },
   catChipText:      { color: '#555', fontSize: 12, fontWeight: '600' },
-  cultureInput:     { backgroundColor: '#0a0a18', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: '#1e1e38' },
-  postBtn:          { backgroundColor: '#5865f2', borderRadius: 16, padding: 15, alignItems: 'center' },
-  postBtnOff:       { backgroundColor: '#1e1e38' },
+  cultureInput:     { backgroundColor: '#000000', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2F3336' },
+  postBtn:          { backgroundColor: '#E8003D', borderRadius: 16, padding: 15, alignItems: 'center' },
+  postBtnOff:       { backgroundColor: '#2F3336' },
   postBtnText:      { color: '#fff', fontSize: 15, fontWeight: '800' },
 
-  postCard:         { backgroundColor: '#12122a', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#1e1e38', gap: 12 },
+  postCard:         { backgroundColor: '#16181C', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: '#2F3336', gap: 12 },
   postHeader:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   postUser:         { color: '#fff', fontWeight: '800', fontSize: 13 },
-  postCatBadge:     { backgroundColor: '#5865f218', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 5, borderWidth: 1, borderColor: '#5865f230' },
-  postCatText:      { color: '#5865f2', fontSize: 10, fontWeight: '800' },
+  postCatBadge:     { backgroundColor: '#E8003D18', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 5, borderWidth: 1, borderColor: '#E8003D30' },
+  postCatText:      { color: '#E8003D', fontSize: 10, fontWeight: '800' },
   postText:         { color: '#bbb', fontSize: 14, lineHeight: 22 },
 
   goLiveRow:        { marginHorizontal: 20, marginBottom: 4 },

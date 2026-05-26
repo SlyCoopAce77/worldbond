@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -70,7 +71,7 @@ function SearchBar({ value, onChange, placeholder }) {
   );
 }
 const sb = StyleSheet.create({
-  wrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#1e1e38', marginHorizontal: 20, marginBottom: 16 },
+  wrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 16 },
   icon:  { fontSize: 15 },
   input: { flex: 1, color: '#fff', fontSize: 15 },
   clear: { color: '#444', fontSize: 15, paddingHorizontal: 4 },
@@ -99,7 +100,7 @@ function Breadcrumb({ country, city, onCountry, onCity }) {
 }
 const bc = StyleSheet.create({
   row:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 6 },
-  link:   { color: '#5865f2', fontSize: 13, fontWeight: '600' },
+  link:   { color: '#E8003D', fontSize: 13, fontWeight: '600' },
   sep:    { color: '#333', fontSize: 14 },
   active: { color: '#888', fontSize: 13 },
 });
@@ -120,17 +121,17 @@ function CountryCard({ item, onPress, index }) {
   );
 }
 const crc = StyleSheet.create({
-  card:  { flex: 1, backgroundColor: '#12122a', borderRadius: 18, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#1e1e38', margin: 5 },
+  card:  { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2F3336', margin: 5 },
   flag:  { fontSize: 42 },
   name:  { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  arrow: { color: '#5865f2', fontSize: 14 },
+  arrow: { color: '#E8003D', fontSize: 14 },
 });
 
 // ─── City card ────────────────────────────────────────────────────────────────
 function CityCard({ name, index, onPress }) {
   const anim = useFadeSlide(true, index * 50);
   const colors = [
-    ['#1a1a42', '#0f0f28'], ['#1a2a1a', '#0f1a0f'], ['#2a1a0e', '#1a0e06'],
+    ['#1C1F23', '#0f0f28'], ['#1a2a1a', '#0f1a0f'], ['#2a1a0e', '#1a0e06'],
     ['#0a1e2e', '#061218'], ['#1a0a2e', '#100820'], ['#2a0a1a', '#1a0810'],
   ];
   const [c1, c2] = colors[index % colors.length];
@@ -157,13 +158,13 @@ const city = StyleSheet.create({
   icon:  { fontSize: 34 },
   name:  { color: '#fff', fontSize: 20, fontWeight: '800' },
   sub:   { color: '#ffffff66', fontSize: 12, marginTop: 2 },
-  arrow: { color: '#5865f2', fontSize: 26, fontWeight: '300' },
+  arrow: { color: '#E8003D', fontSize: 26, fontWeight: '300' },
 });
 
 // ─── Place card ───────────────────────────────────────────────────────────────
 function PlaceCard({ item, onPress, index }) {
   const anim = useFadeSlide(true, index * 60);
-  const meta  = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#5865f2', grad: ['#1a1a2e', '#12122a'] };
+  const meta  = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#E8003D', grad: ['#1C1F23', '#16181C'] };
 
   return (
     <Animated.View style={anim}>
@@ -216,7 +217,7 @@ function PlaceCard({ item, onPress, index }) {
   );
 }
 const pc = StyleSheet.create({
-  card:         { backgroundColor: '#12122a', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#1e1e38' },
+  card:         { backgroundColor: '#16181C', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336' },
   cover:        { height: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
   coverIcon:    { fontSize: 52 },
   coverRight:   { gap: 8, alignItems: 'flex-end' },
@@ -242,6 +243,7 @@ const pc = StyleSheet.create({
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function ExploreScreen({ navigation, user }) {
+  const { colors } = useTheme();
   const socket = getSocket();
 
   const [view,     setView]     = useState('countries');
@@ -293,10 +295,10 @@ export default function ExploreScreen({ navigation, user }) {
   if (view === 'countries') {
     const filtered = countries.filter(c => c.toLowerCase().includes(search.toLowerCase()));
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <Animated.View style={[styles.header, headerAnim]}>
-          <Text style={styles.title}>Explore ✈️</Text>
-          <Text style={styles.subtitle}>Find where people hang out worldwide</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Explore ✈️</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Find where people hang out worldwide</Text>
         </Animated.View>
         <SearchBar value={search} onChange={setSearch} placeholder="Search countries…" />
         <FlatList
@@ -304,6 +306,7 @@ export default function ExploreScreen({ navigation, user }) {
           keyExtractor={c => c}
           numColumns={2}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={30}
           contentContainerStyle={styles.countryGrid}
           renderItem={({ item, index }) => (
             <CountryCard item={item} index={index} onPress={() => selectCountry(item)} />
@@ -322,7 +325,7 @@ export default function ExploreScreen({ navigation, user }) {
   // ── Cities ──
   if (view === 'cities') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
         <Animated.View style={[styles.header, headerAnim]}>
           <Breadcrumb country={selCountry} onCountry={goToCountries} onCity={null} />
           <Text style={styles.title}>{selCountry?.split(' ').slice(1).join(' ')}</Text>
@@ -332,6 +335,7 @@ export default function ExploreScreen({ navigation, user }) {
           data={cities}
           keyExtractor={c => c}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={30}
           contentContainerStyle={styles.cityList}
           renderItem={({ item, index }) => (
             <CityCard name={item} index={index} onPress={() => selectCity(item)} />
@@ -404,7 +408,7 @@ export default function ExploreScreen({ navigation, user }) {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
               {hotPlaces.map(p => {
-                const m = TYPE_META[p.type] || { icon: '📍', color: '#5865f2' };
+                const m = TYPE_META[p.type] || { icon: '📍', color: '#E8003D' };
                 return (
                   <TouchableOpacity key={p.id} style={[hot.card, { borderColor: m.color + '44' }]} onPress={() => openPlace(p)}>
                     <Text style={hot.icon}>{m.icon}</Text>
@@ -440,7 +444,7 @@ export default function ExploreScreen({ navigation, user }) {
 }
 
 const hot = StyleSheet.create({
-  card:     { width: 96, backgroundColor: '#12122a', borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1 },
+  card:     { width: 96, backgroundColor: '#16181C', borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1 },
   icon:     { fontSize: 28 },
   name:     { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   countRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -449,15 +453,15 @@ const hot = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#0a0a18' },
+  container:      { flex: 1, backgroundColor: '#000000' },
 
   header:         { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10, gap: 4 },
   title:          { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
   subtitle:       { color: '#555', fontSize: 13 },
 
   placesHeadRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  backBtn:        { backgroundColor: '#5865f218', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#5865f240' },
-  backBtnText:    { color: '#5865f2', fontSize: 13, fontWeight: '700' },
+  backBtn:        { backgroundColor: '#E8003D18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#E8003D40' },
+  backBtnText:    { color: '#E8003D', fontSize: 13, fontWeight: '700' },
 
   countryGrid:    { paddingHorizontal: 15, paddingBottom: 40 },
 
@@ -467,8 +471,8 @@ const styles = StyleSheet.create({
   placesList:     { paddingHorizontal: 20, gap: 14 },
 
   filters:        { paddingHorizontal: 20, gap: 8 },
-  filterChip:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38' },
-  filterChipOn:   { backgroundColor: '#5865f2', borderColor: '#5865f2' },
+  filterChip:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  filterChipOn:   { backgroundColor: '#E8003D', borderColor: '#E8003D' },
   filterText:     { color: '#555', fontSize: 13, fontWeight: '600' },
   filterTextOn:   { color: '#fff' },
 

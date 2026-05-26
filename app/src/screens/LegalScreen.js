@@ -123,14 +123,14 @@ export default function LegalScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a18' },
+  container: { flex: 1, backgroundColor: '#000000' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a2e',
+    borderBottomWidth: 1, borderBottomColor: '#1C1F23',
   },
-  backBtn:  { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#12122a', borderRadius: 12, borderWidth: 1, borderColor: '#1e1e38' },
+  backBtn:  { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#16181C', borderRadius: 12, borderWidth: 1, borderColor: '#2F3336' },
   backIcon: { color: '#fff', fontSize: 26, lineHeight: 30 },
   title:    { color: '#fff', fontSize: 17, fontWeight: '700' },
 

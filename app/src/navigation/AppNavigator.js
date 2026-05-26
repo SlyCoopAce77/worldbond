@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View, StyleSheet } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 // Tab screens
 import HomeScreen from '../screens/HomeScreen';
@@ -51,24 +52,25 @@ function TabIcon({ icon, color, focused }) {
 
 const tabStyles = StyleSheet.create({
   iconWrap:       { width: 44, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  iconWrapActive: { backgroundColor: '#5865f218' },
+  iconWrapActive: { backgroundColor: '#E8003D18' },
 });
 
 function HomeTabs({ user, onLogout }) {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0d0d1f',
-          borderTopColor: '#1a1a2e',
+          backgroundColor: colors.tabBg,
+          borderTopColor: colors.tabBorder,
           borderTopWidth: 1,
           height: 64,
           paddingBottom: 8,
           paddingTop: 6,
         },
-        tabBarActiveTintColor: '#5865f2',
-        tabBarInactiveTintColor: '#3a3a5a',
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.tabInactive,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 0 },
       }}
     >

@@ -76,8 +76,8 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
   const scale = animValue.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] });
   const opacity = animValue.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
-  const cardBorderColor = isActive ? t.color : isPro ? t.color + '55' : '#1e1e3a';
-  const cardBg = isPro ? '#1a1500' : '#12122a';
+  const cardBorderColor = isActive ? t.color : isPro ? t.color + '55' : '#2F3336';
+  const cardBg = isPro ? '#1C1F23' : '#16181C';
 
   const btnLabel = isLoading
     ? 'Processing…'
@@ -159,7 +159,7 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
           </LinearGradient>
         ) : isFree ? (
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: '#1e1e3a', borderWidth: 1, borderColor: '#333' }]}
+            style={[styles.btn, { backgroundColor: '#2F3336', borderWidth: 1, borderColor: '#333' }]}
             onPress={() => onPress(tierId)}
             disabled={isActive}
           >
@@ -167,7 +167,7 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
           </TouchableOpacity>
         ) : (
           <LinearGradient
-            colors={['#5865f2', '#4752c4']}
+            colors={['#E8003D', '#C7003A']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.btn}
           >
@@ -251,7 +251,7 @@ export default function SubscriptionScreen({ navigation }) {
         {/* Hero */}
         <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
           <LinearGradient
-            colors={['#5865f222', '#f59e0b11', '#0f0f1a']}
+            colors={['#E8003D22', '#f59e0b11', '#000000']}
             style={styles.heroBg}
           >
             <Text style={styles.heroGlobe}>🌍</Text>
@@ -324,15 +324,15 @@ export default function SubscriptionScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f1a' },
+  container: { flex: 1, backgroundColor: '#000000' },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1a1a2e',
+    borderBottomWidth: 1, borderBottomColor: '#1C1F23',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backArrow: { color: '#5865f2', fontSize: 24, fontWeight: '300' },
+  backArrow: { color: '#E8003D', fontSize: 24, fontWeight: '300' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
 
   scroll: { paddingBottom: 40 },
@@ -359,16 +359,16 @@ const styles = StyleSheet.create({
   toggleText: { color: '#555', fontSize: 14, fontWeight: '600' },
   toggleTextActive: { color: '#fff' },
   toggleTrack: {
-    width: 52, height: 28, backgroundColor: '#1e1e3a',
+    width: 52, height: 28, backgroundColor: '#2F3336',
     borderRadius: 14, justifyContent: 'center',
-    borderWidth: 1, borderColor: '#2a2a4a',
+    borderWidth: 1, borderColor: '#2F3336',
   },
   toggleKnob: {
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#5865f2', position: 'absolute', left: 2,
+    backgroundColor: '#E8003D', position: 'absolute', left: 2,
   },
   savePill: {
-    backgroundColor: '#5865f2', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+    backgroundColor: '#E8003D', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
   },
   savePillText: { color: '#fff', fontSize: 10, fontWeight: '800' },
 
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   },
   activePillText: { fontSize: 12, fontWeight: '700' },
 
-  divider: { height: 1, backgroundColor: '#1e1e3a', marginVertical: 14 },
+  divider: { height: 1, backgroundColor: '#2F3336', marginVertical: 14 },
 
   featureList: { gap: 9, marginBottom: 18 },
   featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
@@ -412,11 +412,11 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   betaBanner: {
-    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#5865f218',
-    borderWidth: 1, borderColor: '#5865f240', borderRadius: 14,
+    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#E8003D18',
+    borderWidth: 1, borderColor: '#E8003D40', borderRadius: 14,
     paddingVertical: 10, alignItems: 'center',
   },
-  betaBannerText: { color: '#5865f2', fontSize: 13, fontWeight: '700' },
+  betaBannerText: { color: '#E8003D', fontSize: 13, fontWeight: '700' },
 
   footer: { alignItems: 'center', gap: 6, paddingHorizontal: 24, marginTop: 8 },
   footerLine: { color: '#444', fontSize: 12, textAlign: 'center' },

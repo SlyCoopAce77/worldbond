@@ -67,7 +67,7 @@ export default function AuthScreen({ onLogin }) {
     case SCREENS.LOADING:
       return (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#5865f2" />
+          <ActivityIndicator size="large" color="#E8003D" />
         </View>
       );
 
@@ -129,5 +129,5 @@ export default function AuthScreen({ onLogin }) {
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, backgroundColor: '#0a0a18', alignItems: 'center', justifyContent: 'center' },
+  loading: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
 });

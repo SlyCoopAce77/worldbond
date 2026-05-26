@@ -9,6 +9,7 @@ import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import FilteredImage from '../components/FilteredImage';
+import { useTheme } from '../context/ThemeContext';
 import FilterPicker from '../components/FilterPicker';
 import StoriesBar from '../components/StoriesBar';
 import StoryViewer from '../components/StoryViewer';
@@ -164,10 +165,12 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
       formData.append('filter', filter);
 
       const endpoint = isStory ? '/api/stories/upload' : '/api/photos/upload';
-      await axios.post(`${SERVER_URL}${endpoint}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
-        timeout: 30000,
+      const uploadRes = await fetch(`${SERVER_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
+      if (!uploadRes.ok) throw new Error('Upload failed');
       reset();
       onClose();
     } catch (err) {
@@ -374,6 +377,7 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds }
 // ─── MAIN SCREEN ─────────────────────────────────────────────────────────────
 
 export default function PhotoFeedScreen({ navigation, user }) {
+  const { colors } = useTheme();
   const [photos, setPhotos] = useState([]);
   const [stories, setStories] = useState([]);
   const [showUpload, setShowUpload] = useState(false);
@@ -483,7 +487,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <FlatList
         data={photos}
         keyExtractor={p => p.id}
@@ -538,17 +542,17 @@ export default function PhotoFeedScreen({ navigation, user }) {
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f0f1a' },
-  divider: { height: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: '#000000' },
+  divider: { height: 1, backgroundColor: '#1C1F23' },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', padding: 20, paddingBottom: 12,
   },
   title: { fontSize: 26, fontWeight: 'bold', color: '#fff' },
   subtitle: { color: '#888', fontSize: 13, marginTop: 3 },
-  uploadBtn: { backgroundColor: '#5865f2', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  uploadBtn: { backgroundColor: '#E8003D', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   uploadBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  photoCard: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#1a1a2e' },
+  photoCard: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
   photoHeader: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 14, paddingVertical: 10, gap: 10,
@@ -560,15 +564,15 @@ const styles = StyleSheet.create({
   photoUsername: { color: '#fff', fontWeight: '700', fontSize: 14 },
   photoCountry: { color: '#888', fontSize: 11, marginTop: 1 },
   followBtn: {
-    borderWidth: 1, borderColor: '#5865f2', borderRadius: 14,
+    borderWidth: 1, borderColor: '#E8003D', borderRadius: 14,
     paddingHorizontal: 12, paddingVertical: 4,
   },
-  followBtnActive: { backgroundColor: '#5865f2', borderColor: '#5865f2' },
-  followBtnText: { color: '#5865f2', fontSize: 12, fontWeight: '700' },
+  followBtnActive: { backgroundColor: '#E8003D', borderColor: '#E8003D' },
+  followBtnText: { color: '#E8003D', fontSize: 12, fontWeight: '700' },
   followBtnTextActive: { color: '#fff' },
   photoTime: { color: '#555', fontSize: 11 },
   photoWrap: { position: 'relative' },
-  photoImage: { width: '100%', aspectRatio: 1, backgroundColor: '#1a1a2e' },
+  photoImage: { width: '100%', aspectRatio: 1, backgroundColor: '#1C1F23' },
   heartBurst: {
     position: 'absolute', alignSelf: 'center',
     top: '35%', fontSize: 90,
@@ -597,7 +601,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 56 },
   emptyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
   emptySub: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
-  emptyBtn: { backgroundColor: '#5865f2', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 },
+  emptyBtn: { backgroundColor: '#E8003D', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
@@ -605,7 +609,7 @@ const cStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: {
-    backgroundColor: '#1a1a2e', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: '#1C1F23', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     maxHeight: '75%', paddingBottom: 8,
   },
   handle: { width: 40, height: 4, backgroundColor: '#444', borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 12 },
@@ -623,15 +627,15 @@ const cStyles = StyleSheet.create({
   commentText: { color: '#ddd', fontSize: 13, lineHeight: 18 },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', padding: 12,
-    borderTopWidth: 1, borderTopColor: '#2a2a4a', gap: 8,
+    borderTopWidth: 1, borderTopColor: '#2F3336', gap: 8,
   },
   myAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   myAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
   input: {
-    flex: 1, backgroundColor: '#0f0f1a', color: '#fff', borderRadius: 20,
+    flex: 1, backgroundColor: '#000000', color: '#fff', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, maxHeight: 80,
   },
-  sendBtn: { backgroundColor: '#5865f2', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: '#E8003D', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   sendBtnOff: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 16 },
 });
@@ -640,28 +644,28 @@ const upStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: {
-    backgroundColor: '#1a1a2e', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    backgroundColor: '#1C1F23', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, paddingBottom: 36,
   },
   handle: { width: 40, height: 4, backgroundColor: '#444', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 16 },
   pickBtns: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   pickBtn: {
-    flex: 1, backgroundColor: '#0f0f1a', borderRadius: 16, padding: 20,
-    alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2a2a4a',
+    flex: 1, backgroundColor: '#000000', borderRadius: 16, padding: 20,
+    alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2F3336',
   },
   pickBtnIcon: { fontSize: 32 },
   pickBtnText: { color: '#ccc', fontSize: 13, textAlign: 'center' },
   preview: { alignItems: 'center', marginBottom: 14, gap: 8 },
   previewImage: { width: '100%', height: 220, borderRadius: 16 },
   changeBtn: { paddingVertical: 6 },
-  changeBtnText: { color: '#5865f2', fontSize: 13, fontWeight: '600' },
+  changeBtnText: { color: '#E8003D', fontSize: 13, fontWeight: '600' },
   captionInput: {
-    backgroundColor: '#0f0f1a', color: '#fff', borderRadius: 12,
+    backgroundColor: '#000000', color: '#fff', borderRadius: 12,
     padding: 14, fontSize: 14, minHeight: 60, textAlignVertical: 'top',
-    borderWidth: 1, borderColor: '#2a2a4a', marginBottom: 14, marginTop: 12,
+    borderWidth: 1, borderColor: '#2F3336', marginBottom: 14, marginTop: 12,
   },
-  uploadBtn: { backgroundColor: '#5865f2', borderRadius: 14, padding: 16, alignItems: 'center' },
+  uploadBtn: { backgroundColor: '#E8003D', borderRadius: 14, padding: 16, alignItems: 'center' },
   uploadBtnOff: { backgroundColor: '#333' },
   uploadBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

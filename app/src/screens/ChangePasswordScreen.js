@@ -74,7 +74,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
 
           <Animated.View style={{ opacity: fadeAnim }}>
             <View style={styles.iconWrap}>
-              <LinearGradient colors={['#5865f230', '#5865f210']} style={styles.iconBg}>
+              <LinearGradient colors={['#E8003D30', '#E8003D10']} style={styles.iconBg}>
                 <Text style={styles.icon}>🔑</Text>
               </LinearGradient>
             </View>
@@ -116,7 +116,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                     <View style={styles.btnGrad}><ActivityIndicator color="#fff" /></View>
                   ) : (
                     <LinearGradient
-                      colors={['#6875f5', '#5865f2', '#4752c4']}
+                      colors={['#E8003D', '#E8003D', '#C7003A']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.btnGrad}
                     >
@@ -137,7 +137,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                       <TextInput
                         style={styles.input}
                         placeholder="• • • • • •"
-                        placeholderTextColor="#3a3a5a"
+                        placeholderTextColor="#536471"
                         value={code}
                         onChangeText={t => { setCode(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
                         keyboardType="number-pad"
@@ -155,7 +155,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                       <TextInput
                         style={styles.input}
                         placeholder="At least 8 characters"
-                        placeholderTextColor="#3a3a5a"
+                        placeholderTextColor="#536471"
                         value={newPassword}
                         onChangeText={t => { setNewPassword(t); setError(''); }}
                         secureTextEntry
@@ -173,7 +173,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                       <TextInput
                         style={styles.input}
                         placeholder="Repeat password"
-                        placeholderTextColor="#3a3a5a"
+                        placeholderTextColor="#536471"
                         value={confirmPassword}
                         onChangeText={t => { setConfirmPassword(t); setError(''); }}
                         secureTextEntry
@@ -198,7 +198,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                     <View style={styles.btnGrad}><ActivityIndicator color="#fff" /></View>
                   ) : (
                     <LinearGradient
-                      colors={['#6875f5', '#5865f2', '#4752c4']}
+                      colors={['#E8003D', '#E8003D', '#C7003A']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.btnGrad}
                     >
@@ -225,7 +225,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
 
                 <TouchableOpacity style={styles.btn} onPress={() => navigation.goBack()} activeOpacity={0.87}>
                   <LinearGradient
-                    colors={['#6875f5', '#5865f2', '#4752c4']}
+                    colors={['#E8003D', '#E8003D', '#C7003A']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={styles.btnGrad}
                   >
@@ -242,33 +242,33 @@ export default function ChangePasswordScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a18' },
+  container: { flex: 1, backgroundColor: '#000000' },
   scroll:    { flexGrow: 1, padding: 24, paddingTop: 16 },
 
   backBtn:      { marginBottom: 28, alignSelf: 'flex-start' },
-  backBtnInner: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#12122a', borderWidth: 1, borderColor: '#1e1e38', alignItems: 'center', justifyContent: 'center' },
+  backBtnInner: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
 
   iconWrap: { alignItems: 'center', marginBottom: 24 },
-  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#5865f240' },
+  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E8003D40' },
   icon:     { fontSize: 36 },
 
   header:   { marginBottom: 28, alignItems: 'center' },
   title:    { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.5, textAlign: 'center' },
-  subtitle: { fontSize: 15, color: '#555577', marginTop: 8, textAlign: 'center', lineHeight: 22 },
+  subtitle: { fontSize: 15, color: '#536471', marginTop: 8, textAlign: 'center', lineHeight: 22 },
 
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
   errorIcon:   { fontSize: 16 },
   errorText:   { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
-  emailBox:   { backgroundColor: '#12122a', borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#1e1e38' },
-  emailLabel: { color: '#555577', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  emailBox:   { backgroundColor: '#16181C', borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#2F3336' },
+  emailLabel: { color: '#536471', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
   emailValue: { color: '#e0e0f0', fontSize: 15 },
 
   form:       { gap: 20, marginBottom: 8 },
   fieldGroup: { gap: 8 },
-  label:      { color: '#555577', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  inputWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#12122a', borderRadius: 16, borderWidth: 1, borderColor: '#1e1e38', paddingHorizontal: 16 },
+  label:      { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  inputWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
   inputIcon:  { fontSize: 16, marginRight: 10 },
   input:      { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
   check:      { color: '#4ade80', fontSize: 16, fontWeight: '700' },
@@ -278,11 +278,11 @@ const styles = StyleSheet.create({
   btnGrad:{ paddingVertical: 19, alignItems: 'center', borderRadius: 18 },
   btnText:{ color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
 
-  successCard:  { backgroundColor: '#12122a', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#1e1e38', marginBottom: 8 },
+  successCard:  { backgroundColor: '#16181C', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#2F3336', marginBottom: 8 },
   successIcon:  { fontSize: 40, marginBottom: 4 },
   successTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
   successSub:   { color: '#666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   resendBtn:  { paddingVertical: 16, alignItems: 'center' },
-  resendText: { color: '#5865f2', fontSize: 14, fontWeight: '600' },
+  resendText: { color: '#E8003D', fontSize: 14, fontWeight: '600' },
 });
