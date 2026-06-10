@@ -1,369 +1,315 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  SafeAreaView, TextInput, ScrollView, Animated, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet,
+  SafeAreaView, TextInput, ScrollView, FlatList, Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
-import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
+const CARD_W = (width - 48) / 2;
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const LOCAL_CATEGORIES = [
-  { id: 'daily-chat',   name: 'Daily Chat',   icon: '🌅', description: 'Morning check-ins, late nights, and everything in between', rooms: ['morning-check-in', 'late-night-thoughts', 'confessions', 'today-i-learned', 'whats-good'] },
-  { id: 'hot-takes',    name: 'Hot Takes',    icon: '🔥', description: 'Say it with your chest. Debate respectfully.',               rooms: ['split-the-bill', 'unpopular-opinions', 'change-my-mind', 'would-you-rather', 'ai-is-overrated'] },
-  { id: 'love-dating',  name: 'Love & Dating',icon: '❤️‍🔥', description: 'Hot take dating era — values first, small talk never',       rooms: ['red-flags', 'dealbreakers', 'situationships', 'solo-vs-dating', 'first-date-rules'] },
-  { id: 'money-talk',   name: 'Money Talk',   icon: '💸', description: 'Financial transparency is the new intimacy',                  rooms: ['money-and-love', 'salary-sharing', 'broke-to-rich', 'side-hustles', 'financial-goals'] },
-  { id: 'mind-soul',    name: 'Mind & Soul',  icon: '🧠', description: 'Real talk, no filters — mental health and growth',            rooms: ['vent-freely', 'daily-wins', 'therapy-talk', 'anxiety-corner', 'glow-up'] },
-  { id: 'culture-clash',name: 'Culture Clash',icon: '🌍', description: "How different is life where you're from?",                    rooms: ['food-opinions', 'family-values', 'country-stereotypes', 'traditions', 'city-vs-village'] },
-  { id: 'pop-culture',  name: 'Pop Culture',  icon: '🎧', description: 'Music, drama, shows — current obsessions',                   rooms: ['now-playing', 'celebrity-drama', 'show-recs', 'lyrics-that-hit', 'guilty-pleasures'] },
-  { id: 'tech-ai',      name: 'Tech & AI',    icon: '🤖', description: "The future everyone's arguing about right now",               rooms: ['ai-hot-takes', 'kids-and-phones', 'influencer-culture', 'digital-detox', 'future-predictions'] },
-  { id: 'bars-nightlife', name: 'Bars & Nightlife', icon: '🍻', description: 'Bar recommendations, night out stories',                  rooms: ['cocktails', 'craft-beer', 'wine', 'nightclubs', 'karaoke'] },
-  { id: 'music',          name: 'Music',            icon: '🎵', description: 'Share your favorite artists and discover new music',       rooms: ['hip-hop', 'rock', 'kpop', 'jazz', 'electronic'] },
-  { id: 'food',           name: 'Food & Cooking',   icon: '🍜', description: 'Share recipes and food culture across countries',          rooms: ['asian-cuisine', 'street-food', 'vegetarian', 'desserts', 'bbq'] },
-  { id: 'language-learning', name: 'Language Learning', icon: '📚', description: 'Practice languages with native speakers',             rooms: ['english', 'japanese', 'spanish', 'korean', 'french'] },
-  { id: 'sports',         name: 'Sports',           icon: '⚽', description: 'Football, basketball, soccer and more',                    rooms: ['football', 'basketball', 'soccer', 'baseball', 'tennis'] },
+  { id: 'daily-chat',        name: 'Daily Chat',        icon: '🌅', rooms: ['morning-check-in', 'late-night-thoughts', 'confessions', 'today-i-learned', 'whats-good'] },
+  { id: 'hot-takes',         name: 'Hot Takes',         icon: '🔥', rooms: ['split-the-bill', 'unpopular-opinions', 'change-my-mind', 'would-you-rather', 'ai-is-overrated'] },
+  { id: 'love-dating',       name: 'Love & Dating',     icon: '❤️‍🔥', rooms: ['red-flags', 'dealbreakers', 'situationships', 'solo-vs-dating', 'first-date-rules'] },
+  { id: 'money-talk',        name: 'Money Talk',        icon: '💸', rooms: ['money-and-love', 'salary-sharing', 'broke-to-rich', 'side-hustles', 'financial-goals'] },
+  { id: 'mind-soul',         name: 'Mind & Soul',       icon: '🧠', rooms: ['vent-freely', 'daily-wins', 'therapy-talk', 'anxiety-corner', 'glow-up'] },
+  { id: 'culture-clash',     name: 'Culture Clash',     icon: '🌍', rooms: ['food-opinions', 'family-values', 'country-stereotypes', 'traditions', 'city-vs-village'] },
+  { id: 'pop-culture',       name: 'Pop Culture',       icon: '🎧', rooms: ['now-playing', 'celebrity-drama', 'show-recs', 'lyrics-that-hit', 'guilty-pleasures'] },
+  { id: 'tech-ai',           name: 'Tech & AI',         icon: '🤖', rooms: ['ai-hot-takes', 'kids-and-phones', 'influencer-culture', 'digital-detox', 'future-predictions'] },
+  { id: 'bars-nightlife',    name: 'Bars & Nightlife',  icon: '🍻', rooms: ['cocktails', 'craft-beer', 'wine', 'nightclubs', 'karaoke'] },
+  { id: 'music',             name: 'Music',             icon: '🎵', rooms: ['hip-hop', 'rock', 'kpop', 'jazz', 'electronic'] },
+  { id: 'food',              name: 'Food & Cooking',    icon: '🍜', rooms: ['asian-cuisine', 'street-food', 'vegetarian', 'desserts', 'bbq'] },
+  { id: 'language-learning', name: 'Language Learning', icon: '📚', rooms: ['english', 'japanese', 'spanish', 'korean', 'french'] },
+  { id: 'sports',            name: 'Sports',            icon: '⚽', rooms: ['football', 'basketball', 'soccer', 'baseball', 'tennis'] },
 ];
 
-const CATEGORY_COLORS = {
-  'daily-chat':    { from: '#92400e', to: '#78350f' },
-  'hot-takes':     { from: '#991b1b', to: '#7f1d1d' },
-  'love-dating':   { from: '#9d174d', to: '#5b1035' },
-  'money-talk':    { from: '#14532d', to: '#052e16' },
-  'mind-soul':     { from: '#1e3a8a', to: '#172554' },
-  'culture-clash': { from: '#065f46', to: '#064e3b' },
-  'pop-culture':   { from: '#5b21b6', to: '#3b0764' },
-  'tech-ai':          { from: '#0e7490', to: '#164e63' },
-  'bars-nightlife':   { from: '#c2410c', to: '#7c2d12' },
-  'music':            { from: '#86198f', to: '#4a044e' },
-  'food':             { from: '#166534', to: '#14532d' },
-  'language-learning':{ from: '#4338ca', to: '#312e81' },
-  'sports':           { from: '#1e40af', to: '#1e3a8a' },
+const COLORS = {
+  'daily-chat':        { from: '#b45309', to: '#78350f', accent: '#fbbf24' },
+  'hot-takes':         { from: '#b91c1c', to: '#7f1d1d', accent: '#f87171' },
+  'love-dating':       { from: '#be185d', to: '#831843', accent: '#f472b6' },
+  'money-talk':        { from: '#15803d', to: '#14532d', accent: '#4ade80' },
+  'mind-soul':         { from: '#1d4ed8', to: '#1e3a8a', accent: '#60a5fa' },
+  'culture-clash':     { from: '#0f766e', to: '#134e4a', accent: '#2dd4bf' },
+  'pop-culture':       { from: '#7c3aed', to: '#4c1d95', accent: '#a78bfa' },
+  'tech-ai':           { from: '#0e7490', to: '#164e63', accent: '#22d3ee' },
+  'bars-nightlife':    { from: '#c2410c', to: '#7c2d12', accent: '#fb923c' },
+  'music':             { from: '#a21caf', to: '#701a75', accent: '#e879f9' },
+  'food':              { from: '#16a34a', to: '#166534', accent: '#86efac' },
+  'language-learning': { from: '#4338ca', to: '#3730a3', accent: '#818cf8' },
+  'sports':            { from: '#1d4ed8', to: '#1e40af', accent: '#93c5fd' },
 };
 
-const CATEGORY_ACCENT = {
-  'daily-chat':    '#fbbf24',
-  'hot-takes':     '#f87171',
-  'love-dating':   '#fb7185',
-  'money-talk':    '#4ade80',
-  'mind-soul':     '#60a5fa',
-  'culture-clash': '#34d399',
-  'pop-culture':   '#a78bfa',
-  'tech-ai':          '#22d3ee',
-  'bars-nightlife':   '#fb923c',
-  'music':            '#e879f9',
-  'food':             '#4ade80',
-  'language-learning':'#818cf8',
-  'sports':           '#60a5fa',
-};
+function getC(id) { return COLORS[id] || { from: '#1a1a3a', to: '#16181C', accent: '#6C47FF' }; }
 
-function getColors(id) {
-  return CATEGORY_COLORS[id] || { from: '#1a1a3a', to: '#16181C' };
-}
-function getAccent(id) {
-  return CATEGORY_ACCENT[id] || '#6C47FF';
-}
-
-// ─── Room chip ────────────────────────────────────────────────────────────────
-function RoomChip({ room, accent, onPress }) {
+// ─── Room card (grid tile) ────────────────────────────────────────────────────
+function RoomCard({ room, categoryId, accent, from, to, count, onPress }) {
+  const isLive = count > 0;
   return (
-    <TouchableOpacity
-      style={[rc.chip, { backgroundColor: accent + '20', borderColor: accent + '55' }]}
-      onPress={onPress}
-      activeOpacity={0.75}
-    >
-      <Text style={[rc.text, { color: accent }]}>#{room}</Text>
+    <TouchableOpacity style={rc.wrap} onPress={onPress} activeOpacity={0.82}>
+      <LinearGradient colors={[from, to]} style={rc.card}>
+        {isLive && (
+          <View style={rc.liveBadge}>
+            <View style={rc.liveDot} />
+            <Text style={[rc.liveNum, { color: accent }]}>{count}</Text>
+          </View>
+        )}
+        <Text style={rc.name}>#{room}</Text>
+        <Text style={[rc.status, { color: accent }]}>
+          {isLive ? 'Active now' : 'Start the chat'}
+        </Text>
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
 const rc = StyleSheet.create({
-  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
-  text: { fontSize: 12, fontWeight: '600' },
+  wrap:      { width: CARD_W },
+  card:      { borderRadius: 18, padding: 16, minHeight: 100, justifyContent: 'flex-end', borderWidth: 1, borderColor: '#ffffff12' },
+  liveBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#00000040', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4ade80' },
+  liveNum:   { fontSize: 11, fontWeight: '800' },
+  name:      { color: '#fff', fontSize: 14, fontWeight: '800', marginTop: 24 },
+  status:    { fontSize: 11, fontWeight: '600', marginTop: 3, opacity: 0.85 },
 });
 
-// ─── Category card ────────────────────────────────────────────────────────────
-function CategoryCard({ item, onRoomPress, memberCounts, index }) {
-  const colors = getColors(item.id);
-  const accent = getAccent(item.id);
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: index * 70, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, delay: index * 70, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  // total online in this category
-  const totalMembers = item.rooms.reduce((sum, r) => sum + (memberCounts[`${item.id}:${r}`] || 0), 0);
-
+// ─── Category tab ─────────────────────────────────────────────────────────────
+function CategoryTab({ item, isActive, onPress }) {
+  const c = getC(item.id);
   return (
-    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-      <LinearGradient
-        colors={[colors.from + 'cc', colors.to]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={cc.card}
-      >
-        {/* Top row */}
-        <View style={cc.top}>
-          <View style={cc.iconWrap}>
-            <Text style={cc.icon}>{item.icon}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={cc.name}>{item.name}</Text>
-            <Text style={cc.desc} numberOfLines={1}>{item.description}</Text>
-          </View>
-          {totalMembers > 0 && (
-            <View style={[cc.liveBadge, { backgroundColor: accent + '30', borderColor: accent + '60' }]}>
-              <View style={cc.liveDot} />
-              <Text style={[cc.liveText, { color: accent }]}>{totalMembers} live</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Room chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={cc.roomsRow}>
-          {item.rooms.map(room => (
-            <RoomChip
-              key={room}
-              room={room}
-              accent={accent}
-              onPress={() => onRoomPress(item, room)}
-            />
-          ))}
-        </ScrollView>
-      </LinearGradient>
-    </Animated.View>
-  );
-}
-
-const cc = StyleSheet.create({
-  card:      { borderRadius: 22, padding: 18, gap: 14, borderWidth: 1, borderColor: '#ffffff10' },
-  top:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconWrap:  { width: 52, height: 52, borderRadius: 16, backgroundColor: '#00000030', alignItems: 'center', justifyContent: 'center' },
-  icon:      { fontSize: 28 },
-  name:      { color: '#fff', fontSize: 17, fontWeight: '800' },
-  desc:      { color: '#ffffff88', fontSize: 12, marginTop: 2 },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1 },
-  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#57f287' },
-  liveText:  { fontSize: 11, fontWeight: '700' },
-  roomsRow:  { gap: 8 },
-});
-
-// ─── Active room card (horizontal scroll) ─────────────────────────────────────
-function ActiveRoomCard({ categoryId, room, count, icon, accent, onPress }) {
-  return (
-    <TouchableOpacity style={[ar.card, { borderColor: accent + '44' }]} onPress={onPress} activeOpacity={0.85}>
-      <View style={[ar.iconWrap, { backgroundColor: accent + '22' }]}>
-        <Text style={{ fontSize: 22 }}>{icon}</Text>
-      </View>
-      <Text style={ar.room}>#{room}</Text>
-      <View style={ar.countRow}>
-        <View style={ar.dot} />
-        <Text style={ar.count}>{count}</Text>
-      </View>
+    <TouchableOpacity
+      style={[tab.pill, isActive && { backgroundColor: c.accent + '22', borderColor: c.accent + '70' }]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <Text style={tab.icon}>{item.icon}</Text>
+      <Text style={[tab.label, isActive && { color: c.accent, fontWeight: '800' }]}>
+        {item.name}
+      </Text>
+      {isActive && <View style={[tab.bar, { backgroundColor: c.accent }]} />}
     </TouchableOpacity>
   );
 }
-const ar = StyleSheet.create({
-  card:    { width: 100, backgroundColor: '#16181C', borderRadius: 18, padding: 14, alignItems: 'center', gap: 8, borderWidth: 1 },
-  iconWrap:{ width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  room:    { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  countRow:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#57f287' },
-  count:   { color: '#57f287', fontSize: 11, fontWeight: '700' },
+const tab = StyleSheet.create({
+  pill:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 22, backgroundColor: '#111', borderWidth: 1, borderColor: '#222', marginBottom: 2 },
+  icon:  { fontSize: 15 },
+  label: { color: '#666', fontSize: 13, fontWeight: '600' },
+  bar:   { display: 'none' },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function GroupsScreen({ navigation, user }) {
-  const { colors } = useTheme();
   const socket = getSocket();
 
-  const [categories,    setCategories]   = useState(LOCAL_CATEGORIES);
-  const [memberCounts,  setMemberCounts] = useState({});
-  const [search,        setSearch]       = useState('');
-  const [totalOnline,   setTotalOnline]  = useState(0);
-
-  const headerAnim = useRef(new Animated.Value(0)).current;
+  const [memberCounts, setMemberCounts] = useState({});
+  const [search,       setSearch]       = useState('');
+  const [totalOnline,  setTotalOnline]  = useState(0);
+  const [activeCatId,  setActiveCatId]  = useState(LOCAL_CATEGORIES[0].id);
 
   useEffect(() => {
-    // Use local categories as source of truth; request member counts for each room
-    LOCAL_CATEGORIES.forEach(cat => {
-      cat.rooms.forEach(room => {
-        socket.emit('get_room_members', { categoryId: cat.id, roomName: room });
-      });
-    });
-
-    socket.on('group_list', () => {
-      // categories are defined locally — ignore server list
-    });
-
+    LOCAL_CATEGORIES.forEach(cat =>
+      cat.rooms.forEach(room =>
+        socket.emit('get_room_members', { categoryId: cat.id, roomName: room })
+      )
+    );
     socket.on('room_members', ({ categoryId, roomName, members }) => {
       const key = `${categoryId}:${roomName}`;
       setMemberCounts(prev => {
         const updated = { ...prev, [key]: members.length };
-        const total   = Object.values(updated).reduce((a, b) => a + b, 0);
-        setTotalOnline(total);
+        setTotalOnline(Object.values(updated).reduce((a, b) => a + b, 0));
         return updated;
       });
     });
-
-    Animated.timing(headerAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-
-    return () => {
-      socket.off('group_list');
-      socket.off('room_members');
-    };
+    return () => socket.off('room_members');
   }, []);
 
-  // Active rooms = rooms with at least 1 member, sorted by count
-  const activeRooms = useMemo(() => {
-    const result = [];
-    categories.forEach(cat => {
+  // Search mode: flat list of all rooms matching query
+  const searchResults = useMemo(() => {
+    if (!search.trim()) return [];
+    const q = search.toLowerCase();
+    const results = [];
+    LOCAL_CATEGORIES.forEach(cat => {
       cat.rooms.forEach(room => {
-        const count = memberCounts[`${cat.id}:${room}`] || 0;
-        if (count > 0) result.push({ categoryId: cat.id, room, count, icon: cat.icon, accent: getAccent(cat.id), category: cat });
+        if (room.includes(q) || cat.name.toLowerCase().includes(q)) {
+          results.push({ room, cat, key: `${cat.id}:${room}` });
+        }
       });
     });
-    return result.sort((a, b) => b.count - a.count).slice(0, 10);
-  }, [categories, memberCounts]);
+    return results;
+  }, [search]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return categories;
-    const q = search.toLowerCase();
-    return categories.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.description.toLowerCase().includes(q) ||
-      c.rooms.some(r => r.includes(q))
-    );
-  }, [categories, search]);
+  const activeCategory = LOCAL_CATEGORIES.find(c => c.id === activeCatId) || LOCAL_CATEGORIES[0];
+  const c = getC(activeCatId);
 
   function openRoom(category, room) {
     navigation.navigate('GroupChat', { category, user, initialRoom: room });
   }
 
-  const headerOpacity = headerAnim;
-  const headerSlide   = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] });
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+    <SafeAreaView style={s.safe}>
 
-        {/* ── Header ── */}
-        <Animated.View style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerSlide }] }]}>
-          <View>
-            <Text style={[styles.title, { color: colors.text }]}>Chats</Text>
-            <Text style={[styles.subtitle, { color: colors.textMuted }]}>Find your community worldwide</Text>
-          </View>
-          {totalOnline > 0 && (
-            <View style={styles.onlinePill}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>{totalOnline} in rooms</Text>
-            </View>
-          )}
-        </Animated.View>
-
-        {/* ── Search ── */}
-        <View style={[styles.searchWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search rooms…"
-            placeholderTextColor={colors.textMuted}
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Text style={styles.searchClear}>✕</Text>
-            </TouchableOpacity>
-          )}
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <View>
+          <Text style={s.title}>Chats</Text>
+          <Text style={s.subtitle}>Find your people worldwide</Text>
         </View>
-
-        {/* ── Active Rooms ── */}
-        {activeRooms.length > 0 && !search && (
-          <View style={styles.section}>
-            <View style={styles.sectionHead}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>🔥 Active Right Now</Text>
-              <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>live</Text>
-              </View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-              {activeRooms.map(ar => (
-                <ActiveRoomCard
-                  key={`${ar.categoryId}:${ar.room}`}
-                  {...ar}
-                  onPress={() => openRoom(ar.category, ar.room)}
-                />
-              ))}
-            </ScrollView>
+        {totalOnline > 0 && (
+          <View style={s.onlinePill}>
+            <View style={s.greenDot} />
+            <Text style={s.onlineText}>{totalOnline} online</Text>
           </View>
         )}
+      </View>
 
-        {/* ── Categories ── */}
-        <View style={styles.section}>
-          {!search && (
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Browse Categories</Text>
-              <Text style={styles.sectionSub}>{categories.length} communities</Text>
-            </View>
-          )}
+      {/* ── Search ── */}
+      <View style={s.searchRow}>
+        <Text style={s.searchIcon}>🔍</Text>
+        <TextInput
+          style={s.searchInput}
+          placeholder="Search any room…"
+          placeholderTextColor="#444"
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Text style={s.clearBtn}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
-          {filtered.length === 0 ? (
-            <View style={styles.noResults}>
+      {search.trim() ? (
+        /* ── Search results ── */
+        <FlatList
+          data={searchResults}
+          keyExtractor={item => item.key}
+          contentContainerStyle={s.searchList}
+          ListEmptyComponent={
+            <View style={s.empty}>
               <Text style={{ fontSize: 36 }}>🔍</Text>
-              <Text style={styles.noResultsText}>No rooms match "{search}"</Text>
+              <Text style={s.emptyText}>No rooms match "{search}"</Text>
             </View>
-          ) : (
-            <View style={styles.cardList}>
-              {filtered.map((item, index) => (
-                <CategoryCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  memberCounts={memberCounts}
-                  onRoomPress={openRoom}
-                />
-              ))}
-            </View>
-          )}
-        </View>
+          }
+          renderItem={({ item }) => {
+            const cc = getC(item.cat.id);
+            const count = memberCounts[item.key] || 0;
+            return (
+              <TouchableOpacity
+                style={s.searchItem}
+                onPress={() => openRoom(item.cat, item.room)}
+                activeOpacity={0.75}
+              >
+                <Text style={s.searchItemIcon}>{item.cat.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.searchItemRoom}>#{item.room}</Text>
+                  <Text style={s.searchItemCat}>{item.cat.name}</Text>
+                </View>
+                {count > 0 && (
+                  <View style={[s.searchLive, { backgroundColor: cc.accent + '22' }]}>
+                    <View style={s.greenDot} />
+                    <Text style={[s.searchLiveText, { color: cc.accent }]}>{count} live</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      ) : (
+        <>
+          {/* ── Category tabs (horizontal) ── */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.tabRow}
+          >
+            {LOCAL_CATEGORIES.map(cat => (
+              <CategoryTab
+                key={cat.id}
+                item={cat}
+                isActive={activeCatId === cat.id}
+                onPress={() => setActiveCatId(cat.id)}
+              />
+            ))}
+          </ScrollView>
 
-      </ScrollView>
+          {/* ── Active category banner ── */}
+          <LinearGradient colors={[c.from + '55', 'transparent']} style={s.catBanner}>
+            <Text style={s.catBannerIcon}>{activeCategory.icon}</Text>
+            <Text style={s.catBannerName}>{activeCategory.name}</Text>
+            {totalOnline > 0 && (
+              <Text style={[s.catBannerCount, { color: c.accent }]}>
+                {activeCategory.rooms.reduce((sum, r) => sum + (memberCounts[`${activeCatId}:${r}`] || 0), 0)} in here
+              </Text>
+            )}
+          </LinearGradient>
+
+          {/* ── Room grid ── */}
+          <FlatList
+            data={activeCategory.rooms}
+            keyExtractor={r => r}
+            numColumns={2}
+            scrollEnabled={false}
+            contentContainerStyle={s.grid}
+            columnWrapperStyle={s.gridRow}
+            renderItem={({ item: room }) => {
+              const count = memberCounts[`${activeCatId}:${room}`] || 0;
+              return (
+                <RoomCard
+                  room={room}
+                  categoryId={activeCatId}
+                  accent={c.accent}
+                  from={c.from}
+                  to={c.to}
+                  count={count}
+                  onPress={() => openRoom(activeCategory, room)}
+                />
+              );
+            }}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#000000' },
-  scroll:      { paddingBottom: 60, gap: 24 },
+const s = StyleSheet.create({
+  safe:        { flex: 1, backgroundColor: '#000' },
 
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 16 },
-  title:       { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  subtitle:    { color: '#555', fontSize: 13, marginTop: 3 },
-  onlinePill:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#57f28715', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: '#57f28730' },
-  onlineDot:   { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#57f287' },
-  onlineText:  { color: '#57f287', fontSize: 12, fontWeight: '700' },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
+  title:       { color: '#fff', fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
+  subtitle:    { color: '#555', fontSize: 13, marginTop: 2 },
+  onlinePill:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#4ade8015', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 6, borderWidth: 1, borderColor: '#4ade8030' },
+  greenDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
+  onlineText:  { color: '#4ade80', fontSize: 12, fontWeight: '700' },
 
-  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336' },
+  searchRow:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#111', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#222' },
   searchIcon:  { fontSize: 16 },
   searchInput: { flex: 1, color: '#fff', fontSize: 15 },
-  searchClear: { color: '#444', fontSize: 16, paddingHorizontal: 4 },
+  clearBtn:    { color: '#444', fontSize: 16 },
 
-  section:     { paddingHorizontal: 20, gap: 14 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle:{ color: '#fff', fontSize: 17, fontWeight: '800' },
-  sectionSub:  { color: '#555', fontSize: 12 },
-  liveBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#57f28715', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#57f28730' },
-  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#57f287' },
-  liveText:    { color: '#57f287', fontSize: 11, fontWeight: '700' },
+  tabRow:      { paddingHorizontal: 16, gap: 8, paddingBottom: 4 },
 
-  cardList:    { gap: 12 },
+  catBanner:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 12, marginBottom: 4, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14 },
+  catBannerIcon: { fontSize: 22 },
+  catBannerName: { color: '#fff', fontSize: 16, fontWeight: '800', flex: 1 },
+  catBannerCount:{ fontSize: 12, fontWeight: '700' },
 
-  noResults:   { alignItems: 'center', paddingVertical: 40, gap: 10 },
-  noResultsText: { color: '#555', fontSize: 15 },
+  grid:        { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100, gap: 10 },
+  gridRow:     { gap: 10 },
+
+  // search results
+  searchList:  { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100, gap: 8 },
+  searchItem:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#111', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#1e1e1e' },
+  searchItemIcon: { fontSize: 24 },
+  searchItemRoom: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  searchItemCat:  { color: '#555', fontSize: 12, marginTop: 2 },
+  searchLive:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
+  searchLiveText: { fontSize: 11, fontWeight: '700' },
+
+  empty:       { alignItems: 'center', paddingVertical: 60, gap: 12 },
+  emptyText:   { color: '#555', fontSize: 15 },
 });

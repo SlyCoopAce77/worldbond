@@ -22,24 +22,24 @@ export const LIGHT = {
 };
 
 export const DARK = {
-  bg:          '#15202B',
-  bgSecondary: '#1E2732',
-  card:        '#1E2732',
-  cardAlt:     '#22303C',
-  border:      '#38444D',
-  borderStrong:'#38444D',
+  bg:          '#000000',
+  bgSecondary: '#0d0d0d',
+  card:        '#111111',
+  cardAlt:     '#161616',
+  border:      '#1e1e1e',
+  borderStrong:'#2a2a2a',
   text:        '#FFFFFF',
-  textSub:     '#8899A6',
-  textMuted:   '#536471',
+  textSub:     '#888888',
+  textMuted:   '#444444',
   accent:      '#6C47FF',
   accentDark:  '#5533DD',
   accentFaint: '#6C47FF15',
-  tabBg:       '#15202B',
-  tabBorder:   '#38444D',
+  tabBg:       '#000000',
+  tabBorder:   '#1e1e1e',
   tabActive:   '#FFFFFF',
-  tabInactive: '#8899A6',
-  inputBg:     '#1E2732',
-  shadow:      '#00000040',
+  tabInactive: '#555555',
+  inputBg:     '#111111',
+  shadow:      '#00000060',
 };
 
 // follows system setting by default

@@ -398,7 +398,7 @@ export default function GroupChatScreen({ route, navigation }) {
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>{category?.icon}  {category?.name}</Text>
-          <Text style={styles.headerSub}>#{activeRoom}  ·  {roomDesc}</Text>
+          <Text style={styles.headerSub}>#{activeRoom}</Text>
         </View>
 
         <TouchableOpacity
@@ -406,9 +406,10 @@ export default function GroupChatScreen({ route, navigation }) {
           onPress={() => setShowMembers(true)}
           activeOpacity={0.8}
         >
-          <LinearGradient colors={[`${ACCENT}44`, `${ACCENT}22`]} style={styles.membersBtnGradient}>
-            <Text style={styles.membersBtnIcon}>👥</Text>
+          <LinearGradient colors={[`${ACCENT}55`, `${ACCENT}33`]} style={styles.membersBtnGradient}>
+            <View style={styles.memberLiveDot} />
             <Text style={styles.membersBtnCount}>{members.length}</Text>
+            <Text style={styles.membersBtnLabel}>{members.length === 1 ? 'person' : 'people'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -548,14 +549,15 @@ const styles = StyleSheet.create({
   backArrow:  { color: ACCENT, fontSize: 24 },
   headerTitle:{ color: '#fff', fontSize: 16, fontWeight: '800' },
   headerSub:  { color: '#666', fontSize: 11, marginTop: 2 },
-  membersBtn: { borderRadius: 12, overflow: 'hidden' },
+  membersBtn: { borderRadius: 14, overflow: 'hidden' },
   membersBtnGradient: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12,
-    borderWidth: 1, borderColor: `${ACCENT}44`,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14,
+    borderWidth: 1, borderColor: `${ACCENT}55`,
   },
-  membersBtnIcon:  { fontSize: 16 },
-  membersBtnCount: { color: ACCENT, fontSize: 13, fontWeight: '800' },
+  memberLiveDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
+  membersBtnCount: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  membersBtnLabel: { color: ACCENT, fontSize: 11, fontWeight: '600' },
 
   // Room tabs
   roomTabsBar:     { maxHeight: 46, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },

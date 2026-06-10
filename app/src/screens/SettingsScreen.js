@@ -239,11 +239,11 @@ export default function SettingsScreen({ navigation, onLogout }) {
         <Section title="Appearance" />
         <Card>
           <ToggleRow
-            icon={isDark ? '🌙' : '☀️'}
+            icon="🌙"
             label="Dark Mode"
-            sublabel={isDark ? 'Dark Mode' : 'Light Mode'}
-            value={isDark}
-            onToggle={toggleTheme}
+            sublabel="Always on"
+            value={true}
+            onToggle={() => {}}
           />
         </Card>
 
