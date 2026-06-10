@@ -45,7 +45,7 @@ export default function LiveWatchScreen({ route, navigation }) {
   const [floats,      setFloats]      = useState([]);
   const [text,        setText]        = useState('');
   const [ended,       setEnded]       = useState(false);
-  const [elapsed,     setElapsed]     = useState(stream?.startedAt ? Math.floor((Date.now() - stream.startedAt) / 1000) : 0);
+  const [elapsed,     setElapsed]     = useState(stream?.startedAt ? Math.floor((Date.now() - stream?.startedAt) / 1000) : 0);
 
   const flatRef  = useRef(null);
   const timerRef = useRef(null);
@@ -53,14 +53,14 @@ export default function LiveWatchScreen({ route, navigation }) {
   // Duration ticker (synced to stream start)
   useEffect(() => {
     timerRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - stream.startedAt) / 1000));
+      setElapsed(Math.floor((Date.now() - (stream?.startedAt || Date.now())) / 1000));
     }, 1000);
     return () => clearInterval(timerRef.current);
   }, []);
 
   // Join stream on mount, leave on unmount
   useEffect(() => {
-    socket.emit('join_live', { streamId: stream.streamId });
+    socket.emit('join_live', { streamId: stream?.streamId });
 
     socket.on('live_joined', ({ messages: history }) => {
       setMessages(history || []);
@@ -79,11 +79,11 @@ export default function LiveWatchScreen({ route, navigation }) {
     });
 
     socket.on('live_ended', ({ streamId }) => {
-      if (streamId === stream.streamId) setEnded(true);
+      if (streamId === stream?.streamId) setEnded(true);
     });
 
     return () => {
-      socket.emit('leave_live', { streamId: stream.streamId });
+      socket.emit('leave_live', { streamId: stream?.streamId });
       socket.off('live_joined');
       socket.off('live_viewer_count');
       socket.off('live_message');
@@ -94,12 +94,12 @@ export default function LiveWatchScreen({ route, navigation }) {
 
   function sendMessage() {
     if (!text.trim()) return;
-    socket.emit('live_message', { streamId: stream.streamId, text: text.trim() });
+    socket.emit('live_message', { streamId: stream?.streamId, text: text.trim() });
     setText('');
   }
 
   function sendReaction(emoji) {
-    socket.emit('live_reaction', { streamId: stream.streamId, emoji });
+    socket.emit('live_reaction', { streamId: stream?.streamId, emoji });
   }
 
   function removeFloat(id) {
@@ -112,7 +112,7 @@ export default function LiveWatchScreen({ route, navigation }) {
     return `${m}:${s}`;
   }
 
-  const avatarColor = stringToColor(stream.hostName || '');
+  const avatarColor = stringToColor(stream?.hostName || '');
 
   if (ended) {
     return (
@@ -120,7 +120,7 @@ export default function LiveWatchScreen({ route, navigation }) {
         <LinearGradient colors={['#1a0a2e', '#000000']} style={StyleSheet.absoluteFill} />
         <Text style={{ fontSize: 52, marginBottom: 20 }}>📴</Text>
         <Text style={styles.endedTitle}>Live ended</Text>
-        <Text style={styles.endedSub}>{stream.hostName} ended their stream</Text>
+        <Text style={styles.endedSub}>{stream?.hostName} ended their stream</Text>
         <TouchableOpacity style={styles.endedBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.endedBtnText}>Go Back</Text>
         </TouchableOpacity>
@@ -137,11 +137,11 @@ export default function LiveWatchScreen({ route, navigation }) {
 
       {/* Host visual */}
       <View style={styles.centerAvatar}>
-        {stream.hostPhoto ? (
+        {stream?.hostPhoto ? (
           <Image source={{ uri: stream.hostPhoto }} style={styles.hostPhoto} />
         ) : (
           <LinearGradient colors={[avatarColor, avatarColor + '88']} style={styles.hostAvatarBg}>
-            <Text style={styles.hostInitial}>{(stream.hostName || '?')[0].toUpperCase()}</Text>
+            <Text style={styles.hostInitial}>{(stream?.hostName || '?')[0].toUpperCase()}</Text>
           </LinearGradient>
         )}
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.72)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
@@ -165,8 +165,8 @@ export default function LiveWatchScreen({ route, navigation }) {
               <View style={styles.liveDot} />
               <Text style={styles.liveText}>LIVE</Text>
             </View>
-            <Text style={styles.hostName}>{stream.hostName}</Text>
-            <Text style={styles.streamTitle} numberOfLines={1}>{stream.title}</Text>
+            <Text style={styles.hostName}>{stream?.hostName}</Text>
+            <Text style={styles.streamTitle} numberOfLines={1}>{stream?.title}</Text>
           </View>
 
           <View style={styles.topRight}>
@@ -183,7 +183,7 @@ export default function LiveWatchScreen({ route, navigation }) {
           <FlatList
             ref={flatRef}
             data={messages}
-            keyExtractor={m => m.id}
+            keyExtractor={m => String(m.id)}
             renderItem={({ item }) => {
               const isMine = item.senderId === socket.id;
               return (
@@ -268,8 +268,8 @@ const styles = StyleSheet.create({
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
-  msgRowMine:   { borderLeftWidth: 2, borderLeftColor: '#E8003D' },
-  msgName:      { color: '#E8003D', fontWeight: '700', fontSize: 13 },
+  msgRowMine:   { borderLeftWidth: 2, borderLeftColor: '#6C47FF' },
+  msgName:      { color: '#6C47FF', fontWeight: '700', fontSize: 13 },
   msgText:      { color: '#fff', fontSize: 13 },
   translated:   { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
@@ -279,12 +279,12 @@ const styles = StyleSheet.create({
 
   inputBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   input:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
+  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
   endedScreen:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   endedTitle:   { color: '#fff', fontSize: 24, fontWeight: '900' },
   endedSub:     { color: '#666', fontSize: 14, marginBottom: 20 },
-  endedBtn:     { backgroundColor: '#E8003D', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
+  endedBtn:     { backgroundColor: '#6C47FF', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
   endedBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

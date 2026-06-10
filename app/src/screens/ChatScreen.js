@@ -11,7 +11,7 @@ import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import GiftPicker from '../components/GiftPicker';
 
-const ACCENT  = '#E8003D';
+const ACCENT  = '#6C47FF';
 const BG      = '#000000';
 const CARD    = '#1C1F23';
 const BORDER  = '#2F3336';
@@ -388,7 +388,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const headerSubtitle = otherOnline
     ? '🟢 Online now'
-    : otherUser.country || '';
+    : otherUser?.country || '';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -525,7 +525,7 @@ export default function ChatScreen({ route, navigation }) {
           />
           {text.trim() ? (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
-              <LinearGradient colors={[ACCENT, '#E8003D']} style={styles.sendBtn}>
+              <LinearGradient colors={[ACCENT, '#6C47FF']} style={styles.sendBtn}>
                 <Text style={styles.sendIcon}>➤</Text>
               </LinearGradient>
             </TouchableOpacity>

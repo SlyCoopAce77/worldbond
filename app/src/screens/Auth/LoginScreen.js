@@ -129,7 +129,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                 <ActivityIndicator color="#fff" />
               ) : (
                 <LinearGradient
-                  colors={['#E8003D', '#E8003D', '#C7003A']}
+                  colors={['#6C47FF', '#6C47FF', '#5533DD']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.submitGrad}
                 >
@@ -180,14 +180,14 @@ const styles = StyleSheet.create({
   fieldGroup:      { gap: 8 },
   labelRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label:           { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  forgotLink:      { color: '#E8003D', fontSize: 13, fontWeight: '600' },
+  forgotLink:      { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
 
   inputWrap:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputWrapFocused:{ borderColor: '#E8003D40' },
+  inputWrapFocused:{ borderColor: '#6C47FF40' },
   inputIcon:       { fontSize: 16, marginRight: 10 },
   input:           { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
   showHide:        { paddingLeft: 8 },
-  showHideText:    { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  showHideText:    { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
 
   submitBtn:       { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
   submitBtnOff:    { opacity: 0.45 },
@@ -200,5 +200,5 @@ const styles = StyleSheet.create({
 
   footerRow:       { flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
   footerText:      { color: '#555', fontSize: 15 },
-  footerLink:      { color: '#E8003D', fontSize: 15, fontWeight: '700' },
+  footerLink:      { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
 });

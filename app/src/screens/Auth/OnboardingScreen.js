@@ -72,7 +72,7 @@ function StepBar({ step }) {
 const bar = StyleSheet.create({
   container: { flexDirection: 'row', gap: 6, marginBottom: 28 },
   seg:       { flex: 1, height: 4, borderRadius: 2, backgroundColor: '#2F3336' },
-  segOn:     { backgroundColor: '#E8003D' },
+  segOn:     { backgroundColor: '#6C47FF' },
   segActive: { backgroundColor: '#7c87f5' },
 });
 
@@ -308,7 +308,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                         onPress={() => setLanguage(l.code)}
                       >
                         <Text style={{ fontSize: 15 }}>{l.flag}</Text>
-                        <Text style={[s.langText, language === l.code && { color: '#E8003D', fontWeight: '700' }]}>
+                        <Text style={[s.langText, language === l.code && { color: '#6C47FF', fontWeight: '700' }]}>
                           {l.label}
                         </Text>
                       </TouchableOpacity>
@@ -405,7 +405,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                 <View style={s.nextGrad}><ActivityIndicator color="#fff" /></View>
               ) : (
                 <LinearGradient
-                  colors={['#E8003D', '#E8003D', '#C7003A']}
+                  colors={['#6C47FF', '#6C47FF', '#5533DD']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={s.nextGrad}
                 >
@@ -440,9 +440,9 @@ const s = StyleSheet.create({
   scroll:     { flexGrow: 1, padding: 24, paddingTop: 20, paddingBottom: 50 },
 
   stepHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 28 },
-  stepIconBadge:{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#E8003D18', borderWidth: 1, borderColor: '#E8003D30', alignItems: 'center', justifyContent: 'center' },
+  stepIconBadge:{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#6C47FF18', borderWidth: 1, borderColor: '#6C47FF30', alignItems: 'center', justifyContent: 'center' },
   stepIconText: { fontSize: 26 },
-  stepCount:  { color: '#E8003D', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3 },
+  stepCount:  { color: '#6C47FF', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3 },
   stepTitle:  { fontSize: 26, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
   stepSub:    { fontSize: 13, color: '#536471', marginTop: 4 },
 
@@ -460,19 +460,19 @@ const s = StyleSheet.create({
 
   chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 14, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  chipOn:     { backgroundColor: '#E8003D20', borderColor: '#E8003D' },
+  chipOn:     { backgroundColor: '#6C47FF20', borderColor: '#6C47FF' },
   chipText:   { color: '#536471', fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: '#E8003D', fontWeight: '700' },
+  chipTextOn: { color: '#6C47FF', fontWeight: '700' },
 
   listBox:    { backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', maxHeight: 220 },
   listItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a30' },
-  listItemOn: { backgroundColor: '#E8003D15' },
+  listItemOn: { backgroundColor: '#6C47FF15' },
   listItemText:{ flex: 1, color: '#aaa', fontSize: 15 },
-  check:      { color: '#E8003D', fontSize: 16, fontWeight: '800' },
+  check:      { color: '#6C47FF', fontSize: 16, fontWeight: '800' },
 
   langGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   langChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  langChipOn: { backgroundColor: '#E8003D18', borderColor: '#E8003D55' },
+  langChipOn: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF55' },
   langText:   { color: '#536471', fontSize: 13, fontWeight: '600' },
 
   ctList:     { gap: 10 },
@@ -494,10 +494,10 @@ const s = StyleSheet.create({
 
   btnArea:    { marginTop: 32, gap: 6 },
   nextBtn:    { borderRadius: 18, overflow: 'hidden' },
-  nextGrad:   { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: '#E8003D' },
+  nextGrad:   { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: '#6C47FF' },
   nextText:   { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
   skipBtn:    { paddingVertical: 14, alignItems: 'center' },
   skipText:   { color: '#333355', fontSize: 15 },
   backBtn:    { paddingVertical: 12, alignItems: 'center' },
-  backText:   { color: '#E8003D', fontSize: 15, fontWeight: '700' },
+  backText:   { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
 });

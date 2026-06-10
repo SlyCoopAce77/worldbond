@@ -23,27 +23,27 @@ export default function PlaceDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     function fetchPlaceData() {
-      socket.emit('get_place_checkins', { placeId: place.id });
-      socket.emit('get_reviews', { placeId: place.id });
+      socket.emit('get_place_checkins', { placeId: place?.id });
+      socket.emit('get_reviews', { placeId: place?.id });
     }
     if (socket.connected) fetchPlaceData();
     else socket.once('connect', fetchPlaceData);
 
     socket.on('place_checkins', ({ placeId, checkins: c }) => {
-      if (placeId === place.id) setCheckins(c);
+      if (placeId === place?.id) setCheckins(c);
     });
     socket.on('place_reviews', ({ placeId, reviews: r, avgRating: avg }) => {
-      if (placeId === place.id) { setReviews(r); setAvgRating(avg); }
+      if (placeId === place?.id) { setReviews(r); setAvgRating(avg); }
     });
     socket.on('place_history', ({ placeId, messages: hist }) => {
-      if (placeId === place.id) setMessages(hist);
+      if (placeId === place?.id) setMessages(hist);
     });
     socket.on('place_message', (msg) => {
       setMessages(prev => [...prev, msg]);
     });
 
     return () => {
-      if (checkedInRef.current) socket.emit('checkout_place', { placeId: place.id });
+      if (checkedInRef.current) socket.emit('checkout_place', { placeId: place?.id });
       socket.off('place_checkins');
       socket.off('place_reviews');
       socket.off('place_history');
@@ -59,11 +59,11 @@ export default function PlaceDetailScreen({ route, navigation }) {
 
   function toggleCheckin() {
     if (checkedIn) {
-      socket.emit('checkout_place', { placeId: place.id });
+      socket.emit('checkout_place', { placeId: place?.id });
       setCheckedIn(false);
       checkedInRef.current = false;
     } else {
-      socket.emit('checkin_place', { placeId: place.id });
+      socket.emit('checkin_place', { placeId: place?.id });
       setCheckedIn(true);
       checkedInRef.current = true;
       setTab('chat');
@@ -72,14 +72,14 @@ export default function PlaceDetailScreen({ route, navigation }) {
 
   function sendMessage() {
     if (!text.trim() || !checkedIn) return;
-    socket.emit('place_message', { placeId: place.id, text: text.trim() });
+    socket.emit('place_message', { placeId: place?.id, text: text.trim() });
     setText('');
   }
 
   function submitReview() {
     if (myRating === 0) return;
     setSubmittingReview(true);
-    socket.emit('submit_review', { placeId: place.id, rating: myRating, text: reviewText.trim() });
+    socket.emit('submit_review', { placeId: place?.id, rating: myRating, text: reviewText.trim() });
     setReviewText('');
     setSubmittingReview(false);
   }
@@ -185,7 +185,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
           </View>
           <Text style={styles.infoSectionLabel}>Tags</Text>
           <View style={styles.tagsRow}>
-            {place.tags.map(tag => (
+            {(place?.tags || []).map(tag => (
               <View key={tag} style={styles.tag}>
                 <Text style={styles.tagText}>#{tag}</Text>
               </View>
@@ -219,7 +219,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
           <FlatList
             ref={flatRef}
             data={messages}
-            keyExtractor={item => item.id}
+            keyExtractor={item => String(item.id)}
             renderItem={renderMessage}
             contentContainerStyle={styles.messageList}
             ListEmptyComponent={
@@ -301,7 +301,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
               <View key={r.id} style={styles.reviewCard}>
                 <View style={styles.reviewHeader}>
                   <View style={[styles.reviewAvatar, { backgroundColor: stringToColor(r.username) }]}>
-                    <Text style={styles.reviewAvatarText}>{r.username[0].toUpperCase()}</Text>
+                    <Text style={styles.reviewAvatarText}>{(r.username?.[0] ?? '?').toUpperCase()}</Text>
                   </View>
                   <View style={styles.reviewMeta}>
                     <Text style={styles.reviewUsername}>{r.username}</Text>
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1C1F23', gap: 10,
   },
   backBtn: { padding: 6 },
-  backText: { color: '#E8003D', fontSize: 22 },
+  backText: { color: '#6C47FF', fontSize: 22 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIcon: { fontSize: 28 },
   headerName: { color: '#fff', fontSize: 15, fontWeight: '700', maxWidth: 160 },
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1F23', borderRadius: 20, paddingHorizontal: 12,
     paddingVertical: 7, borderWidth: 1, borderColor: '#2F3336',
   },
-  checkinBtnActive: { backgroundColor: '#E8003D', borderColor: '#E8003D' },
+  checkinBtnActive: { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
   checkinBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   liveBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20,
@@ -386,9 +386,9 @@ const styles = StyleSheet.create({
   liveText: { color: '#4caf50', fontSize: 13, fontWeight: '600' },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#E8003D' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: '#6C47FF' },
   tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#E8003D' },
+  tabTextActive: { color: '#6C47FF' },
   infoScroll: { padding: 20, gap: 16 },
   infoCard: { backgroundColor: '#1C1F23', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
   infoDesc: { color: '#ccc', fontSize: 15, lineHeight: 22 },
@@ -398,10 +398,10 @@ const styles = StyleSheet.create({
   infoItemValue: { color: '#fff', fontSize: 14, fontWeight: '600' },
   infoSectionLabel: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { backgroundColor: '#E8003D22', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  tagText: { color: '#E8003D', fontSize: 13 },
+  tag: { backgroundColor: '#6C47FF22', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { color: '#6C47FF', fontSize: 13 },
   bigCheckinBtn: {
-    backgroundColor: '#E8003D', borderRadius: 14, padding: 16,
+    backgroundColor: '#6C47FF', borderRadius: 14, padding: 16,
     alignItems: 'center', marginTop: 8,
   },
   bigCheckinBtnActive: { backgroundColor: '#333' },
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2F3336',
   },
   lockedText: { color: '#aaa', fontSize: 13, flex: 1 },
-  lockedBtn: { backgroundColor: '#E8003D', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
+  lockedBtn: { backgroundColor: '#6C47FF', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
   lockedBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   messageList: { padding: 14, gap: 10, flexGrow: 1 },
   emptyChatWrap: { flex: 1, alignItems: 'center', paddingTop: 60, gap: 10 },
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   avatarText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 12 },
-  bubbleMine: { backgroundColor: '#E8003D', borderBottomRightRadius: 4 },
+  bubbleMine: { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: '#1C1F23', borderBottomLeftRadius: 4 },
   senderRow: { flexDirection: 'row', gap: 6, marginBottom: 4, alignItems: 'center' },
   senderName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#1C1F23', color: '#fff', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100,
   },
-  sendBtn: { backgroundColor: '#E8003D', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: '#6C47FF', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 18 },
   peopleList: { padding: 16, gap: 10 },
@@ -457,8 +457,8 @@ const styles = StyleSheet.create({
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { color: '#fff', fontSize: 15, fontWeight: '600' },
   personCountry: { color: '#888', fontSize: 12, marginTop: 2 },
-  personLang: { backgroundColor: '#E8003D33', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  personLangText: { color: '#E8003D', fontSize: 12, fontWeight: '700' },
+  personLang: { backgroundColor: '#6C47FF33', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  personLangText: { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 
   // Rating strip
   ratingStrip: {
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2F3336',
   },
   submitReviewBtn: {
-    backgroundColor: '#E8003D', borderRadius: 12, padding: 14, alignItems: 'center',
+    backgroundColor: '#6C47FF', borderRadius: 12, padding: 14, alignItems: 'center',
   },
   submitReviewBtnDisabled: { backgroundColor: '#333' },
   submitReviewBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },

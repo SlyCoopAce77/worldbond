@@ -2,8 +2,11 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, Platform } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { NotificationsProvider } from '../context/NotificationsContext';
+import { navigationRef } from '../services/navigationRef';
+import NotificationToast from '../components/NotificationToast';
 
 // Tab screens
 import HomeScreen from '../screens/HomeScreen';
@@ -52,7 +55,7 @@ function TabIcon({ icon, color, focused }) {
 
 const tabStyles = StyleSheet.create({
   iconWrap:       { width: 44, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  iconWrapActive: { backgroundColor: '#E8003D18' },
+  iconWrapActive: { backgroundColor: '#6C47FF18' },
 });
 
 function HomeTabs({ user, onLogout }) {
@@ -121,43 +124,50 @@ function HomeTabs({ user, onLogout }) {
 
 export default function AppNavigator({ user, onLogout }) {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Main">
-          {props => <HomeTabs {...props} user={user} onLogout={onLogout} />}
-        </Stack.Screen>
+    <NotificationsProvider>
+      <View style={{ flex: 1 }}>
+        <NavigationContainer ref={navigationRef}>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Main">
+              {props => <HomeTabs {...props} user={user} onLogout={onLogout} />}
+            </Stack.Screen>
 
-        {/* Chats */}
-        <Stack.Screen name="Chat" component={ChatScreen} />
-        <Stack.Screen name="GroupChat" component={GroupChatScreen} />
-        <Stack.Screen name="Call" component={CallScreen} options={{ presentation: 'modal' }} />
+            {/* Chats */}
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="GroupChat" component={GroupChatScreen} />
+            <Stack.Screen name="Call" component={CallScreen} options={{ presentation: 'modal' }} />
 
-        {/* People */}
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Bond" component={MatchesScreen} />
+            {/* People */}
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Bond" component={MatchesScreen} />
 
-        {/* Explore */}
-        <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
-        <Stack.Screen name="Events" component={EventsScreen} />
-        <Stack.Screen name="Experiences" component={ExperiencesScreen} />
+            {/* Explore */}
+            <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
+            <Stack.Screen name="Events" component={EventsScreen} />
+            <Stack.Screen name="Experiences" component={ExperiencesScreen} />
 
-        {/* Notifications */}
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            {/* Notifications */}
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
 
-        {/* Settings */}
-        <Stack.Screen name="Subscription" component={SubscriptionScreen} />
-        <Stack.Screen name="Settings">
-          {props => <SettingsScreen {...props} onLogout={onLogout} />}
-        </Stack.Screen>
+            {/* Settings */}
+            <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+            <Stack.Screen name="Settings">
+              {props => <SettingsScreen {...props} onLogout={onLogout} />}
+            </Stack.Screen>
 
-        {/* Live */}
-        <Stack.Screen name="Live"      component={LiveScreen}      options={{ presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="LiveWatch" component={LiveWatchScreen} options={{ presentation: 'fullScreenModal' }} />
+            {/* Live */}
+            <Stack.Screen name="Live"      component={LiveScreen}      options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="LiveWatch" component={LiveWatchScreen} options={{ presentation: 'fullScreenModal' }} />
 
-        {/* Settings sub-screens */}
-        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
-        <Stack.Screen name="Legal"          component={LegalScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+            {/* Settings sub-screens */}
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+            <Stack.Screen name="Legal"          component={LegalScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+
+        {/* Toast lives outside NavigationContainer so the navigator's gesture handler can't intercept taps */}
+        <NotificationToast />
+      </View>
+    </NotificationsProvider>
   );
 }

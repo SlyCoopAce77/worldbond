@@ -17,14 +17,14 @@ function signRefresh(userId) {
   return jwt.sign({ sub: userId, jti: uuidv4() }, process.env.JWT_SECRET, { expiresIn: REFRESH_TTL });
 }
 
-async function register({ email, password }) {
+async function register({ email, password, dateOfBirth }) {
   const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
   if (existing.rowCount > 0) throw Object.assign(new Error('Email already registered'), { status: 409 });
 
   const hash = await bcrypt.hash(password, 12);
   const { rows } = await query(
-    'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',
-    [email.toLowerCase(), hash]
+    'INSERT INTO users (email, password_hash, date_of_birth) VALUES ($1, $2, $3) RETURNING id',
+    [email.toLowerCase(), hash, dateOfBirth]
   );
   const userId = rows[0].id;
   const access  = signAccess(userId);

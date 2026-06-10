@@ -54,14 +54,14 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.doneWrap}>
-          <LinearGradient colors={['#E8003D30', '#E8003D10']} style={styles.doneIconBg}>
+          <LinearGradient colors={['#6C47FF30', '#6C47FF10']} style={styles.doneIconBg}>
             <Text style={styles.doneIcon}>✅</Text>
           </LinearGradient>
           <Text style={styles.doneTitle}>Password reset!</Text>
           <Text style={styles.doneSub}>Your password has been updated. Sign in with your new password.</Text>
           <TouchableOpacity style={styles.doneBtn} onPress={onSuccess} activeOpacity={0.87}>
             <LinearGradient
-              colors={['#E8003D', '#E8003D', '#C7003A']}
+              colors={['#6C47FF', '#6C47FF', '#5533DD']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
               style={styles.doneBtnGrad}
             >
@@ -182,7 +182,7 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
                 </View>
               ) : (
                 <LinearGradient
-                  colors={['#E8003D', '#E8003D', '#C7003A']}
+                  colors={['#6C47FF', '#6C47FF', '#5533DD']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.submitGrad}
                 >
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   header:         { marginBottom: 28 },
   title:          { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
   subtitle:       { fontSize: 15, color: '#536471', marginTop: 8, lineHeight: 22 },
-  emailHighlight: { color: '#E8003D', fontWeight: '700' },
+  emailHighlight: { color: '#6C47FF', fontWeight: '700' },
 
   errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
   errorIcon:   { fontSize: 16 },
@@ -227,14 +227,14 @@ const styles = StyleSheet.create({
   label:      { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
 
   inputWrap:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputWrapFocused: { borderColor: '#E8003D40' },
+  inputWrapFocused: { borderColor: '#6C47FF40' },
   codeWrap:         { justifyContent: 'center' },
   inputIcon:        { fontSize: 16, marginRight: 10 },
   input:            { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
   codeInput:        { textAlign: 'center', fontSize: 28, fontWeight: '800', letterSpacing: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   checkMark:        { color: '#57f287', fontSize: 18, fontWeight: '800', marginLeft: 8 },
   showHide:         { paddingLeft: 8 },
-  showHideText:     { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  showHideText:     { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
 
   submitBtn:    { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
   submitBtnOff: { opacity: 0.45 },
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
 
   hintRow:  { flexDirection: 'row', justifyContent: 'center', paddingVertical: 18 },
   hint:     { color: '#555', fontSize: 13 },
-  hintLink: { color: '#E8003D', fontSize: 13, fontWeight: '600' },
+  hintLink: { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
 
   // Done state
   doneWrap:   { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },

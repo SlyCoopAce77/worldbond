@@ -35,6 +35,16 @@ const FILTERS = [
   { key: 'lounge',     label: '🛋️ Lounge' },
 ];
 
+const SPOT_CATEGORIES = [
+  { key: 'bar',        icon: '🍺', label: 'Bar Spots',    desc: 'Grab a drink & meet locals',    color: '#f59e0b', grad: ['#2a1a00', '#1a1000'] },
+  { key: 'club',       icon: '🎉', label: 'Club Spots',   desc: 'Dance floors & nightlife',       color: '#8b5cf6', grad: ['#1a0a2e', '#120820'] },
+  { key: 'restaurant', icon: '🍜', label: 'Food Spots',   desc: 'Local eats & dining',            color: '#ef4444', grad: ['#2a0a0a', '#1a0606'] },
+  { key: 'beach',      icon: '🏖️', label: 'Beach Spots',  desc: 'Sun, sand & vibes',              color: '#06b6d4', grad: ['#001e2a', '#001218'] },
+  { key: 'park',       icon: '🌳', label: 'Park Spots',   desc: 'Outdoor hangouts & chill zones', color: '#22c55e', grad: ['#0a1e0a', '#061206'] },
+  { key: 'lounge',     icon: '🛋️', label: 'Lounge Spots', desc: 'Relaxed vibes & good company',  color: '#a78bfa', grad: ['#1a1030', '#100820'] },
+  { key: 'all',        icon: '🌍', label: 'All Spots',    desc: 'Browse everything in this city', color: '#6C47FF', grad: ['#2a0010', '#1a000a'] },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function useFadeSlide(trigger = true, delay = 0) {
   const fade  = useRef(new Animated.Value(0)).current;
@@ -100,7 +110,7 @@ function Breadcrumb({ country, city, onCountry, onCity }) {
 }
 const bc = StyleSheet.create({
   row:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 6 },
-  link:   { color: '#E8003D', fontSize: 13, fontWeight: '600' },
+  link:   { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
   sep:    { color: '#333', fontSize: 14 },
   active: { color: '#888', fontSize: 13 },
 });
@@ -124,7 +134,7 @@ const crc = StyleSheet.create({
   card:  { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2F3336', margin: 5 },
   flag:  { fontSize: 42 },
   name:  { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  arrow: { color: '#E8003D', fontSize: 14 },
+  arrow: { color: '#6C47FF', fontSize: 14 },
 });
 
 // ─── City card ────────────────────────────────────────────────────────────────
@@ -158,13 +168,54 @@ const city = StyleSheet.create({
   icon:  { fontSize: 34 },
   name:  { color: '#fff', fontSize: 20, fontWeight: '800' },
   sub:   { color: '#ffffff66', fontSize: 12, marginTop: 2 },
-  arrow: { color: '#E8003D', fontSize: 26, fontWeight: '300' },
+  arrow: { color: '#6C47FF', fontSize: 26, fontWeight: '300' },
+});
+
+// ─── Spot type card ───────────────────────────────────────────────────────────
+function SpotTypeCard({ item, onPress, index, count }) {
+  const anim = useFadeSlide(true, index * 60);
+  return (
+    <Animated.View style={[stc.wrap, anim]}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+        <LinearGradient colors={item.grad} style={stc.card}>
+          <View style={[stc.iconCircle, { backgroundColor: item.color + '22', borderColor: item.color + '44' }]}>
+            <Text style={stc.icon}>{item.icon}</Text>
+          </View>
+          <View style={stc.info}>
+            <Text style={stc.label}>{item.label}</Text>
+            <Text style={stc.desc}>{item.desc}</Text>
+          </View>
+          <View style={stc.right}>
+            {count > 0 && (
+              <View style={[stc.countBadge, { backgroundColor: item.color + '22', borderColor: item.color + '44' }]}>
+                <Text style={[stc.countText, { color: item.color }]}>{count}</Text>
+              </View>
+            )}
+            <Text style={[stc.arrow, { color: item.color }]}>›</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+const stc = StyleSheet.create({
+  wrap:        { marginBottom: 12 },
+  card:        { borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#ffffff10' },
+  iconCircle:  { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  icon:        { fontSize: 26 },
+  info:        { flex: 1, gap: 3 },
+  label:       { color: '#fff', fontSize: 17, fontWeight: '800' },
+  desc:        { color: '#ffffff66', fontSize: 12 },
+  right:       { alignItems: 'center', gap: 6 },
+  countBadge:  { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  countText:   { fontSize: 12, fontWeight: '800' },
+  arrow:       { fontSize: 24, fontWeight: '300' },
 });
 
 // ─── Place card ───────────────────────────────────────────────────────────────
 function PlaceCard({ item, onPress, index }) {
   const anim = useFadeSlide(true, index * 60);
-  const meta  = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#E8003D', grad: ['#1C1F23', '#16181C'] };
+  const meta  = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF', grad: ['#1C1F23', '#16181C'] };
 
   return (
     <Animated.View style={anim}>
@@ -254,6 +305,7 @@ export default function ExploreScreen({ navigation, user }) {
   const [selCity,    setSelCity]    = useState(null);
   const [search,     setSearch]     = useState('');
   const [filter,     setFilter]     = useState('all');
+  const [selSpotType, setSelSpotType] = useState(null);
 
   const headerAnim = useFadeSlide(true);
 
@@ -262,7 +314,7 @@ export default function ExploreScreen({ navigation, user }) {
     else socket.once('connect', () => socket.emit('get_countries'));
     socket.on('countries_list', list => setCountries(list));
     socket.on('cities_list', ({ cities: c }) => { setCities(c); setView('cities'); });
-    socket.on('places_list', ({ places: p }) => { setPlaces(p); setView('places'); });
+    socket.on('places_list', ({ places: p }) => { setPlaces(p); setView('spot_types'); });
     return () => {
       socket.off('countries_list');
       socket.off('cities_list');
@@ -275,21 +327,44 @@ export default function ExploreScreen({ navigation, user }) {
 
   function goBack() {
     setSearch('');
-    if (view === 'places') { setView('cities'); setSelCity(null); setPlaces([]); }
+    if (view === 'places') { setView('spot_types'); setSelSpotType(null); }
+    else if (view === 'spot_types') { setView('cities'); setSelCity(null); setPlaces([]); setSelSpotType(null); }
     else if (view === 'cities') { setView('countries'); setSelCountry(null); setCities([]); }
   }
 
   function goToCountries() {
     setView('countries'); setSelCountry(null); setSelCity(null);
-    setCities([]); setPlaces([]); setSearch('');
+    setCities([]); setPlaces([]); setSearch(''); setSelSpotType(null);
   }
   function goToCities() {
-    if (view === 'places') { setView('cities'); setSelCity(null); setPlaces([]); setSearch(''); }
+    setView('cities'); setSelCity(null); setPlaces([]); setSearch(''); setSelSpotType(null);
+  }
+
+  function selectSpotType(cat) {
+    setSelSpotType(cat.key);
+    setFilter(cat.key);
+    setSearch('');
+    setView('places');
   }
 
   function openPlace(place) {
     navigation.navigate('PlaceDetail', { place, user });
   }
+
+  const filteredPlaces = useMemo(() => {
+    return places.filter(p => {
+      const q = search.toLowerCase();
+      const matchSearch = !q ||
+        p.name.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.vibe?.toLowerCase().includes(q) ||
+        p.tags?.some(t => t.toLowerCase().includes(q));
+      const matchFilter = filter === 'all' || p.type === filter;
+      return matchSearch && matchFilter;
+    });
+  }, [places, search, filter]);
+
+  const hotPlaces = useMemo(() => places.filter(p => (p.checkinCount || 0) > 0).slice(0, 5), [places]);
 
   // ── Countries ──
   if (view === 'countries') {
@@ -345,22 +420,43 @@ export default function ExploreScreen({ navigation, user }) {
     );
   }
 
+  // ── Spot Types ──
+  if (view === 'spot_types') {
+    const countForType = key => key === 'all' ? places.length : places.filter(p => p.type === key).length;
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+        <Animated.View style={[styles.header, headerAnim]}>
+          <Breadcrumb country={selCountry} city={selCity} onCountry={goToCountries} onCity={goToCities} />
+          <View style={styles.placesHeadRow}>
+            <View>
+              <Text style={styles.title}>🏙️ {selCity}</Text>
+              <Text style={styles.subtitle}>Where do you want to hang out?</Text>
+            </View>
+            <TouchableOpacity style={styles.backBtn} onPress={goBack}>
+              <Text style={styles.backBtnText}>← Back</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.spotTypeList}>
+          {SPOT_CATEGORIES.map((cat, index) => {
+            const cnt = countForType(cat.key);
+            if (cat.key !== 'all' && cnt === 0) return null;
+            return (
+              <SpotTypeCard
+                key={cat.key}
+                item={cat}
+                index={index}
+                count={cnt}
+                onPress={() => selectSpotType(cat)}
+              />
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   // ── Places ──
-  const filteredPlaces = useMemo(() => {
-    return places.filter(p => {
-      const q = search.toLowerCase();
-      const matchSearch = !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q) ||
-        p.vibe?.toLowerCase().includes(q) ||
-        p.tags?.some(t => t.toLowerCase().includes(q));
-      const matchFilter = filter === 'all' || p.type === filter;
-      return matchSearch && matchFilter;
-    });
-  }, [places, search, filter]);
-
-  const hotPlaces = useMemo(() => places.filter(p => (p.checkinCount || 0) > 0).slice(0, 5), [places]);
-
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.placesScroll}>
@@ -370,8 +466,12 @@ export default function ExploreScreen({ navigation, user }) {
           <Breadcrumb country={selCountry} city={selCity} onCountry={goToCountries} onCity={goToCities} />
           <View style={styles.placesHeadRow}>
             <View>
-              <Text style={styles.title}>🏙️ {selCity}</Text>
-              <Text style={styles.subtitle}>{places.length} spots to explore</Text>
+              <Text style={styles.title}>
+                {SPOT_CATEGORIES.find(c => c.key === selSpotType)?.icon ?? '📍'} {selCity}
+              </Text>
+              <Text style={styles.subtitle}>
+                {filteredPlaces.length} {SPOT_CATEGORIES.find(c => c.key === selSpotType)?.label ?? 'spots'} to explore
+              </Text>
             </View>
             <TouchableOpacity style={styles.backBtn} onPress={goBack}>
               <Text style={styles.backBtnText}>← Back</Text>
@@ -408,7 +508,7 @@ export default function ExploreScreen({ navigation, user }) {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
               {hotPlaces.map(p => {
-                const m = TYPE_META[p.type] || { icon: '📍', color: '#E8003D' };
+                const m = TYPE_META[p.type] || { icon: '📍', color: '#6C47FF' };
                 return (
                   <TouchableOpacity key={p.id} style={[hot.card, { borderColor: m.color + '44' }]} onPress={() => openPlace(p)}>
                     <Text style={hot.icon}>{m.icon}</Text>
@@ -460,19 +560,20 @@ const styles = StyleSheet.create({
   subtitle:       { color: '#555', fontSize: 13 },
 
   placesHeadRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  backBtn:        { backgroundColor: '#E8003D18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#E8003D40' },
-  backBtnText:    { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  backBtn:        { backgroundColor: '#6C47FF18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#6C47FF40' },
+  backBtnText:    { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
 
   countryGrid:    { paddingHorizontal: 15, paddingBottom: 40 },
 
   cityList:       { paddingHorizontal: 20, paddingBottom: 40, gap: 12 },
+  spotTypeList:   { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
 
   placesScroll:   { paddingBottom: 60 },
   placesList:     { paddingHorizontal: 20, gap: 14 },
 
   filters:        { paddingHorizontal: 20, gap: 8 },
   filterChip:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  filterChipOn:   { backgroundColor: '#E8003D', borderColor: '#E8003D' },
+  filterChipOn:   { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
   filterText:     { color: '#555', fontSize: 13, fontWeight: '600' },
   filterTextOn:   { color: '#fff' },
 

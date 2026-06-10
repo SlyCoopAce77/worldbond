@@ -124,6 +124,31 @@ app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req,
   }
 });
 
+// Debug: fire a test notification to all connected clients using a real profile userId
+app.post('/api/debug/notify', async (req, res) => {
+  const ioInstance = req.app.get('io');
+  const { type = 'follower' } = req.body;
+
+  // Grab a real userId from the profiles table so tapping the notification navigates to a real profile
+  let realUserId = null;
+  try {
+    const { query: dbQuery } = require('./database/db');
+    const { rows } = await dbQuery('SELECT user_id FROM profiles ORDER BY last_active DESC NULLS LAST LIMIT 1');
+    if (rows[0]) realUserId = rows[0].user_id;
+  } catch {}
+
+  const uid = realUserId || 'test-user';
+  const events = {
+    follower: ['new_follower',       { followerId: uid, followerName: 'Yuki', followerCountry: 'Japan 🇯🇵' }],
+    gift:     ['gift_received',      { senderId: uid, senderName: 'Carlos', senderCountry: 'Brazil 🇧🇷', gift: { emoji: '🌹', name: 'Rose' } }],
+    random:   ['random_match',       { matchedUser: { userId: uid, username: 'Sofia', country: 'Italy 🇮🇹' } }],
+    live:     ['live_viewer_joined', { viewerId: uid, viewerName: 'Amara', viewerCountry: 'Nigeria 🇳🇬', count: 7 }],
+  };
+  const ev = events[type] || events.follower;
+  ioInstance.emit(ev[0], ev[1]);
+  res.json({ ok: true, fired: ev[0], userId: uid });
+});
+
 setupSocket(io);
 
 const PORT = process.env.PORT || 3001;

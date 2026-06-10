@@ -54,11 +54,11 @@ function FilterChip({ ct, active, onPress }) {
       style={[
         fc.chip,
         active && !isAll && { backgroundColor: ct.color + '20', borderColor: ct.color + '55' },
-        active && isAll  && { backgroundColor: '#E8003D20', borderColor: '#E8003D55' },
+        active && isAll  && { backgroundColor: '#6C47FF20', borderColor: '#6C47FF55' },
       ]}
     >
       {ct && <Text style={{ fontSize: 14 }}>{ct.emoji}</Text>}
-      <Text style={[fc.text, active && { color: ct ? ct.color : '#E8003D' }]}>
+      <Text style={[fc.text, active && { color: ct ? ct.color : '#6C47FF' }]}>
         {ct ? ct.label : 'All'}
       </Text>
     </TouchableOpacity>
@@ -270,7 +270,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 onPress={() => update('is_global', !form.is_global)}
               >
                 <Text style={cm.globalIcon}>{form.is_global ? '🌍' : '📍'}</Text>
-                <Text style={[cm.globalText, form.is_global && { color: '#E8003D' }]}>
+                <Text style={[cm.globalText, form.is_global && { color: '#6C47FF' }]}>
                   {form.is_global ? 'Global — visible to anyone worldwide' : 'Local — visible to people near you'}
                 </Text>
               </TouchableOpacity>
@@ -283,7 +283,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={form.connection_type ? [ct.color, ct.color + 'bb'] : ['#E8003D', '#C7003A']}
+                  colors={form.connection_type ? [ct.color, ct.color + 'bb'] : ['#6C47FF', '#5533DD']}
                   style={cm.submitGrad}
                 >
                   <Text style={cm.submitText}>{loading ? 'Posting…' : 'Post Experience 🌍'}</Text>
@@ -310,10 +310,10 @@ const cm = StyleSheet.create({
   typeText:     { color: '#555', fontSize: 12, fontWeight: '700' },
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   catChip:      { width: (width - 48 - 20) / 3, backgroundColor: '#16181C', borderRadius: 16, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#2F3336' },
-  catChipActive:{ backgroundColor: '#E8003D22', borderColor: '#E8003D55' },
+  catChipActive:{ backgroundColor: '#6C47FF22', borderColor: '#6C47FF55' },
   catLabel:     { color: '#555', fontSize: 11, fontWeight: '700' },
   globalBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#16181C', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
-  globalBtnActive:{ backgroundColor: '#E8003D18', borderColor: '#E8003D40' },
+  globalBtnActive:{ backgroundColor: '#6C47FF18', borderColor: '#6C47FF40' },
   globalIcon:   { fontSize: 20 },
   globalText:   { color: '#555', fontSize: 13, fontWeight: '600', flex: 1 },
   submitWrap:   { borderRadius: 16, overflow: 'hidden' },
@@ -372,7 +372,7 @@ export default function ExperiencesScreen({ navigation, user }) {
           )}
         </View>
         <TouchableOpacity style={styles.postBtn} onPress={() => setShowCreate(true)}>
-          <LinearGradient colors={['#E8003D', '#C7003A']} style={styles.postGrad}>
+          <LinearGradient colors={['#6C47FF', '#5533DD']} style={styles.postGrad}>
             <Text style={styles.postText}>+ Post</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -404,7 +404,7 @@ export default function ExperiencesScreen({ navigation, user }) {
       ) : (
         <FlatList
           data={experiences}
-          keyExtractor={item => item.id}
+          keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -438,8 +438,8 @@ const styles = StyleSheet.create({
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:        { color: '#fff', fontSize: 22, fontWeight: '900' },
-  countPill:    { backgroundColor: '#E8003D22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#E8003D40' },
-  countText:    { color: '#E8003D', fontSize: 12, fontWeight: '800' },
+  countPill:    { backgroundColor: '#6C47FF22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#6C47FF40' },
+  countText:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
   postBtn:      { borderRadius: 14, overflow: 'hidden' },
   postGrad:     { paddingHorizontal: 16, paddingVertical: 9 },
   postText:     { color: '#fff', fontSize: 14, fontWeight: '800' },

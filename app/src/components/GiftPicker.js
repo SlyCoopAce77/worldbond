@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 12 },
   catList: { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
   catChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#000000', borderWidth: 1, borderColor: '#2F3336' },
-  catChipActive: { backgroundColor: '#E8003D', borderColor: '#E8003D' },
+  catChipActive: { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
   catText: { color: '#888', fontSize: 13 },
   catTextActive: { color: '#fff', fontWeight: '700' },
   giftGrid: { paddingHorizontal: 12, paddingTop: 4 },

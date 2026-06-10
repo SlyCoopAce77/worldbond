@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   email           VARCHAR(255) UNIQUE NOT NULL,
   phone           VARCHAR(50),
   password_hash   VARCHAR(255) NOT NULL,
+  date_of_birth   DATE,
   is_verified     BOOLEAN DEFAULT FALSE,
   verify_token    VARCHAR(255),
   created_at      TIMESTAMPTZ DEFAULT NOW(),
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   languages_spoken    TEXT[]      DEFAULT '{}',
   bio                 TEXT,
   photo_url           TEXT,
+  gallery_photos      TEXT[]      DEFAULT '{}',
   voice_note_url      TEXT,
   -- JSON blob from voice analysis: { pitch, pace, energy, tone }
   voice_tone_data     JSONB       DEFAULT '{}',
@@ -46,6 +48,9 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE INDEX IF NOT EXISTS idx_profiles_country  ON profiles(country);
 CREATE INDEX IF NOT EXISTS idx_profiles_language ON profiles(language);
 CREATE INDEX IF NOT EXISTS idx_profiles_ghost    ON profiles(ghost_score);
+
+-- Safe migration: add gallery_photos to existing databases
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gallery_photos TEXT[] DEFAULT '{}';
 
 -- ─── EXPERIENCES ─────────────────────────────────────────────────────────────
 -- "I want to try street food in Bangkok with someone who can make me laugh"

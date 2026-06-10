@@ -13,7 +13,7 @@ import { getSocket, SERVER_URL } from '../services/socket';
 const { width: SCREEN_W } = Dimensions.get('window');
 const PANEL_W = Math.min(SCREEN_W * 0.78, 320);
 
-const ACCENT  = '#E8003D';
+const ACCENT  = '#6C47FF';
 const BG      = '#000000';
 const CARD    = '#1C1F23';
 const BORDER  = '#2F3336';
@@ -194,7 +194,7 @@ export default function GroupChatScreen({ route, navigation }) {
   // ── Socket setup ──────────────────────────────────────────────────────────
 
   useEffect(() => {
-    joinRoom(category.rooms[0]);
+    joinRoom(category?.rooms?.[0]);
 
     socket.on('group_history', ({ messages: hist }) => setMessages(hist || []));
     socket.on('group_message', msg => setMessages(prev => [...prev, msg]));
@@ -208,7 +208,7 @@ export default function GroupChatScreen({ route, navigation }) {
     });
 
     return () => {
-      socket.emit('leave_group', { categoryId: category.id, roomName: activeRoomRef.current });
+      socket.emit('leave_group', { categoryId: category?.id, roomName: activeRoomRef.current });
       socket.off('group_history');
       socket.off('group_message');
       socket.off('room_members');
@@ -231,13 +231,13 @@ export default function GroupChatScreen({ route, navigation }) {
 
   function joinRoom(roomName) {
     if (activeRoomRef.current && activeRoomRef.current !== roomName) {
-      socket.emit('leave_group', { categoryId: category.id, roomName: activeRoomRef.current });
+      socket.emit('leave_group', { categoryId: category?.id, roomName: activeRoomRef.current });
     }
     setActiveRoom(roomName);
     setMessages([]);
     setTypingUsers([]);
     setMembers([]);
-    socket.emit('join_group', { categoryId: category.id, roomName });
+    socket.emit('join_group', { categoryId: category?.id, roomName });
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -245,23 +245,23 @@ export default function GroupChatScreen({ route, navigation }) {
   function handleTextChange(val) {
     setText(val);
     if (val.trim()) {
-      socket.emit('group_typing', { categoryId: category.id, roomName: activeRoom });
+      socket.emit('group_typing', { categoryId: category?.id, roomName: activeRoom });
       clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => {
-        socket.emit('group_stop_typing', { categoryId: category.id, roomName: activeRoom });
+        socket.emit('group_stop_typing', { categoryId: category?.id, roomName: activeRoom });
       }, 2000);
     } else {
       clearTimeout(typingTimer.current);
-      socket.emit('group_stop_typing', { categoryId: category.id, roomName: activeRoom });
+      socket.emit('group_stop_typing', { categoryId: category?.id, roomName: activeRoom });
     }
   }
 
   function sendMessage() {
     if (!text.trim()) return;
     clearTimeout(typingTimer.current);
-    socket.emit('group_stop_typing', { categoryId: category.id, roomName: activeRoom });
+    socket.emit('group_stop_typing', { categoryId: category?.id, roomName: activeRoom });
     socket.emit('group_message', {
-      categoryId: category.id,
+      categoryId: category?.id,
       roomName: activeRoom,
       text: text.trim(),
     });
@@ -281,7 +281,7 @@ export default function GroupChatScreen({ route, navigation }) {
         headers: { ...headers }, timeout: 30000,
       });
       socket.emit('group_message', {
-        categoryId: category.id,
+        categoryId: category?.id,
         roomName: activeRoom,
         text: '📷 Photo',
         imageUrl: data.imageUrl,
@@ -381,7 +381,7 @@ export default function GroupChatScreen({ route, navigation }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const roomDesc = category.description || '';
+  const roomDesc = category?.description || '';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -397,7 +397,7 @@ export default function GroupChatScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>{category.icon}  {category.name}</Text>
+          <Text style={styles.headerTitle}>{category?.icon}  {category?.name}</Text>
           <Text style={styles.headerSub}>#{activeRoom}  ·  {roomDesc}</Text>
         </View>
 
@@ -420,7 +420,7 @@ export default function GroupChatScreen({ route, navigation }) {
         style={styles.roomTabsBar}
         contentContainerStyle={styles.roomTabsContent}
       >
-        {category.rooms.map(room => (
+        {(category?.rooms || []).map(room => (
           <TouchableOpacity
             key={room}
             style={[styles.roomTab, activeRoom === room && styles.roomTabActive]}
@@ -444,7 +444,7 @@ export default function GroupChatScreen({ route, navigation }) {
         onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={
           <View style={styles.emptyRoom}>
-            <Text style={styles.emptyIcon}>{category.icon}</Text>
+            <Text style={styles.emptyIcon}>{category?.icon}</Text>
             <Text style={styles.emptyTitle}>#{activeRoom}</Text>
             <Text style={styles.emptyHint}>No messages yet — be the first! 👋</Text>
           </View>
@@ -480,7 +480,7 @@ export default function GroupChatScreen({ route, navigation }) {
 
           {text.trim() ? (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
-              <LinearGradient colors={[ACCENT, '#E8003D']} style={styles.sendBtn}>
+              <LinearGradient colors={[ACCENT, '#6C47FF']} style={styles.sendBtn}>
                 <Text style={styles.sendIcon}>➤</Text>
               </LinearGradient>
             </TouchableOpacity>

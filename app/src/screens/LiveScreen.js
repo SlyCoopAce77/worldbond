@@ -269,7 +269,7 @@ export default function LiveScreen({ route, navigation }) {
           <FlatList
             ref={flatRef}
             data={messages}
-            keyExtractor={m => m.id}
+            keyExtractor={m => String(m.id)}
             renderItem={({ item }) => (
               <View style={styles.msgRow}>
                 <Text style={styles.msgName}>{item.senderName}</Text>
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
-  msgName:      { color: '#E8003D', fontWeight: '700', fontSize: 13 },
+  msgName:      { color: '#6C47FF', fontWeight: '700', fontSize: 13 },
   msgText:      { color: '#fff', fontSize: 13 },
   translated:   { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
 
   inputBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   input:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
+  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
   // Lobby

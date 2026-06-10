@@ -48,8 +48,8 @@ function ToggleRow({ icon, label, sublabel, value, onToggle, disabled }) {
         value={value}
         onValueChange={onToggle}
         disabled={disabled}
-        trackColor={{ false: colors.border, true: '#E8003D55' }}
-        thumbColor={value ? '#E8003D' : colors.textMuted}
+        trackColor={{ false: colors.border, true: '#6C47FF55' }}
+        thumbColor={value ? '#6C47FF' : colors.textMuted}
         ios_backgroundColor={colors.border}
       />
     </View>
@@ -83,11 +83,11 @@ function RadioGroup({ label, options, value, onChange }) {
           <TouchableOpacity
             key={opt.value}
             style={[s.radioBtn, { backgroundColor: colors.bg, borderColor: colors.border },
-              value === opt.value && { backgroundColor: '#E8003D18', borderColor: '#E8003D55' }]}
+              value === opt.value && { backgroundColor: '#6C47FF18', borderColor: '#6C47FF55' }]}
             onPress={() => onChange(opt.value)}
           >
             <Text style={[s.radioBtnText, { color: colors.textMuted },
-              value === opt.value && { color: '#E8003D' }]}>
+              value === opt.value && { color: '#6C47FF' }]}>
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -224,7 +224,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
 
       {saving && (
         <View style={s.savingBanner}>
-          <ActivityIndicator size="small" color="#E8003D" />
+          <ActivityIndicator size="small" color="#6C47FF" />
           <Text style={s.savingText}>Processing…</Text>
         </View>
       )}
@@ -470,8 +470,8 @@ const s = StyleSheet.create({
   backIcon:     { fontSize: 26, lineHeight: 30 },
   headerTitle:  { fontSize: 20, fontWeight: '900' },
 
-  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#E8003D15', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#E8003D30' },
-  savingText:   { color: '#E8003D', fontSize: 13, fontWeight: '600' },
+  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#6C47FF15', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#6C47FF30' },
+  savingText:   { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
 
   scroll:       { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
 
@@ -484,7 +484,7 @@ const s = StyleSheet.create({
   rowIcon:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   rowLabel:     { fontSize: 15, fontWeight: '600' },
   rowSub:       { fontSize: 12, marginTop: 2 },
-  rowValue:     { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  rowValue:     { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
   chevron:      { fontSize: 22, fontWeight: '300' },
 
   radioGroup:   { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },

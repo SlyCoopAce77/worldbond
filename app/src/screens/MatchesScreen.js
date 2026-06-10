@@ -68,12 +68,12 @@ function VoiceNote() {
   );
 }
 const vn = StyleSheet.create({
-  row:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8003D15', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: '#E8003D30' },
-  btn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
-  btnOn:{ backgroundColor: '#C7003A' },
+  row:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6C47FF15', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: '#6C47FF30' },
+  btn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  btnOn:{ backgroundColor: '#5533DD' },
   btnIcon: { color: '#fff', fontSize: 12 },
   wave: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  bar:  { width: 3, borderRadius: 2, backgroundColor: '#E8003D' },
+  bar:  { width: 3, borderRadius: 2, backgroundColor: '#6C47FF' },
   dur:  { color: '#555', fontSize: 11 },
 });
 
@@ -264,7 +264,7 @@ const dc = StyleSheet.create({
   body:          { padding: 18, gap: 14 },
   bio:           { color: '#aaa', fontSize: 14, lineHeight: 22 },
   breakdownToggle:{ alignSelf: 'flex-start' },
-  breakdownToggleText: { color: '#E8003D', fontSize: 12, fontWeight: '600' },
+  breakdownToggleText: { color: '#6C47FF', fontSize: 12, fontWeight: '600' },
   actions:       { flexDirection: 'row', gap: 10, marginTop: 4 },
   passBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 16, backgroundColor: '#2F3336', borderWidth: 1, borderColor: '#2F3336' },
   passIcon:      { color: '#555', fontSize: 14, fontWeight: '700' },
@@ -318,7 +318,7 @@ function ConnectionRow({ item, onChat, onProfile, index }) {
         </View>
 
         <TouchableOpacity style={cr.chatBtn} onPress={onChat}>
-          <LinearGradient colors={['#E8003D', '#C7003A']} style={cr.chatGrad}>
+          <LinearGradient colors={['#6C47FF', '#5533DD']} style={cr.chatGrad}>
             <Text style={cr.chatIcon}>💬</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -370,9 +370,10 @@ export default function MatchesScreen({ navigation }) {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    socket.on('user_list', list => setOnlineUsers(list));
+    const handleUserList = list => setOnlineUsers(list);
+    socket.on('user_list', handleUserList);
     socket.emit('get_users');
-    return () => socket.off('user_list');
+    return () => socket.off('user_list', handleUserList);
   }, []);
 
   function switchTab(t) {
@@ -460,7 +461,7 @@ export default function MatchesScreen({ navigation }) {
 
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator color="#E8003D" size="large" />
+          <ActivityIndicator color="#6C47FF" size="large" />
           <Text style={styles.loadingText}>Finding your matches…</Text>
         </View>
       ) : (
@@ -473,7 +474,7 @@ export default function MatchesScreen({ navigation }) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); load(); }}
-              tintColor="#E8003D"
+              tintColor="#6C47FF"
             />
           }
           renderItem={({ item, index }) =>
@@ -529,15 +530,15 @@ const styles = StyleSheet.create({
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10 },
   headerTitle: { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   countPills:  { flexDirection: 'row', gap: 8 },
-  pill:        { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E8003D15', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#E8003D40' },
-  pillNum:     { color: '#E8003D', fontSize: 15, fontWeight: '800' },
+  pill:        { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#6C47FF15', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#6C47FF40' },
+  pillNum:     { color: '#6C47FF', fontSize: 15, fontWeight: '800' },
   pillLabel:   { color: '#555', fontSize: 10 },
 
   tabBar:      { flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, backgroundColor: '#16181C', borderRadius: 16, padding: 4, position: 'relative', overflow: 'hidden' },
   tabBtn:      { flex: 1, paddingVertical: 11, alignItems: 'center', zIndex: 1 },
   tabText:     { color: '#555', fontSize: 13, fontWeight: '700' },
   tabTextOn:   { color: '#fff' },
-  tabIndicator:{ position: 'absolute', top: 4, bottom: 4, left: 4, width: '50%', backgroundColor: '#E8003D', borderRadius: 12 },
+  tabIndicator:{ position: 'absolute', top: 4, bottom: 4, left: 4, width: '50%', backgroundColor: '#6C47FF', borderRadius: 12 },
 
   list:        { paddingHorizontal: 20, paddingBottom: 60 },
 
@@ -545,10 +546,10 @@ const styles = StyleSheet.create({
   loadingText: { color: '#555', fontSize: 14 },
 
   empty:       { paddingTop: 40 },
-  emptyCard:   { borderRadius: 24, padding: 32, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#E8003D20' },
+  emptyCard:   { borderRadius: 24, padding: 32, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#6C47FF20' },
   emptyEmoji:  { fontSize: 50 },
   emptyTitle:  { color: '#fff', fontSize: 20, fontWeight: '800' },
   emptySub:    { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  emptyBtn:    { marginTop: 6, backgroundColor: '#E8003D', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13 },
+  emptyBtn:    { marginTop: 6, backgroundColor: '#6C47FF', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13 },
   emptyBtnText:{ color: '#fff', fontSize: 14, fontWeight: '700' },
 });

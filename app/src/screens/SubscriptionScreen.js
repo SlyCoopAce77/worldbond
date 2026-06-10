@@ -167,7 +167,7 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
           </TouchableOpacity>
         ) : (
           <LinearGradient
-            colors={['#E8003D', '#C7003A']}
+            colors={['#6C47FF', '#5533DD']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.btn}
           >
@@ -251,7 +251,7 @@ export default function SubscriptionScreen({ navigation }) {
         {/* Hero */}
         <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
           <LinearGradient
-            colors={['#E8003D22', '#f59e0b11', '#000000']}
+            colors={['#6C47FF22', '#f59e0b11', '#000000']}
             style={styles.heroBg}
           >
             <Text style={styles.heroGlobe}>🌍</Text>
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1C1F23',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backArrow: { color: '#E8003D', fontSize: 24, fontWeight: '300' },
+  backArrow: { color: '#6C47FF', fontSize: 24, fontWeight: '300' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
 
   scroll: { paddingBottom: 40 },
@@ -365,10 +365,10 @@ const styles = StyleSheet.create({
   },
   toggleKnob: {
     width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#E8003D', position: 'absolute', left: 2,
+    backgroundColor: '#6C47FF', position: 'absolute', left: 2,
   },
   savePill: {
-    backgroundColor: '#E8003D', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+    backgroundColor: '#6C47FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
   },
   savePillText: { color: '#fff', fontSize: 10, fontWeight: '800' },
 
@@ -412,11 +412,11 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 
   betaBanner: {
-    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#E8003D18',
-    borderWidth: 1, borderColor: '#E8003D40', borderRadius: 14,
+    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#6C47FF18',
+    borderWidth: 1, borderColor: '#6C47FF40', borderRadius: 14,
     paddingVertical: 10, alignItems: 'center',
   },
-  betaBannerText: { color: '#E8003D', fontSize: 13, fontWeight: '700' },
+  betaBannerText: { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
 
   footer: { alignItems: 'center', gap: 6, paddingHorizontal: 24, marginTop: 8 },
   footerLine: { color: '#444', fontSize: 12, textAlign: 'center' },

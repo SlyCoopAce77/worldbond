@@ -19,7 +19,7 @@ export const TIERS = {
     id: 'plus',
     label: 'WorldBond Plus',
     price: '$4.99/mo',
-    color: '#E8003D',
+    color: '#6C47FF',
     giftsPerDay: Infinity,
     icebreakerResponses: Infinity,
     randomConnectsPerDay: 5,

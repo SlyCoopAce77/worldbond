@@ -10,32 +10,32 @@ import { useTheme } from '../context/ThemeContext';
 const { width } = Dimensions.get('window');
 
 const CATEGORY_COLORS = {
-  'gaming':           { from: '#7b5ea7', to: '#4a3570' },
-  'sports':           { from: '#1565c0', to: '#0d3b6e' },
-  'bars-nightlife':   { from: '#e65100', to: '#8a3200' },
-  'music':            { from: '#ad1457', to: '#6a0f38' },
-  'food':             { from: '#2e7d32', to: '#1a4a1c' },
-  'travel':           { from: '#00838f', to: '#005662' },
-  'language-learning':{ from: '#6a1b9a', to: '#3d1060' },
-  'movies-tv':        { from: '#b71c1c', to: '#6d1010' },
+  'daily-chat':    { from: '#92400e', to: '#78350f' },
+  'hot-takes':     { from: '#991b1b', to: '#7f1d1d' },
+  'love-dating':   { from: '#9d174d', to: '#5b1035' },
+  'money-talk':    { from: '#14532d', to: '#052e16' },
+  'mind-soul':     { from: '#1e3a8a', to: '#172554' },
+  'culture-clash': { from: '#065f46', to: '#064e3b' },
+  'pop-culture':   { from: '#5b21b6', to: '#3b0764' },
+  'tech-ai':       { from: '#0e7490', to: '#164e63' },
 };
 
 const CATEGORY_ACCENT = {
-  'gaming':           '#9c6fe4',
-  'sports':           '#42a5f5',
-  'bars-nightlife':   '#ff8a50',
-  'music':            '#f06292',
-  'food':             '#66bb6a',
-  'travel':           '#26c6da',
-  'language-learning':'#ab47bc',
-  'movies-tv':        '#ef5350',
+  'daily-chat':    '#fbbf24',
+  'hot-takes':     '#f87171',
+  'love-dating':   '#fb7185',
+  'money-talk':    '#4ade80',
+  'mind-soul':     '#60a5fa',
+  'culture-clash': '#34d399',
+  'pop-culture':   '#a78bfa',
+  'tech-ai':       '#22d3ee',
 };
 
 function getColors(id) {
   return CATEGORY_COLORS[id] || { from: '#1a1a3a', to: '#16181C' };
 }
 function getAccent(id) {
-  return CATEGORY_ACCENT[id] || '#E8003D';
+  return CATEGORY_ACCENT[id] || '#6C47FF';
 }
 
 // ─── Room chip ────────────────────────────────────────────────────────────────

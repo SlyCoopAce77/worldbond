@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   SafeAreaView, FlatList, Animated, Dimensions,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import { useNotifications } from '../context/NotificationsContext';
 
 const { width } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 const TYPES = {
-  match:     { icon: '🌍', label: 'Match',    color: '#E8003D', bg: '#E8003D15', border: '#E8003D40' },
+  match:     { icon: '🌍', label: 'Match',    color: '#6C47FF', bg: '#6C47FF15', border: '#6C47FF40' },
   message:   { icon: '💬', label: 'Message',  color: '#26c6da', bg: '#26c6da15', border: '#26c6da40' },
   missed:    { icon: '📵', label: 'Missed',   color: '#e53935', bg: '#e5393515', border: '#e5393540' },
   bond:      { icon: '🤝', label: 'Bond',     color: '#57f287', bg: '#57f28715', border: '#57f28740' },
@@ -17,6 +17,10 @@ const TYPES = {
   call:      { icon: '📞', label: 'Call',     color: '#66bb6a', bg: '#66bb6a15', border: '#66bb6a40' },
   system:    { icon: '🔔', label: 'System',   color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40' },
   milestone: { icon: '🏆', label: 'Badge',    color: '#ffd700', bg: '#ffd70015', border: '#ffd70040' },
+  follower:  { icon: '👤', label: 'Follower', color: '#57f287', bg: '#57f28715', border: '#57f28740' },
+  gift:      { icon: '🎁', label: 'Gift',     color: '#f06292', bg: '#f0629215', border: '#f0629240' },
+  random:    { icon: '🌀', label: 'Random',   color: '#6C47FF', bg: '#6C47FF15', border: '#6C47FF40' },
+  live:      { icon: '🔴', label: 'Live',     color: '#e53935', bg: '#e5393515', border: '#e5393540' },
 };
 
 const FILTERS = ['All', 'Matches', 'Messages', 'Calls', 'Bonds', 'Likes'];
@@ -29,27 +33,11 @@ const FILTER_TYPE_MAP = {
   Likes:    ['like'],
 };
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
-const SEED = [
-  { id: '1',  type: 'match',     title: 'New Match!',              body: 'You matched with Amara from Nigeria 🇳🇬',         time: 120,    read: false, from: 'Amara' },
-  { id: '2',  type: 'message',   title: 'Lena sent a message',     body: '"Hey! Are you free to chat tonight?" 👋',         time: 300,    read: false, from: 'Lena' },
-  { id: '3',  type: 'bond',      title: 'Bond Request',            body: 'Carlos wants to bond with you 🤝',                time: 900,    read: false, from: 'Carlos' },
-  { id: '4',  type: 'missed',    title: 'Missed Call',             body: 'You missed a voice call from Yuki 📵',            time: 1800,   read: false, from: 'Yuki' },
-  { id: '5',  type: 'like',      title: 'Photo liked',             body: 'Priya liked your travel photo ❤️',                time: 3600,   read: true,  from: 'Priya' },
-  { id: '6',  type: 'match',     title: 'New Match!',              body: 'You matched with Diego from Mexico 🇲🇽',          time: 7200,   read: true,  from: 'Diego' },
-  { id: '7',  type: 'message',   title: 'Aisha sent a message',    body: '"I loved your story about Tokyo!"',               time: 14400,  read: true,  from: 'Aisha' },
-  { id: '8',  type: 'milestone', title: 'Achievement Unlocked!',   body: "You've been active 7 days in a row 🏆",           time: 86400,  read: true,  from: null },
-  { id: '9',  type: 'call',      title: 'Call accepted',           body: 'Your call with Marco lasted 12 minutes 📞',       time: 86400,  read: true,  from: 'Marco' },
-  { id: '10', type: 'bond',      title: 'Bond accepted!',          body: 'Sofia accepted your bond request 🌍',            time: 172800, read: true,  from: 'Sofia' },
-  { id: '11', type: 'system',    title: 'Your profile is 80%',     body: 'Add a voice note to complete your profile 🎙️',   time: 172800, read: true,  from: null },
-  { id: '12', type: 'like',      title: '3 people liked you',      body: 'Check who swiped right on you today ❤️',          time: 259200, read: true,  from: null },
-  { id: '13', type: 'match',     title: 'New Match!',              body: 'You matched with Fatima from Morocco 🇲🇦',        time: 345600, read: true,  from: 'Fatima' },
-  { id: '14', type: 'system',    title: 'Weekly Wrap',             body: '5 matches · 12 messages · 3 bonds this week 🌟', time: 604800, read: true,  from: null },
-];
 
-function timeAgo(secs) {
-  if (secs < 60)   return 'Just now';
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+function timeAgo(ts) {
+  const secs = Math.floor((Date.now() - (ts || 0)) / 1000);
+  if (secs < 60)    return 'Just now';
+  if (secs < 3600)  return `${Math.floor(secs / 60)}m ago`;
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
   if (secs < 604800) return `${Math.floor(secs / 86400)}d ago`;
   return `${Math.floor(secs / 604800)}w ago`;
@@ -97,7 +85,7 @@ function NotifRow({ item, index, onPress, onDismiss }) {
             <Text style={[nr.title, !item.read && nr.titleUnread]} numberOfLines={1}>
               {item.title}
             </Text>
-            <Text style={nr.time}>{timeAgo(item.time)}</Text>
+            <Text style={nr.time}>{timeAgo(item.ts)}</Text>
           </View>
           <Text style={nr.bodyText} numberOfLines={2}>{item.body}</Text>
         </View>
@@ -115,15 +103,15 @@ function NotifRow({ item, index, onPress, onDismiss }) {
 }
 
 const nr = StyleSheet.create({
-  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#2F3336', marginBottom: 10 },
-  iconWrap:    { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
+  row:         { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 18, paddingVertical: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#2F3336', marginBottom: 10 },
+  iconWrap:    { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0, marginRight: 12 },
   iconText:    { fontSize: 22 },
-  body:        { flex: 1, gap: 3 },
-  titleRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:       { color: '#ffffff88', fontSize: 13, fontWeight: '600', flex: 1 },
+  body:        { flex: 1, flexDirection: 'column', marginRight: 8 },
+  titleRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  title:       { color: '#ffffff88', fontSize: 13, fontWeight: '600', flex: 1, flexShrink: 1 },
   titleUnread: { color: '#fff' },
   time:        { color: '#444', fontSize: 11, flexShrink: 0, marginLeft: 6 },
-  bodyText:    { color: '#555', fontSize: 12, lineHeight: 17 },
+  bodyText:    { color: '#555', fontSize: 12, lineHeight: 18 },
   dot:         { width: 8, height: 8, borderRadius: 4, flexShrink: 0, marginRight: 4 },
   dismiss:     { padding: 4, flexShrink: 0 },
   dismissIcon: { color: '#333', fontSize: 12 },
@@ -143,9 +131,9 @@ function FilterChip({ label, active, onPress }) {
 }
 const fc = StyleSheet.create({
   chip:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  chipActive: { backgroundColor: '#E8003D22', borderColor: '#E8003D55' },
+  chipActive: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF55' },
   text:       { color: '#555', fontSize: 13, fontWeight: '600' },
-  textActive: { color: '#E8003D' },
+  textActive: { color: '#6C47FF' },
 });
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -175,7 +163,7 @@ function StatsRow({ items }) {
   const bonds   = items.filter(n => n.type === 'bond').length;
 
   const stats = [
-    { label: 'Unread',  value: unread,  color: '#E8003D' },
+    { label: 'Unread',  value: unread,  color: '#6C47FF' },
     { label: 'Matches', value: matches, color: '#f59e0b' },
     { label: 'Bonds',   value: bonds,   color: '#57f287' },
   ];
@@ -200,7 +188,7 @@ const sr = StyleSheet.create({
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function NotificationsScreen({ navigation }) {
-  const [items,     setItems]     = useState(SEED);
+  const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } = useNotifications();
   const [filter,    setFilter]    = useState('All');
   const headerAnim = useRef(new Animated.Value(0)).current;
 
@@ -210,25 +198,15 @@ export default function NotificationsScreen({ navigation }) {
 
   const displayed = useMemo(() => {
     const types = FILTER_TYPE_MAP[filter];
-    if (!types) return items;
-    return items.filter(n => types.includes(n.type));
-  }, [items, filter]);
-
-  const unreadCount = useMemo(() => items.filter(n => !n.read).length, [items]);
-
-  function markAllRead() {
-    setItems(prev => prev.map(n => ({ ...n, read: true })));
-  }
-
-  function dismiss(id) {
-    setItems(prev => prev.filter(n => n.id !== id));
-  }
+    if (!types) return notifications;
+    return notifications.filter(n => types.includes(n.type));
+  }, [notifications, filter]);
 
   function handlePress(item) {
-    setItems(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
-    // TODO: navigate based on type
-    // if (item.type === 'message') navigation.navigate('Chat', ...)
-    // if (item.type === 'match')   navigation.navigate('Bond', ...)
+    markRead(item.id);
+    if (item.fromId) {
+      navigation.navigate('Profile', { bondUserId: item.fromId });
+    }
   }
 
   const headerSlide = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] });
@@ -258,7 +236,7 @@ export default function NotificationsScreen({ navigation }) {
       </Animated.View>
 
       {/* ── Stats ── */}
-      <StatsRow items={items} />
+      <StatsRow items={notifications} />
 
       {/* ── Filters ── */}
       <FlatList
@@ -294,7 +272,7 @@ export default function NotificationsScreen({ navigation }) {
         )}
         ListFooterComponent={
           displayed.length > 0 ? (
-            <TouchableOpacity style={styles.clearAll} onPress={() => setItems([])}>
+            <TouchableOpacity style={styles.clearAll} onPress={dismissAll}>
               <Text style={styles.clearAllText}>Clear all notifications</Text>
             </TouchableOpacity>
           ) : null
@@ -312,10 +290,10 @@ const styles = StyleSheet.create({
   backIcon:        { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
   headerCenter:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:           { color: '#fff', fontSize: 20, fontWeight: '900' },
-  unreadBadge:     { backgroundColor: '#E8003D', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  unreadBadge:     { backgroundColor: '#6C47FF', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   unreadBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  markAllBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: '#E8003D18', borderWidth: 1, borderColor: '#E8003D40' },
-  markAllText:     { color: '#E8003D', fontSize: 12, fontWeight: '700' },
+  markAllBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, backgroundColor: '#6C47FF18', borderWidth: 1, borderColor: '#6C47FF40' },
+  markAllText:     { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 
   filtersRow:      { paddingHorizontal: 20, gap: 8 },
 

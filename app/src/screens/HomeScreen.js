@@ -10,6 +10,8 @@ import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationsContext';
+import { getCountryFlag } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
 const CARD_W = 160;
@@ -65,7 +67,7 @@ function StoryRing({ user, onPress }) {
     <TouchableOpacity style={story.wrap} onPress={onPress} activeOpacity={0.8}>
       <Animated.View style={[story.ring, { transform: [{ scale: pulseAnim }] }]}>
         <LinearGradient
-          colors={['#E8003D', '#57f287']}
+          colors={['#6C47FF', '#57f287']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
           style={story.gradient}
         >
@@ -195,7 +197,7 @@ function IcebreakerCard({ question, responseCount, onAnswer }) {
         </View>
         <Text style={ib.question}>"{question}"</Text>
         <TouchableOpacity style={ib.btn} onPress={onAnswer} activeOpacity={0.85}>
-          <LinearGradient colors={['#E8003D', '#C7003A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ib.btnGrad}>
+          <LinearGradient colors={['#6C47FF', '#5533DD']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ib.btnGrad}>
             <Text style={ib.btnText}>Share Your Answer  →</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -204,10 +206,10 @@ function IcebreakerCard({ question, responseCount, onAnswer }) {
   );
 }
 const ib = StyleSheet.create({
-  card:       { borderRadius: 24, padding: 22, gap: 16, borderWidth: 1, borderColor: '#E8003D40' },
+  card:       { borderRadius: 24, padding: 22, gap: 16, borderWidth: 1, borderColor: '#6C47FF40' },
   topRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  labelBadge: { backgroundColor: '#E8003D22', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#E8003D40' },
-  labelText:  { color: '#E8003D', fontSize: 12, fontWeight: '700' },
+  labelBadge: { backgroundColor: '#6C47FF22', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#6C47FF40' },
+  labelText:  { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
   countBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   countDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#57f287' },
   countText:  { color: '#888', fontSize: 12 },
@@ -287,8 +289,8 @@ const expS = StyleSheet.create({
   author:      { color: '#555', fontSize: 12 },
   ctBadge:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
   desc:        { color: '#888', fontSize: 13, lineHeight: 20 },
-  interestBtn: { backgroundColor: '#E8003D18', borderRadius: 12, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: '#E8003D40' },
-  interestText:{ color: '#E8003D', fontSize: 14, fontWeight: '700' },
+  interestBtn: { backgroundColor: '#6C47FF18', borderRadius: 12, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: '#6C47FF40' },
+  interestText:{ color: '#6C47FF', fontSize: 14, fontWeight: '700' },
 });
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -312,8 +314,8 @@ const sh = StyleSheet.create({
   row:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   title:     { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
   sub:       { fontSize: 12, marginTop: 2 },
-  actionBtn: { backgroundColor: '#E8003D18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#E8003D40' },
-  actionText:{ color: '#E8003D', fontSize: 12, fontWeight: '700' },
+  actionBtn: { backgroundColor: '#6C47FF18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#6C47FF40' },
+  actionText:{ color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 });
 
 // ─── Quick action tile ────────────────────────────────────────────────────────
@@ -337,6 +339,7 @@ const qt = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation, user }) {
   const { colors, isDark } = useTheme();
+  const { unreadCount } = useNotifications();
   const socket = getSocket();
 
   const [onlineUsers,   setOnlineUsers]   = useState([]);
@@ -347,7 +350,6 @@ export default function HomeScreen({ navigation, user }) {
   const [loadingMatches,setLoadingM]      = useState(true);
   const [loadingExps,   setLoadingE]      = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
-  const [notifCount,    setNotifCount]    = useState(0);
 
   const scrollY       = useRef(new Animated.Value(0)).current;
   const headerOpacity = scrollY.interpolate({ inputRange: [0, 80], outputRange: [0, 1], extrapolate: 'clamp' });
@@ -372,7 +374,6 @@ export default function HomeScreen({ navigation, user }) {
 
       if (matchRes.status === 'fulfilled') {
         setDailyMatches(matchRes.value.data.slice(0, 5));
-        setNotifCount(matchRes.value.data.filter(m => m.action === 'pending').length);
       }
       if (expRes.status === 'fulfilled') setExperiences(expRes.value.data.slice(0, 6));
     } catch {}
@@ -403,22 +404,24 @@ export default function HomeScreen({ navigation, user }) {
     if (socket.connected) registerAndFetch();
     else socket.once('connect', registerAndFetch);
 
-    socket.on('user_list', list => setOnlineUsers(list.filter(u => u.socketId !== socket.id)));
-    socket.on('icebreaker_data', ({ question, responses }) => {
-      setIcebreaker({ question, responseCount: responses?.length || 0 });
-    });
-    socket.on('incoming_call', ({ from, callerName, callerCountry, offer, callType }) => {
-      navigation.navigate('Call', { mode: 'incoming', from, callerName, callerCountry, offer, callType });
-    });
-    socket.on('live_streams', streams => setLiveStreams(streams));
+    const handleUserList     = list => setOnlineUsers(list.filter(u => u.socketId !== socket.id));
+    const handleIcebreaker   = ({ question, responses }) => setIcebreaker({ question, responseCount: responses?.length || 0 });
+    const handleIncomingCall = ({ from, callerName, callerCountry, offer, callType }) => navigation.navigate('Call', { mode: 'incoming', from, callerName, callerCountry, offer, callType });
+    const handleLiveStreams  = streams => setLiveStreams(streams);
+
+    socket.on('user_list',      handleUserList);
+    socket.on('icebreaker_data',handleIcebreaker);
+    socket.on('incoming_call',  handleIncomingCall);
+    socket.on('live_streams',   handleLiveStreams);
     socket.emit('get_live_streams');
 
     fetchBondData();
     return () => {
-      socket.off('user_list');
-      socket.off('icebreaker_data');
-      socket.off('incoming_call');
-      socket.off('live_streams');
+      socket.off('connect',       registerAndFetch);
+      socket.off('user_list',     handleUserList);
+      socket.off('icebreaker_data',handleIcebreaker);
+      socket.off('incoming_call', handleIncomingCall);
+      socket.off('live_streams',  handleLiveStreams);
     };
   }, [fetchBondData]);
 
@@ -468,7 +471,7 @@ export default function HomeScreen({ navigation, user }) {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Floating sticky bar */}
-      <Animated.View style={[styles.stickyBar, { opacity: headerOpacity, backgroundColor: colors.bg + 'f0', borderBottomColor: colors.border }]}>
+      <Animated.View pointerEvents="none" style={[styles.stickyBar, { opacity: headerOpacity, backgroundColor: colors.bg + 'f0', borderBottomColor: colors.border }]}>
         <SafeAreaView>
           <View style={styles.stickyInner}>
             <Text style={[styles.stickyLogo, { color: colors.text }]}>Bond</Text>
@@ -483,7 +486,7 @@ export default function HomeScreen({ navigation, user }) {
       <Animated.ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E8003D" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C47FF" />}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
         scrollEventThrottle={16}
       >
@@ -497,7 +500,7 @@ export default function HomeScreen({ navigation, user }) {
               <View style={styles.heroInner}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.greeting, { color: colors.text }]}>{greeting()}, {firstName} 👋</Text>
-                  <Text style={[styles.greetingSub, { color: colors.textMuted }]}>{user?.country || 'Earth 🌍'}</Text>
+                  <Text style={[styles.greetingSub, { color: colors.textMuted }]}>{user?.country ? `${user.country} ${getCountryFlag(user.country)}` : 'Earth 🌍'}</Text>
                 </View>
                 <View style={styles.heroRight}>
                   <View style={styles.onlineBadge}>
@@ -509,9 +512,9 @@ export default function HomeScreen({ navigation, user }) {
                     onPress={() => navigation.navigate('Notifications')}
                   >
                     <Text style={styles.notifIcon}>🔔</Text>
-                    {notifCount > 0 && (
+                    {unreadCount > 0 && (
                       <View style={styles.notifBadge}>
-                        <Text style={styles.notifBadgeText}>{notifCount > 9 ? '9+' : notifCount}</Text>
+                        <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -597,7 +600,7 @@ export default function HomeScreen({ navigation, user }) {
 
           {loadingMatches ? (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color="#E8003D" />
+              <ActivityIndicator color="#6C47FF" />
               <Text style={styles.loadingText}>Finding your matches…</Text>
             </View>
           ) : dailyMatches.length > 0 ? (
@@ -651,7 +654,7 @@ export default function HomeScreen({ navigation, user }) {
           />
 
           {loadingExps ? (
-            <ActivityIndicator color="#E8003D" style={{ marginVertical: 24 }} />
+            <ActivityIndicator color="#6C47FF" style={{ marginVertical: 24 }} />
           ) : experiences.length > 0 ? (
             <View style={{ gap: 12 }}>
               {experiences.slice(0, 4).map(exp => (
@@ -715,19 +718,19 @@ const styles = StyleSheet.create({
   loadingText:     { color: '#555', fontSize: 13 },
 
   moreCard:        { width: 80, height: 230, backgroundColor: '#13132a', borderRadius: 22, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed' },
-  moreNum:         { color: '#E8003D', fontSize: 28, fontWeight: '300' },
+  moreNum:         { color: '#6C47FF', fontSize: 28, fontWeight: '300' },
   moreLabel:       { color: '#555', fontSize: 12, textAlign: 'center', lineHeight: 18 },
 
-  emptyCard:       { borderRadius: 24, padding: 28, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#E8003D20' },
+  emptyCard:       { borderRadius: 24, padding: 28, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#6C47FF20' },
   emptyTitle:      { color: '#fff', fontSize: 18, fontWeight: '700' },
   emptySub:        { color: '#555', fontSize: 13, textAlign: 'center', lineHeight: 20 },
-  emptyBtn:        { backgroundColor: '#E8003D', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, marginTop: 6 },
+  emptyBtn:        { backgroundColor: '#6C47FF', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, marginTop: 6 },
   emptyBtnText:    { color: '#fff', fontSize: 14, fontWeight: '700' },
   emptyExps:       { backgroundColor: '#13132a', borderRadius: 20, padding: 28, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed' },
-  emptyLink:       { color: '#E8003D', fontSize: 14, fontWeight: '600', marginTop: 6 },
+  emptyLink:       { color: '#6C47FF', fontSize: 14, fontWeight: '600', marginTop: 6 },
 
   seeMoreBtn:      { backgroundColor: '#13132a', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#2F3336' },
-  seeMoreText:     { color: '#E8003D', fontSize: 14, fontWeight: '600' },
+  seeMoreText:     { color: '#6C47FF', fontSize: 14, fontWeight: '600' },
 
   liveCard:        { width: 130, borderRadius: 18, overflow: 'hidden' },
   liveCardBg:      { padding: 14, gap: 6, minHeight: 140, justifyContent: 'flex-end', borderWidth: 1, borderColor: '#e5393530' },

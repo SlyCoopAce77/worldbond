@@ -81,13 +81,13 @@ function CommentsModal({ visible, photo, user, onClose }) {
           <Text style={cStyles.title}>Comments</Text>
           <FlatList
             data={photo.comments || []}
-            keyExtractor={c => c.id}
+            keyExtractor={c => String(c.id)}
             style={cStyles.list}
             ListEmptyComponent={<Text style={cStyles.noComments}>No comments yet — be first!</Text>}
             renderItem={({ item }) => (
               <View style={cStyles.commentRow}>
                 <View style={[cStyles.avatar, { backgroundColor: stringToColor(item.username) }]}>
-                  <Text style={cStyles.avatarText}>{item.username[0].toUpperCase()}</Text>
+                  <Text style={cStyles.avatarText}>{(item.username?.[0] ?? '?').toUpperCase()}</Text>
                 </View>
                 <View style={cStyles.commentBody}>
                   <View style={cStyles.commentMeta}>
@@ -490,7 +490,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
       <FlatList
         data={photos}
-        keyExtractor={p => p.id}
+        keyExtractor={p => String(p.id)}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 26, fontWeight: 'bold', color: '#fff' },
   subtitle: { color: '#888', fontSize: 13, marginTop: 3 },
-  uploadBtn: { backgroundColor: '#E8003D', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  uploadBtn: { backgroundColor: '#6C47FF', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   uploadBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   photoCard: { marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
   photoHeader: {
@@ -564,11 +564,11 @@ const styles = StyleSheet.create({
   photoUsername: { color: '#fff', fontWeight: '700', fontSize: 14 },
   photoCountry: { color: '#888', fontSize: 11, marginTop: 1 },
   followBtn: {
-    borderWidth: 1, borderColor: '#E8003D', borderRadius: 14,
+    borderWidth: 1, borderColor: '#6C47FF', borderRadius: 14,
     paddingHorizontal: 12, paddingVertical: 4,
   },
-  followBtnActive: { backgroundColor: '#E8003D', borderColor: '#E8003D' },
-  followBtnText: { color: '#E8003D', fontSize: 12, fontWeight: '700' },
+  followBtnActive: { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  followBtnText: { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
   followBtnTextActive: { color: '#fff' },
   photoTime: { color: '#555', fontSize: 11 },
   photoWrap: { position: 'relative' },
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 56 },
   emptyText: { color: '#fff', fontSize: 20, fontWeight: '700' },
   emptySub: { color: '#888', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
-  emptyBtn: { backgroundColor: '#E8003D', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 },
+  emptyBtn: { backgroundColor: '#6C47FF', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 8 },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
@@ -635,7 +635,7 @@ const cStyles = StyleSheet.create({
     flex: 1, backgroundColor: '#000000', color: '#fff', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, maxHeight: 80,
   },
-  sendBtn: { backgroundColor: '#E8003D', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: '#6C47FF', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   sendBtnOff: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 16 },
 });
@@ -659,13 +659,13 @@ const upStyles = StyleSheet.create({
   preview: { alignItems: 'center', marginBottom: 14, gap: 8 },
   previewImage: { width: '100%', height: 220, borderRadius: 16 },
   changeBtn: { paddingVertical: 6 },
-  changeBtnText: { color: '#E8003D', fontSize: 13, fontWeight: '600' },
+  changeBtnText: { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
   captionInput: {
     backgroundColor: '#000000', color: '#fff', borderRadius: 12,
     padding: 14, fontSize: 14, minHeight: 60, textAlignVertical: 'top',
     borderWidth: 1, borderColor: '#2F3336', marginBottom: 14, marginTop: 12,
   },
-  uploadBtn: { backgroundColor: '#E8003D', borderRadius: 14, padding: 16, alignItems: 'center' },
+  uploadBtn: { backgroundColor: '#6C47FF', borderRadius: 14, padding: 16, alignItems: 'center' },
   uploadBtnOff: { backgroundColor: '#333' },
   uploadBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

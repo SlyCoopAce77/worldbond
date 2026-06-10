@@ -12,15 +12,15 @@ async function upsertProfile(userId, data) {
   const {
     display_name, age, gender, country, city, lat, lng,
     language, languages_spoken, bio, photo_url, voice_note_url,
-    voice_tone_data, connection_types,
+    voice_tone_data, connection_types, gallery_photos,
   } = data;
 
   const { rows } = await query(`
     INSERT INTO profiles
       (user_id, display_name, age, gender, country, city, lat, lng,
        language, languages_spoken, bio, photo_url, voice_note_url,
-       voice_tone_data, connection_types, last_active)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
+       voice_tone_data, connection_types, gallery_photos, last_active)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
     ON CONFLICT (user_id) DO UPDATE SET
       display_name     = EXCLUDED.display_name,
       age              = COALESCE(EXCLUDED.age, profiles.age),
@@ -36,6 +36,7 @@ async function upsertProfile(userId, data) {
       voice_note_url   = COALESCE(EXCLUDED.voice_note_url, profiles.voice_note_url),
       voice_tone_data  = COALESCE(EXCLUDED.voice_tone_data, profiles.voice_tone_data),
       connection_types = COALESCE(EXCLUDED.connection_types, profiles.connection_types),
+      gallery_photos   = COALESCE(EXCLUDED.gallery_photos, profiles.gallery_photos),
       last_active      = NOW(),
       updated_at       = NOW()
     RETURNING *
@@ -43,7 +44,16 @@ async function upsertProfile(userId, data) {
     userId, display_name, age, gender, country, city, lat, lng,
     language || 'en', languages_spoken || [], bio, photo_url,
     voice_note_url, voice_tone_data || {}, connection_types || [],
+    gallery_photos || [],
   ]);
+  return rows[0];
+}
+
+async function updateGalleryPhotos(userId, photos) {
+  const { rows } = await query(
+    `UPDATE profiles SET gallery_photos = $2, updated_at = NOW() WHERE user_id = $1 RETURNING *`,
+    [userId, photos.slice(0, 6)]
+  );
   return rows[0];
 }
 
@@ -87,11 +97,11 @@ async function listProfiles(requestingUserId, { limit = 30, connection_type, sea
     FROM profiles p
     LEFT JOIN user_blocks b ON (b.blocker_id = $1 AND b.blocked_id = p.user_id)
                             OR (b.blocker_id = p.user_id AND b.blocked_id = $1)
-    WHERE ${where} AND b.id IS NULL
+    WHERE ${where} AND b.blocker_id IS NULL
     ORDER BY p.last_active DESC NULLS LAST
     LIMIT $${params.length}
   `, params);
   return rows;
 }
 
-module.exports = { getProfile, upsertProfile, updateVoiceNote, touchLastActive, listProfiles };
+module.exports = { getProfile, upsertProfile, updateVoiceNote, updateGalleryPhotos, touchLastActive, listProfiles };

@@ -56,7 +56,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
             <View style={styles.iconWrap}>
-              <LinearGradient colors={['#E8003D30', '#E8003D10']} style={styles.iconBg}>
+              <LinearGradient colors={['#6C47FF30', '#6C47FF10']} style={styles.iconBg}>
                 <Text style={styles.icon}>🔑</Text>
               </LinearGradient>
             </View>
@@ -91,7 +91,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
                   activeOpacity={0.87}
                 >
                   <LinearGradient
-                    colors={['#E8003D', '#E8003D', '#C7003A']}
+                    colors={['#6C47FF', '#6C47FF', '#5533DD']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={styles.submitGrad}
                   >
@@ -139,7 +139,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
                     </View>
                   ) : (
                     <LinearGradient
-                      colors={['#E8003D', '#E8003D', '#C7003A']}
+                      colors={['#6C47FF', '#6C47FF', '#5533DD']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.submitGrad}
                     >
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
 
   iconWrap: { alignItems: 'center', marginBottom: 24 },
-  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E8003D40' },
+  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#6C47FF40' },
   icon:     { fontSize: 36 },
 
   header:   { marginBottom: 28, alignItems: 'center' },
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   fieldGroup:  { gap: 8 },
   label:       { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   inputWrap:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputWrapFocused: { borderColor: '#E8003D40' },
+  inputWrapFocused: { borderColor: '#6C47FF40' },
   inputIcon:   { fontSize: 16, marginRight: 10 },
   input:       { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
 
@@ -196,5 +196,5 @@ const styles = StyleSheet.create({
   successSub:   { color: '#666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   resendBtn:  { paddingVertical: 16, alignItems: 'center' },
-  resendText: { color: '#E8003D', fontSize: 14, fontWeight: '600' },
+  resendText: { color: '#6C47FF', fontSize: 14, fontWeight: '600' },
 });

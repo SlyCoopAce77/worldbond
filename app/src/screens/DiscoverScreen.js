@@ -11,6 +11,7 @@ import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
+import { getCountryFlag, getCountryName } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
 const TABS = [
@@ -23,6 +24,7 @@ const TAB_W = width / TABS.length;
 
 const LANG_FLAGS = { en:'🇺🇸', ja:'🇯🇵', es:'🇪🇸', fr:'🇫🇷', de:'🇩🇪', pt:'🇧🇷', zh:'🇨🇳', ko:'🇰🇷', ar:'🇸🇦', hi:'🇮🇳', th:'🇹🇭', ru:'🇷🇺' };
 const LANG_NAMES = { en:'English', ja:'Japanese', es:'Spanish', fr:'French', de:'German', pt:'Portuguese', zh:'Chinese', ko:'Korean', ar:'Arabic', hi:'Hindi', th:'Thai', ru:'Russian' };
+
 
 const CT_META = {
   dating:           { emoji:'❤️',  label:'Dating',    color:'#e91e63' },
@@ -56,18 +58,53 @@ function Avatar({ photo_url, name, size = 44 }) {
 }
 
 // ─── Icebreaker tab ───────────────────────────────────────────────────────────
-function IcebreakerTab({ user }) {
+function IcebreakerTab({ user, navigation }) {
   const { tierInfo, isPremium } = usePremium();
-  const [question,  setQuestion]  = useState('');
-  const [responses, setResponses] = useState([]);
-  const [myAnswer,  setMyAnswer]  = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [question,         setQuestion]         = useState('');
+  const [responses,        setResponses]        = useState([]);
+  const [myAnswer,         setMyAnswer]         = useState('');
+  const [myAnswerText,     setMyAnswerText]     = useState('');
+  const [submitted,        setSubmitted]        = useState(false);
+  const [likedIds,         setLikedIds]         = useState(new Set());
+  const [expandedComments, setExpandedComments] = useState(new Set());
+  const [commentTexts,     setCommentTexts]     = useState({});
+  const [likedCommentIds,  setLikedCommentIds]  = useState(new Set());
+  const scrollRef = useRef(null);
   const socket = getSocket();
 
   useEffect(() => {
     if (socket.connected) socket.emit('get_icebreaker');
     else socket.once('connect', () => socket.emit('get_icebreaker'));
-    socket.on('icebreaker_data', ({ question: q, responses: r }) => { setQuestion(q); setResponses(r); });
+
+    socket.on('icebreaker_data', ({ question: q, responses: r }) => {
+      setQuestion(q);
+      setResponses(r);
+      // Restore like state from server (likedByMe flags)
+      const ids = new Set();
+      const cIds = new Set();
+      r.forEach(resp => {
+        if (resp.likedByMe) ids.add(resp.id);
+        (resp.comments || []).forEach(c => {
+          if (c.likedByMe) cIds.add(`${resp.id}:${c.id}`);
+        });
+      });
+      setLikedIds(ids);
+      setLikedCommentIds(cIds);
+      // Restore submitted state if user already answered; reset if server lost the data
+      const myUserId = user?.userId;
+      if (myUserId) {
+        const mine = r.find(resp => resp.userId === myUserId);
+        if (mine) {
+          setSubmitted(true);
+          setMyAnswerText(mine.text);
+        } else {
+          setSubmitted(false);
+          setMyAnswerText('');
+          setMyAnswer('');
+        }
+      }
+    });
+
     socket.on('icebreaker_responses', ({ responses: r }) => setResponses(r));
     return () => { socket.off('icebreaker_data'); socket.off('icebreaker_responses'); };
   }, []);
@@ -75,15 +112,66 @@ function IcebreakerTab({ user }) {
   function submit() {
     if (!myAnswer.trim()) return;
     socket.emit('submit_icebreaker', { text: myAnswer.trim() });
+    setMyAnswerText(myAnswer.trim());
     setSubmitted(true);
+  }
+
+  function handleLike(responseId) {
+    setLikedIds(prev => {
+      const next = new Set(prev);
+      next.has(responseId) ? next.delete(responseId) : next.add(responseId);
+      return next;
+    });
+    socket.emit('like_icebreaker_response', { responseId });
+  }
+
+  function toggleComments(responseId) {
+    setExpandedComments(prev => {
+      const next = new Set(prev);
+      next.has(responseId) ? next.delete(responseId) : next.add(responseId);
+      return next;
+    });
+  }
+
+  function submitComment(responseId) {
+    const text = (commentTexts[responseId] || '').trim();
+    if (!text || !submitted) return;
+    socket.emit('add_icebreaker_comment', { responseId, text });
+    setCommentTexts(prev => ({ ...prev, [responseId]: '' }));
+  }
+
+  function handleLikeComment(responseId, commentId) {
+    if (!submitted) return;
+    const key = `${responseId}:${commentId}`;
+    setLikedCommentIds(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+    socket.emit('like_icebreaker_comment', { responseId, commentId });
+  }
+
+  function handleDeleteComment(responseId, commentId) {
+    socket.emit('delete_icebreaker_comment', { responseId, commentId });
+    const key = `${responseId}:${commentId}`;
+    setLikedCommentIds(prev => { const next = new Set(prev); next.delete(key); return next; });
+  }
+
+  function goToProfile(r) {
+    if (!r.userId) return;
+    navigation.navigate('Profile', {
+      profileUser: { userId: r.userId, username: r.username, photo_url: r.photo_url, country: r.country, language: r.language },
+      bondUserId: r.userId,
+    });
   }
 
   const visible = isPremium ? responses : responses.slice(0, tierInfo?.icebreakerResponses ?? 3);
 
   return (
-    <ScrollView contentContainerStyle={tab.scroll} showsVerticalScrollIndicator={false}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90} style={{ flex: 1 }}>
+    <ScrollView ref={scrollRef} contentContainerStyle={tab.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* Question card */}
-      <LinearGradient colors={['#16181C', '#000000']} style={tab.questionCard}>
+      <LinearGradient colors={['#200010', '#120008', '#000000']} style={tab.questionCard}>
         <View style={tab.questionTop}>
           <View style={tab.questionBadge}>
             <View style={tab.questionDot} />
@@ -94,13 +182,13 @@ function IcebreakerTab({ user }) {
         <Text style={tab.questionText}>"{question || 'Loading today\'s question…'}"</Text>
       </LinearGradient>
 
-      {/* Answer box */}
+      {/* Answer box — shows input before submit, stays as card after */}
       {!submitted ? (
         <View style={tab.answerWrap}>
           <TextInput
             style={tab.answerInput}
             placeholder="Share your honest answer with people worldwide…"
-            placeholderTextColor="#444"
+            placeholderTextColor="rgba(255,255,255,0.45)"
             value={myAnswer}
             onChangeText={setMyAnswer}
             multiline
@@ -114,33 +202,187 @@ function IcebreakerTab({ user }) {
               disabled={!myAnswer.trim()}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#E8003D', '#C7003A']} style={tab.submitGrad}>
+              <LinearGradient colors={['#6C47FF', '#5533DD']} style={tab.submitGrad}>
                 <Text style={tab.submitText}>Share with the World 🌍</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <View style={tab.submitted}>
-          <Text style={{ fontSize: 20 }}>✅</Text>
-          <Text style={tab.submittedText}>Your answer is live! See what others said below.</Text>
+        /* My answer stays visible as a pinned card */
+        <View style={tab.myAnswerCard}>
+          <View style={tab.myAnswerHeader}>
+            <Avatar photo_url={user?.photo_url} name={user?.username} size={36} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={tab.myAnswerName}>{user?.username || 'You'}</Text>
+                <View style={tab.liveBadge}>
+                  <View style={tab.liveDot} />
+                  <Text style={tab.liveBadgeText}>LIVE</Text>
+                </View>
+              </View>
+              <Text style={tab.myAnswerMeta}>
+                {getCountryFlag(user?.country)}  {getCountryName(user?.country)}
+              </Text>
+            </View>
+          </View>
+          <Text style={tab.myAnswerText}>{myAnswerText}</Text>
         </View>
       )}
 
       {/* Responses */}
       {visible.length > 0 && (
         <View style={tab.responsesWrap}>
-          <Text style={tab.responsesLabel}>What people said</Text>
-          {visible.map((r, i) => (
-            <Animated.View key={r.id} style={tab.responseCard}>
-              <View style={tab.responseTop}>
-                <Text style={{ fontSize: 20 }}>{r.country?.split(' ')[0] || '🌍'}</Text>
-                <Text style={tab.responseName}>{r.username}</Text>
-                <Text style={tab.responseCountry}>{r.country?.split(' ').slice(1).join(' ')}</Text>
+          <Text style={tab.responsesLabel}>
+            {submitted ? `${responses.length} people answered` : 'Share your answer to interact ↑'}
+          </Text>
+          {visible.map(r => {
+            const isLiked          = likedIds.has(r.id);
+            const flag             = getCountryFlag(r.country);
+            const countryName      = getCountryName(r.country);
+            const likeCount        = r.likes || 0;
+            const comments         = r.comments || [];
+            const commentCount     = comments.length;
+            const commentsOpen     = expandedComments.has(r.id);
+
+            return (
+              <View key={r.id} style={tab.responseCard}>
+                {/* Header: avatar + name + flag */}
+                <TouchableOpacity
+                  style={tab.responseUserRow}
+                  onPress={() => goToProfile(r)}
+                  activeOpacity={r.userId ? 0.7 : 1}
+                  disabled={!r.userId}
+                >
+                  <Avatar photo_url={r.photo_url} name={r.username} size={44} />
+                  <View style={tab.responseInfo}>
+                    <View style={tab.responseNameRow}>
+                      <Text style={tab.responseName}>{r.username}</Text>
+                      {r.userId && <Text style={tab.profileChevron}>›</Text>}
+                    </View>
+                    <View style={tab.responseLocationRow}>
+                      <Text style={tab.responseFlag}>{flag}</Text>
+                      {countryName ? <Text style={tab.responseCountry}>{countryName}</Text> : null}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Response text */}
+                <Text style={tab.responseText}>{r.text}</Text>
+
+                {/* Footer: like + comment */}
+                <View style={tab.responseFooter}>
+                  <TouchableOpacity
+                    style={tab.footerBtn}
+                    onPress={() => handleLike(r.id)}
+                    activeOpacity={submitted ? 0.7 : 1}
+                    disabled={!submitted}
+                  >
+                    <Text style={[tab.likeIcon, isLiked && tab.likeIconActive]}>
+                      {isLiked ? '♥' : '♡'}
+                    </Text>
+                    <Text style={[tab.footerCount, isLiked && tab.likeCountActive]}>
+                      {likeCount}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[tab.footerBtn, { marginLeft: 24 }]}
+                    onPress={() => toggleComments(r.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[tab.commentIcon, commentsOpen && tab.commentIconActive]}>💬</Text>
+                    <Text style={[tab.footerCount, commentsOpen && tab.commentCountActive]}>
+                      {commentCount}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {!submitted && (
+                    <Text style={tab.likeHint}>Share your answer to interact</Text>
+                  )}
+                </View>
+
+                {/* Expandable comment section */}
+                {commentsOpen && (
+                  <View style={tab.commentsSection}>
+                    {comments.length === 0 && (
+                      <Text style={tab.noComments}>No replies yet — be the first!</Text>
+                    )}
+                    {comments.map(c => {
+                      const cKey   = `${r.id}:${c.id}`;
+                      const cLiked = likedCommentIds.has(cKey);
+                      const cFlag  = getCountryFlag(c.country);
+                      return (
+                        <View key={c.id} style={tab.commentItem}>
+                          <Avatar photo_url={c.photo_url} name={c.username} size={32} />
+                          <View style={tab.commentBody}>
+                            <View style={tab.commentMeta}>
+                              <Text style={tab.commentName}>{c.username}</Text>
+                              <Text style={tab.commentFlag}>{cFlag}</Text>
+                            </View>
+                            <Text style={tab.commentText}>{c.text}</Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <TouchableOpacity
+                              style={tab.commentLikeBtn}
+                              onPress={() => handleLikeComment(r.id, c.id)}
+                              activeOpacity={submitted ? 0.7 : 1}
+                              disabled={!submitted}
+                            >
+                              <Text style={[tab.commentLikeIcon, cLiked && tab.likeIconActive]}>
+                                {cLiked ? '♥' : '♡'}
+                              </Text>
+                              {(c.likes > 0) && (
+                                <Text style={[tab.commentLikeCount, cLiked && tab.likeCountActive]}>
+                                  {c.likes}
+                                </Text>
+                              )}
+                            </TouchableOpacity>
+                            {c.userId === user?.userId && (
+                              <TouchableOpacity
+                                style={tab.commentDeleteBtn}
+                                onPress={() => handleDeleteComment(r.id, c.id)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={tab.commentDeleteIcon}>✕</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+
+                    {/* Reply input — only when user has submitted */}
+                    {submitted ? (
+                      <View style={tab.commentInputRow}>
+                        <Avatar photo_url={user?.photo_url} name={user?.username} size={30} />
+                        <TextInput
+                          style={tab.commentInput}
+                          placeholder="Write a reply…"
+                          placeholderTextColor="rgba(255,255,255,0.3)"
+                          value={commentTexts[r.id] || ''}
+                          onChangeText={t => setCommentTexts(prev => ({ ...prev, [r.id]: t }))}
+                          maxLength={150}
+                          returnKeyType="send"
+                          onSubmitEditing={() => submitComment(r.id)}
+                          onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200)}
+                        />
+                        <TouchableOpacity
+                          style={[tab.commentSendBtn, !(commentTexts[r.id]?.trim()) && { opacity: 0.35 }]}
+                          onPress={() => submitComment(r.id)}
+                          disabled={!commentTexts[r.id]?.trim()}
+                        >
+                          <Text style={tab.commentSendIcon}>➤</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <Text style={tab.replyHint}>Share your answer to reply</Text>
+                    )}
+                  </View>
+                )}
               </View>
-              <Text style={tab.responseText}>{r.text}</Text>
-            </Animated.View>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -151,36 +393,86 @@ function IcebreakerTab({ user }) {
         </View>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 const tab = StyleSheet.create({
-  scroll:          { padding: 20, gap: 16, paddingBottom: 50 },
-  questionCard:    { borderRadius: 22, padding: 22, gap: 14, borderWidth: 1, borderColor: '#E8003D30' },
-  questionTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  questionBadge:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  questionDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E8003D' },
-  questionBadgeText:{ color: '#E8003D', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
-  responseCount:   { color: '#555', fontSize: 12 },
-  questionText:    { color: '#fff', fontSize: 18, lineHeight: 28, fontStyle: 'italic', fontWeight: '500' },
-  answerWrap:      { gap: 10 },
-  answerInput:     { backgroundColor: '#16181C', color: '#fff', borderRadius: 16, padding: 16, fontSize: 14, minHeight: 90, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2F3336', lineHeight: 22 },
-  answerFooter:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  charCount:       { color: '#444', fontSize: 11 },
-  submitBtn:       { borderRadius: 14, overflow: 'hidden' },
-  submitGrad:      { paddingHorizontal: 20, paddingVertical: 12 },
-  submitText:      { color: '#fff', fontSize: 14, fontWeight: '800' },
-  submitted:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#57f28715', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#57f28730' },
-  submittedText:   { color: '#57f287', fontSize: 13, fontWeight: '600', flex: 1 },
-  responsesWrap:   { gap: 10 },
-  responsesLabel:  { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  responseCard:    { backgroundColor: '#16181C', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#2F3336', gap: 8 },
-  responseTop:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  responseName:    { color: '#fff', fontSize: 13, fontWeight: '700' },
-  responseCountry: { color: '#555', fontSize: 11 },
-  responseText:    { color: '#bbb', fontSize: 14, lineHeight: 21 },
-  lockedMore:      { backgroundColor: '#E8003D10', borderRadius: 18, padding: 18, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#E8003D30', borderStyle: 'dashed' },
-  lockedText:      { color: '#E8003D', fontSize: 14, fontWeight: '800' },
-  lockedSub:       { color: '#E8003D88', fontSize: 12 },
+  scroll:            { padding: 20, gap: 18, paddingBottom: 60 },
+
+  questionCard:      { borderRadius: 24, padding: 22, gap: 14, borderWidth: 1, borderColor: 'rgba(232,0,61,0.25)' },
+  questionTop:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  questionBadge:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  questionDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6C47FF' },
+  questionBadgeText: { color: '#6C47FF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  responseCount:     { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '600' },
+  questionText:      { color: '#ffffff', fontSize: 19, lineHeight: 30, fontStyle: 'italic', fontWeight: '600', letterSpacing: 0.1 },
+
+  answerWrap:        { gap: 12 },
+  answerInput:       { backgroundColor: '#1e1e2e', color: '#ffffff', borderRadius: 18, padding: 16, fontSize: 15, minHeight: 95, textAlignVertical: 'top', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)', lineHeight: 23 },
+  answerFooter:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  charCount:         { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
+  submitBtn:         { borderRadius: 16, overflow: 'hidden' },
+  submitGrad:        { paddingHorizontal: 22, paddingVertical: 13 },
+  submitText:        { color: '#fff', fontSize: 14, fontWeight: '800' },
+
+  myAnswerCard:      { backgroundColor: 'rgba(232,0,61,0.1)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(232,0,61,0.3)', gap: 12 },
+  myAnswerHeader:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  myAnswerName:      { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  myAnswerMeta:      { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 2 },
+  myAnswerText:      { color: '#ffffff', fontSize: 15, lineHeight: 24 },
+  liveBadge:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#6C47FF', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  liveDot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: '#fff' },
+  liveBadgeText:     { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+
+  responsesWrap:     { gap: 12 },
+  responsesLabel:    { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
+
+  responseCard:        { backgroundColor: '#151520', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', gap: 12 },
+  responseUserRow:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  responseInfo:        { flex: 1, gap: 4 },
+  responseNameRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  responseName:        { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  profileChevron:      { color: 'rgba(255,255,255,0.3)', fontSize: 18, fontWeight: '300' },
+  responseLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  responseFlag:        { fontSize: 20 },
+  responseCountry:     { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500' },
+  responseText:        { color: '#ffffff', fontSize: 15, lineHeight: 24, fontWeight: '400' },
+
+  responseFooter:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 10 },
+  footerBtn:         { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  likeIcon:          { fontSize: 22, color: 'rgba(255,255,255,0.3)' },
+  likeIconActive:    { color: '#6C47FF' },
+  footerCount:       { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
+  likeCountActive:   { color: '#6C47FF' },
+  commentIcon:       { fontSize: 20 },
+  commentIconActive: { },
+  commentCountActive:{ color: '#57c4ff' },
+  likeHint:          { color: 'rgba(255,255,255,0.2)', fontSize: 11, fontStyle: 'italic', marginLeft: 'auto' },
+
+  commentsSection:   { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 12, gap: 12 },
+  noComments:        { color: 'rgba(255,255,255,0.25)', fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 4 },
+  replyHint:         { color: 'rgba(255,255,255,0.2)', fontSize: 11, fontStyle: 'italic', textAlign: 'center' },
+
+  commentItem:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  commentBody:       { flex: 1, gap: 3 },
+  commentMeta:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  commentName:       { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+  commentFlag:       { fontSize: 15 },
+  commentText:       { color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20 },
+  commentLikeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingTop: 4, paddingLeft: 4 },
+  commentLikeIcon:   { fontSize: 17, color: 'rgba(255,255,255,0.3)' },
+  commentLikeCount:  { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.35)' },
+  commentDeleteBtn:  { paddingTop: 4, paddingLeft: 2 },
+  commentDeleteIcon: { fontSize: 13, color: 'rgba(255,255,255,0.22)' },
+
+  commentInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  commentInput:      { flex: 1, color: '#ffffff', fontSize: 13, paddingVertical: 6 },
+  commentSendBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  commentSendIcon:   { color: '#fff', fontSize: 14 },
+
+  lockedMore:        { backgroundColor: 'rgba(232,0,61,0.08)', borderRadius: 18, padding: 18, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(232,0,61,0.25)', borderStyle: 'dashed' },
+  lockedText:        { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
+  lockedSub:         { color: 'rgba(232,0,61,0.6)', fontSize: 12 },
 });
 
 // ─── Random connect tab ───────────────────────────────────────────────────────
@@ -269,7 +561,7 @@ function RandomTab({ user, navigation }) {
         <FlatList
           ref={flatRef}
           data={messages}
-          keyExtractor={m => m.id}
+          keyExtractor={m => String(m.id)}
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, gap: 8 }}
           ListEmptyComponent={
@@ -351,7 +643,7 @@ function RandomTab({ user, navigation }) {
         </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={connect} activeOpacity={0.85} style={rc.connectWrap}>
-          <LinearGradient colors={['#E8003D', '#E8003D']} style={rc.connectBtn}>
+          <LinearGradient colors={['#6C47FF', '#6C47FF']} style={rc.connectBtn}>
             <Text style={rc.connectText}>{state === 'timeout' ? '🔄  Try Again' : '🌀  Connect with a Stranger'}</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -406,7 +698,7 @@ const rc = StyleSheet.create({
   msgRow:       { flexDirection: 'row' },
   msgRowMine:   { justifyContent: 'flex-end' },
   bubble:       { maxWidth: width * 0.72, borderRadius: 18, padding: 12 },
-  bubbleMine:   { backgroundColor: '#E8003D', borderBottomRightRadius: 4 },
+  bubbleMine:   { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
   bubbleOther:  { backgroundColor: '#16181C', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2F3336' },
   msgText:      { color: '#fff', fontSize: 14, lineHeight: 20 },
   translated:   { color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop: 2 },
@@ -478,7 +770,7 @@ function LanguageTab({ user, navigation }) {
 
       {loading ? (
         <View style={lx.loading}>
-          <ActivityIndicator color="#E8003D" />
+          <ActivityIndicator color="#6C47FF" />
           <Text style={lx.loadingText}>Finding language partners…</Text>
         </View>
       ) : partners.length === 0 ? (
@@ -524,7 +816,7 @@ function LanguageTab({ user, navigation }) {
 }
 const lx = StyleSheet.create({
   scroll:        { padding: 20, gap: 12, paddingBottom: 50 },
-  myBadge:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#E8003D30' },
+  myBadge:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#6C47FF30' },
   myTitle:       { color: '#fff', fontSize: 16, fontWeight: '800' },
   mySub:         { color: '#ffffff66', fontSize: 12, marginTop: 3, lineHeight: 18 },
   proGate:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f59e0b15', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#f59e0b30' },
@@ -538,9 +830,9 @@ const lx = StyleSheet.create({
   onlineDot:     { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
   name:          { color: '#fff', fontSize: 15, fontWeight: '700' },
   country:       { color: '#555', fontSize: 12 },
-  exchangeBadge: { backgroundColor: '#E8003D18', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#E8003D35' },
-  exchangeFlags: { color: '#E8003D', fontSize: 15, fontWeight: '800' },
-  exchangeNames: { color: '#E8003D88', fontSize: 9, fontWeight: '700' },
+  exchangeBadge: { backgroundColor: '#6C47FF18', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#6C47FF35' },
+  exchangeFlags: { color: '#6C47FF', fontSize: 15, fontWeight: '800' },
+  exchangeNames: { color: '#6C47FF88', fontSize: 9, fontWeight: '700' },
 });
 
 // ─── People tab ───────────────────────────────────────────────────────────────
@@ -635,12 +927,12 @@ function PeopleTab({ user, navigation }) {
               style={[
                 pe.chip,
                 active && meta  && { backgroundColor: meta.color + '20', borderColor: meta.color + '55' },
-                active && !meta && { backgroundColor: '#E8003D20', borderColor: '#E8003D55' },
+                active && !meta && { backgroundColor: '#6C47FF20', borderColor: '#6C47FF55' },
               ]}
               onPress={() => setCtFilter(f.id)}
             >
               <Text style={{ fontSize: 13 }}>{f.emoji}</Text>
-              <Text style={[pe.chipText, active && { color: meta ? meta.color : '#E8003D' }]}>{f.label}</Text>
+              <Text style={[pe.chipText, active && { color: meta ? meta.color : '#6C47FF' }]}>{f.label}</Text>
             </TouchableOpacity>
           );
         }}
@@ -649,7 +941,7 @@ function PeopleTab({ user, navigation }) {
 
       {loading ? (
         <View style={pe.loading}>
-          <ActivityIndicator color="#E8003D" />
+          <ActivityIndicator color="#6C47FF" />
           <Text style={pe.loadingText}>Loading people…</Text>
         </View>
       ) : profiles.length === 0 ? (
@@ -664,7 +956,7 @@ function PeopleTab({ user, navigation }) {
           keyExtractor={p => String(p.user_id)}
           contentContainerStyle={pe.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} tintColor="#E8003D" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} tintColor="#6C47FF" />}
           renderItem={({ item: p }) => {
             const isOnline = online[p.user_id];
             const cts      = p.connection_types || [];
@@ -794,7 +1086,7 @@ export default function DiscoverScreen({ navigation, user }) {
       </View>
 
       {/* ── Content ── */}
-      {activeTab === 'icebreaker' && <IcebreakerTab user={user} />}
+      {activeTab === 'icebreaker' && <IcebreakerTab user={user} navigation={navigation} />}
       {activeTab === 'random'     && <RandomTab user={user} navigation={navigation} />}
       {activeTab === 'language'   && <LanguageTab user={user} navigation={navigation} />}
       {activeTab === 'people'     && <PeopleTab user={user} navigation={navigation} />}
@@ -813,6 +1105,6 @@ const styles = StyleSheet.create({
   tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 3 },
   tabIcon:       { fontSize: 18 },
   tabLabel:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  tabLabelActive:{ color: '#E8003D' },
-  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#E8003D', borderRadius: 2 },
+  tabLabelActive:{ color: '#6C47FF' },
+  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#6C47FF', borderRadius: 2 },
 });

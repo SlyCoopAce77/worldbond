@@ -152,17 +152,75 @@ function getTodaysQuestion() {
 
 function addResponse(questionIndex, response) {
   if (!questionResponses[questionIndex]) questionResponses[questionIndex] = [];
-  // One response per user — update if exists
   const existing = questionResponses[questionIndex].findIndex(r => r.userId === response.userId);
   if (existing !== -1) {
-    questionResponses[questionIndex][existing] = { ...questionResponses[questionIndex][existing], ...response, updatedAt: Date.now() };
+    questionResponses[questionIndex][existing] = {
+      ...questionResponses[questionIndex][existing],
+      ...response,
+      updatedAt: Date.now(),
+    };
   } else {
-    questionResponses[questionIndex].push({ id: uuidv4(), ...response, createdAt: Date.now() });
+    questionResponses[questionIndex].push({
+      id: uuidv4(), ...response, likes: 0, likedBy: [], createdAt: Date.now(),
+    });
   }
 }
 
-function getResponses(questionIndex) {
-  return (questionResponses[questionIndex] || []).slice().reverse();
+function likeResponse(questionIndex, responseId, likerId) {
+  const list = questionResponses[questionIndex] || [];
+  const r = list.find(r => r.id === responseId);
+  if (!r) return;
+  if (r.likedBy.includes(likerId)) {
+    r.likedBy = r.likedBy.filter(id => id !== likerId);
+    r.likes = Math.max(0, r.likes - 1);
+  } else {
+    r.likedBy.push(likerId);
+    r.likes++;
+  }
 }
 
-module.exports = { getTodaysQuestion, addResponse, getResponses };
+function addComment(questionIndex, responseId, comment) {
+  const list = questionResponses[questionIndex] || [];
+  const r = list.find(r => r.id === responseId);
+  if (!r) return;
+  if (!r.comments) r.comments = [];
+  r.comments.push({ id: uuidv4(), ...comment, likes: 0, likedBy: [], createdAt: Date.now() });
+}
+
+function likeComment(questionIndex, responseId, commentId, likerId) {
+  const list = questionResponses[questionIndex] || [];
+  const r = list.find(r => r.id === responseId);
+  if (!r || !r.comments) return;
+  const c = r.comments.find(c => c.id === commentId);
+  if (!c) return;
+  if (c.likedBy.includes(likerId)) {
+    c.likedBy = c.likedBy.filter(id => id !== likerId);
+    c.likes = Math.max(0, c.likes - 1);
+  } else {
+    c.likedBy.push(likerId);
+    c.likes++;
+  }
+}
+
+function deleteComment(questionIndex, responseId, commentId, requesterId) {
+  const list = questionResponses[questionIndex] || [];
+  const r = list.find(r => r.id === responseId);
+  if (!r || !r.comments) return false;
+  const idx = r.comments.findIndex(c => c.id === commentId && c.userId === requesterId);
+  if (idx === -1) return false;
+  r.comments.splice(idx, 1);
+  return true;
+}
+
+function getResponses(questionIndex, viewerId) {
+  return (questionResponses[questionIndex] || []).slice().reverse().map(({ likedBy, comments, ...rest }) => ({
+    ...rest,
+    likedByMe: viewerId ? likedBy.includes(viewerId) : false,
+    comments: (comments || []).map(({ likedBy: cLikedBy, ...c }) => ({
+      ...c,
+      likedByMe: viewerId ? (cLikedBy || []).includes(viewerId) : false,
+    })),
+  }));
+}
+
+module.exports = { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment, likeComment, deleteComment };

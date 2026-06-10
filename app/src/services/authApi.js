@@ -9,8 +9,8 @@ const KEYS = {
   PROFILE: 'worldbond_user',
 };
 
-export async function register(email, password) {
-  const { data } = await axios.post(`${SERVER_URL}/api/auth/register`, { email, password });
+export async function register(email, password, dateOfBirth) {
+  const { data } = await axios.post(`${SERVER_URL}/api/auth/register`, { email, password, dateOfBirth });
   await storeTokens(data);
   return data;
 }

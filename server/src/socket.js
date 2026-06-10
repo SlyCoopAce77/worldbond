@@ -7,7 +7,7 @@ const {
   addReview, getReviews, getAverageRating,
   getCountries, getCitiesInCountry, getPlacesInCity, PLACE_TYPES,
 } = require('./places');
-const { getTodaysQuestion, addResponse, getResponses } = require('./icebreaker');
+const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment } = require('./icebreaker');
 const { createEvent, getEvents, getEventById, joinEvent, leaveEvent, addEventMessage, getEventMessages } = require('./events');
 const { createCulturalPost, likePost, getCulturalPosts } = require('./culturalPosts');
 const { toggleLike, addComment, deletePhoto, getPhotos } = require('./photos');
@@ -332,7 +332,7 @@ function setupSocket(io) {
       const giftMessage = {
         id: uuidv4(),
         type: 'gift',
-        senderId: socket.id,
+        senderId: sender.userId || socket.id,
         senderName: sender.username,
         senderCountry: sender.country,
         gift,
@@ -382,28 +382,72 @@ function setupSocket(io) {
     // ── DAILY ICEBREAKER ──
 
     socket.on('get_icebreaker', () => {
+      const user = connectedUsers[socket.id];
       const { index, question } = getTodaysQuestion();
-      const responses = getResponses(index);
+      const viewerId = user?.userId || socket.id;
+      const responses = getResponses(index, viewerId);
       socket.emit('icebreaker_data', { index, question, responses });
     });
 
     socket.on('submit_icebreaker', async ({ text }) => {
       const user = connectedUsers[socket.id];
       if (!user || !text?.trim()) return;
-      const { index, question } = getTodaysQuestion();
-
-      let translatedTexts = {};
-      // Store original; translation happens client-side per recipient
+      const { index } = getTodaysQuestion();
       addResponse(index, {
-        userId: socket.id,
-        username: user.username,
-        country: user.country,
-        language: user.language,
-        text: text.trim(),
+        userId:    user.userId || socket.id,
+        username:  user.username,
+        country:   user.country,
+        language:  user.language,
+        photo_url: user.photo_url || null,
+        text:      text.trim(),
       });
-
       const responses = getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
+    });
+
+    socket.on('like_icebreaker_response', ({ responseId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !responseId) return;
+      const { index } = getTodaysQuestion();
+      likeResponse(index, responseId, user.userId || socket.id);
+      const responses = getResponses(index);
+      io.emit('icebreaker_responses', { index, responses });
+    });
+
+    socket.on('add_icebreaker_comment', ({ responseId, text }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !responseId || !text?.trim()) return;
+      const { index } = getTodaysQuestion();
+      addIcebreakerComment(index, responseId, {
+        userId:    user.userId || socket.id,
+        username:  user.username,
+        country:   user.country,
+        language:  user.language,
+        photo_url: user.photo_url || null,
+        text:      text.trim(),
+      });
+      const responses = getResponses(index);
+      io.emit('icebreaker_responses', { index, responses });
+    });
+
+    socket.on('like_icebreaker_comment', ({ responseId, commentId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !responseId || !commentId) return;
+      const { index } = getTodaysQuestion();
+      likeIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
+      const responses = getResponses(index);
+      io.emit('icebreaker_responses', { index, responses });
+    });
+
+    socket.on('delete_icebreaker_comment', ({ responseId, commentId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !responseId || !commentId) return;
+      const { index } = getTodaysQuestion();
+      const deleted = deleteIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
+      if (deleted) {
+        const responses = getResponses(index);
+        io.emit('icebreaker_responses', { index, responses });
+      }
     });
 
     // ── RANDOM WORLD CONNECT ──
@@ -441,8 +485,8 @@ function setupSocket(io) {
         socket.join(roomKey);
         io.sockets.sockets.get(matchedId)?.join(roomKey);
 
-        socket.emit('random_match', { matchedUser: matched, roomKey });
-        io.to(matchedId).emit('random_match', { matchedUser: user, roomKey });
+        socket.emit('random_match', { matchedUser: { ...matched, userId: matched.userId }, roomKey });
+        io.to(matchedId).emit('random_match', { matchedUser: { ...user, userId: user.userId }, roomKey });
       } else {
         // Add to queue and start a 30-second timeout
         if (!randomConnectQueue.includes(socket.id)) randomConnectQueue.push(socket.id);
@@ -689,9 +733,11 @@ function setupSocket(io) {
       });
 
       // Tell host someone joined
+      const viewer = connectedUsers[socket.id];
       io.to(streamId).emit('live_viewer_joined', {
-        viewerName: connectedUsers[socket.id]?.username || 'Someone',
-        viewerCountry: connectedUsers[socket.id]?.country || '',
+        viewerId: viewer?.userId || socket.id,
+        viewerName: viewer?.username || 'Someone',
+        viewerCountry: viewer?.country || '',
         count: stream.viewerIds.size,
       });
     });
@@ -758,7 +804,7 @@ function setupSocket(io) {
       // Notify the target if they're online
       const targetSocket = Object.values(connectedUsers).find(u => u.socketId === targetUserId);
       if (targetSocket) {
-        io.to(targetSocket.socketId).emit('new_follower', { followerId: socket.id, followerName: user.username, followerCountry: user.country });
+        io.to(targetSocket.socketId).emit('new_follower', { followerId: user.userId || socket.id, followerName: user.username, followerCountry: user.country });
       }
     });
 

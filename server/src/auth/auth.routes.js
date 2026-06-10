@@ -4,11 +4,22 @@ const { register, login, refreshAccess, logout, forgotPassword, resetPassword } 
 const router = Router();
 
 router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, dateOfBirth } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (!dateOfBirth) return res.status(400).json({ error: 'Date of birth is required' });
+
+  const dob = new Date(dateOfBirth);
+  if (isNaN(dob.getTime())) return res.status(400).json({ error: 'Invalid date of birth' });
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  if (age < 18) return res.status(400).json({ error: 'You must be 18 or older to join Bond.' });
+
   try {
-    const result = await register({ email, password });
+    const result = await register({ email, password, dateOfBirth: dob });
     res.status(201).json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

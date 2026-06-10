@@ -2,13 +2,17 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Image, Alert, ActivityIndicator,
-  Animated, Linking, Dimensions,
+  Animated, Linking, Dimensions, Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Sound from 'react-native-sound';
 import axios from 'axios';
 import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
+import { getCountryFlag } from '../utils/countryUtils';
+
+Sound.setCategory('Playback');
 
 const { width, height } = Dimensions.get('window');
 const COVER_HEIGHT = 340;
@@ -47,15 +51,35 @@ function getReliability(score) {
 
 // ─── Voice note player ─────────────────────────────────────────────────────
 function VoiceNotePlayer({ url }) {
-  const [playing, setPlaying] = useState(false);
-  const bars = useRef(Array.from({ length: 32 }, () => 4 + Math.random() * 24)).current;
+  const [loading,  setLoading]  = useState(true);
+  const [playing,  setPlaying]  = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [position, setPosition] = useState(0);
+  const [loadErr,  setLoadErr]  = useState(false);
+  const soundRef = useRef(null);
+  const timerRef = useRef(null);
+  const bars     = useRef(Array.from({ length: 32 }, () => 4 + Math.random() * 24)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!url) { setLoading(false); setLoadErr(true); return; }
+    const snd = new Sound(url, '', err => {
+      if (err) { setLoadErr(true); setLoading(false); return; }
+      setDuration(snd.getDuration());
+      soundRef.current = snd;
+      setLoading(false);
+    });
+    return () => {
+      clearInterval(timerRef.current);
+      soundRef.current?.release();
+    };
+  }, [url]);
 
   useEffect(() => {
     if (playing) {
       Animated.loop(Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.1, duration: 500, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 450, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 450, useNativeDriver: true }),
       ])).start();
     } else {
       pulseAnim.stopAnimation();
@@ -63,38 +87,69 @@ function VoiceNotePlayer({ url }) {
     }
   }, [playing]);
 
+  function togglePlay() {
+    const snd = soundRef.current;
+    if (!snd || loading || loadErr) return;
+    if (playing) {
+      snd.pause();
+      clearInterval(timerRef.current);
+      setPlaying(false);
+    } else {
+      snd.play(success => {
+        clearInterval(timerRef.current);
+        setPlaying(false);
+        if (success) { snd.setCurrentTime(0); setPosition(0); }
+      });
+      timerRef.current = setInterval(() => {
+        snd.getCurrentTime(t => setPosition(t));
+      }, 200);
+      setPlaying(true);
+    }
+  }
+
+  function fmt(secs) {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
   return (
     <View style={vStyles.section}>
       <Text style={vStyles.label}>Voice Note</Text>
       <View style={vStyles.container}>
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <TouchableOpacity
-            style={[vStyles.btn, playing && vStyles.btnActive]}
-            onPress={() => setPlaying(p => !p)}
-          >
-            <Text style={vStyles.btnIcon}>{playing ? '⏸' : '▶'}</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {loading ? (
+          <ActivityIndicator color="#6C47FF" style={{ marginRight: 12 }} />
+        ) : (
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              style={[vStyles.btn, playing && vStyles.btnActive]}
+              onPress={togglePlay}
+              disabled={loadErr}
+            >
+              <Text style={vStyles.btnIcon}>{playing ? '⏸' : '▶'}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
         <View style={vStyles.waveform}>
           {bars.map((h, i) => (
             <View key={i} style={[vStyles.bar, { height: h, opacity: playing ? 1 : 0.3 }]} />
           ))}
         </View>
-        <Text style={vStyles.dur}>0:30</Text>
+        <Text style={vStyles.dur}>{loadErr ? '--:--' : fmt(playing ? position : duration)}</Text>
       </View>
-      <Text style={vStyles.hint}>Tap to hear their voice 🎙️</Text>
+      {!loadErr && <Text style={vStyles.hint}>Tap to hear their voice 🎙️</Text>}
     </View>
   );
 }
 const vStyles = StyleSheet.create({
   section:   { gap: 10 },
   label:     { color: '#666', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8003D12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#E8003D30' },
-  btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E8003D', alignItems: 'center', justifyContent: 'center' },
-  btnActive: { backgroundColor: '#C7003A' },
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6C47FF12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#6C47FF30' },
+  btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  btnActive: { backgroundColor: '#5533DD' },
   btnIcon:   { color: '#fff', fontSize: 16 },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2, height: 44 },
-  bar:       { width: 3, borderRadius: 2, backgroundColor: '#E8003D' },
+  bar:       { width: 3, borderRadius: 2, backgroundColor: '#6C47FF' },
   dur:       { color: '#666', fontSize: 12 },
   hint:      { color: '#555', fontSize: 12, textAlign: 'center' },
 });
@@ -157,8 +212,8 @@ const cStyles = StyleSheet.create({
   row:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowLabel:  { color: '#888', fontSize: 12, width: 120 },
   track:     { flex: 1, height: 4, backgroundColor: '#2F3336', borderRadius: 2, overflow: 'hidden' },
-  fill:      { height: '100%', backgroundColor: '#E8003D', borderRadius: 2 },
-  pct:       { color: '#E8003D', fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
+  fill:      { height: '100%', backgroundColor: '#6C47FF', borderRadius: 2 },
+  pct:       { color: '#6C47FF', fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
 });
 
 // ─── Main screen ───────────────────────────────────────────────────────────
@@ -170,10 +225,12 @@ export default function ProfileScreen({ route, navigation }) {
   const [bondProfile, setBondProfile] = useState(null);
   const [experiences, setExperiences] = useState([]);
   const [loadingBond, setLoadingBond] = useState(false);
+  const [profileNotFound, setProfileNotFound] = useState(false);
   const [following,   setFollowing]   = useState(false);
   const [followCounts,setFollowCounts]= useState({ followers: 0, following: 0 });
   const [connecting,  setConnecting]  = useState(false);
   const [connected,   setConnected]   = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState(null);
 
   const slideAnim = useRef(new Animated.Value(60)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -190,6 +247,7 @@ export default function ProfileScreen({ route, navigation }) {
           axios.get(`${SERVER_URL}/api/experiences`, { params: { userId: bondUserId }, headers, timeout: 8000 }),
         ]);
         if (pRes.status === 'fulfilled') setBondProfile(pRes.value.data);
+        else setProfileNotFound(true);
         if (eRes.status === 'fulfilled') setExperiences(eRes.value.data.filter(e => e.user_id === bondUserId));
       } catch {}
       finally {
@@ -317,7 +375,12 @@ export default function ProfileScreen({ route, navigation }) {
             </Text>
             {bondProfile?.gender ? <Text style={styles.coverGender}>{bondProfile.gender}</Text> : null}
             <Text style={styles.coverLocation}>
-              {[bondProfile?.city, bondProfile?.country || profileUser?.country].filter(Boolean).join(', ')}
+              {(() => {
+                const country = bondProfile?.country || profileUser?.country;
+                const flag = getCountryFlag(country);
+                const parts = [bondProfile?.city, country].filter(Boolean);
+                return parts.length ? `${parts.join(', ')}${flag ? ` ${flag}` : ''}` : '';
+              })()}
             </Text>
 
             {bondProfile?.ghost_score ? (
@@ -360,122 +423,169 @@ export default function ProfileScreen({ route, navigation }) {
 
           {loadingBond && (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color="#E8003D" size="small" />
+              <ActivityIndicator color="#6C47FF" size="small" />
               <Text style={styles.loadingText}>Loading profile…</Text>
             </View>
           )}
 
-          {/* Connection types */}
-          {connectionTypesData.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Here For</Text>
-              <View style={styles.ctWrap}>
-                {connectionTypesData.map(ct => (
-                  <View key={ct.key} style={[styles.ctBadge, { backgroundColor: ct.color + '18', borderColor: ct.color + '55' }]}>
-                    <Text style={{ fontSize: 16 }}>{ct.emoji}</Text>
-                    <Text style={[styles.ctLabel, { color: ct.color }]}>{ct.label}</Text>
-                  </View>
-                ))}
+          {profileNotFound && !loadingBond && (
+            <View style={styles.notFoundCard}>
+              <Text style={{ fontSize: 40 }}>👤</Text>
+              <Text style={styles.notFoundText}>Profile not available</Text>
+            </View>
+          )}
+
+          {!loadingBond && !profileNotFound && (
+            <>
+              {/* Voice note */}
+              {bondProfile?.voice_note_url && (
+                <VoiceNotePlayer url={bondProfile.voice_note_url} />
+              )}
+
+              {/* About */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About</Text>
+                <View style={styles.bioCard}>
+                  {bondProfile?.bio ? (
+                    <Text style={styles.bioText}>{bondProfile.bio}</Text>
+                  ) : (
+                    <Text style={styles.bioEmpty}>No bio added yet</Text>
+                  )}
+                </View>
               </View>
-            </View>
-          )}
 
-          {/* Voice note */}
-          {bondProfile?.voice_note_url && (
-            <View style={styles.section}>
-              <VoiceNotePlayer url={bondProfile.voice_note_url} />
-            </View>
-          )}
-
-          {/* Bio */}
-          {bondProfile?.bio && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <View style={styles.bioCard}>
-                <Text style={styles.bioText}>{bondProfile.bio}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Compatibility */}
-          {(compatibilityScore != null || scoreBreakdown) && (
-            <View style={styles.section}>
-              <CompatBreakdown score={compatibilityScore} breakdown={scoreBreakdown} />
-            </View>
-          )}
-
-          {/* Experiences */}
-          {experiences.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Their Experiences</Text>
-              {experiences.map(exp => {
-                const ct = CONNECTION_TYPES.find(c => c.key === exp.connection_type);
-                return (
-                  <View key={exp.id} style={styles.expCard}>
-                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-                      {ct && (
-                        <View style={[styles.expIcon, { backgroundColor: ct.color + '20' }]}>
-                          <Text style={{ fontSize: 20 }}>{ct.emoji}</Text>
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.expTitle}>{exp.title}</Text>
-                        {exp.description ? (
-                          <Text style={styles.expDesc} numberOfLines={2}>{exp.description}</Text>
-                        ) : null}
+              {/* Here For */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Here For</Text>
+                {connectionTypesData.length > 0 ? (
+                  <View style={styles.ctWrap}>
+                    {connectionTypesData.map(ct => (
+                      <View key={ct.key} style={[styles.ctBadge, { backgroundColor: ct.color + '18', borderColor: ct.color + '55' }]}>
+                        <Text style={{ fontSize: 16 }}>{ct.emoji}</Text>
+                        <Text style={[styles.ctLabel, { color: ct.color }]}>{ct.label}</Text>
                       </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.interestBtn}
-                      onPress={async () => {
-                        try {
-                          const token = await getAccessToken();
-                          await axios.post(`${SERVER_URL}/api/experiences/${exp.id}/apply`, { message: '' }, {
-                            headers: { Authorization: `Bearer ${token}` }, timeout: 10000,
-                          });
-                          Alert.alert('Interest sent!', `${displayName} will see your interest.`);
-                        } catch (err) {
-                          Alert.alert('Error', err.response?.data?.error || 'Could not apply');
-                        }
-                      }}
-                    >
-                      <Text style={styles.interestBtnText}>Show Interest</Text>
-                    </TouchableOpacity>
+                    ))}
                   </View>
-                );
-              })}
-            </View>
-          )}
+                ) : (
+                  <View style={styles.emptyRow}>
+                    <Text style={styles.emptyText}>Nothing specified yet</Text>
+                  </View>
+                )}
+              </View>
 
-          {/* Social links */}
-          {hasSocials && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Socials</Text>
-              {SOCIAL_PLATFORMS.map(p => {
-                const handle = profileUser?.socials?.[p.key];
-                if (!handle?.trim()) return null;
-                return (
-                  <TouchableOpacity
-                    key={p.key}
-                    style={styles.socialCard}
-                    onPress={() => Linking.openURL(p.baseUrl + handle.replace('@', '').trim())}
-                  >
-                    <Text style={styles.socialIcon}>{p.icon}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.socialPlatform}>{p.label}</Text>
-                      <Text style={styles.socialHandle}>{handle}</Text>
-                    </View>
-                    <Text style={styles.socialArrow}>↗</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+              {/* Photos */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Photos</Text>
+                <View style={styles.galleryGrid}>
+                  {Array.from({ length: 9 }).map((_, i) => {
+                    const url = (bondProfile?.gallery_photos || [])[i];
+                    return url ? (
+                      <TouchableOpacity
+                        key={i}
+                        style={styles.gallerySlot}
+                        onPress={() => setViewingPhoto(url)}
+                        activeOpacity={0.85}
+                      >
+                        <Image source={{ uri: url }} style={styles.galleryImg} />
+                      </TouchableOpacity>
+                    ) : (
+                      <View key={i} style={styles.gallerySlotEmpty} />
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Compatibility */}
+              {(compatibilityScore != null || scoreBreakdown) && (
+                <View style={styles.section}>
+                  <CompatBreakdown score={compatibilityScore} breakdown={scoreBreakdown} />
+                </View>
+              )}
+
+              {/* Experiences */}
+              {experiences.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Experiences</Text>
+                  {experiences.map(exp => {
+                    const ct = CONNECTION_TYPES.find(c => c.key === exp.connection_type);
+                    return (
+                      <View key={exp.id} style={styles.expCard}>
+                        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                          {ct && (
+                            <View style={[styles.expIcon, { backgroundColor: ct.color + '20' }]}>
+                              <Text style={{ fontSize: 20 }}>{ct.emoji}</Text>
+                            </View>
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.expTitle}>{exp.title}</Text>
+                            {exp.description ? (
+                              <Text style={styles.expDesc} numberOfLines={2}>{exp.description}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.interestBtn}
+                          onPress={async () => {
+                            try {
+                              const token = await getAccessToken();
+                              await axios.post(`${SERVER_URL}/api/experiences/${exp.id}/apply`, { message: '' }, {
+                                headers: { Authorization: `Bearer ${token}` }, timeout: 10000,
+                              });
+                              Alert.alert('Interest sent!', `${displayName} will see your interest.`);
+                            } catch (err) {
+                              Alert.alert('Error', err.response?.data?.error || 'Could not apply');
+                            }
+                          }}
+                        >
+                          <Text style={styles.interestBtnText}>Show Interest</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Social links */}
+              {hasSocials && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Socials</Text>
+                  {SOCIAL_PLATFORMS.map(p => {
+                    const handle = profileUser?.socials?.[p.key];
+                    if (!handle?.trim()) return null;
+                    return (
+                      <TouchableOpacity
+                        key={p.key}
+                        style={styles.socialCard}
+                        onPress={() => Linking.openURL(p.baseUrl + handle.replace('@', '').trim())}
+                      >
+                        <Text style={styles.socialIcon}>{p.icon}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.socialPlatform}>{p.label}</Text>
+                          <Text style={styles.socialHandle}>{handle}</Text>
+                        </View>
+                        <Text style={styles.socialArrow}>↗</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </>
           )}
 
           {/* Bottom spacer for action bar */}
           <View style={{ height: 110 }} />
         </Animated.View>
       </ScrollView>
+
+      {/* ── Full-screen photo viewer ─────────────────────────── */}
+      <Modal visible={!!viewingPhoto} transparent animationType="fade" onRequestClose={() => setViewingPhoto(null)}>
+        <View style={styles.photoModal}>
+          <Image source={{ uri: viewingPhoto }} style={styles.photoModalImg} resizeMode="contain" />
+          <TouchableOpacity style={styles.photoModalClose} onPress={() => setViewingPhoto(null)}>
+            <Text style={styles.photoModalCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* ── Floating action bar ──────────────────────────────── */}
       {!isOwnProfile && (
@@ -491,7 +601,7 @@ export default function ProfileScreen({ route, navigation }) {
               </View>
             ) : (
               <LinearGradient
-                colors={['#E8003D', '#C7003A']}
+                colors={['#6C47FF', '#5533DD']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.bondBtn}
               >
@@ -533,47 +643,65 @@ const styles = StyleSheet.create({
   relBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginTop: 6 },
   relBadgeText:    { fontSize: 12, fontWeight: '700' },
 
-  body:            { paddingTop: 20, gap: 28, paddingHorizontal: 20 },
+  body:            { paddingTop: 24, gap: 24, paddingHorizontal: 20 },
 
-  followRow:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1F23', borderRadius: 18, padding: 16, gap: 16, borderWidth: 1, borderColor: '#2F3336' },
+  galleryGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  gallerySlot:      { width: (width - 40 - 16) / 3, aspectRatio: 1, borderRadius: 16, overflow: 'hidden' },
+  galleryImg:       { width: '100%', height: '100%' },
+  gallerySlotEmpty: { width: (width - 40 - 16) / 3, height: (width - 40 - 16) / 3, borderRadius: 16, backgroundColor: '#111316', borderWidth: 1.5, borderColor: '#2a2e35', borderStyle: 'dashed' },
+
+  photoModal:          { flex: 1, backgroundColor: '#000000f2', alignItems: 'center', justifyContent: 'center' },
+  photoModalImg:       { width, height: width },
+  photoModalClose:     { position: 'absolute', top: 60, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: '#ffffff18', borderWidth: 1, borderColor: '#ffffff30', alignItems: 'center', justifyContent: 'center' },
+  photoModalCloseText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+
+  followRow:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111316', borderRadius: 16, padding: 16, gap: 16, borderWidth: 1, borderColor: '#222527' },
   followStat:      { alignItems: 'center', gap: 2 },
   followNum:       { color: '#fff', fontSize: 20, fontWeight: '800' },
   followLabel:     { color: '#555', fontSize: 11 },
   followDivider:   { width: 1, height: 32, backgroundColor: '#2F3336' },
-  followBtn:       { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#E8003D' },
-  followBtnActive: { backgroundColor: '#E8003D20' },
-  followBtnText:   { color: '#E8003D', fontSize: 13, fontWeight: '700' },
-  followBtnTextActive: { color: '#E8003D' },
+  followBtn:       { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#6C47FF' },
+  followBtnActive: { backgroundColor: '#6C47FF20' },
+  followBtnText:   { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  followBtnTextActive: { color: '#6C47FF' },
 
   loadingRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
   loadingText:     { color: '#555', fontSize: 13 },
 
-  section:         { gap: 12 },
-  sectionTitle:    { color: '#666', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  notFoundCard:    { alignItems: 'center', gap: 10, paddingVertical: 32 },
+  notFoundText:    { color: '#444', fontSize: 14 },
+
+  section:         { gap: 10 },
+  sectionTitle:    { color: '#555', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 },
 
   ctWrap:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  ctBadge:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22, borderWidth: 1 },
+  ctBadge:         { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 22, borderWidth: 1 },
   ctLabel:         { fontSize: 13, fontWeight: '700' },
 
-  bioCard:         { backgroundColor: '#1C1F23', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#2F3336' },
-  bioText:         { color: '#ccc', fontSize: 15, lineHeight: 26 },
+  emptyRow:        { backgroundColor: '#111316', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#222527', alignItems: 'center' },
+  emptyText:       { color: '#3a3f44', fontSize: 14, fontStyle: 'italic' },
 
-  expCard:         { backgroundColor: '#1C1F23', borderRadius: 18, padding: 16, gap: 14, borderWidth: 1, borderColor: '#2F3336' },
+
+  bioCard:         { backgroundColor: '#111316', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#222527' },
+  bioText:         { color: '#bbb', fontSize: 15, lineHeight: 26 },
+  bioEmpty:        { color: '#3a3f44', fontSize: 15, lineHeight: 26, fontStyle: 'italic' },
+
+  expCard:         { backgroundColor: '#111316', borderRadius: 16, padding: 16, gap: 14, borderWidth: 1, borderColor: '#222527' },
   expIcon:         { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   expTitle:        { color: '#fff', fontSize: 15, fontWeight: '700' },
   expDesc:         { color: '#666', fontSize: 13, marginTop: 4, lineHeight: 18 },
-  interestBtn:     { backgroundColor: '#E8003D', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  interestBtn:     { backgroundColor: '#6C47FF', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   interestBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  socialCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1F23', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336', gap: 12 },
+  socialCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111316', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#222527', gap: 12 },
   socialIcon:      { fontSize: 26 },
   socialPlatform:  { color: '#555', fontSize: 11, marginBottom: 2 },
   socialHandle:    { color: '#fff', fontSize: 14, fontWeight: '600' },
-  socialArrow:     { color: '#E8003D', fontSize: 20, fontWeight: '700' },
+  socialArrow:     { color: '#6C47FF', fontSize: 20, fontWeight: '700' },
 
   actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 34, backgroundColor: '#000000f2', borderTopWidth: 1, borderTopColor: '#1C1F23' },
-  messageBtn:      { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#E8003D' },
-  messageBtnText:  { color: '#E8003D', fontSize: 14, fontWeight: '700' },
+  messageBtn:      { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#6C47FF' },
+  messageBtnText:  { color: '#6C47FF', fontSize: 14, fontWeight: '700' },
   bondBtn:         { flex: 2, borderRadius: 18, overflow: 'hidden' },
   bondBtnInner:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },

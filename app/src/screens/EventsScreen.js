@@ -58,10 +58,10 @@ function FilterChip({ id, active, onPress }) {
       style={[
         fc.chip,
         active && meta  && { backgroundColor: meta.color + '20', borderColor: meta.color + '55' },
-        active && !meta && { backgroundColor: '#E8003D20', borderColor: '#E8003D55' },
+        active && !meta && { backgroundColor: '#6C47FF20', borderColor: '#6C47FF55' },
       ]}
     >
-      <Text style={[fc.text, active && { color: meta ? meta.color : '#E8003D' }]}>{label}</Text>
+      <Text style={[fc.text, active && { color: meta ? meta.color : '#6C47FF' }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -190,9 +190,9 @@ const ec = StyleSheet.create({
   attendeeRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   attendeeDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#57f287' },
   attendeeCount: { color: '#57f287', fontSize: 11, fontWeight: '700' },
-  spotsBadge:    { backgroundColor: '#E8003D18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#E8003D40' },
+  spotsBadge:    { backgroundColor: '#6C47FF18', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#6C47FF40' },
   spotsFull:     { backgroundColor: '#e5393518', borderColor: '#e5393540' },
-  spotsText:     { color: '#E8003D', fontSize: 11, fontWeight: '600' },
+  spotsText:     { color: '#6C47FF', fontSize: 11, fontWeight: '600' },
   spotsTextFull: { color: '#e53935' },
   joinBtn:       { borderRadius: 14, overflow: 'hidden' },
   joinBtnDisabled:{ borderRadius: 14, overflow: 'hidden', opacity: 0.4 },
@@ -385,7 +385,7 @@ function EventChatModal({ visible, event, onClose, user }) {
         <FlatList
           ref={flatRef}
           data={messages}
-          keyExtractor={m => m.id}
+          keyExtractor={m => String(m.id)}
           contentContainerStyle={chat.list}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -463,7 +463,7 @@ const chat = StyleSheet.create({
   avatar:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarText:  { color: '#fff', fontSize: 11, fontWeight: '800' },
   bubble:      { maxWidth: width * 0.72, borderRadius: 18, padding: 12, gap: 4 },
-  bubbleMine:  { backgroundColor: '#E8003D', borderBottomRightRadius: 4 },
+  bubbleMine:  { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: '#16181C', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2F3336' },
   senderName:  { color: '#ffffff66', fontSize: 10, fontWeight: '700' },
   msgText:     { color: '#fff', fontSize: 14, lineHeight: 20 },
@@ -553,7 +553,7 @@ export default function EventsScreen({ navigation, user }) {
             style={styles.createBtn}
             onPress={() => setShowCreate(true)}
           >
-            <LinearGradient colors={['#E8003D', '#C7003A']} style={styles.createGrad}>
+            <LinearGradient colors={['#6C47FF', '#5533DD']} style={styles.createGrad}>
               <Text style={styles.createText}>+ Create</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -593,7 +593,7 @@ export default function EventsScreen({ navigation, user }) {
       {/* ── List ── */}
       <FlatList
         data={filtered}
-        keyExtractor={e => e.id}
+        keyExtractor={e => String(e.id)}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -650,7 +650,7 @@ const styles = StyleSheet.create({
 
   statsRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 8, marginTop: 4 },
   statsText:     { color: '#555', fontSize: 13 },
-  clearFilter:   { color: '#E8003D', fontSize: 12, fontWeight: '700' },
+  clearFilter:   { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 
   list:          { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 4 },
 
