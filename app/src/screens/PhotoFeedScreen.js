@@ -5,6 +5,7 @@ import {
   Platform, Animated, Alert, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket, SERVER_URL } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import FilteredImage from '../components/FilteredImage';
@@ -399,7 +400,25 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [commentPhoto,      setCommentPhoto]      = useState(null);
   const [viewingStoryGroup, setViewingStoryGroup] = useState(null);
   const [followingIds,      setFollowingIds]      = useState([]);
+  const [savedCountries,    setSavedCountries]    = useState([]);
   const socket = getSocket();
+
+  // Load saved countries from storage
+  useEffect(() => {
+    AsyncStorage.getItem('bond_saved_countries').then(raw => {
+      if (raw) setSavedCountries(JSON.parse(raw));
+    });
+  }, []);
+
+  async function toggleSaveCountry(country) {
+    setSavedCountries(prev => {
+      const next = prev.includes(country)
+        ? prev.filter(c => c !== country)
+        : [...prev, country];
+      AsyncStorage.setItem('bond_saved_countries', JSON.stringify(next));
+      return next;
+    });
+  }
 
   useEffect(() => {
     function init() {
@@ -480,6 +499,47 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
   const countryFilterHeader = (
     <View>
+
+      {/* ── My Countries (pinned) ── */}
+      {savedCountries.length > 0 && (
+        <View style={s.myCountriesSection}>
+          <View style={s.myCountriesHead}>
+            <Text style={s.myCountriesTitle}>📌 My Countries</Text>
+            <Text style={s.myCountriesSub}>Tap to filter · Hold + to remove</Text>
+          </View>
+          <FlatList
+            horizontal
+            data={savedCountries}
+            keyExtractor={c => c}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.myCountriesRow}
+            renderItem={({ item: c }) => {
+              const active = countryFilter === c;
+              return (
+                <TouchableOpacity
+                  style={[s.myPill, active && s.myPillActive]}
+                  onPress={() => setCountryFilter(prev => prev === c ? null : c)}
+                  onLongPress={() => toggleSaveCountry(c)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.myPillFlag}>{countryFlag(c)}</Text>
+                  <Text style={[s.myPillName, active && s.myPillNameActive]} numberOfLines={1}>
+                    {countryName(c) || c}
+                  </Text>
+                  <TouchableOpacity
+                    style={s.myPillRemove}
+                    onPress={() => toggleSaveCountry(c)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Text style={s.myPillRemoveTxt}>✕</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
+
       {/* ── World Pulse header ── */}
       <View style={s.pulseHeader}>
         <View>
@@ -495,37 +555,51 @@ export default function PhotoFeedScreen({ navigation, user }) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Country cards ── */}
+      {/* ── Country cards with save button ── */}
       {countryStats.length > 0 && (
         <FlatList
           horizontal
           data={[null, ...countryStats]}
-          keyExtractor={(c, i) => (c ? c[0] : '__all__')}
+          keyExtractor={(c) => (c ? c[0] : '__all__')}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.countryCards}
           renderItem={({ item }) => {
-            const isAll    = item === null;
-            const country  = isAll ? null : item[0];
-            const count    = isAll ? photos.length : item[1];
-            const active   = countryFilter === country;
+            const isAll   = item === null;
+            const country = isAll ? null : item[0];
+            const count   = isAll ? photos.length : item[1];
+            const active  = countryFilter === country;
+            const saved   = !isAll && savedCountries.includes(country);
             return (
-              <TouchableOpacity
-                style={[s.countryCard, active && s.countryCardActive]}
-                onPress={() => setCountryFilter(country)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.countryCardFlag}>
-                  {isAll ? '🌐' : countryFlag(country)}
-                </Text>
-                <Text style={[s.countryCardName, active && s.countryCardNameActive]} numberOfLines={1}>
-                  {isAll ? 'All' : (countryName(country) || country)}
-                </Text>
-                <View style={[s.countryCardBadge, active && s.countryCardBadgeActive]}>
-                  <Text style={[s.countryCardCount, active && s.countryCardCountActive]}>
-                    {count} {count === 1 ? 'post' : 'posts'}
+              <View style={[s.countryCard, active && s.countryCardActive]}>
+                {/* Save button — top right */}
+                {!isAll && (
+                  <TouchableOpacity
+                    style={[s.saveBtn, saved && s.saveBtnOn]}
+                    onPress={() => toggleSaveCountry(country)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Text style={s.saveBtnTxt}>{saved ? '✓' : '+'}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={s.countryCardInner}
+                  onPress={() => setCountryFilter(country)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.countryCardFlag}>
+                    {isAll ? '🌐' : countryFlag(country)}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                  <Text style={[s.countryCardName, active && s.countryCardNameActive]} numberOfLines={1}>
+                    {isAll ? 'All' : (countryName(country) || country)}
+                  </Text>
+                  <View style={[s.countryCardBadge, active && s.countryCardBadgeActive]}>
+                    <Text style={[s.countryCardCount, active && s.countryCardCountActive]}>
+                      {count} {count === 1 ? 'post' : 'posts'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             );
           }}
         />
@@ -675,6 +749,20 @@ const s = StyleSheet.create({
   tabTxt:       { color: '#555', fontSize: 14, fontWeight: '700' },
   tabTxtActive: { color: '#fff' },
 
+  // My Countries (pinned)
+  myCountriesSection: { paddingBottom: 4 },
+  myCountriesHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 },
+  myCountriesTitle:   { color: '#fff', fontSize: 14, fontWeight: '800' },
+  myCountriesSub:     { color: '#444', fontSize: 10 },
+  myCountriesRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
+  myPill:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#111', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1.5, borderColor: '#222' },
+  myPillActive:       { borderColor: '#6C47FF', backgroundColor: '#6C47FF15' },
+  myPillFlag:         { fontSize: 18 },
+  myPillName:         { color: '#888', fontSize: 12, fontWeight: '700', maxWidth: 80 },
+  myPillNameActive:   { color: '#fff' },
+  myPillRemove:       { marginLeft: 2 },
+  myPillRemoveTxt:    { color: '#333', fontSize: 12, fontWeight: '700' },
+
   // World Pulse discovery
   pulseHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
   pulseTitle:    { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
@@ -682,9 +770,10 @@ const s = StyleSheet.create({
   surpriseBtn:   { backgroundColor: '#6C47FF20', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#6C47FF44' },
   surpriseTxt:   { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 
-  countryCards:  { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
-  countryCard:   { width: 90, backgroundColor: '#111', borderRadius: 18, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#1e1e1e' },
-  countryCardActive: { borderColor: '#6C47FF', backgroundColor: '#6C47FF12' },
+  countryCards:      { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
+  countryCard:       { width: 90, backgroundColor: '#111', borderRadius: 18, borderWidth: 1.5, borderColor: '#1e1e1e', overflow: 'hidden' },
+  countryCardActive: { borderColor: '#6C47FF', backgroundColor: '#6C47FF0d' },
+  countryCardInner:  { padding: 12, alignItems: 'center', gap: 6 },
   countryCardFlag:   { fontSize: 30 },
   countryCardName:   { color: '#888', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   countryCardNameActive: { color: '#fff' },
@@ -693,7 +782,12 @@ const s = StyleSheet.create({
   countryCardCount:  { color: '#555', fontSize: 10, fontWeight: '700' },
   countryCardCountActive: { color: '#6C47FF' },
 
-  activeFilter:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10 },
+  // Save button on country card
+  saveBtn:    { position: 'absolute', top: 6, right: 6, zIndex: 1, width: 20, height: 20, borderRadius: 10, backgroundColor: '#1e1e1e', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#333' },
+  saveBtnOn:  { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  saveBtnTxt: { color: '#fff', fontSize: 10, fontWeight: '900' },
+
+  activeFilter:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10 },
   activeFilterTxt:   { color: '#fff', fontSize: 13, fontWeight: '700' },
   activeFilterClear: { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
 
