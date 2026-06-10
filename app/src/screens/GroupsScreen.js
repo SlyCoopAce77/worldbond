@@ -9,6 +9,22 @@ import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
+const LOCAL_CATEGORIES = [
+  { id: 'daily-chat',   name: 'Daily Chat',   icon: '🌅', description: 'Morning check-ins, late nights, and everything in between', rooms: ['morning-check-in', 'late-night-thoughts', 'confessions', 'today-i-learned', 'whats-good'] },
+  { id: 'hot-takes',    name: 'Hot Takes',    icon: '🔥', description: 'Say it with your chest. Debate respectfully.',               rooms: ['split-the-bill', 'unpopular-opinions', 'change-my-mind', 'would-you-rather', 'ai-is-overrated'] },
+  { id: 'love-dating',  name: 'Love & Dating',icon: '❤️‍🔥', description: 'Hot take dating era — values first, small talk never',       rooms: ['red-flags', 'dealbreakers', 'situationships', 'solo-vs-dating', 'first-date-rules'] },
+  { id: 'money-talk',   name: 'Money Talk',   icon: '💸', description: 'Financial transparency is the new intimacy',                  rooms: ['money-and-love', 'salary-sharing', 'broke-to-rich', 'side-hustles', 'financial-goals'] },
+  { id: 'mind-soul',    name: 'Mind & Soul',  icon: '🧠', description: 'Real talk, no filters — mental health and growth',            rooms: ['vent-freely', 'daily-wins', 'therapy-talk', 'anxiety-corner', 'glow-up'] },
+  { id: 'culture-clash',name: 'Culture Clash',icon: '🌍', description: "How different is life where you're from?",                    rooms: ['food-opinions', 'family-values', 'country-stereotypes', 'traditions', 'city-vs-village'] },
+  { id: 'pop-culture',  name: 'Pop Culture',  icon: '🎧', description: 'Music, drama, shows — current obsessions',                   rooms: ['now-playing', 'celebrity-drama', 'show-recs', 'lyrics-that-hit', 'guilty-pleasures'] },
+  { id: 'tech-ai',      name: 'Tech & AI',    icon: '🤖', description: "The future everyone's arguing about right now",               rooms: ['ai-hot-takes', 'kids-and-phones', 'influencer-culture', 'digital-detox', 'future-predictions'] },
+  { id: 'bars-nightlife', name: 'Bars & Nightlife', icon: '🍻', description: 'Bar recommendations, night out stories',                  rooms: ['cocktails', 'craft-beer', 'wine', 'nightclubs', 'karaoke'] },
+  { id: 'music',          name: 'Music',            icon: '🎵', description: 'Share your favorite artists and discover new music',       rooms: ['hip-hop', 'rock', 'kpop', 'jazz', 'electronic'] },
+  { id: 'food',           name: 'Food & Cooking',   icon: '🍜', description: 'Share recipes and food culture across countries',          rooms: ['asian-cuisine', 'street-food', 'vegetarian', 'desserts', 'bbq'] },
+  { id: 'language-learning', name: 'Language Learning', icon: '📚', description: 'Practice languages with native speakers',             rooms: ['english', 'japanese', 'spanish', 'korean', 'french'] },
+  { id: 'sports',         name: 'Sports',           icon: '⚽', description: 'Football, basketball, soccer and more',                    rooms: ['football', 'basketball', 'soccer', 'baseball', 'tennis'] },
+];
+
 const CATEGORY_COLORS = {
   'daily-chat':    { from: '#92400e', to: '#78350f' },
   'hot-takes':     { from: '#991b1b', to: '#7f1d1d' },
@@ -17,7 +33,12 @@ const CATEGORY_COLORS = {
   'mind-soul':     { from: '#1e3a8a', to: '#172554' },
   'culture-clash': { from: '#065f46', to: '#064e3b' },
   'pop-culture':   { from: '#5b21b6', to: '#3b0764' },
-  'tech-ai':       { from: '#0e7490', to: '#164e63' },
+  'tech-ai':          { from: '#0e7490', to: '#164e63' },
+  'bars-nightlife':   { from: '#c2410c', to: '#7c2d12' },
+  'music':            { from: '#86198f', to: '#4a044e' },
+  'food':             { from: '#166534', to: '#14532d' },
+  'language-learning':{ from: '#4338ca', to: '#312e81' },
+  'sports':           { from: '#1e40af', to: '#1e3a8a' },
 };
 
 const CATEGORY_ACCENT = {
@@ -28,7 +49,12 @@ const CATEGORY_ACCENT = {
   'mind-soul':     '#60a5fa',
   'culture-clash': '#34d399',
   'pop-culture':   '#a78bfa',
-  'tech-ai':       '#22d3ee',
+  'tech-ai':          '#22d3ee',
+  'bars-nightlife':   '#fb923c',
+  'music':            '#e879f9',
+  'food':             '#4ade80',
+  'language-learning':'#818cf8',
+  'sports':           '#60a5fa',
 };
 
 function getColors(id) {
@@ -154,7 +180,7 @@ export default function GroupsScreen({ navigation, user }) {
   const { colors } = useTheme();
   const socket = getSocket();
 
-  const [categories,    setCategories]   = useState([]);
+  const [categories,    setCategories]   = useState(LOCAL_CATEGORIES);
   const [memberCounts,  setMemberCounts] = useState({});
   const [search,        setSearch]       = useState('');
   const [totalOnline,   setTotalOnline]  = useState(0);
@@ -162,15 +188,15 @@ export default function GroupsScreen({ navigation, user }) {
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    socket.emit('get_groups');
-    socket.on('group_list', cats => {
-      setCategories(cats);
-      // Request member counts for all rooms
-      cats.forEach(cat => {
-        cat.rooms.forEach(room => {
-          socket.emit('get_room_members', { categoryId: cat.id, roomName: room });
-        });
+    // Use local categories as source of truth; request member counts for each room
+    LOCAL_CATEGORIES.forEach(cat => {
+      cat.rooms.forEach(room => {
+        socket.emit('get_room_members', { categoryId: cat.id, roomName: room });
       });
+    });
+
+    socket.on('group_list', () => {
+      // categories are defined locally — ignore server list
     });
 
     socket.on('room_members', ({ categoryId, roomName, members }) => {

@@ -55,6 +55,41 @@ const GROUP_CATEGORIES = [
     description: 'The future everyone\'s arguing about right now',
     rooms: ['ai-hot-takes', 'kids-and-phones', 'influencer-culture', 'digital-detox', 'future-predictions'],
   },
+  {
+    id: 'bars-nightlife',
+    name: 'Bars & Nightlife',
+    icon: '🍻',
+    description: 'Bar recommendations, night out stories',
+    rooms: ['cocktails', 'craft-beer', 'wine', 'nightclubs', 'karaoke'],
+  },
+  {
+    id: 'music',
+    name: 'Music',
+    icon: '🎵',
+    description: 'Share your favorite artists and discover new music',
+    rooms: ['hip-hop', 'rock', 'kpop', 'jazz', 'electronic'],
+  },
+  {
+    id: 'food',
+    name: 'Food & Cooking',
+    icon: '🍜',
+    description: 'Share recipes and food culture across countries',
+    rooms: ['asian-cuisine', 'street-food', 'vegetarian', 'desserts', 'bbq'],
+  },
+  {
+    id: 'language-learning',
+    name: 'Language Learning',
+    icon: '📚',
+    description: 'Practice languages with native speakers',
+    rooms: ['english', 'japanese', 'spanish', 'korean', 'french'],
+  },
+  {
+    id: 'sports',
+    name: 'Sports',
+    icon: '⚽',
+    description: 'Football, basketball, soccer and more',
+    rooms: ['football', 'basketball', 'soccer', 'baseball', 'tennis'],
+  },
 ];
 
 const activeRooms = {};
