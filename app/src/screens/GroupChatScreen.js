@@ -332,8 +332,12 @@ export default function GroupChatScreen({ route, navigation }) {
         <View style={{ maxWidth: '78%', gap: 2 }}>
           {!isMine && (
             <View style={styles.senderRow}>
+              {item.senderCountry?.match(/\p{Regional_Indicator}{2}/u) && (
+                <Text style={styles.senderFlag}>
+                  {item.senderCountry.match(/\p{Regional_Indicator}{2}/u)[0]}
+                </Text>
+              )}
               <Text style={[styles.senderName, { color }]}>{item.senderName}</Text>
-              <Text style={styles.senderCountry}>{item.senderCountry}</Text>
             </View>
           )}
 
@@ -579,6 +583,7 @@ const styles = StyleSheet.create({
   avatarWrap: { marginRight: 7, marginBottom: 2 },
 
   senderRow:    { flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 3 },
+  senderFlag:   { fontSize: 12 },
   senderName:   { fontSize: 11, fontWeight: '700' },
   senderCountry:{ color: '#555', fontSize: 10 },
 

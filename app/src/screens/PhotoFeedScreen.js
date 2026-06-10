@@ -307,9 +307,12 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, 
           {photo.mood && <Text style={pc.mood}>{photo.mood}</Text>}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={pc.username}>{photo.username}</Text>
-          <View style={pc.sub}>
+          {/* Flag right next to name */}
+          <View style={pc.nameRow}>
             <Text style={pc.flag}>{countryFlag(photo.country)}</Text>
+            <Text style={pc.username}>{photo.username}</Text>
+          </View>
+          <View style={pc.sub}>
             <Text style={pc.country}>{countryName(photo.country)}</Text>
             <Text style={pc.sep}>·</Text>
             <Text style={pc.time}>{timeAgo(photo.createdAt)}</Text>
@@ -462,31 +465,84 @@ export default function PhotoFeedScreen({ navigation, user }) {
     socket.emit(isFollowed ? 'unfollow_user' : 'follow_user', { targetUserId });
   }
 
+  // Count posts per country
+  const countryStats = useMemo(() => {
+    const map = {};
+    photos.forEach(p => { if (p.country) map[p.country] = (map[p.country] || 0) + 1; });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [photos]);
+
+  function surpriseMe() {
+    if (countries.length === 0) return;
+    const random = countries[Math.floor(Math.random() * countries.length)];
+    setCountryFilter(random);
+  }
+
   const countryFilterHeader = (
     <View>
-      {/* Country filter strip */}
-      <FlatList
-        horizontal
-        data={[null, ...countries]}
-        keyExtractor={(c, i) => c || '__all__'}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.countryRow}
-        renderItem={({ item: c }) => {
-          const active = countryFilter === c;
-          return (
-            <TouchableOpacity
-              style={[s.countryPill, active && s.countryPillActive]}
-              onPress={() => setCountryFilter(c)}
-              activeOpacity={0.75}
-            >
-              {c ? <Text style={s.countryFlag}>{countryFlag(c)}</Text> : null}
-              <Text style={[s.countryTxt, active && s.countryTxtActive]}>
-                {c ? countryName(c) || c : 'All'}
-              </Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
+      {/* ── World Pulse header ── */}
+      <View style={s.pulseHeader}>
+        <View>
+          <Text style={s.pulseTitle}>🌍 World Pulse</Text>
+          <Text style={s.pulseSub}>
+            {countryStats.length > 0
+              ? `${countryStats.length} countries posting right now`
+              : 'Be the first to post from your country!'}
+          </Text>
+        </View>
+        <TouchableOpacity style={s.surpriseBtn} onPress={surpriseMe} activeOpacity={0.8}>
+          <Text style={s.surpriseTxt}>🎲 Surprise me</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Country cards ── */}
+      {countryStats.length > 0 && (
+        <FlatList
+          horizontal
+          data={[null, ...countryStats]}
+          keyExtractor={(c, i) => (c ? c[0] : '__all__')}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.countryCards}
+          renderItem={({ item }) => {
+            const isAll    = item === null;
+            const country  = isAll ? null : item[0];
+            const count    = isAll ? photos.length : item[1];
+            const active   = countryFilter === country;
+            return (
+              <TouchableOpacity
+                style={[s.countryCard, active && s.countryCardActive]}
+                onPress={() => setCountryFilter(country)}
+                activeOpacity={0.8}
+              >
+                <Text style={s.countryCardFlag}>
+                  {isAll ? '🌐' : countryFlag(country)}
+                </Text>
+                <Text style={[s.countryCardName, active && s.countryCardNameActive]} numberOfLines={1}>
+                  {isAll ? 'All' : (countryName(country) || country)}
+                </Text>
+                <View style={[s.countryCardBadge, active && s.countryCardBadgeActive]}>
+                  <Text style={[s.countryCardCount, active && s.countryCardCountActive]}>
+                    {count} {count === 1 ? 'post' : 'posts'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      )}
+
+      {/* Active filter label */}
+      {countryFilter && (
+        <View style={s.activeFilter}>
+          <Text style={s.activeFilterTxt}>
+            {countryFlag(countryFilter)} Showing {countryName(countryFilter)}
+          </Text>
+          <TouchableOpacity onPress={() => setCountryFilter(null)}>
+            <Text style={s.activeFilterClear}>✕ Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={s.divider} />
     </View>
   );
@@ -619,12 +675,27 @@ const s = StyleSheet.create({
   tabTxt:       { color: '#555', fontSize: 14, fontWeight: '700' },
   tabTxtActive: { color: '#fff' },
 
-  countryRow:        { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  countryPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  countryPillActive: { backgroundColor: '#6C47FF20', borderColor: '#6C47FF55' },
-  countryFlag:       { fontSize: 14 },
-  countryTxt:        { color: '#666', fontSize: 12, fontWeight: '600' },
-  countryTxtActive:  { color: '#6C47FF', fontWeight: '800' },
+  // World Pulse discovery
+  pulseHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
+  pulseTitle:    { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
+  pulseSub:      { color: '#555', fontSize: 12, marginTop: 2 },
+  surpriseBtn:   { backgroundColor: '#6C47FF20', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#6C47FF44' },
+  surpriseTxt:   { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
+
+  countryCards:  { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
+  countryCard:   { width: 90, backgroundColor: '#111', borderRadius: 18, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#1e1e1e' },
+  countryCardActive: { borderColor: '#6C47FF', backgroundColor: '#6C47FF12' },
+  countryCardFlag:   { fontSize: 30 },
+  countryCardName:   { color: '#888', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  countryCardNameActive: { color: '#fff' },
+  countryCardBadge:  { backgroundColor: '#1e1e1e', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  countryCardBadgeActive: { backgroundColor: '#6C47FF30' },
+  countryCardCount:  { color: '#555', fontSize: 10, fontWeight: '700' },
+  countryCardCountActive: { color: '#6C47FF' },
+
+  activeFilter:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10 },
+  activeFilterTxt:   { color: '#fff', fontSize: 13, fontWeight: '700' },
+  activeFilterClear: { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
 
   divider: { height: 1, backgroundColor: '#111' },
 
@@ -645,9 +716,10 @@ const pc = StyleSheet.create({
   av:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avTxt:    { color: '#fff', fontWeight: 'bold', fontSize: 17 },
   mood:     { position: 'absolute', bottom: -2, right: -2, fontSize: 13 },
+  nameRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  flag:     { fontSize: 15 },
   username: { color: '#fff', fontWeight: '700', fontSize: 14 },
   sub:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  flag:     { fontSize: 12 },
   country:  { color: '#666', fontSize: 11 },
   sep:      { color: '#444', fontSize: 11 },
   time:     { color: '#444', fontSize: 11 },
