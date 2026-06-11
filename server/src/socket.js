@@ -20,8 +20,9 @@ if (process.env.DATABASE_URL) {
   try { ({ recordResponse } = require('./ghostScore/ghostScore.service')); } catch {}
 }
 
-const connectedUsers = {};
-const countryFlags   = {};   // country -> Set of socketIds who planted flag
+const connectedUsers  = {};
+const countryFlags    = {};   // country -> Set of socketIds who planted flag
+const socketCountries = {};   // socketId -> Set of countries (for cleanup on disconnect)
 const directMessageHistory = {};
 const randomConnectQueue = []; // users waiting for a random match
 const randomConnectTimers = {}; // socketId -> timeout handle
@@ -29,6 +30,11 @@ const liveStreams = {};        // streamId -> stream object
 
 function getDMKey(userA, userB) {
   return [userA, userB].sort().join('::');
+}
+
+// Strip leading flag emoji so "🇯🇵 Japan" and "Japan" key the same bucket
+function normalizeCountry(str = '') {
+  return str.replace(/[\uD83C][\uDDE6-\uDDFF][\uD83C][\uDDE6-\uDDFF]\s*/g, '').trim();
 }
 
 function setupSocket(io) {
@@ -841,20 +847,25 @@ function setupSocket(io) {
     // ── COUNTRY FLAGS (Plant / Uproot) ─────────────────────────────────
     socket.on('plant_flag', ({ country }) => {
       if (!country) return;
-      if (!countryFlags[country]) countryFlags[country] = new Set();
-      countryFlags[country].add(socket.id);
-      io.emit('country_flag_count', { country, count: countryFlags[country].size });
+      const key = normalizeCountry(country);
+      if (!countryFlags[key]) countryFlags[key] = new Set();
+      countryFlags[key].add(socket.id);
+      if (!socketCountries[socket.id]) socketCountries[socket.id] = new Set();
+      socketCountries[socket.id].add(key);
+      io.emit('country_flag_count', { country, count: countryFlags[key].size });
     });
 
     socket.on('uproot_flag', ({ country }) => {
-      if (!country || !countryFlags[country]) return;
-      countryFlags[country].delete(socket.id);
-      io.emit('country_flag_count', { country, count: countryFlags[country].size });
+      if (!country) return;
+      const key = normalizeCountry(country);
+      countryFlags[key]?.delete(socket.id);
+      socketCountries[socket.id]?.delete(key);
+      io.emit('country_flag_count', { country, count: countryFlags[key]?.size || 0 });
     });
 
     socket.on('get_country_flag_count', ({ country }) => {
-      const count = countryFlags[country]?.size || 0;
-      socket.emit('country_flag_count', { country, count });
+      const key = normalizeCountry(country);
+      socket.emit('country_flag_count', { country, count: countryFlags[key]?.size || 0 });
     });
 
     // Disconnect
@@ -881,6 +892,11 @@ function setupSocket(io) {
       io.emit('user_list', Object.values(connectedUsers));
       const qIdx = randomConnectQueue.indexOf(socket.id);
       if (qIdx !== -1) randomConnectQueue.splice(qIdx, 1);
+      // Clean up planted flags (keys are already normalized)
+      if (socketCountries[socket.id]) {
+        socketCountries[socket.id].forEach(key => countryFlags[key]?.delete(socket.id));
+        delete socketCountries[socket.id];
+      }
       console.log(`User disconnected: ${socket.id}`);
     });
   });

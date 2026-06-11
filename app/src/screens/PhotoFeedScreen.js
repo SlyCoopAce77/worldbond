@@ -425,10 +425,15 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const landAnim   = useRef(new Animated.Value(0)).current;
   const socket = getSocket();
 
-  // Load saved countries from storage
+  // Load saved countries and re-plant flags on server after connect
   useEffect(() => {
     AsyncStorage.getItem('bond_saved_countries').then(raw => {
-      if (raw) setSavedCountries(JSON.parse(raw));
+      const countries = raw ? JSON.parse(raw) : [];
+      if (countries.length) {
+        setSavedCountries(countries);
+        const plant = () => countries.forEach(c => socket.emit('plant_flag', { country: c }));
+        if (socket.connected) plant(); else socket.once('connect', plant);
+      }
     });
   }, []);
 
