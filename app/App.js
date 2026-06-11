@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar, View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AuthScreen from './src/screens/AuthScreen';
 import AppNavigator from './src/navigation/AppNavigator';
 import { getSocket, disconnectSocket } from './src/services/socket';
@@ -17,7 +18,6 @@ function Inner() {
       try {
         const authed  = await isAuthenticated();
         const profile = await getSavedProfile();
-
         if (authed && profile) {
           // Fully authenticated with a completed profile — auto-login
           setUser(profile);
@@ -69,11 +69,13 @@ function Inner() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <PremiumProvider>
-        <Inner />
-      </PremiumProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <PremiumProvider>
+          <Inner />
+        </PremiumProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
 

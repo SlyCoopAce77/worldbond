@@ -272,15 +272,19 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
 
 function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, showCountryBadge }) {
   const socket = getSocket();
-  const [liked,     setLiked]     = useState(photo.likes?.some(l => l.userId === socket.id));
-  const [likeCount, setLikeCount] = useState(photo.likes?.length || 0);
-  const [showHeart, setShowHeart] = useState(false);
+  const [liked,      setLiked]     = useState(photo.likes?.some(l => l.userId === socket.id));
+  const [likeCount,  setLikeCount] = useState(photo.likes?.length || 0);
+  const [echoed,     setEchoed]    = useState(photo.echos?.some(e => e.userId === socket.id));
+  const [echoCount,  setEchoCount] = useState(photo.echos?.length || 0);
+  const [showHeart,  setShowHeart] = useState(false);
   const lastTap = useRef(0);
 
   useEffect(() => {
     setLiked(photo.likes?.some(l => l.userId === socket.id));
     setLikeCount(photo.likes?.length || 0);
-  }, [photo.likes]);
+    setEchoed(photo.echos?.some(e => e.userId === socket.id));
+    setEchoCount(photo.echos?.length || 0);
+  }, [photo.likes, photo.echos]);
 
   function toggleLike() {
     socket.emit('like_photo', { photoId: photo.id });
@@ -358,9 +362,23 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, 
       <View style={pc.actions}>
         <TouchableOpacity style={pc.actionBtn} onPress={toggleLike}>
           <Text style={[pc.actionIcon, liked && pc.liked]}>{liked ? '❤️' : '🤍'}</Text>
+          {likeCount > 0 && <Text style={[pc.actionCount, liked && pc.likedCount]}>{likeCount}</Text>}
         </TouchableOpacity>
         <TouchableOpacity style={pc.actionBtn} onPress={() => onComment(photo)}>
           <Text style={pc.actionIcon}>💬</Text>
+          {photo.comments?.length > 0 && <Text style={pc.actionCount}>{photo.comments.length}</Text>}
+        </TouchableOpacity>
+        {/* Echo — Bond's unique repost */}
+        <TouchableOpacity
+          style={pc.actionBtn}
+          onPress={() => {
+            socket.emit('echo_photo', { photoId: photo.id });
+            setEchoed(e => !e);
+            setEchoCount(c => echoed ? c - 1 : c + 1);
+          }}
+        >
+          <Text style={[pc.actionIcon, echoed && pc.echoed]}>🔊</Text>
+          {echoCount > 0 && <Text style={[pc.actionCount, echoed && pc.echoedCount]}>{echoCount}</Text>}
         </TouchableOpacity>
       </View>
 
@@ -402,6 +420,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [followingIds,      setFollowingIds]      = useState([]);
   const [savedCountries,    setSavedCountries]    = useState([]);
   const [currentCountry,    setCurrentCountry]    = useState(null); // null = globe prompt
+  const [countryFlagCounts, setCountryFlagCounts] = useState({});   // country -> planted count
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
   const socket = getSocket();
@@ -415,10 +434,11 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
   async function toggleSaveCountry(country) {
     setSavedCountries(prev => {
-      const next = prev.includes(country)
-        ? prev.filter(c => c !== country)
-        : [...prev, country];
+      const alreadySaved = prev.includes(country);
+      const next = alreadySaved ? prev.filter(c => c !== country) : [...prev, country];
       AsyncStorage.setItem('bond_saved_countries', JSON.stringify(next));
+      // Tell server
+      socket.emit(alreadySaved ? 'uproot_flag' : 'plant_flag', { country });
       return next;
     });
   }
@@ -444,8 +464,11 @@ export default function PhotoFeedScreen({ navigation, user }) {
         following ? [...new Set([...prev, targetUserId])] : prev.filter(id => id !== targetUserId)
       )
     );
+    socket.on('country_flag_count', ({ country, count }) =>
+      setCountryFlagCounts(prev => ({ ...prev, [country]: count }))
+    );
     return () => {
-      ['photos_feed','new_photo','photo_updated','stories_updated','following_list','follow_status']
+      ['photos_feed','new_photo','photo_updated','stories_updated','following_list','follow_status','country_flag_count']
         .forEach(e => socket.off(e));
     };
   }, []);
@@ -502,6 +525,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
     landAnim.setValue(0);
     setCurrentCountry(pick);
+    socket.emit('get_country_flag_count', { country: pick });
     Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
   }
 
@@ -576,12 +600,19 @@ export default function PhotoFeedScreen({ navigation, user }) {
             <View style={{ flex: 1 }}>
               <Text style={s.landingLabel}>You landed in</Text>
               <Text style={s.landingCountry}>{countryName(currentCountry) || currentCountry}</Text>
+              {/* 🚩 planted count */}
+              <View style={s.plantedRow}>
+                <Text style={s.plantedIcon}>🚩</Text>
+                <Text style={s.plantedCount}>
+                  {(countryFlagCounts[currentCountry] || 0).toLocaleString()} planted
+                </Text>
+              </View>
             </View>
             <TouchableOpacity style={s.nextBtn} onPress={teleport} activeOpacity={0.8}>
               <Text style={s.nextBtnTxt}>Next 🌍</Text>
             </TouchableOpacity>
           </View>
-          {/* Follow / unfollow this country */}
+          {/* Plant / Uproot Flag */}
           <TouchableOpacity
             style={[s.followCountryBtn, savedCountries.includes(currentCountry) && s.followCountryBtnOn]}
             onPress={() => toggleSaveCountry(currentCountry)}
@@ -589,8 +620,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
           >
             <Text style={[s.followCountryTxt, savedCountries.includes(currentCountry) && s.followCountryTxtOn]}>
               {savedCountries.includes(currentCountry)
-                ? `✓ Following ${countryName(currentCountry) || currentCountry}`
-                : `+ Follow ${countryName(currentCountry) || currentCountry}`}
+                ? `🚩 Flag planted in ${countryName(currentCountry) || currentCountry}`
+                : `🚩 Plant your flag in ${countryName(currentCountry) || currentCountry}`}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -759,6 +790,9 @@ const s = StyleSheet.create({
   followCountryBtnOn:  { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
   followCountryTxt:    { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
   followCountryTxtOn:  { color: '#fff' },
+  plantedRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  plantedIcon: { fontSize: 12 },
+  plantedCount:{ color: '#888', fontSize: 11, fontWeight: '700' },
 
   divider: { height: 1, backgroundColor: '#111' },
 
@@ -799,10 +833,14 @@ const pc = StyleSheet.create({
   },
   countryBadgeFlag: { fontSize: 16 },
   countryBadgeName: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  actions:  { flexDirection: 'row', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 14 },
-  actionBtn:{ flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionIcon:{ fontSize: 26 },
-  liked:    { color: '#e91e63' },
+  actions:    { flexDirection: 'row', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 18 },
+  actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionIcon: { fontSize: 24 },
+  actionCount:{ color: '#888', fontSize: 13, fontWeight: '600' },
+  liked:       { color: '#e91e63' },
+  likedCount:  { color: '#e91e63' },
+  echoed:      { },
+  echoedCount: { color: '#6C47FF' },
   likes:    { color: '#fff', fontSize: 13, fontWeight: '700', paddingHorizontal: 14, marginBottom: 4 },
   captionRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 14, marginBottom: 4, flexWrap: 'wrap' },
   captionUser:{ color: '#fff', fontWeight: '700', fontSize: 13 },

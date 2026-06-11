@@ -15,6 +15,7 @@ function addPhoto({ userId, username, country, language, mood, imageUrl, caption
     filter: filter || 'normal',
     likes: [],        // array of { userId, username }
     comments: [],     // array of { id, userId, username, country, text, createdAt }
+    echos: [],        // array of { userId, username, country }
     createdAt: Date.now(),
   };
   photos.unshift(photo);
@@ -58,6 +59,18 @@ function addComment(photoId, { userId, username, country, text }) {
   return photo;
 }
 
+function toggleEcho(photoId, userId, username, country) {
+  const photo = getPhotoById(photoId);
+  if (!photo) return null;
+  const idx = photo.echos.findIndex(e => e.userId === userId);
+  if (idx !== -1) {
+    photo.echos.splice(idx, 1);
+  } else {
+    photo.echos.push({ userId, username, country });
+  }
+  return photo;
+}
+
 function deletePhoto(photoId, userId) {
   const idx = photos.findIndex(p => p.id === photoId && p.userId === userId);
   if (idx === -1) return false;
@@ -65,4 +78,4 @@ function deletePhoto(photoId, userId) {
   return true;
 }
 
-module.exports = { addPhoto, getPhotos, getPhotoById, toggleLike, addComment, deletePhoto };
+module.exports = { addPhoto, getPhotos, getPhotoById, toggleLike, addComment, deletePhoto, toggleEcho };

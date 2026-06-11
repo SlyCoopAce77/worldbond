@@ -226,9 +226,10 @@ export default function ProfileScreen({ route, navigation }) {
   const [experiences, setExperiences] = useState([]);
   const [loadingBond, setLoadingBond] = useState(false);
   const [profileNotFound, setProfileNotFound] = useState(false);
-  const [following,   setFollowing]   = useState(false);
-  const [followCounts,setFollowCounts]= useState({ followers: 0, following: 0 });
-  const [connecting,  setConnecting]  = useState(false);
+  const [following,        setFollowing]        = useState(false);
+  const [followCounts,     setFollowCounts]     = useState({ followers: 0, following: 0 });
+  const [countryFlagCount, setCountryFlagCount] = useState(null);
+  const [connecting,       setConnecting]       = useState(false);
   const [connected,   setConnected]   = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(null);
 
@@ -287,6 +288,20 @@ export default function ProfileScreen({ route, navigation }) {
     socket.on('follow_status', onFollowStatus);
     return () => socket.off('follow_status', onFollowStatus);
   }, [bondUserId, profileUser?.userId]);
+
+  // Fetch flag count for this user's country
+  useEffect(() => {
+    const country = bondProfile?.country || profileUser?.country;
+    if (!country) return;
+    const emit = () => socket.emit('get_country_flag_count', { country });
+    if (socket.connected) emit();
+    else socket.once('connect', emit);
+    function onFlagCount({ country: c, count }) {
+      if (c === country) setCountryFlagCount(count);
+    }
+    socket.on('country_flag_count', onFlagCount);
+    return () => socket.off('country_flag_count', onFlagCount);
+  }, [bondProfile?.country, profileUser?.country]);
 
   function toggleFollow() {
     const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
@@ -370,16 +385,23 @@ export default function ProfileScreen({ route, navigation }) {
 
           {/* Identity block pinned to bottom of cover */}
           <View style={styles.coverBottom}>
-            <Text style={styles.coverName}>
-              {displayName}{bondProfile?.age ? `, ${bondProfile.age}` : ''}
-            </Text>
+            {/* Flag + Name on same line */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {(() => {
+                const country = bondProfile?.country || profileUser?.country;
+                const flag = getCountryFlag(country);
+                return flag ? <Text style={{ fontSize: 22 }}>{flag}</Text> : null;
+              })()}
+              <Text style={styles.coverName}>
+                {displayName}{bondProfile?.age ? `, ${bondProfile.age}` : ''}
+              </Text>
+            </View>
             {bondProfile?.gender ? <Text style={styles.coverGender}>{bondProfile.gender}</Text> : null}
             <Text style={styles.coverLocation}>
               {(() => {
                 const country = bondProfile?.country || profileUser?.country;
-                const flag = getCountryFlag(country);
                 const parts = [bondProfile?.city, country].filter(Boolean);
-                return parts.length ? `${parts.join(', ')}${flag ? ` ${flag}` : ''}` : '';
+                return parts.length ? parts.join(', ') : '';
               })()}
             </Text>
 
@@ -395,16 +417,21 @@ export default function ProfileScreen({ route, navigation }) {
         {/* ── Body content ──────────────────────────────────── */}
         <Animated.View style={[styles.body, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
-          {/* Follow / stats row */}
+          {/* Stats row — Bond-branded */}
           <View style={styles.followRow}>
             <View style={styles.followStat}>
               <Text style={styles.followNum}>{followCounts.followers}</Text>
-              <Text style={styles.followLabel}>Followers</Text>
+              <Text style={styles.followLabel}>🤝 Bonds</Text>
             </View>
             <View style={styles.followDivider} />
             <View style={styles.followStat}>
               <Text style={styles.followNum}>{followCounts.following}</Text>
-              <Text style={styles.followLabel}>Following</Text>
+              <Text style={styles.followLabel}>🤝 Bonding</Text>
+            </View>
+            <View style={styles.followDivider} />
+            <View style={styles.followStat}>
+              <Text style={styles.followNum}>{countryFlagCount ?? '—'}</Text>
+              <Text style={styles.followLabel}>🚩 Flags</Text>
             </View>
             {!isOwnProfile && (
               <>
@@ -414,7 +441,7 @@ export default function ProfileScreen({ route, navigation }) {
                   onPress={toggleFollow}
                 >
                   <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
-                    {following ? '✓ Following' : '+ Follow'}
+                    {following ? '✓ Bonded' : '+ Bond'}
                   </Text>
                 </TouchableOpacity>
               </>

@@ -318,6 +318,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const [loading, setLoading]         = useState(true);
   const [myExps, setMyExps]           = useState([]);
   const [matchCount, setMatchCount]   = useState(0);
+  const [flagsPlanted, setFlagsPlanted] = useState(0);
   const [showEdit, setShowEdit]       = useState(false);
   const [tab, setTab]                 = useState('bond');
   const [galleryUploading, setGalleryUploading] = useState(false);
@@ -344,6 +345,9 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       if (pRes.status === 'fulfilled') setProfile(pRes.value.data);
       if (eRes.status === 'fulfilled') setMyExps(eRes.value.data);
       if (mRes.status === 'fulfilled') setMatchCount(mRes.value.data.length);
+      // Load flags planted count from AsyncStorage
+      const raw = await AsyncStorage.getItem('bond_saved_countries');
+      setFlagsPlanted(raw ? JSON.parse(raw).length : 0);
     } catch {}
     finally { setLoading(false); }
   }, []);
@@ -593,12 +597,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Stats row ────────────────────────────────────── */}
           <View style={styles.statsRow}>
             {[
-              { value: matchCount,      label: 'Bonds' },
-              { value: myExps.length,   label: 'Experiences' },
-              { value: rel.label,       label: 'Reliability', color: rel.color },
+              { value: matchCount,    label: 'Bonds',          icon: '🤝' },
+              { value: flagsPlanted,  label: 'Flags Planted',  icon: '🚩' },
+              { value: myExps.length, label: 'Experiences',    icon: '✨' },
             ].map(s => (
               <View key={s.label} style={styles.statCard}>
-                <Text style={[styles.statValue, s.color && { color: s.color }]}>{s.value ?? '—'}</Text>
+                <Text style={styles.statIcon}>{s.icon}</Text>
+                <Text style={styles.statValue}>{s.value ?? '—'}</Text>
                 <Text style={styles.statLabel}>{s.label}</Text>
               </View>
             ))}
@@ -965,8 +970,9 @@ const styles = StyleSheet.create({
   statsRow:         { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
   statCard:         { flex: 1, backgroundColor: GLASS, borderRadius: 20, padding: 16, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: BORDER },
   statEmoji:        { fontSize: 22 },
+  statIcon:         { fontSize: 18, marginBottom: 2 },
   statValue:        { color: '#ffffff', fontSize: 17, fontWeight: '900', textAlign: 'center' },
-  statLabel:        { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  statLabel:        { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, textAlign: 'center' },
 
   section:          { paddingHorizontal: 20, gap: 12 },
   sectionTitle:     { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4, color: 'rgba(255,255,255,0.38)' },

@@ -146,7 +146,10 @@ function MatchCard({ match, onPress, index }) {
 
         {/* Bottom info */}
         <View style={mc.info}>
-          <Text style={mc.name} numberOfLines={1}>{name}{match.age ? `, ${match.age}` : ''}</Text>
+          <View style={mc.nameRow}>
+            {match.country ? <Text style={mc.nameFlag}>{getCountryFlag(match.country)}</Text> : null}
+            <Text style={mc.name} numberOfLines={1}>{name}{match.age ? `, ${match.age}` : ''}</Text>
+          </View>
           <Text style={mc.location} numberOfLines={1}>
             {[match.city, match.country].filter(Boolean).join(', ')}
           </Text>
@@ -171,7 +174,9 @@ const mc = StyleSheet.create({
   ctChip:     { position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   ctEmoji:    { fontSize: 14 },
   info:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, gap: 2 },
-  name:       { color: '#fff', fontSize: 15, fontWeight: '800' },
+  nameRow:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  nameFlag:   { fontSize: 14 },
+  name:       { color: '#fff', fontSize: 15, fontWeight: '800', flex: 1 },
   location:   { color: '#ffffff99', fontSize: 11 },
   voiceRow:   { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
   voiceText:  { color: '#ffffff88', fontSize: 10 },

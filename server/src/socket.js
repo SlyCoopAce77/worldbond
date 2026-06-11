@@ -10,7 +10,7 @@ const {
 const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment } = require('./icebreaker');
 const { createEvent, getEvents, getEventById, joinEvent, leaveEvent, addEventMessage, getEventMessages } = require('./events');
 const { createCulturalPost, likePost, getCulturalPosts } = require('./culturalPosts');
-const { toggleLike, addComment, deletePhoto, getPhotos } = require('./photos');
+const { toggleLike, addComment, deletePhoto, getPhotos, toggleEcho } = require('./photos');
 const { getStoriesGrouped, viewStory, deleteStory } = require('./stories');
 const { followUser, unfollowUser, getFollowing, getFollowers, isFollowing } = require('./follows');
 
@@ -21,6 +21,7 @@ if (process.env.DATABASE_URL) {
 }
 
 const connectedUsers = {};
+const countryFlags   = {};   // country -> Set of socketIds who planted flag
 const directMessageHistory = {};
 const randomConnectQueue = []; // users waiting for a random match
 const randomConnectTimers = {}; // socketId -> timeout handle
@@ -643,6 +644,13 @@ function setupSocket(io) {
       if (deleted) io.emit('photos_feed', getPhotos());
     });
 
+    socket.on('echo_photo', ({ photoId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user) return;
+      const photo = toggleEcho(photoId, socket.id, user.username, user.country);
+      if (photo) io.emit('photo_updated', photo);
+    });
+
     // ── STORIES ──
 
     socket.on('get_stories', () => {
@@ -828,6 +836,25 @@ function setupSocket(io) {
 
     socket.on('get_following', ({ userId }) => {
       socket.emit('following_list', { userId, following: getFollowing(userId) });
+    });
+
+    // ── COUNTRY FLAGS (Plant / Uproot) ─────────────────────────────────
+    socket.on('plant_flag', ({ country }) => {
+      if (!country) return;
+      if (!countryFlags[country]) countryFlags[country] = new Set();
+      countryFlags[country].add(socket.id);
+      io.emit('country_flag_count', { country, count: countryFlags[country].size });
+    });
+
+    socket.on('uproot_flag', ({ country }) => {
+      if (!country || !countryFlags[country]) return;
+      countryFlags[country].delete(socket.id);
+      io.emit('country_flag_count', { country, count: countryFlags[country].size });
+    });
+
+    socket.on('get_country_flag_count', ({ country }) => {
+      const count = countryFlags[country]?.size || 0;
+      socket.emit('country_flag_count', { country, count });
     });
 
     // Disconnect
