@@ -12,7 +12,10 @@ import { finalizeProfile, getAccessToken } from '../../services/authApi';
 
 const { width } = Dimensions.get('window');
 
-const GENDERS = ['Man', 'Woman', 'Non-binary', 'Other'];
+const GENDERS = [
+  { id: 'Man',   icon: '👨', label: 'Man'   },
+  { id: 'Woman', icon: '👩', label: 'Woman' },
+];
 
 const LANGUAGES = [
   { code: 'en', flag: '🇺🇸', label: 'English' },
@@ -50,13 +53,14 @@ const CONNECTION_TYPES = [
   { key: 'mentorship', emoji: '🎓',  color: '#4caf50', title: 'Mentorship',       desc: 'Learn from or guide others' },
 ];
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const STEP_META = [
-  { icon: '👤', title: 'About you',     subtitle: 'How others will see you on Bond' },
-  { icon: '🌍', title: 'Where are you?', subtitle: 'Helps us find nearby Bonds' },
-  { icon: '🎯', title: 'Why are you here?', subtitle: 'Select all that apply' },
-  { icon: '✨', title: 'Your vibe',     subtitle: 'A photo and a line about you goes a long way' },
+  { icon: '👤', title: 'About you',        subtitle: 'How others will see you on Bond' },
+  { icon: '🌍', title: 'Where are you?',   subtitle: 'Helps us find nearby Bonds' },
+  { icon: '🎯', title: 'Why are you here?',subtitle: 'Select all that apply' },
+  { icon: '✨', title: 'Your vibe',        subtitle: 'A photo and a line about you goes a long way' },
+  { icon: '🌐', title: 'App Language',     subtitle: 'Choose the language you want the app in' },
 ];
 
 // ─── Step progress bar ────────────────────────────────────────────────────────
@@ -249,16 +253,22 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   </View>
                   <View style={[s.field, { flex: 2 }]}>
                     <Text style={s.label}>Gender</Text>
-                    <View style={s.chipRow}>
-                      {GENDERS.map(g => (
-                        <TouchableOpacity
-                          key={g}
-                          style={[s.chip, gender === g && s.chipOn]}
-                          onPress={() => setGender(g)}
-                        >
-                          <Text style={[s.chipText, gender === g && s.chipTextOn]}>{g}</Text>
-                        </TouchableOpacity>
-                      ))}
+                    <View style={s.genderRow}>
+                      {GENDERS.map(g => {
+                        const active = gender === g.id;
+                        return (
+                          <TouchableOpacity
+                            key={g.id}
+                            style={[s.genderCard, active && s.genderCardOn]}
+                            onPress={() => setGender(g.id)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={s.genderIcon}>{g.icon}</Text>
+                            <Text style={[s.genderLabel, active && s.genderLabelOn]}>{g.label}</Text>
+                            {active && <View style={s.genderCheck}><Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>✓</Text></View>}
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   </View>
                 </View>
@@ -298,23 +308,6 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   />
                 </View>
 
-                <View style={s.field}>
-                  <Text style={s.label}>Primary Language</Text>
-                  <View style={s.langGrid}>
-                    {LANGUAGES.map(l => (
-                      <TouchableOpacity
-                        key={l.code}
-                        style={[s.langChip, language === l.code && s.langChipOn]}
-                        onPress={() => setLanguage(l.code)}
-                      >
-                        <Text style={{ fontSize: 15 }}>{l.flag}</Text>
-                        <Text style={[s.langText, language === l.code && { color: '#6C47FF', fontWeight: '700' }]}>
-                          {l.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
               </View>
             )}
 
@@ -388,6 +381,33 @@ export default function OnboardingScreen({ userId, onComplete }) {
                     textAlignVertical="top"
                   />
                 </View>
+              </View>
+            )}
+
+            {/* ── Step 5: App Language ──────────────────────────── */}
+            {step === 5 && (
+              <View style={s.form}>
+                <View style={s.appLangGrid}>
+                  {LANGUAGES.map(l => {
+                    const active = language === l.code;
+                    return (
+                      <TouchableOpacity
+                        key={l.code}
+                        style={[s.appLangCard, active && s.appLangCardOn]}
+                        onPress={() => setLanguage(l.code)}
+                        activeOpacity={0.8}
+                      >
+                        {active && <View style={s.appLangActiveLine} />}
+                        <Text style={s.appLangFlag}>{l.flag}</Text>
+                        <Text style={[s.appLangLabel, active && s.appLangLabelOn]}>{l.label}</Text>
+                        {active && <Text style={s.appLangCheck}>✓</Text>}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={s.appLangHint}>
+                  This sets the language WorldBond uses across the app
+                </Text>
               </View>
             )}
 
@@ -500,4 +520,24 @@ const s = StyleSheet.create({
   skipText:   { color: '#333355', fontSize: 15 },
   backBtn:    { paddingVertical: 12, alignItems: 'center' },
   backText:   { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
+
+  // Gender cards (Step 1)
+  genderRow:     { flexDirection: 'row', gap: 10 },
+  genderCard:    { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 6, position: 'relative' },
+  genderCardOn:  { borderColor: '#6C47FF', backgroundColor: '#6C47FF12' },
+  genderIcon:    { fontSize: 30 },
+  genderLabel:   { color: '#536471', fontSize: 14, fontWeight: '700' },
+  genderLabelOn: { color: '#6C47FF' },
+  genderCheck:   { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+
+  // App language grid (Step 5)
+  appLangGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  appLangCard:    { width: '47%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', position: 'relative', overflow: 'hidden' },
+  appLangCardOn:  { borderColor: '#6C47FF', backgroundColor: '#6C47FF12' },
+  appLangActiveLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: '#6C47FF' },
+  appLangFlag:    { fontSize: 22 },
+  appLangLabel:   { flex: 1, color: '#536471', fontSize: 14, fontWeight: '600' },
+  appLangLabelOn: { color: '#fff', fontWeight: '700' },
+  appLangCheck:   { color: '#6C47FF', fontSize: 14, fontWeight: '900' },
+  appLangHint:    { color: '#333355', fontSize: 12, textAlign: 'center', marginTop: 4 },
 });
