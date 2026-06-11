@@ -17,13 +17,84 @@ const CARD    = '#1C1F23';
 const BORDER  = '#2F3336';
 const REACTIONS = ['❤️', '🔥', '😂', '👍', '😮'];
 
-const STARTERS = [
-  'If you could live anywhere in the world for a year, where?',
-  'What\'s one thing about your culture you wish more people knew?',
-  'What\'s the best meal you\'ve ever had?',
-  'What\'s a skill you\'re currently learning?',
-  'What song are you listening to on repeat right now?',
+// ── Pulse Drops — rotate daily, deterministic (same day = same pulses worldwide) ──
+const ALL_PULSES = [
+  // 🌏 Asia
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What food from your country would make anyone obsessed after one bite?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What\'s a phrase in your language that has no English translation?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What\'s the most beautiful place you\'ve seen in your country?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What\'s one rule in your culture that outsiders always find surprising?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'Tea or coffee — and what\'s the ritual around it where you\'re from?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What K-drama, anime, or show has the world sleeping on right now?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What would a perfect Sunday look like for you?' },
+  { region: '🌏', from: 'Asia',     color: '#ff6b6b', q: 'What festival from your culture do you wish the whole world celebrated?' },
+
+  // 🌍 Africa
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'What tradition from your culture do you wish the world knew about?' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'What does home smell like to you?' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'What\'s the wildest thing your grandmother ever told you?' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'Name one African artist, musician, or chef the world needs to discover.' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'What\'s a proverb from your culture that you live by?' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'What\'s something about your city that tourists always miss?' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'If your life had a theme song right now, what would it be?' },
+  { region: '🌍', from: 'Africa',   color: '#ffd93d', q: 'What\'s a food from your country that needs its own Netflix documentary?' },
+
+  // 🌎 Americas
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'If you could teleport anywhere on Earth right now, where and why?' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'What\'s a road trip route in your country that everyone should do once?' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'What\'s the most underrated city in your country?' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'Beach, mountains, or city — where do you reset best?' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'What\'s a local slang word where you\'re from that I should know?' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'What dream are you currently chasing and why?' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'Describe your vibe in three songs.' },
+  { region: '🌎', from: 'Americas', color: '#6c5ce7', q: 'What\'s one thing about your city that locals are lowkey proud of?' },
+
+  // 🇪🇺 Europe
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'What\'s the biggest misconception people have about your country?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'What\'s a European hidden gem that deserves more attention?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'Coffee shop or park bench — where do you do your best thinking?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'What book or film changed how you see the world?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'What\'s something your country does better than anywhere else?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'Summer in the city or summer in the countryside?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'What\'s a museum, market, or street that made you feel alive?' },
+  { region: '🇪🇺', from: 'Europe',  color: '#00b894', q: 'What would your perfect day in your city look like?' },
+
+  // 🌐 Global
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'What\'s one thing you\'ve learned about yourself this year?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'What\'s a skill you\'re secretly working on right now?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'Would you rather be fluent in every language or able to fly?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'What\'s the last thing that genuinely surprised you?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'At what age did you feel like yourself for the first time?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'If you could have dinner with anyone alive on Earth tonight, who?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'What\'s something most people misunderstand about you?' },
+  { region: '🌐', from: 'Worldwide', color: '#a29bfe', q: 'What\'s a small daily habit that quietly shapes your whole day?' },
 ];
+
+function getDailyPulses() {
+  const now  = new Date();
+  const day  = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  // Deterministic shuffle: same day everywhere = same 3 pulses globally
+  const pool = ALL_PULSES.map((p, i) => ({ ...p, _i: i }));
+  pool.sort((a, b) => {
+    const ha = ((day * 2654435761 + a._i * 40503) >>> 0);
+    const hb = ((day * 2654435761 + b._i * 40503) >>> 0);
+    return ha - hb;
+  });
+  // Pick one from each of the first 3 distinct regions that appear
+  const seen = new Set();
+  const picks = [];
+  for (const p of pool) {
+    if (!seen.has(p.from)) { seen.add(p.from); picks.push(p); }
+    if (picks.length === 3) break;
+  }
+  return picks;
+}
+
+const TODAY_PULSES = getDailyPulses();
+
+function todayLabel() {
+  return new Date().toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 async function authHeader() {
   const token = await getAccessToken();
@@ -463,10 +534,29 @@ export default function ChatScreen({ route, navigation }) {
           <Text style={styles.emptyHint}>
             {otherOnline ? 'Online now — say hi!' : 'Start the conversation'}
           </Text>
-          <Text style={styles.startersLabel}>Conversation starters:</Text>
-          {STARTERS.map((q, i) => (
-            <TouchableOpacity key={i} style={styles.starterChip} onPress={() => sendStarter(q)} activeOpacity={0.75}>
-              <Text style={styles.starterText}>{q}</Text>
+
+          {/* ── Pulse Drops ── */}
+          <View style={styles.pulseHeader}>
+            <View style={styles.pulseDot} />
+            <Text style={styles.pulseTitle}>Today's Pulse Drops</Text>
+            <Text style={styles.pulseDate}>{todayLabel()}</Text>
+          </View>
+          {TODAY_PULSES.map((p, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[styles.pulseCard, { borderLeftColor: p.color }]}
+              onPress={() => sendStarter(p.q)}
+              activeOpacity={0.78}
+            >
+              <View style={[styles.pulseAccent, { backgroundColor: p.color }]} />
+              <View style={styles.pulseBody}>
+                <View style={styles.pulseFromRow}>
+                  <Text style={styles.pulseRegion}>{p.region}</Text>
+                  <Text style={[styles.pulseFrom, { color: p.color }]}>Pulse from {p.from}</Text>
+                </View>
+                <Text style={styles.pulseQ}>{p.q}</Text>
+              </View>
+              <Text style={[styles.pulseArrow, { color: p.color }]}>→</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -709,12 +799,19 @@ const styles = StyleSheet.create({
   },
   emptyName:     { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 8 },
   emptyHint:     { color: '#888', fontSize: 13, marginBottom: 8 },
-  startersLabel: { color: '#555', fontSize: 12, fontWeight: '600', marginTop: 10, alignSelf: 'flex-start' },
-  starterChip: {
-    backgroundColor: CARD, borderRadius: 14, padding: 14, width: '100%',
-    borderWidth: 1, borderColor: BORDER,
-  },
-  starterText: { color: '#ccc', fontSize: 14, lineHeight: 20 },
+  // Pulse Drops
+  pulseHeader:  { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 10, alignSelf: 'flex-start' },
+  pulseDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: ACCENT },
+  pulseTitle:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  pulseDate:    { color: '#333', fontSize: 11, fontWeight: '600', marginLeft: 'auto' },
+  pulseCard:    { width: '100%', flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, borderLeftWidth: 0, marginBottom: 8 },
+  pulseAccent:  { width: 3, alignSelf: 'stretch' },
+  pulseBody:    { flex: 1, paddingHorizontal: 14, paddingVertical: 13, gap: 5 },
+  pulseFromRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pulseRegion:  { fontSize: 13 },
+  pulseFrom:    { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  pulseQ:       { color: '#ddd', fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  pulseArrow:   { fontSize: 18, fontWeight: '700', paddingRight: 14 },
 
   // Reply bar
   replyBar: {
