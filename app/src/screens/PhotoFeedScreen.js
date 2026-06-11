@@ -7,6 +7,7 @@ import {
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket, SERVER_URL } from '../services/socket';
+import { WORLD_COUNTRIES } from '../utils/countryUtils';
 import { getAccessToken } from '../services/authApi';
 import FilteredImage from '../components/FilteredImage';
 import FilterPicker from '../components/FilterPicker';
@@ -272,9 +273,10 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
 
 function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, showCountryBadge }) {
   const socket = getSocket();
+  const myUid = user?.userId || socket.id;
   const [liked,      setLiked]     = useState(photo.likes?.some(l => l.userId === socket.id));
   const [likeCount,  setLikeCount] = useState(photo.likes?.length || 0);
-  const [echoed,     setEchoed]    = useState(photo.echos?.some(e => e.userId === socket.id));
+  const [echoed,     setEchoed]    = useState(photo.echos?.some(e => e.userId === myUid));
   const [echoCount,  setEchoCount] = useState(photo.echos?.length || 0);
   const [showHeart,  setShowHeart] = useState(false);
   const lastTap = useRef(0);
@@ -282,7 +284,7 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, 
   useEffect(() => {
     setLiked(photo.likes?.some(l => l.userId === socket.id));
     setLikeCount(photo.likes?.length || 0);
-    setEchoed(photo.echos?.some(e => e.userId === socket.id));
+    setEchoed(photo.echos?.some(e => e.userId === myUid));
     setEchoCount(photo.echos?.length || 0);
   }, [photo.likes, photo.echos]);
 
@@ -385,6 +387,9 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, 
       {likeCount > 0 && (
         <Text style={pc.likes}>❤️ {likeCount} {likeCount === 1 ? 'like' : 'likes'}</Text>
       )}
+      {echoCount > 0 && (
+        <Text style={pc.echos}>🔊 {echoCount} {echoCount === 1 ? 'echo' : 'echos'}</Text>
+      )}
       {!!photo.caption && (
         <View style={pc.captionRow}>
           <Text style={pc.captionUser}>{photo.username}</Text>
@@ -413,6 +418,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [stories,           setStories]          = useState([]);
   const [tab,               setTab]              = useState('world');
   const [countryFilter,     setCountryFilter]    = useState(null);
+  const [showFootprints,    setShowFootprints]    = useState(false);
   const [showUpload,        setShowUpload]        = useState(false);
   const [uploadMode,        setUploadMode]        = useState('photo');
   const [commentPhoto,      setCommentPhoto]      = useState(null);
@@ -488,13 +494,14 @@ export default function PhotoFeedScreen({ navigation, user }) {
     currentCountry ? photos.filter(p => p.country === currentCountry) : photos
   , [photos, currentCountry]);
 
+  const myUserId = user?.userId || socket.id;
   const bondPhotos = useMemo(() =>
     photos.filter(p =>
       followingIds.includes(p.userId) ||
-      p.userId === socket.id ||
+      p.userId === myUserId ||
       p.echos?.some(e => followingIds.includes(e.userId))
     )
-  , [photos, followingIds]);
+  , [photos, followingIds, myUserId]);
 
   // Stories filtered by audience for bonds tab
   const bondsStories = useMemo(() =>
@@ -520,7 +527,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
   }
 
   function teleport() {
-    if (countries.length === 0) return;
     // Bounce the globe, then land somewhere new
     Animated.sequence([
       Animated.timing(globeAnim, { toValue: 1.4, duration: 120, useNativeDriver: true }),
@@ -528,9 +534,9 @@ export default function PhotoFeedScreen({ navigation, user }) {
       Animated.spring(globeAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
     ]).start();
 
-    // Pick a different random country
-    const options = countries.filter(c => c !== currentCountry);
-    const pick = (options.length > 0 ? options : countries)[Math.floor(Math.random() * (options.length || countries.length))];
+    // Pick a random country from all world countries, excluding the current one
+    const options = WORLD_COUNTRIES.filter(c => c !== currentCountry);
+    const pick = options[Math.floor(Math.random() * options.length)];
 
     landAnim.setValue(0);
     setCurrentCountry(pick);
@@ -541,42 +547,23 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const countryFilterHeader = (
     <View>
 
-      {/* ── My Countries (pinned) ── */}
+      {/* ── Footprints trigger (replaces scrolling pill strip) ── */}
       {savedCountries.length > 0 && (
-        <View style={s.myCountriesSection}>
-          <Text style={s.myCountriesTitle}>📌 My Countries</Text>
-          <FlatList
-            horizontal
-            data={savedCountries}
-            keyExtractor={c => c}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.myCountriesRow}
-            renderItem={({ item: c }) => {
-              const active = currentCountry === c;
-              return (
-                <TouchableOpacity
-                  style={[s.myPill, active && s.myPillActive]}
-                  onPress={() => {
-                    landAnim.setValue(0);
-                    setCurrentCountry(prev => prev === c ? null : c);
-                    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7 }).start();
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={s.myPillFlag}>{countryFlag(c)}</Text>
-                  <Text style={[s.myPillName, active && s.myPillNameActive]} numberOfLines={1}>
-                    {countryName(c) || c}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => toggleSaveCountry(c)}
-                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                  >
-                    <Text style={s.myPillRemoveTxt}>✕</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              );
-            }}
-          />
+        <View style={s.footprintRow}>
+          <TouchableOpacity style={s.footprintBtn} onPress={() => setShowFootprints(true)} activeOpacity={0.8}>
+            <Text style={s.footprintEmoji}>👣</Text>
+            <Text style={s.footprintLabel}>Footprints</Text>
+            <View style={s.footprintBadge}>
+              <Text style={s.footprintBadgeTxt}>{savedCountries.length}</Text>
+            </View>
+          </TouchableOpacity>
+          {currentCountry && savedCountries.includes(currentCountry) && (
+            <TouchableOpacity style={s.footprintActiveChip} onPress={() => setCurrentCountry(null)} activeOpacity={0.8}>
+              <Text style={s.footprintActiveFlag}>{countryFlag(currentCountry)}</Text>
+              <Text style={s.footprintActiveName} numberOfLines={1}>{countryName(currentCountry) || currentCountry}</Text>
+              <Text style={s.footprintActiveClear}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -690,7 +677,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.list}
         ListHeaderComponent={
-          tab === 'world' && countries.length > 0 ? countryFilterHeader : bondsHeader
+          tab === 'world' ? countryFilterHeader : bondsHeader
         }
         ListEmptyComponent={
           <View style={s.empty}>
@@ -747,6 +734,50 @@ export default function PhotoFeedScreen({ navigation, user }) {
         onViewStory={id => socket.emit('view_story', { storyId: id })}
         currentUserId={socket.id}
       />
+
+      {/* ── Footprints bottom sheet ── */}
+      <Modal visible={showFootprints} transparent animationType="slide" onRequestClose={() => setShowFootprints(false)}>
+        <TouchableOpacity style={s.fpOverlay} activeOpacity={1} onPress={() => setShowFootprints(false)}>
+          <TouchableOpacity style={s.fpSheet} activeOpacity={1} onPress={() => {}}>
+            <View style={s.fpHandle} />
+            <Text style={s.fpTitle}>👣 Your Footprints</Text>
+            <View style={s.fpGrid}>
+              {/* All — clear filter */}
+              <TouchableOpacity
+                style={[s.fpCell, !currentCountry && s.fpCellActive]}
+                onPress={() => { setCurrentCountry(null); setShowFootprints(false); }}
+                activeOpacity={0.8}
+              >
+                <Text style={s.fpCellFlag}>🌍</Text>
+                <Text style={s.fpCellName}>All</Text>
+              </TouchableOpacity>
+              {savedCountries.map(c => (
+                <TouchableOpacity
+                  key={c}
+                  style={[s.fpCell, currentCountry === c && s.fpCellActive]}
+                  onPress={() => {
+                    landAnim.setValue(0);
+                    setCurrentCountry(prev => prev === c ? null : c);
+                    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7 }).start();
+                    setShowFootprints(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.fpCellFlag}>{countryFlag(c)}</Text>
+                  <Text style={s.fpCellName} numberOfLines={1}>{countryName(c) || c}</Text>
+                  <TouchableOpacity
+                    style={s.fpCellRemove}
+                    onPress={() => toggleSaveCountry(c)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={s.fpCellRemoveTxt}>✕</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -768,16 +799,30 @@ const s = StyleSheet.create({
   tabTxt:       { color: '#555', fontSize: 14, fontWeight: '700' },
   tabTxtActive: { color: '#fff' },
 
-  // My Countries pinned strip
-  myCountriesSection: { paddingTop: 10, paddingBottom: 2 },
-  myCountriesTitle:   { color: '#fff', fontSize: 13, fontWeight: '800', paddingHorizontal: 16, marginBottom: 8 },
-  myCountriesRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 4 },
-  myPill:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#111', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1.5, borderColor: '#222' },
-  myPillActive:       { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' },
-  myPillFlag:         { fontSize: 18 },
-  myPillName:         { color: '#888', fontSize: 12, fontWeight: '700', maxWidth: 80 },
-  myPillNameActive:   { color: '#fff' },
-  myPillRemoveTxt:    { color: '#333', fontSize: 13, fontWeight: '700', paddingLeft: 2 },
+  // Footprints trigger row
+  footprintRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 8 },
+  footprintBtn:        { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
+  footprintEmoji:      { fontSize: 16 },
+  footprintLabel:      { color: '#fff', fontSize: 13, fontWeight: '800' },
+  footprintBadge:      { backgroundColor: '#6C47FF', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  footprintBadgeTxt:   { color: '#fff', fontSize: 11, fontWeight: '900' },
+  footprintActiveChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#6C47FF18', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF44', flex: 1 },
+  footprintActiveFlag: { fontSize: 16 },
+  footprintActiveName: { color: '#fff', fontSize: 13, fontWeight: '700', flex: 1 },
+  footprintActiveClear:{ color: '#6C47FF', fontSize: 14, fontWeight: '700' },
+
+  // Footprints bottom sheet
+  fpOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  fpSheet:        { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 44 },
+  fpHandle:       { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 18 },
+  fpTitle:        { color: '#fff', fontSize: 20, fontWeight: '900', paddingHorizontal: 20, marginBottom: 18, letterSpacing: -0.3 },
+  fpGrid:         { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14, gap: 10 },
+  fpCell:         { width: '22%', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 4, borderWidth: 1, borderColor: '#222' },
+  fpCellActive:   { borderColor: '#6C47FF', backgroundColor: 'rgba(108,71,255,0.12)' },
+  fpCellFlag:     { fontSize: 30, marginBottom: 6 },
+  fpCellName:     { color: '#aaa', fontSize: 10, textAlign: 'center', fontWeight: '700' },
+  fpCellRemove:   { position: 'absolute', top: 5, right: 6 },
+  fpCellRemoveTxt:{ color: '#444', fontSize: 11, fontWeight: '800' },
 
   // Globe teleport
   globePrompt:    { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24, gap: 10 },
@@ -850,7 +895,8 @@ const pc = StyleSheet.create({
   likedCount:  { color: '#e91e63' },
   echoed:      { },
   echoedCount: { color: '#6C47FF' },
-  likes:    { color: '#fff', fontSize: 13, fontWeight: '700', paddingHorizontal: 14, marginBottom: 4 },
+  likes:    { color: '#fff', fontSize: 13, fontWeight: '700', paddingHorizontal: 14, marginBottom: 2 },
+  echos:    { color: '#6C47FF', fontSize: 13, fontWeight: '700', paddingHorizontal: 14, marginBottom: 4 },
   captionRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 14, marginBottom: 4, flexWrap: 'wrap' },
   captionUser:{ color: '#fff', fontWeight: '700', fontSize: 13 },
   caption:  { color: '#ccc', fontSize: 13, flex: 1, flexWrap: 'wrap' },

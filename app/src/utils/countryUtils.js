@@ -31,6 +31,30 @@ const COUNTRY_FLAG_MAP = {
   'scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','wales':'🏴󠁧󠁢󠁷󠁬󠁳󠁿',
 };
 
+export const WORLD_COUNTRIES = [
+  'United States','Japan','South Korea','Brazil','United Kingdom',
+  'France','Germany','Mexico','India','Australia',
+  'Nigeria','Saudi Arabia','South Africa','Canada',
+  'Italy','Spain','Thailand','Indonesia','Turkey',
+  'Argentina','Egypt','Netherlands','Philippines','Singapore',
+  'China','Russia','Ukraine','Poland','Sweden','Norway','Denmark',
+  'Finland','Portugal','Greece','Switzerland','Austria','Belgium',
+  'Czech Republic','Romania','Hungary','Iran','Pakistan',
+  'Bangladesh','Vietnam','Malaysia','Myanmar','Nepal',
+  'Kenya','Ethiopia','Ghana','Tanzania','Cameroon',
+  'Colombia','Venezuela','Peru','Chile','Ecuador','Cuba',
+  'New Zealand','Morocco','Algeria','Tunisia','Lebanon','Jordan',
+  'United Arab Emirates','Kuwait','Qatar','Bahrain','Oman',
+  'Taiwan','Hong Kong','Israel','Iraq','Sri Lanka',
+  'Cambodia','Laos','Mongolia','Senegal','Ivory Coast',
+  'Zambia','Zimbabwe','Angola','Mozambique','Madagascar',
+  'Bolivia','Paraguay','Uruguay','Jamaica','Puerto Rico',
+  'Dominican Republic','Haiti','Trinidad and Tobago','Panama',
+  'Costa Rica','Guatemala','Honduras','El Salvador','Nicaragua',
+  'Slovakia','Croatia','Serbia','Bulgaria','Ireland',
+  'Scotland','Wales',
+];
+
 export function getCountryFlag(countryStr) {
   if (!countryStr) return '';
   const str = countryStr.trim();

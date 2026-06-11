@@ -653,7 +653,8 @@ function setupSocket(io) {
     socket.on('echo_photo', ({ photoId }) => {
       const user = connectedUsers[socket.id];
       if (!user) return;
-      const photo = toggleEcho(photoId, socket.id, user.username, user.country);
+      const uid = user.userId || socket.id;
+      const photo = toggleEcho(photoId, uid, user.username, user.country);
       if (photo) io.emit('photo_updated', photo);
     });
 
