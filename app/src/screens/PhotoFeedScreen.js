@@ -489,7 +489,11 @@ export default function PhotoFeedScreen({ navigation, user }) {
   , [photos, currentCountry]);
 
   const bondPhotos = useMemo(() =>
-    photos.filter(p => followingIds.includes(p.userId) || p.userId === socket.id)
+    photos.filter(p =>
+      followingIds.includes(p.userId) ||
+      p.userId === socket.id ||
+      p.echos?.some(e => followingIds.includes(e.userId))
+    )
   , [photos, followingIds]);
 
   // Stories filtered by audience for bonds tab
@@ -605,9 +609,9 @@ export default function PhotoFeedScreen({ navigation, user }) {
             <View style={{ flex: 1 }}>
               <Text style={s.landingLabel}>You landed in</Text>
               <Text style={s.landingCountry}>{countryName(currentCountry) || currentCountry}</Text>
-              {/* 🚩 planted count */}
+              {/* 📍 planted count */}
               <View style={s.plantedRow}>
-                <Text style={s.plantedIcon}>🚩</Text>
+                <Text style={s.plantedIcon}>📍</Text>
                 <Text style={s.plantedCount}>
                   {(countryFlagCounts[currentCountry] || 0).toLocaleString()} planted
                 </Text>
@@ -617,7 +621,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
               <Text style={s.nextBtnTxt}>Next 🌍</Text>
             </TouchableOpacity>
           </View>
-          {/* Plant / Uproot Flag */}
+          {/* Pin / Unpin country */}
           <TouchableOpacity
             style={[s.followCountryBtn, savedCountries.includes(currentCountry) && s.followCountryBtnOn]}
             onPress={() => toggleSaveCountry(currentCountry)}
@@ -625,8 +629,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
           >
             <Text style={[s.followCountryTxt, savedCountries.includes(currentCountry) && s.followCountryTxtOn]}>
               {savedCountries.includes(currentCountry)
-                ? `🚩 Flag planted in ${countryName(currentCountry) || currentCountry}`
-                : `🚩 Plant your flag in ${countryName(currentCountry) || currentCountry}`}
+                ? `📍 Pinned in ${countryName(currentCountry) || currentCountry}`
+                : `📍 Pin yourself in ${countryName(currentCountry) || currentCountry}`}
             </Text>
           </TouchableOpacity>
         </Animated.View>

@@ -598,7 +598,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           <View style={styles.statsRow}>
             {[
               { value: matchCount,    label: 'Bonds',          icon: '🤝' },
-              { value: flagsPlanted,  label: 'Flags Planted',  icon: '🚩' },
+              { value: flagsPlanted,  label: 'Pins Dropped',   icon: '📍' },
               { value: myExps.length, label: 'Experiences',    icon: '✨' },
             ].map(s => (
               <View key={s.label} style={styles.statCard}>

@@ -431,7 +431,7 @@ export default function ProfileScreen({ route, navigation }) {
             <View style={styles.followDivider} />
             <View style={styles.followStat}>
               <Text style={styles.followNum}>{countryFlagCount ?? '—'}</Text>
-              <Text style={styles.followLabel}>🚩 Flags</Text>
+              <Text style={styles.followLabel}>📍 Pins</Text>
             </View>
             {!isOwnProfile && (
               <>
