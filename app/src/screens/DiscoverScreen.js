@@ -476,12 +476,19 @@ const tab = StyleSheet.create({
 });
 
 // ─── Random connect tab ───────────────────────────────────────────────────────
+const SIGNAL_OPTIONS = [
+  { id: 'male',   label: 'Guys',       emoji: '🔵', color: '#1da1f2' },
+  { id: 'any',    label: 'Open World', emoji: '🌍', color: '#6C47FF' },
+  { id: 'female', label: 'Girls',      emoji: '💜', color: '#e91e63' },
+];
+
 function RandomTab({ user, navigation }) {
   const [state,       setState]       = useState('idle');
   const [matchedUser, setMatchedUser] = useState(null);
   const [roomKey,     setRoomKey]     = useState(null);
   const [messages,    setMessages]    = useState([]);
   const [text,        setText]        = useState('');
+  const [genderPref,  setGenderPref]  = useState('any');
   const flatRef   = useRef(null);
   const socket    = getSocket();
   const ring1     = useRef(new Animated.Value(1)).current;
@@ -490,6 +497,8 @@ function RandomTab({ user, navigation }) {
   const op1       = useRef(new Animated.Value(0.5)).current;
   const op2       = useRef(new Animated.Value(0.35)).current;
   const op3       = useRef(new Animated.Value(0.2)).current;
+
+  const signalColor = SIGNAL_OPTIONS.find(o => o.id === genderPref)?.color || '#6C47FF';
 
   useEffect(() => {
     socket.on('random_match',     ({ matchedUser: mu, roomKey: rk }) => {
@@ -530,7 +539,7 @@ function RandomTab({ user, navigation }) {
     if (messages.length > 0) flatRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  function connect()    { setState('waiting'); socket.emit('join_random_connect'); }
+  function connect()    { setState('waiting'); socket.emit('join_random_connect', { genderPref }); }
   function disconnect() {
     socket.emit('leave_random_connect');
     setState('idle'); setMatchedUser(null); setRoomKey(null); setMessages([]);
@@ -614,13 +623,19 @@ function RandomTab({ user, navigation }) {
         {state === 'waiting' && (
           <>
             {[ring1, ring2, ring3].map((r, i) => (
-              <Animated.View key={i} style={[rc.ring, { transform: [{ scale: r }], opacity: [op1,op2,op3][i] }]} />
+              <Animated.View key={i} style={[rc.ring, { borderColor: signalColor + '55', transform: [{ scale: r }], opacity: [op1,op2,op3][i] }]} />
             ))}
           </>
         )}
         <LinearGradient
-          colors={state === 'waiting' ? ['#1a3a1a', '#000000'] : state === 'timeout' ? ['#3a1a1a', '#000000'] : ['#16181C', '#000000']}
-          style={rc.orb}
+          colors={
+            state === 'waiting'
+              ? [signalColor + '30', '#000000']
+              : state === 'timeout'
+              ? ['#3a1a1a', '#000000']
+              : ['#16181C', '#000000']
+          }
+          style={[rc.orb, state === 'idle' && { borderColor: signalColor + '40' }]}
         >
           <Text style={{ fontSize: 52 }}>{state === 'waiting' ? '🔍' : state === 'timeout' ? '😔' : '🌀'}</Text>
         </LinearGradient>
@@ -637,14 +652,52 @@ function RandomTab({ user, navigation }) {
           : 'Meet a stranger from anywhere on Earth. Messages auto-translate in real time.'}
       </Text>
 
+      {/* ── Signal Tuner — only shown before connecting ── */}
+      {state !== 'waiting' && (
+        <View style={rc.signalWrap}>
+          <View style={rc.signalHeader}>
+            <Text style={rc.signalDot}>●</Text>
+            <Text style={rc.signalTitle}>Tune Your Signal</Text>
+          </View>
+          <View style={rc.signalRow}>
+            {SIGNAL_OPTIONS.map(opt => {
+              const active = genderPref === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    rc.signalCard,
+                    active && { borderColor: opt.color, backgroundColor: opt.color + '18' },
+                  ]}
+                  onPress={() => setGenderPref(opt.id)}
+                  activeOpacity={0.8}
+                >
+                  {active && <View style={[rc.signalLock, { backgroundColor: opt.color }]} />}
+                  <Text style={rc.signalEmoji}>{opt.emoji}</Text>
+                  <Text style={[rc.signalLabel, active && { color: opt.color }]}>{opt.label}</Text>
+                  {active && <Text style={[rc.signalLockedTxt, { color: opt.color }]}>Locked</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={[rc.signalSub, { color: signalColor + 'cc' }]}>
+            {genderPref === 'any'
+              ? '🌍 Open to everyone — matched worldwide'
+              : genderPref === 'male'
+              ? '🔵 Signal locked — connecting with guys only'
+              : '💜 Signal locked — connecting with girls only'}
+          </Text>
+        </View>
+      )}
+
       {state === 'waiting' ? (
         <TouchableOpacity style={rc.cancelBtn} onPress={disconnect}>
           <Text style={rc.cancelText}>Cancel</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={connect} activeOpacity={0.85} style={rc.connectWrap}>
-          <LinearGradient colors={['#6C47FF', '#6C47FF']} style={rc.connectBtn}>
-            <Text style={rc.connectText}>{state === 'timeout' ? '🔄  Try Again' : '🌀  Connect with a Stranger'}</Text>
+          <LinearGradient colors={[signalColor, signalColor + 'cc']} style={rc.connectBtn}>
+            <Text style={rc.connectText}>{state === 'timeout' ? '🔄  Retune & Try Again' : '🌀  Connect with a Stranger'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       )}
@@ -686,6 +739,18 @@ const rc = StyleSheet.create({
   statCard:     { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#2F3336' },
   statVal:      { color: '#fff', fontSize: 16, fontWeight: '900' },
   statLbl:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  signalWrap:     { width: '100%', gap: 10 },
+  signalHeader:   { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  signalDot:      { color: '#6C47FF', fontSize: 8 },
+  signalTitle:    { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  signalRow:      { flexDirection: 'row', gap: 10 },
+  signalCard:     { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 5, position: 'relative', overflow: 'hidden' },
+  signalLock:     { position: 'absolute', top: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
+  signalEmoji:    { fontSize: 26 },
+  signalLabel:    { color: '#555', fontSize: 12, fontWeight: '800' },
+  signalLockedTxt:{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 },
+  signalSub:      { fontSize: 12, textAlign: 'center', fontWeight: '600' },
+
   connHeader:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
   connAvatar:   { position: 'relative' },
   onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },

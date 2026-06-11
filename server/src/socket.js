@@ -42,7 +42,7 @@ function setupSocket(io) {
     console.log(`User connected: ${socket.id}`);
 
     // Register user with name, language, and optional social links
-    socket.on('register', ({ username, display_name, language, country, socials, userId, photo_url }) => {
+    socket.on('register', ({ username, display_name, language, country, socials, userId, photo_url, gender }) => {
       connectedUsers[socket.id] = {
         username:     display_name || username,
         display_name: display_name || username,
@@ -51,6 +51,7 @@ function setupSocket(io) {
         socketId:   socket.id,
         userId,
         photo_url,
+        gender,
       };
       socket.emit('registered', { socketId: socket.id });
       io.emit('user_list', Object.values(connectedUsers));
@@ -466,14 +467,28 @@ function setupSocket(io) {
       delete randomConnectTimers[id];
     }
 
-    socket.on('join_random_connect', () => {
+    socket.on('join_random_connect', ({ genderPref = 'any' } = {}) => {
       const user = connectedUsers[socket.id];
       if (!user) return;
+      user.genderPref = genderPref; // store on session for mutual check
 
-      // Find someone in the queue from a different country
+      function normGender(s) {
+        const v = (s || '').toLowerCase().trim();
+        if (v === 'male' || v === 'man') return 'male';
+        if (v === 'female' || v === 'woman') return 'female';
+        return null;
+      }
+      function prefOk(pref, gender) {
+        if (!pref || pref === 'any') return true;
+        const g = normGender(gender);
+        return !g || g === pref; // if no gender set, don't exclude
+      }
+
+      // Find someone in the queue from a different country whose gender prefs align mutually
       const matchIndex = randomConnectQueue.findIndex(id => {
         const other = connectedUsers[id];
-        return other && other.country !== user.country && id !== socket.id;
+        if (!other || other.country === user.country || id === socket.id) return false;
+        return prefOk(user.genderPref, other.gender) && prefOk(other.genderPref, user.gender);
       });
 
       if (matchIndex !== -1) {
