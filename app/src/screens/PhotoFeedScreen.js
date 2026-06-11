@@ -401,6 +401,9 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [viewingStoryGroup, setViewingStoryGroup] = useState(null);
   const [followingIds,      setFollowingIds]      = useState([]);
   const [savedCountries,    setSavedCountries]    = useState([]);
+  const [currentCountry,    setCurrentCountry]    = useState(null); // null = globe prompt
+  const globeAnim  = useRef(new Animated.Value(1)).current;
+  const landAnim   = useRef(new Animated.Value(0)).current;
   const socket = getSocket();
 
   // Load saved countries from storage
@@ -454,8 +457,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
   }, [photos]);
 
   const worldPhotos = useMemo(() =>
-    countryFilter ? photos.filter(p => p.country === countryFilter) : photos
-  , [photos, countryFilter]);
+    currentCountry ? photos.filter(p => p.country === currentCountry) : photos
+  , [photos, currentCountry]);
 
   const bondPhotos = useMemo(() =>
     photos.filter(p => followingIds.includes(p.userId) || p.userId === socket.id)
@@ -484,17 +487,22 @@ export default function PhotoFeedScreen({ navigation, user }) {
     socket.emit(isFollowed ? 'unfollow_user' : 'follow_user', { targetUserId });
   }
 
-  // Count posts per country
-  const countryStats = useMemo(() => {
-    const map = {};
-    photos.forEach(p => { if (p.country) map[p.country] = (map[p.country] || 0) + 1; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [photos]);
-
-  function surpriseMe() {
+  function teleport() {
     if (countries.length === 0) return;
-    const random = countries[Math.floor(Math.random() * countries.length)];
-    setCountryFilter(random);
+    // Bounce the globe, then land somewhere new
+    Animated.sequence([
+      Animated.timing(globeAnim, { toValue: 1.4, duration: 120, useNativeDriver: true }),
+      Animated.timing(globeAnim, { toValue: 0.85, duration: 100, useNativeDriver: true }),
+      Animated.spring(globeAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
+    ]).start();
+
+    // Pick a different random country
+    const options = countries.filter(c => c !== currentCountry);
+    const pick = (options.length > 0 ? options : countries)[Math.floor(Math.random() * (options.length || countries.length))];
+
+    landAnim.setValue(0);
+    setCurrentCountry(pick);
+    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
   }
 
   const countryFilterHeader = (
@@ -503,10 +511,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
       {/* ── My Countries (pinned) ── */}
       {savedCountries.length > 0 && (
         <View style={s.myCountriesSection}>
-          <View style={s.myCountriesHead}>
-            <Text style={s.myCountriesTitle}>📌 My Countries</Text>
-            <Text style={s.myCountriesSub}>Tap to filter · Hold + to remove</Text>
-          </View>
+          <Text style={s.myCountriesTitle}>📌 My Countries</Text>
           <FlatList
             horizontal
             data={savedCountries}
@@ -514,12 +519,15 @@ export default function PhotoFeedScreen({ navigation, user }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.myCountriesRow}
             renderItem={({ item: c }) => {
-              const active = countryFilter === c;
+              const active = currentCountry === c;
               return (
                 <TouchableOpacity
                   style={[s.myPill, active && s.myPillActive]}
-                  onPress={() => setCountryFilter(prev => prev === c ? null : c)}
-                  onLongPress={() => toggleSaveCountry(c)}
+                  onPress={() => {
+                    landAnim.setValue(0);
+                    setCurrentCountry(prev => prev === c ? null : c);
+                    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7 }).start();
+                  }}
                   activeOpacity={0.8}
                 >
                   <Text style={s.myPillFlag}>{countryFlag(c)}</Text>
@@ -527,9 +535,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
                     {countryName(c) || c}
                   </Text>
                   <TouchableOpacity
-                    style={s.myPillRemove}
                     onPress={() => toggleSaveCountry(c)}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                   >
                     <Text style={s.myPillRemoveTxt}>✕</Text>
                   </TouchableOpacity>
@@ -540,81 +547,53 @@ export default function PhotoFeedScreen({ navigation, user }) {
         </View>
       )}
 
-      {/* ── World Pulse header ── */}
-      <View style={s.pulseHeader}>
-        <View>
-          <Text style={s.pulseTitle}>🌍 World Pulse</Text>
-          <Text style={s.pulseSub}>
-            {countryStats.length > 0
-              ? `${countryStats.length} countries posting right now`
+      {/* ── Globe teleport button ── */}
+      {!currentCountry ? (
+        <View style={s.globePrompt}>
+          <Animated.Text
+            style={[s.globeEmoji, { transform: [{ scale: globeAnim }] }]}
+          >
+            🌍
+          </Animated.Text>
+          <Text style={s.globeTitle}>Explore the world</Text>
+          <Text style={s.globeSub}>
+            {countries.length > 0
+              ? `${countries.length} countries posting right now`
               : 'Be the first to post from your country!'}
           </Text>
-        </View>
-        <TouchableOpacity style={s.surpriseBtn} onPress={surpriseMe} activeOpacity={0.8}>
-          <Text style={s.surpriseTxt}>🎲 Surprise me</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Country cards with save button ── */}
-      {countryStats.length > 0 && (
-        <FlatList
-          horizontal
-          data={[null, ...countryStats]}
-          keyExtractor={(c) => (c ? c[0] : '__all__')}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.countryCards}
-          renderItem={({ item }) => {
-            const isAll   = item === null;
-            const country = isAll ? null : item[0];
-            const count   = isAll ? photos.length : item[1];
-            const active  = countryFilter === country;
-            const saved   = !isAll && savedCountries.includes(country);
-            return (
-              <View style={[s.countryCard, active && s.countryCardActive]}>
-                {/* Save button — top right */}
-                {!isAll && (
-                  <TouchableOpacity
-                    style={[s.saveBtn, saved && s.saveBtnOn]}
-                    onPress={() => toggleSaveCountry(country)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Text style={s.saveBtnTxt}>{saved ? '✓' : '+'}</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={s.countryCardInner}
-                  onPress={() => setCountryFilter(country)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={s.countryCardFlag}>
-                    {isAll ? '🌐' : countryFlag(country)}
-                  </Text>
-                  <Text style={[s.countryCardName, active && s.countryCardNameActive]} numberOfLines={1}>
-                    {isAll ? 'All' : (countryName(country) || country)}
-                  </Text>
-                  <View style={[s.countryCardBadge, active && s.countryCardBadgeActive]}>
-                    <Text style={[s.countryCardCount, active && s.countryCardCountActive]}>
-                      {count} {count === 1 ? 'post' : 'posts'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
-        />
-      )}
-
-      {/* Active filter label */}
-      {countryFilter && (
-        <View style={s.activeFilter}>
-          <Text style={s.activeFilterTxt}>
-            {countryFlag(countryFilter)} Showing {countryName(countryFilter)}
-          </Text>
-          <TouchableOpacity onPress={() => setCountryFilter(null)}>
-            <Text style={s.activeFilterClear}>✕ Clear</Text>
+          <TouchableOpacity style={s.teleportBtn} onPress={teleport} activeOpacity={0.85}>
+            <Text style={s.teleportBtnTxt}>🌍  Take me somewhere</Text>
           </TouchableOpacity>
         </View>
+      ) : (
+        /* ── Landed on a country ── */
+        <Animated.View style={[s.landingBanner, {
+          opacity: landAnim,
+          transform: [{ translateY: landAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+        }]}>
+          <View style={s.landingTop}>
+            <Text style={s.landingFlag}>{countryFlag(currentCountry)}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.landingLabel}>You landed in</Text>
+              <Text style={s.landingCountry}>{countryName(currentCountry) || currentCountry}</Text>
+            </View>
+            <TouchableOpacity style={s.nextBtn} onPress={teleport} activeOpacity={0.8}>
+              <Text style={s.nextBtnTxt}>Next 🌍</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Follow / unfollow this country */}
+          <TouchableOpacity
+            style={[s.followCountryBtn, savedCountries.includes(currentCountry) && s.followCountryBtnOn]}
+            onPress={() => toggleSaveCountry(currentCountry)}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.followCountryTxt, savedCountries.includes(currentCountry) && s.followCountryTxtOn]}>
+              {savedCountries.includes(currentCountry)
+                ? `✓ Following ${countryName(currentCountry) || currentCountry}`
+                : `+ Follow ${countryName(currentCountry) || currentCountry}`}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
       <View style={s.divider} />
@@ -749,47 +728,37 @@ const s = StyleSheet.create({
   tabTxt:       { color: '#555', fontSize: 14, fontWeight: '700' },
   tabTxtActive: { color: '#fff' },
 
-  // My Countries (pinned)
-  myCountriesSection: { paddingBottom: 4 },
-  myCountriesHead:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 },
-  myCountriesTitle:   { color: '#fff', fontSize: 14, fontWeight: '800' },
-  myCountriesSub:     { color: '#444', fontSize: 10 },
-  myCountriesRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 10 },
+  // My Countries pinned strip
+  myCountriesSection: { paddingTop: 10, paddingBottom: 2 },
+  myCountriesTitle:   { color: '#fff', fontSize: 13, fontWeight: '800', paddingHorizontal: 16, marginBottom: 8 },
+  myCountriesRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 4 },
   myPill:             { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#111', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1.5, borderColor: '#222' },
-  myPillActive:       { borderColor: '#6C47FF', backgroundColor: '#6C47FF15' },
+  myPillActive:       { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' },
   myPillFlag:         { fontSize: 18 },
   myPillName:         { color: '#888', fontSize: 12, fontWeight: '700', maxWidth: 80 },
   myPillNameActive:   { color: '#fff' },
-  myPillRemove:       { marginLeft: 2 },
-  myPillRemoveTxt:    { color: '#333', fontSize: 12, fontWeight: '700' },
+  myPillRemoveTxt:    { color: '#333', fontSize: 13, fontWeight: '700', paddingLeft: 2 },
 
-  // World Pulse discovery
-  pulseHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 10 },
-  pulseTitle:    { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
-  pulseSub:      { color: '#555', fontSize: 12, marginTop: 2 },
-  surpriseBtn:   { backgroundColor: '#6C47FF20', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#6C47FF44' },
-  surpriseTxt:   { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
+  // Globe teleport
+  globePrompt:    { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24, gap: 10 },
+  globeEmoji:     { fontSize: 72 },
+  globeTitle:     { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  globeSub:       { color: '#555', fontSize: 13, textAlign: 'center' },
+  teleportBtn:    { marginTop: 8, backgroundColor: '#6C47FF', borderRadius: 24, paddingHorizontal: 28, paddingVertical: 16, shadowColor: '#6C47FF', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
+  teleportBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
 
-  countryCards:      { paddingHorizontal: 16, paddingBottom: 12, gap: 10 },
-  countryCard:       { width: 90, backgroundColor: '#111', borderRadius: 18, borderWidth: 1.5, borderColor: '#1e1e1e', overflow: 'hidden' },
-  countryCardActive: { borderColor: '#6C47FF', backgroundColor: '#6C47FF0d' },
-  countryCardInner:  { padding: 12, alignItems: 'center', gap: 6 },
-  countryCardFlag:   { fontSize: 30 },
-  countryCardName:   { color: '#888', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  countryCardNameActive: { color: '#fff' },
-  countryCardBadge:  { backgroundColor: '#1e1e1e', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  countryCardBadgeActive: { backgroundColor: '#6C47FF30' },
-  countryCardCount:  { color: '#555', fontSize: 10, fontWeight: '700' },
-  countryCardCountActive: { color: '#6C47FF' },
-
-  // Save button on country card
-  saveBtn:    { position: 'absolute', top: 6, right: 6, zIndex: 1, width: 20, height: 20, borderRadius: 10, backgroundColor: '#1e1e1e', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#333' },
-  saveBtnOn:  { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
-  saveBtnTxt: { color: '#fff', fontSize: 10, fontWeight: '900' },
-
-  activeFilter:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10 },
-  activeFilterTxt:   { color: '#fff', fontSize: 13, fontWeight: '700' },
-  activeFilterClear: { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
+  // Country landing banner
+  landingBanner:  { marginHorizontal: 16, marginTop: 12, marginBottom: 4, backgroundColor: '#111', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#222', gap: 12 },
+  landingTop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  landingFlag:    { fontSize: 40 },
+  landingLabel:   { color: '#555', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  landingCountry: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 },
+  nextBtn:        { backgroundColor: '#1e1e1e', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#2a2a2a' },
+  nextBtnTxt:     { color: '#fff', fontSize: 13, fontWeight: '700' },
+  followCountryBtn:    { backgroundColor: '#6C47FF18', borderRadius: 14, paddingVertical: 13, alignItems: 'center', borderWidth: 1.5, borderColor: '#6C47FF44' },
+  followCountryBtnOn:  { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  followCountryTxt:    { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
+  followCountryTxtOn:  { color: '#fff' },
 
   divider: { height: 1, backgroundColor: '#111' },
 
