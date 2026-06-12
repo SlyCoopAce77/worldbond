@@ -63,49 +63,86 @@ function HeartBurst({ visible }) {
   return <Animated.Text style={[s.heartBurst, { transform: [{ scale }], opacity }]}>❤️</Animated.Text>;
 }
 
-// ─── Bond Footprint Banner ────────────────────────────────────────────────────
+// ─── Bond Footprint Card ──────────────────────────────────────────────────────
 
-function BondFootprintBar({ bondPhotos, onPress }) {
-  const countries = useMemo(() => {
-    const seen = new Set();
-    bondPhotos.forEach(p => { if (p.country) seen.add(p.country); });
-    return [...seen];
+function BondFootprintCard({ bondPhotos, followingCount, onPress }) {
+  const countryData = useMemo(() => {
+    const map = {};
+    bondPhotos.forEach(p => {
+      if (!p.country) return;
+      if (!map[p.country]) map[p.country] = { count: 0, users: new Set() };
+      map[p.country].count++;
+      map[p.country].users.add(p.username);
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([country, data]) => ({ country, count: data.count, users: [...data.users] }));
   }, [bondPhotos]);
 
-  const shimmer = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 2200, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0, duration: 2200, useNativeDriver: true }),
-      ])
-    ).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 2800, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 2800, useNativeDriver: true }),
+    ])).start();
   }, []);
-
-  const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.75] });
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={{ marginHorizontal: 14, marginTop: 12, marginBottom: 4 }}>
-      <LinearGradient colors={['#0d0d1f', '#11102a']} style={fp.bar}>
-        <Animated.View style={[fp.glowDot, { opacity: shimmerOpacity }]} />
-        <View style={fp.left}>
-          <Text style={fp.barIcon}>🌐</Text>
-          <View>
-            <Text style={fp.barTitle}>Bond Footprint</Text>
-            <Text style={fp.barSub}>
-              {countries.length === 0
-                ? 'Bond with people to build your map'
-                : `Your bonds reach ${countries.length} ${countries.length === 1 ? 'country' : 'countries'}`}
-            </Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={fp.wrap}>
+      <LinearGradient colors={['#0e0920', '#13103a', '#0a0a18']} style={fp.card}>
+
+        {/* Animated glow orb */}
+        <Animated.View style={[fp.glowOrb, { opacity: glowOpacity }]} />
+
+        {/* Title row */}
+        <View style={fp.topRow}>
+          <View style={fp.titleGroup}>
+            <Text style={fp.globe}>🌐</Text>
+            <View>
+              <Text style={fp.cardTitle}>Bond Footprint</Text>
+              <Text style={fp.cardSub}>Your reach across the world</Text>
+            </View>
+          </View>
+          <View style={fp.explorePill}>
+            <Text style={fp.exploreTxt}>Explore →</Text>
           </View>
         </View>
-        <View style={fp.flagRow}>
-          {countries.slice(0, 6).map(c => (
-            <Text key={c} style={fp.flagSmall}>{countryFlag(c)}</Text>
-          ))}
-          {countries.length > 6 && <Text style={fp.more}>+{countries.length - 6}</Text>}
+
+        {/* Stats */}
+        <View style={fp.statsRow}>
+          <View style={fp.stat}>
+            <Text style={fp.statNum}>{followingCount}</Text>
+            <Text style={fp.statLabel}>bonds</Text>
+          </View>
+          <View style={fp.statDiv} />
+          <View style={fp.stat}>
+            <Text style={fp.statNum}>{countryData.length}</Text>
+            <Text style={fp.statLabel}>countries</Text>
+          </View>
+          <View style={fp.statDiv} />
+          <View style={fp.stat}>
+            <Text style={fp.statNum}>{bondPhotos.length}</Text>
+            <Text style={fp.statLabel}>moments</Text>
+          </View>
         </View>
-        <Text style={fp.chevron}>›</Text>
+
+        {/* Flag grid */}
+        {countryData.length > 0 ? (
+          <View style={fp.flagGrid}>
+            {countryData.slice(0, 12).map(({ country }) => (
+              <Text key={country} style={fp.flagItem}>{countryFlag(country)}</Text>
+            ))}
+            {countryData.length > 12 && (
+              <View style={fp.flagMore}>
+                <Text style={fp.flagMoreTxt}>+{countryData.length - 12}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <Text style={fp.emptyHint}>Bond with people to grow your world reach</Text>
+        )}
+
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -166,44 +203,98 @@ function MomentRing({ group, isSelf, onPress }) {
 
 // ─── Bond Footprint Sheet ─────────────────────────────────────────────────────
 
-function BondFootprintSheet({ visible, bondPhotos, onClose }) {
-  const countries = useMemo(() => {
-    const countMap = {};
+function BondFootprintSheet({ visible, bondPhotos, onClose, onSelectCountry, activeFilter }) {
+  const countryData = useMemo(() => {
+    const map = {};
     bondPhotos.forEach(p => {
       if (!p.country) return;
-      countMap[p.country] = (countMap[p.country] || 0) + 1;
+      if (!map[p.country]) map[p.country] = { count: 0, users: [] };
+      map[p.country].count++;
+      if (!map[p.country].users.find(u => u.id === p.userId)) {
+        map[p.country].users.push({ id: p.userId, username: p.username });
+      }
     });
-    return Object.entries(countMap).sort((a, b) => b[1] - a[1]);
+    return Object.entries(map)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([country, data]) => ({ country, count: data.count, users: data.users }));
+  }, [bondPhotos]);
+
+  const totalBonds = useMemo(() => {
+    const seen = new Set();
+    bondPhotos.forEach(p => seen.add(p.userId));
+    return seen.size;
   }, [bondPhotos]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={bfs.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity style={bfs.sheet} activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={bfs.sheet}>
           <View style={bfs.handle} />
-          <View style={bfs.titleRow}>
-            <Text style={bfs.titleIcon}>🌐</Text>
-            <View>
-              <Text style={bfs.title}>Bond Footprint</Text>
-              <Text style={bfs.sub}>Countries you're connected to through people</Text>
-            </View>
+
+          {/* Header */}
+          <View style={bfs.header}>
+            <Text style={bfs.title}>🌐 Bond Footprint</Text>
+            <Text style={bfs.sub}>
+              {countryData.length} {countryData.length === 1 ? 'country' : 'countries'} · {totalBonds} {totalBonds === 1 ? 'bond' : 'bonds'} · tap to filter
+            </Text>
           </View>
-          {countries.length === 0 ? (
-            <View style={bfs.empty}>
-              <Text style={bfs.emptyIcon}>🌍</Text>
-              <Text style={bfs.emptyTxt}>Bond with people to build your footprint</Text>
-            </View>
-          ) : (
-            <View style={bfs.grid}>
-              {countries.map(([country, count]) => (
-                <View key={country} style={bfs.cell}>
-                  <Text style={bfs.cellFlag}>{countryFlag(country)}</Text>
-                  <Text style={bfs.cellName} numberOfLines={1}>{countryName(country) || country}</Text>
-                  <Text style={bfs.cellCount}>{count} {count === 1 ? 'moment' : 'moments'}</Text>
-                </View>
-              ))}
-            </View>
+
+          {/* Active filter chip */}
+          {activeFilter && (
+            <TouchableOpacity style={bfs.activeChip} onPress={() => { onSelectCountry(null); onClose(); }}>
+              <Text style={bfs.activeChipFlag}>{countryFlag(activeFilter)}</Text>
+              <Text style={bfs.activeChipTxt}>Showing {countryName(activeFilter)}</Text>
+              <Text style={bfs.activeChipX}>✕ Clear</Text>
+            </TouchableOpacity>
           )}
+
+          <ScrollView
+            style={{ maxHeight: 480 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
+            {countryData.length === 0 ? (
+              <View style={bfs.empty}>
+                <Text style={bfs.emptyIcon}>🌍</Text>
+                <Text style={bfs.emptyTxt}>Bond with people from around the world to grow your footprint</Text>
+              </View>
+            ) : (
+              countryData.map(({ country, count, users }) => {
+                const isActive = activeFilter === country;
+                return (
+                  <TouchableOpacity
+                    key={country}
+                    style={[bfs.row, isActive && bfs.rowActive]}
+                    onPress={() => { onSelectCountry(isActive ? null : country); onClose(); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={bfs.rowFlag}>{countryFlag(country)}</Text>
+                    <View style={bfs.rowInfo}>
+                      <Text style={[bfs.rowName, isActive && bfs.rowNameActive]}>
+                        {countryName(country) || country}
+                      </Text>
+                      {/* Bond user initials */}
+                      <View style={bfs.avatarRow}>
+                        {users.slice(0, 6).map(u => (
+                          <View key={u.id} style={[bfs.avatar, { backgroundColor: stringToColor(u.username) }]}>
+                            <Text style={bfs.avatarTxt}>{u.username[0].toUpperCase()}</Text>
+                          </View>
+                        ))}
+                        {users.length > 6 && (
+                          <Text style={bfs.avatarMore}>+{users.length - 6}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <View style={bfs.rowRight}>
+                      <Text style={[bfs.rowCount, isActive && bfs.rowCountActive]}>{count}</Text>
+                      <Text style={bfs.rowCountLabel}>moments</Text>
+                    </View>
+                    <Text style={[bfs.rowChevron, isActive && { color: '#6C47FF' }]}>›</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -719,7 +810,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [savedCountries,    setSavedCountries]    = useState([]);
   const [currentCountry,    setCurrentCountry]    = useState(null); // null = globe prompt
   const [countryFlagCounts, setCountryFlagCounts] = useState({});   // country -> planted count
-  const [showBondFootprint, setShowBondFootprint] = useState(false);
+  const [showBondFootprint,  setShowBondFootprint]  = useState(false);
+  const [bondCountryFilter, setBondCountryFilter] = useState(null);
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
   const socket = getSocket();
@@ -788,13 +880,19 @@ export default function PhotoFeedScreen({ navigation, user }) {
   , [photos, currentCountry]);
 
   const myUserId = user?.userId || socket.id;
-  const bondPhotos = useMemo(() =>
+  const allBondPhotos = useMemo(() =>
     photos.filter(p =>
       followingIds.includes(p.userId) ||
       p.userId === myUserId ||
       p.echos?.some(e => followingIds.includes(e.userId))
     )
   , [photos, followingIds, myUserId]);
+
+  const bondPhotos = useMemo(() =>
+    bondCountryFilter
+      ? allBondPhotos.filter(p => p.country === bondCountryFilter)
+      : allBondPhotos
+  , [allBondPhotos, bondCountryFilter]);
 
   // Stories filtered by audience for bonds tab
   const bondsStories = useMemo(() =>
@@ -922,11 +1020,26 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
   const bondsHeader = (
     <View>
-      {/* Bond Footprint Banner */}
-      <BondFootprintBar
-        bondPhotos={bondPhotos}
+      {/* Bond Footprint Card */}
+      <BondFootprintCard
+        bondPhotos={allBondPhotos}
+        followingCount={followingIds.length}
         onPress={() => setShowBondFootprint(true)}
       />
+
+      {/* Active country filter chip */}
+      {bondCountryFilter && (
+        <TouchableOpacity
+          style={s.bondFilterChip}
+          onPress={() => setBondCountryFilter(null)}
+          activeOpacity={0.8}
+        >
+          <Text style={s.bondFilterFlag}>{countryFlag(bondCountryFilter)}</Text>
+          <Text style={s.bondFilterTxt}>{countryName(bondCountryFilter)}</Text>
+          <Text style={s.bondFilterX}>✕</Text>
+        </TouchableOpacity>
+      )}
+
 
       {/* Moment Rings row */}
       <View style={s.momentSection}>
@@ -1065,8 +1178,10 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
       <BondFootprintSheet
         visible={showBondFootprint}
-        bondPhotos={bondPhotos}
+        bondPhotos={allBondPhotos}
         onClose={() => setShowBondFootprint(false)}
+        onSelectCountry={setBondCountryFilter}
+        activeFilter={bondCountryFilter}
       />
 
       {/* ── Footprints bottom sheet ── */}
@@ -1132,6 +1247,12 @@ const s = StyleSheet.create({
   tabActive:    { backgroundColor: '#1e1e1e' },
   tabTxt:       { color: '#555', fontSize: 14, fontWeight: '700' },
   tabTxtActive: { color: '#fff' },
+
+  // Bond feed country filter chip
+  bondFilterChip:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginTop: 2, marginBottom: 8, backgroundColor: '#6C47FF22', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF55', alignSelf: 'flex-start' },
+  bondFilterFlag:  { fontSize: 18 },
+  bondFilterTxt:   { color: '#a78bfa', fontSize: 13, fontWeight: '800' },
+  bondFilterX:     { color: '#6C47FF', fontSize: 14, fontWeight: '900', marginLeft: 4 },
 
   // Footprints trigger row
   footprintRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 8 },
@@ -1295,16 +1416,26 @@ const up = StyleSheet.create({
 
 // ─── Bond Footprint Banner styles ─────────────────────────────────────────────
 const fp = StyleSheet.create({
-  bar:       { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#6C47FF33', gap: 10 },
-  glowDot:   { position: 'absolute', top: 14, left: 14, width: 8, height: 8, borderRadius: 4, backgroundColor: '#6C47FF' },
-  left:      { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  barIcon:   { fontSize: 22 },
-  barTitle:  { color: '#fff', fontSize: 13, fontWeight: '800' },
-  barSub:    { color: '#6C47FF', fontSize: 11, fontWeight: '600', marginTop: 1 },
-  flagRow:   { flexDirection: 'row', gap: 2, alignItems: 'center' },
-  flagSmall: { fontSize: 15 },
-  more:      { color: '#555', fontSize: 11, fontWeight: '700' },
-  chevron:   { color: '#6C47FF', fontSize: 22, fontWeight: '300' },
+  wrap:        { marginHorizontal: 14, marginTop: 14, marginBottom: 6 },
+  card:        { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#6C47FF44', overflow: 'hidden' },
+  glowOrb:     { position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: '#6C47FF', },
+  topRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  titleGroup:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  globe:       { fontSize: 28 },
+  cardTitle:   { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: -0.3 },
+  cardSub:     { color: 'rgba(108,71,255,0.8)', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  explorePill: { backgroundColor: 'rgba(108,71,255,0.2)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(108,71,255,0.4)' },
+  exploreTxt:  { color: '#a78bfa', fontSize: 12, fontWeight: '800' },
+  statsRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 6, marginBottom: 16, gap: 4 },
+  stat:        { flex: 1, alignItems: 'center', gap: 2 },
+  statNum:     { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  statLabel:   { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statDiv:     { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.08)' },
+  flagGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  flagItem:    { fontSize: 26, lineHeight: 32 },
+  flagMore:    { backgroundColor: 'rgba(108,71,255,0.25)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, justifyContent: 'center', alignItems: 'center' },
+  flagMoreTxt: { color: '#a78bfa', fontSize: 11, fontWeight: '800' },
+  emptyHint:   { color: 'rgba(255,255,255,0.25)', fontSize: 13, textAlign: 'center', paddingVertical: 10 },
 });
 
 // ─── Moment Ring styles ────────────────────────────────────────────────────────
@@ -1324,21 +1455,34 @@ const mr = StyleSheet.create({
 
 // ─── Bond Footprint Sheet styles ──────────────────────────────────────────────
 const bfs = StyleSheet.create({
-  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  sheet:     { backgroundColor: '#0e0e18', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 48 },
-  handle:    { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 20 },
-  titleRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, marginBottom: 20 },
-  titleIcon: { fontSize: 32 },
-  title:     { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
-  sub:       { color: '#6C47FF', fontSize: 12, fontWeight: '600', marginTop: 2 },
-  empty:     { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  emptyIcon: { fontSize: 52 },
-  emptyTxt:  { color: '#444', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
-  grid:      { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 12 },
-  cell:      { width: '22%', alignItems: 'center', backgroundColor: '#141424', borderRadius: 18, paddingVertical: 16, paddingHorizontal: 4, borderWidth: 1, borderColor: '#6C47FF22' },
-  cellFlag:  { fontSize: 32, marginBottom: 6 },
-  cellName:  { color: '#aaa', fontSize: 9, fontWeight: '700', textAlign: 'center' },
-  cellCount: { color: '#6C47FF', fontSize: 9, fontWeight: '600', marginTop: 2 },
+  overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet:          { backgroundColor: '#0c0c1e', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: 44 },
+  handle:         { width: 44, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 14, marginBottom: 4 },
+  header:         { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 14 },
+  title:          { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  sub:            { color: 'rgba(108,71,255,0.8)', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  activeChip:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 10, backgroundColor: '#6C47FF22', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF55' },
+  activeChipFlag: { fontSize: 18 },
+  activeChipTxt:  { color: '#a78bfa', fontSize: 13, fontWeight: '700', flex: 1 },
+  activeChipX:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
+  row:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 14, borderBottomWidth: 1, borderBottomColor: '#111' },
+  rowActive:      { backgroundColor: '#6C47FF12' },
+  rowFlag:        { fontSize: 34, width: 42, textAlign: 'center' },
+  rowInfo:        { flex: 1, gap: 6 },
+  rowName:        { color: '#fff', fontSize: 15, fontWeight: '800' },
+  rowNameActive:  { color: '#a78bfa' },
+  avatarRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  avatar:         { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+  avatarTxt:      { color: '#fff', fontSize: 9, fontWeight: '900' },
+  avatarMore:     { color: '#555', fontSize: 10, fontWeight: '700', marginLeft: 2 },
+  rowRight:       { alignItems: 'center', gap: 2, minWidth: 40 },
+  rowCount:       { color: '#fff', fontSize: 18, fontWeight: '900' },
+  rowCountActive: { color: '#a78bfa' },
+  rowCountLabel:  { color: '#555', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
+  rowChevron:     { color: '#333', fontSize: 22, fontWeight: '300' },
+  empty:          { alignItems: 'center', paddingVertical: 50, gap: 14 },
+  emptyIcon:      { fontSize: 54 },
+  emptyTxt:       { color: '#444', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
 });
 
 // ─── Bond Trail Card styles ────────────────────────────────────────────────────
