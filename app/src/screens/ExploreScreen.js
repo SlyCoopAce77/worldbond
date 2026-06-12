@@ -121,12 +121,14 @@ const ep = StyleSheet.create({
 });
 
 // ─── Vibe button ──────────────────────────────────────────────────────────────
+const VIBE_W = (Dimensions.get('window').width - 48) / 5;
+
 function VibeButton({ vibe, onPress }) {
   const anim = useFade(true);
   return (
-    <Animated.View style={[{ flex: 1 }, anim]}>
+    <Animated.View style={[{ width: VIBE_W }, anim]}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.82}>
-        <LinearGradient colors={[vibe.color + '22', vibe.color + '0a']} style={[vb.card, { borderColor: vibe.color + '40' }]}>
+        <LinearGradient colors={[vibe.color + '33', vibe.color + '11']} style={[vb.card, { borderColor: vibe.color + '55' }]}>
           <Text style={vb.icon}>{vibe.icon}</Text>
           <Text style={[vb.label, { color: vibe.color }]}>{vibe.label}</Text>
         </LinearGradient>
@@ -135,9 +137,9 @@ function VibeButton({ vibe, onPress }) {
   );
 }
 const vb = StyleSheet.create({
-  card:  { borderRadius: 20, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, margin: 4 },
-  icon:  { fontSize: 28 },
-  label: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  card:  { borderRadius: 16, paddingVertical: 14, paddingHorizontal: 4, alignItems: 'center', gap: 6, borderWidth: 1, margin: 3 },
+  icon:  { fontSize: 24 },
+  label: { fontSize: 11, fontWeight: '800', textAlign: 'center' },
 });
 
 // ─── Country card ─────────────────────────────────────────────────────────────
@@ -162,6 +164,31 @@ const cc = StyleSheet.create({
   name:     { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   liveDot:  { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff5252' },
   eventDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b' },
+});
+
+// ─── Compact spot card (used in horizontal group rows) ───────────────────────
+function CompactSpotCard({ item, onPress }) {
+  const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF' };
+  return (
+    <TouchableOpacity style={csc.card} onPress={onPress} activeOpacity={0.85}>
+      <LinearGradient colors={[meta.color + '28', meta.color + '0d']} style={csc.inner}>
+        {item.isLive && <View style={csc.liveDot} />}
+        <Text style={csc.icon}>{meta.icon}</Text>
+        <Text style={csc.name} numberOfLines={2}>{item.name}</Text>
+        <Text style={csc.city} numberOfLines={1}>📍 {item.city}</Text>
+        {item.vibe ? <Text style={[csc.vibe, { color: meta.color }]} numberOfLines={1}>{item.vibe}</Text> : null}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+const csc = StyleSheet.create({
+  card:  { width: 145, marginRight: 0 },
+  inner: { borderRadius: 18, padding: 14, gap: 5, minHeight: 130, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', justifyContent: 'flex-end' },
+  liveDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff5252' },
+  icon:  { fontSize: 32, marginBottom: 2 },
+  name:  { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 17 },
+  city:  { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600' },
+  vibe:  { fontSize: 10, fontWeight: '700' },
 });
 
 // ─── Spot card ────────────────────────────────────────────────────────────────
@@ -380,6 +407,23 @@ export default function ExploreScreen({ navigation, user }) {
   const liveSpots  = useMemo(() => filteredSpots.filter(p => p.isLive || liveIds.has(p.id)), [filteredSpots, liveIds]);
   const eventSpots = useMemo(() => filteredSpots.filter(p => (p.eventCount || eventMap[p.id] || 0) > 0), [filteredSpots, eventMap]);
 
+  // Grouped by type — used when typeFilter === 'all' for the horizontal sections layout
+  const groupedByType = useMemo(() => {
+    if (typeFilter !== 'all') return null;
+    const groups = {};
+    filteredSpots.forEach(s => {
+      if (!groups[s.type]) groups[s.type] = [];
+      groups[s.type].push(s);
+    });
+    // Sort groups by count desc, use VIBES order as tiebreak
+    const vibeOrder = VIBES.map(v => v.key);
+    return Object.entries(groups).sort((a, b) => {
+      const ai = vibeOrder.indexOf(a[0]), bi = vibeOrder.indexOf(b[0]);
+      if (b[1].length !== a[1].length) return b[1].length - a[1].length;
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+  }, [filteredSpots, typeFilter]);
+
   // ════════════════════════ DISCOVER VIEW ═══════════════════════════════════
 
   if (view === 'discover') {
@@ -538,41 +582,108 @@ export default function ExploreScreen({ navigation, user }) {
   return (
     <LinearGradient colors={['#0d001a', '#050010', '#000000']} style={{ flex: 1 }}>
     <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
 
-        {/* Header */}
-        <View style={sv.header}>
-          <TouchableOpacity style={sv.backBtn} onPress={goBack}>
-            <Text style={sv.backTxt}>← Back</Text>
+      {/* ── FIXED: Header — always visible, never scrolls away ── */}
+      <View style={sv.header}>
+        <TouchableOpacity style={sv.backBtn} onPress={goBack} activeOpacity={0.82}>
+          <Text style={sv.backArrow}>←</Text>
+          <Text style={sv.backTxt}>Explore</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={sv.title} numberOfLines={1}>{spotsHeading}</Text>
+          <Text style={sv.sub}>
+            {filteredSpots.length} spots
+            {!activeCountry && spots.length > 0 && ` · ${new Set(spots.map(p => p.country)).size} countries`}
+          </Text>
+        </View>
+      </View>
+
+      {/* ── FIXED: Search ── */}
+      <View style={sv.searchWrap}>
+        <Text style={{ color: '#555', fontSize: 14 }}>🔍</Text>
+        <TextInput
+          style={sv.searchInput}
+          placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
+          placeholderTextColor="#444"
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+        />
+        {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444' }}>✕</Text></TouchableOpacity>}
+      </View>
+
+      {/* ── FIXED: Vibe type filter chips ── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={sv.filterRow}
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+      >
+        {[{ key: 'all', icon: '✨', label: 'All Vibes', color: '#6C47FF' }, ...VIBES].map(v => (
+          <TouchableOpacity
+            key={v.key}
+            style={[sv.filterChip, typeFilter === v.key && { backgroundColor: v.color + '28', borderColor: v.color }]}
+            onPress={() => setTypeFilter(v.key)}
+          >
+            <Text style={{ fontSize: 13 }}>{v.icon}</Text>
+            <Text style={[sv.filterTxt, typeFilter === v.key && { color: v.color, fontWeight: '800' }]}>{v.label}</Text>
           </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={sv.title}>{spotsHeading}</Text>
-            <Text style={sv.sub}>{filteredSpots.length} spots{activeCountry ? '' : ` across ${new Set(spots.map(p => p.country)).size} countries`}</Text>
+        ))}
+      </ScrollView>
+
+      {/* ── FIXED: City filter (country view only) ── */}
+      {activeCountry && cities.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={sv.cityRow}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 6 }}
+        >
+          {[{ key: 'all', label: '🏙️ All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
+            <TouchableOpacity
+              key={c.key}
+              style={[sv.cityChip, cityFilter === c.key && sv.cityChipOn]}
+              onPress={() => setCityFilter(c.key)}
+            >
+              <Text style={[sv.cityTxt, cityFilter === c.key && sv.cityTxtOn]}>{c.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* ── SCROLLABLE: Content ── */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+
+        {/* Live strip */}
+        {liveSpots.length > 0 && (
+          <View style={sv.section}>
+            <View style={sv.sectionRow}>
+              <View style={[sv.dot, { backgroundColor: '#ff5252' }]} />
+              <Text style={sv.sectionTitle}>Live Right Now</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
+              {liveSpots.map(p => {
+                const meta = TYPE_META[p.type] || { icon: '📍', color: '#6C47FF' };
+                return (
+                  <TouchableOpacity key={p.id} style={sv.liveCard} onPress={() => openSpot(p)} activeOpacity={0.85}>
+                    <Text style={{ fontSize: 24 }}>{meta.icon}</Text>
+                    <Text style={sv.liveName} numberOfLines={2}>{p.name}</Text>
+                    <View style={sv.livePill}><View style={sv.liveDot}/><Text style={sv.liveTxt}>LIVE</Text></View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
-        </View>
+        )}
 
-        {/* Search */}
-        <View style={sv.searchWrap}>
-          <Text style={{ color: '#555', fontSize: 14 }}>🔍</Text>
-          <TextInput
-            style={sv.searchInput}
-            placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
-            placeholderTextColor="#444"
-            value={search}
-            onChangeText={setSearch}
-            autoCapitalize="none"
-          />
-          {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444' }}>✕</Text></TouchableOpacity>}
-        </View>
-
-        {/* Upcoming events strip for this country */}
+        {/* Events strip */}
         {countryUpcoming.length > 0 && (
-          <View style={{ marginBottom: 20 }}>
+          <View style={sv.section}>
             <View style={sv.sectionRow}>
               <View style={sv.dot} />
               <Text style={sv.sectionTitle}>Events Coming Up</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
               {countryUpcoming.map((evt, i) => (
                 <EventPill key={evt.id || i} event={evt} onPress={() => {
                   const spot = spots.find(s => s.id === evt.placeId) || { id: evt.placeId, name: evt.placeName, country: evt.placeCountry, city: evt.placeCity };
@@ -583,62 +694,9 @@ export default function ExploreScreen({ navigation, user }) {
           </View>
         )}
 
-        {/* Live spots strip */}
-        {liveSpots.length > 0 && (
-          <View style={{ marginBottom: 20 }}>
-            <View style={sv.sectionRow}>
-              <View style={[sv.dot, { backgroundColor: '#ff5252' }]} />
-              <Text style={sv.sectionTitle}>🔴 Live Right Now</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-              {liveSpots.map((p, i) => {
-                const meta = TYPE_META[p.type] || { icon: '📍', color: '#6C47FF' };
-                return (
-                  <TouchableOpacity key={p.id} style={sv.liveCard} onPress={() => openSpot(p)} activeOpacity={0.85}>
-                    <Text style={{ fontSize: 26 }}>{meta.icon}</Text>
-                    <Text style={sv.liveName} numberOfLines={2}>{p.name}</Text>
-                    <View style={sv.livePill}><View style={sv.liveDot}/><Text style={sv.liveTxt}>LIVE</Text></View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Type filter */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}
-          contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-          {[{ key: 'all', icon: '🌍', label: 'All', color: '#6C47FF' }, ...VIBES].map(v => (
-            <TouchableOpacity
-              key={v.key}
-              style={[sv.filterChip, typeFilter === v.key && { backgroundColor: v.color + '22', borderColor: v.color }]}
-              onPress={() => setTypeFilter(v.key)}
-            >
-              <Text style={{ fontSize: 13 }}>{v.icon}</Text>
-              <Text style={[sv.filterTxt, typeFilter === v.key && { color: v.color, fontWeight: '800' }]}>{v.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* City filter (only for country view) */}
-        {activeCountry && cities.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}
-            contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
-            {[{ key: 'all', label: '🏙️ All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
-              <TouchableOpacity
-                key={c.key}
-                style={[sv.cityChip, cityFilter === c.key && sv.cityChipOn]}
-                onPress={() => setCityFilter(c.key)}
-              >
-                <Text style={[sv.cityTxt, cityFilter === c.key && sv.cityTxtOn]}>{c.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Spots list */}
+        {/* ── GROUPED VIEW (All Vibes) — horizontal row per type ── */}
         {loading ? (
-          <View style={{ alignItems: 'center', paddingTop: 60 }}>
+          <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
             <Text style={{ color: '#555', fontSize: 15 }}>Loading spots…</Text>
           </View>
         ) : filteredSpots.length === 0 ? (
@@ -646,8 +704,39 @@ export default function ExploreScreen({ navigation, user }) {
             <Text style={{ fontSize: 40 }}>🔍</Text>
             <Text style={{ color: '#555', fontSize: 15 }}>No spots match your search</Text>
           </View>
+        ) : groupedByType ? (
+          // Grouped horizontal sections — no endless scrolling
+          groupedByType.map(([type, typeSpots]) => {
+            const meta = TYPE_META[type] || { icon: '📍', label: type, color: '#6C47FF' };
+            return (
+              <View key={type} style={sv.typeGroup}>
+                <View style={sv.typeGroupHeader}>
+                  <Text style={sv.typeGroupIcon}>{meta.icon}</Text>
+                  <Text style={[sv.typeGroupLabel, { color: meta.color }]}>{meta.label}</Text>
+                  <Text style={sv.typeGroupCount}>{typeSpots.length} spots</Text>
+                  <TouchableOpacity onPress={() => setTypeFilter(type)} style={sv.typeGroupSeeAll}>
+                    <Text style={[sv.typeGroupSeeAllTxt, { color: meta.color }]}>See all →</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 4 }}
+                >
+                  {typeSpots.map(s => (
+                    <CompactSpotCard
+                      key={s.id}
+                      item={{ ...s, isLive: s.isLive || liveIds.has(s.id) }}
+                      onPress={() => openSpot(s)}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            );
+          })
         ) : (
-          <View style={{ paddingHorizontal: 20, gap: 14 }}>
+          // Filtered vertical list — full SpotCard detail
+          <View style={{ paddingHorizontal: 16, gap: 14, paddingTop: 8 }}>
             {filteredSpots.map((item, index) => (
               <SpotCard
                 key={item.id}
@@ -699,25 +788,36 @@ const ds = StyleSheet.create({
 });
 
 const sv = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'flex-end', gap: 14, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
-  backBtn:    { backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)' },
-  backTxt:    { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  title:      { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
-  sub:        { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 3 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 16 },
-  searchInput:{ flex: 1, color: '#fff', fontSize: 14 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 12 },
-  dot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF' },
-  sectionTitle:{ color: '#fff', fontSize: 15, fontWeight: '800' },
-  liveCard:   { width: 130, backgroundColor: '#1a0505', borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#ff525230' },
-  liveName:   { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  livePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  liveDot:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
-  liveTxt:    { color: '#ff5252', fontSize: 10, fontWeight: '800' },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  filterTxt:  { color: '#555', fontSize: 12, fontWeight: '600' },
-  cityChip:   { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  cityChipOn: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF' },
-  cityTxt:    { color: '#555', fontSize: 12, fontWeight: '600' },
-  cityTxtOn:  { color: '#6C47FF', fontWeight: '800' },
+  header:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#111' },
+  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)' },
+  backArrow:       { color: '#6C47FF', fontSize: 16, fontWeight: '700', marginTop: -1 },
+  backTxt:         { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
+  title:           { color: '#fff', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
+  sub:             { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2 },
+  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 16, marginTop: 10, marginBottom: 2 },
+  searchInput:     { flex: 1, color: '#fff', fontSize: 14 },
+  filterRow:       { borderBottomWidth: 1, borderBottomColor: '#111' },
+  cityRow:         { borderBottomWidth: 1, borderBottomColor: '#0d0d0d' },
+  filterChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  filterTxt:       { color: '#555', fontSize: 12, fontWeight: '600' },
+  cityChip:        { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  cityChipOn:      { backgroundColor: '#6C47FF22', borderColor: '#6C47FF' },
+  cityTxt:         { color: '#555', fontSize: 12, fontWeight: '600' },
+  cityTxtOn:       { color: '#6C47FF', fontWeight: '800' },
+  section:         { marginBottom: 16 },
+  sectionRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
+  dot:             { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF' },
+  sectionTitle:    { color: '#fff', fontSize: 14, fontWeight: '800' },
+  liveCard:        { width: 120, backgroundColor: '#160505', borderRadius: 14, padding: 12, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#ff525230' },
+  liveName:        { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  livePill:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
+  liveDot:         { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
+  liveTxt:         { color: '#ff5252', fontSize: 9, fontWeight: '900' },
+  typeGroup:       { marginBottom: 8, paddingTop: 6 },
+  typeGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingBottom: 10 },
+  typeGroupIcon:   { fontSize: 18 },
+  typeGroupLabel:  { fontSize: 14, fontWeight: '900', flex: 1 },
+  typeGroupCount:  { color: 'rgba(255,255,255,0.3)', fontSize: 11 },
+  typeGroupSeeAll: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
+  typeGroupSeeAllTxt: { fontSize: 11, fontWeight: '700' },
 });
