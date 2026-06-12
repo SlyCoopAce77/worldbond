@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView, FlatList,
+  View, Text, StyleSheet, SafeAreaView, FlatList, ScrollView,
   TouchableOpacity, TextInput, Modal, KeyboardAvoidingView,
   Platform, Animated, Alert, ActivityIndicator, Dimensions,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket, SERVER_URL } from '../services/socket';
@@ -11,7 +12,6 @@ import { WORLD_COUNTRIES } from '../utils/countryUtils';
 import { getAccessToken } from '../services/authApi';
 import FilteredImage from '../components/FilteredImage';
 import FilterPicker from '../components/FilterPicker';
-import StoriesBar from '../components/StoriesBar';
 import StoryViewer from '../components/StoryViewer';
 
 const { width } = Dimensions.get('window');
@@ -61,6 +61,298 @@ function HeartBurst({ visible }) {
   }, [visible]);
   if (!visible) return null;
   return <Animated.Text style={[s.heartBurst, { transform: [{ scale }], opacity }]}>❤️</Animated.Text>;
+}
+
+// ─── Bond Footprint Banner ────────────────────────────────────────────────────
+
+function BondFootprintBar({ bondPhotos, onPress }) {
+  const countries = useMemo(() => {
+    const seen = new Set();
+    bondPhotos.forEach(p => { if (p.country) seen.add(p.country); });
+    return [...seen];
+  }, [bondPhotos]);
+
+  const shimmer = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 2200, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0, duration: 2200, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={{ marginHorizontal: 14, marginTop: 12, marginBottom: 4 }}>
+      <LinearGradient colors={['#0d0d1f', '#11102a']} style={fp.bar}>
+        <Animated.View style={[fp.glowDot, { opacity: shimmerOpacity }]} />
+        <View style={fp.left}>
+          <Text style={fp.barIcon}>🌐</Text>
+          <View>
+            <Text style={fp.barTitle}>Bond Footprint</Text>
+            <Text style={fp.barSub}>
+              {countries.length === 0
+                ? 'Bond with people to build your map'
+                : `Your bonds reach ${countries.length} ${countries.length === 1 ? 'country' : 'countries'}`}
+            </Text>
+          </View>
+        </View>
+        <View style={fp.flagRow}>
+          {countries.slice(0, 6).map(c => (
+            <Text key={c} style={fp.flagSmall}>{countryFlag(c)}</Text>
+          ))}
+          {countries.length > 6 && <Text style={fp.more}>+{countries.length - 6}</Text>}
+        </View>
+        <Text style={fp.chevron}>›</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Moment Ring (replaces story circle) ─────────────────────────────────────
+
+function MomentRing({ group, isSelf, onPress }) {
+  const hasNew = !isSelf && group?.stories?.some(s => !s.viewed);
+  const pulse = useRef(new Animated.Value(1)).current;
+  const color = stringToColor(group?.username || 'x');
+
+  useEffect(() => {
+    if (!hasNew) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.12, duration: 950, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 950, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [hasNew]);
+
+  const flag = countryFlag(group?.country || '');
+  const cname = countryName(group?.country || '') || group?.username || '';
+
+  return (
+    <TouchableOpacity style={mr.item} onPress={onPress} activeOpacity={0.82}>
+      {isSelf ? (
+        <View style={mr.addRing}>
+          <LinearGradient colors={['#6C47FF22', '#6C47FF0a']} style={mr.addInner}>
+            <Text style={mr.addPlus}>+</Text>
+          </LinearGradient>
+        </View>
+      ) : (
+        <View style={mr.ringWrap}>
+          {hasNew && (
+            <Animated.View
+              style={[mr.outerGlow, { borderColor: color, transform: [{ scale: pulse }] }]}
+            />
+          )}
+          <LinearGradient
+            colors={hasNew ? [color + '55', color + '22'] : ['#1a1a1a', '#111']}
+            style={[mr.ring, hasNew && { borderColor: color + '99' }]}
+          >
+            <Text style={mr.flagBig}>{flag}</Text>
+            <View style={[mr.initBadge, { backgroundColor: color }]}>
+              <Text style={mr.initTxt}>{(group?.username?.[0] ?? '?').toUpperCase()}</Text>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
+      <Text style={mr.label} numberOfLines={1}>{isSelf ? 'Add' : cname}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Bond Footprint Sheet ─────────────────────────────────────────────────────
+
+function BondFootprintSheet({ visible, bondPhotos, onClose }) {
+  const countries = useMemo(() => {
+    const countMap = {};
+    bondPhotos.forEach(p => {
+      if (!p.country) return;
+      countMap[p.country] = (countMap[p.country] || 0) + 1;
+    });
+    return Object.entries(countMap).sort((a, b) => b[1] - a[1]);
+  }, [bondPhotos]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={bfs.overlay} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity style={bfs.sheet} activeOpacity={1} onPress={() => {}}>
+          <View style={bfs.handle} />
+          <View style={bfs.titleRow}>
+            <Text style={bfs.titleIcon}>🌐</Text>
+            <View>
+              <Text style={bfs.title}>Bond Footprint</Text>
+              <Text style={bfs.sub}>Countries you're connected to through people</Text>
+            </View>
+          </View>
+          {countries.length === 0 ? (
+            <View style={bfs.empty}>
+              <Text style={bfs.emptyIcon}>🌍</Text>
+              <Text style={bfs.emptyTxt}>Bond with people to build your footprint</Text>
+            </View>
+          ) : (
+            <View style={bfs.grid}>
+              {countries.map(([country, count]) => (
+                <View key={country} style={bfs.cell}>
+                  <Text style={bfs.cellFlag}>{countryFlag(country)}</Text>
+                  <Text style={bfs.cellName} numberOfLines={1}>{countryName(country) || country}</Text>
+                  <Text style={bfs.cellCount}>{count} {count === 1 ? 'moment' : 'moments'}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// ─── Bond Trail Card ──────────────────────────────────────────────────────────
+
+function BondTrailCard({ photo, user, onComment, onProfile, onFollow, followingIds }) {
+  const socket = getSocket();
+  const myUid = user?.userId || socket.id;
+  const [liked,     setLiked]    = useState(photo.likes?.some(l => l.userId === socket.id));
+  const [likeCount, setLikeCount] = useState(photo.likes?.length || 0);
+  const [echoed,    setEchoed]   = useState(photo.echos?.some(e => e.userId === myUid));
+  const [echoCount, setEchoCount] = useState(photo.echos?.length || 0);
+  const [showHeart, setShowHeart] = useState(false);
+  const lastTap = useRef(0);
+  const threadColor = stringToColor(photo.username);
+
+  useEffect(() => {
+    setLiked(photo.likes?.some(l => l.userId === socket.id));
+    setLikeCount(photo.likes?.length || 0);
+    setEchoed(photo.echos?.some(e => e.userId === myUid));
+    setEchoCount(photo.echos?.length || 0);
+  }, [photo.likes, photo.echos]);
+
+  function toggleLike() {
+    socket.emit('like_photo', { photoId: photo.id });
+    setLiked(l => !l); setLikeCount(c => liked ? c - 1 : c + 1);
+  }
+
+  function handleDoubleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      if (!liked) { toggleLike(); setShowHeart(true); setTimeout(() => setShowHeart(false), 900); }
+    }
+    lastTap.current = now;
+  }
+
+  const isOwn = photo.userId === socket.id;
+  const isFollowed = followingIds.includes(photo.userId);
+  const cardW = width - 32;
+
+  return (
+    <View style={bt.card}>
+      {/* Colored thread line running full height */}
+      <View style={[bt.thread, { backgroundColor: threadColor }]} />
+
+      <View style={bt.inner}>
+        {/* Header */}
+        <TouchableOpacity style={bt.header} onPress={() => onProfile(photo)} activeOpacity={0.8}>
+          <View style={[bt.av, { backgroundColor: threadColor }]}>
+            <Text style={bt.avTxt}>{(photo.username?.[0] ?? '?').toUpperCase()}</Text>
+            {photo.mood && <Text style={bt.mood}>{photo.mood}</Text>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Text style={bt.uname}>{photo.username}</Text>
+              <Text>{countryFlag(photo.country)}</Text>
+            </View>
+            <Text style={bt.meta}>{countryName(photo.country)} · {timeAgo(photo.createdAt)}</Text>
+          </View>
+          {!isOwn && (
+            <TouchableOpacity
+              style={[bt.bondBtn, isFollowed && { backgroundColor: threadColor + '33', borderColor: threadColor }]}
+              onPress={() => onFollow(photo.userId, isFollowed)}
+            >
+              <Text style={[bt.bondBtnTxt, isFollowed && { color: threadColor }]}>
+                {isFollowed ? '✓ Bonded' : '+ Bond'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+
+        {/* Photo + side actions */}
+        <View style={bt.photoRow}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={handleDoubleTap}
+            style={[bt.photoWrap, { width: cardW - 56 }]}
+          >
+            <FilteredImage
+              uri={photo.imageUrl}
+              filterId={photo.filter || 'normal'}
+              style={[bt.photo, { width: cardW - 56, height: (cardW - 56) * 1.1 }]}
+              resizeMode="cover"
+            />
+            {showHeart && (
+              <Animated.Text style={bt.heartBurst}>❤️</Animated.Text>
+            )}
+            {/* Country stamp overlay */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.72)']}
+              style={bt.photoGrad}
+            >
+              <Text style={bt.photoFlag}>{countryFlag(photo.country)}</Text>
+              <Text style={bt.photoCountry}>{countryName(photo.country)}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Vertical actions rail */}
+          <View style={bt.actionsRail}>
+            <TouchableOpacity style={bt.railBtn} onPress={toggleLike}>
+              <Text style={bt.railIcon}>{liked ? '❤️' : '🤍'}</Text>
+              {likeCount > 0 && <Text style={[bt.railCount, liked && { color: '#e91e63' }]}>{likeCount}</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={bt.railBtn} onPress={() => onComment(photo)}>
+              <Text style={bt.railIcon}>💬</Text>
+              {photo.comments?.length > 0 && <Text style={bt.railCount}>{photo.comments.length}</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={bt.railBtn}
+              onPress={() => {
+                socket.emit('echo_photo', { photoId: photo.id });
+                setEchoed(e => !e); setEchoCount(c => echoed ? c - 1 : c + 1);
+              }}
+            >
+              <Text style={[bt.railIcon, echoed && { color: '#6C47FF' }]}>🔊</Text>
+              {echoCount > 0 && <Text style={[bt.railCount, echoed && { color: '#6C47FF' }]}>{echoCount}</Text>}
+            </TouchableOpacity>
+            {isOwn && (
+              <TouchableOpacity
+                style={bt.railBtn}
+                onPress={() => Alert.alert('Delete Photo', 'Remove this photo?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => socket.emit('delete_photo', { photoId: photo.id }) },
+                ])}
+              >
+                <Text style={[bt.railIcon, { fontSize: 18, color: '#555' }]}>⋯</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Caption */}
+        {!!photo.caption && (
+          <View style={bt.captionWrap}>
+            <Text style={bt.captionUser}>{photo.username} </Text>
+            <Text style={bt.captionTxt}>{photo.caption}</Text>
+          </View>
+        )}
+        {photo.comments?.length > 0 && (
+          <TouchableOpacity onPress={() => onComment(photo)} style={bt.commentHint}>
+            <Text style={bt.commentHintTxt}>View {photo.comments.length} {photo.comments.length === 1 ? 'comment' : 'comments'}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 }
 
 // ─── Comments modal ───────────────────────────────────────────────────────────
@@ -427,6 +719,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [savedCountries,    setSavedCountries]    = useState([]);
   const [currentCountry,    setCurrentCountry]    = useState(null); // null = globe prompt
   const [countryFlagCounts, setCountryFlagCounts] = useState({});   // country -> planted count
+  const [showBondFootprint, setShowBondFootprint] = useState(false);
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
   const socket = getSocket();
@@ -629,12 +922,36 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
   const bondsHeader = (
     <View>
-      <StoriesBar
-        stories={bondsStories}
-        currentUserId={socket.id}
-        onStoryPress={g => setViewingStoryGroup(g)}
-        onAddStory={() => { setUploadMode('story'); setShowUpload(true); }}
+      {/* Bond Footprint Banner */}
+      <BondFootprintBar
+        bondPhotos={bondPhotos}
+        onPress={() => setShowBondFootprint(true)}
       />
+
+      {/* Moment Rings row */}
+      <View style={s.momentSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.momentRow}
+        >
+          {/* Add your moment */}
+          <MomentRing
+            isSelf
+            group={{ username: user?.username, country: user?.country }}
+            onPress={() => { setUploadMode('story'); setShowUpload(true); }}
+          />
+          {/* Bond story rings */}
+          {bondsStories.map(g => (
+            <MomentRing
+              key={g.userId}
+              group={g}
+              onPress={() => setViewingStoryGroup(g)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
       <View style={s.divider} />
     </View>
   );
@@ -700,17 +1017,28 @@ export default function PhotoFeedScreen({ navigation, user }) {
             )}
           </View>
         }
-        renderItem={({ item }) => (
-          <PhotoCard
-            photo={item}
-            user={user}
-            onComment={setCommentPhoto}
-            onProfile={openProfile}
-            onFollow={handleFollow}
-            followingIds={followingIds}
-            showCountryBadge={tab === 'world'}
-          />
-        )}
+        renderItem={({ item }) =>
+          tab === 'bonds' ? (
+            <BondTrailCard
+              photo={item}
+              user={user}
+              onComment={setCommentPhoto}
+              onProfile={openProfile}
+              onFollow={handleFollow}
+              followingIds={followingIds}
+            />
+          ) : (
+            <PhotoCard
+              photo={item}
+              user={user}
+              onComment={setCommentPhoto}
+              onProfile={openProfile}
+              onFollow={handleFollow}
+              followingIds={followingIds}
+              showCountryBadge
+            />
+          )
+        }
       />
 
       {/* ── Modals ── */}
@@ -733,6 +1061,12 @@ export default function PhotoFeedScreen({ navigation, user }) {
         onDelete={id => socket.emit('delete_story', { storyId: id })}
         onViewStory={id => socket.emit('view_story', { storyId: id })}
         currentUserId={socket.id}
+      />
+
+      <BondFootprintSheet
+        visible={showBondFootprint}
+        bondPhotos={bondPhotos}
+        onClose={() => setShowBondFootprint(false)}
       />
 
       {/* ── Footprints bottom sheet ── */}
@@ -850,6 +1184,9 @@ const s = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: '#111' },
 
+  momentSection: { paddingVertical: 14 },
+  momentRow:     { paddingHorizontal: 14, gap: 12 },
+
   heartBurst: { position: 'absolute', alignSelf: 'center', top: '35%', fontSize: 90 },
 
   empty:      { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40, gap: 10 },
@@ -954,4 +1291,83 @@ const up = StyleSheet.create({
   btn:     { backgroundColor: '#6C47FF', borderRadius: 14, padding: 16, alignItems: 'center' },
   btnOff:  { backgroundColor: '#222' },
   btnTxt:  { color: '#fff', fontSize: 16, fontWeight: '700' },
+});
+
+// ─── Bond Footprint Banner styles ─────────────────────────────────────────────
+const fp = StyleSheet.create({
+  bar:       { flexDirection: 'row', alignItems: 'center', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: '#6C47FF33', gap: 10 },
+  glowDot:   { position: 'absolute', top: 14, left: 14, width: 8, height: 8, borderRadius: 4, backgroundColor: '#6C47FF' },
+  left:      { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  barIcon:   { fontSize: 22 },
+  barTitle:  { color: '#fff', fontSize: 13, fontWeight: '800' },
+  barSub:    { color: '#6C47FF', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  flagRow:   { flexDirection: 'row', gap: 2, alignItems: 'center' },
+  flagSmall: { fontSize: 15 },
+  more:      { color: '#555', fontSize: 11, fontWeight: '700' },
+  chevron:   { color: '#6C47FF', fontSize: 22, fontWeight: '300' },
+});
+
+// ─── Moment Ring styles ────────────────────────────────────────────────────────
+const mr = StyleSheet.create({
+  item:      { alignItems: 'center', gap: 6, width: 72 },
+  addRing:   { width: 62, height: 62, borderRadius: 31, borderWidth: 1.5, borderColor: '#6C47FF88', borderStyle: 'dashed', overflow: 'hidden' },
+  addInner:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  addPlus:   { color: '#6C47FF', fontSize: 30, fontWeight: '200' },
+  ringWrap:  { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
+  outerGlow: { position: 'absolute', width: 62, height: 62, borderRadius: 31, borderWidth: 2 },
+  ring:      { width: 58, height: 58, borderRadius: 29, backgroundColor: '#1a1a1a', borderWidth: 1.5, borderColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  flagBig:   { fontSize: 28 },
+  initBadge: { position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+  initTxt:   { color: '#fff', fontSize: 9, fontWeight: '900' },
+  label:     { color: '#666', fontSize: 10, fontWeight: '600', textAlign: 'center', maxWidth: 64 },
+});
+
+// ─── Bond Footprint Sheet styles ──────────────────────────────────────────────
+const bfs = StyleSheet.create({
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  sheet:     { backgroundColor: '#0e0e18', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingBottom: 48 },
+  handle:    { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 20 },
+  titleRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, marginBottom: 20 },
+  titleIcon: { fontSize: 32 },
+  title:     { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  sub:       { color: '#6C47FF', fontSize: 12, fontWeight: '600', marginTop: 2 },
+  empty:     { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  emptyIcon: { fontSize: 52 },
+  emptyTxt:  { color: '#444', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
+  grid:      { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 12 },
+  cell:      { width: '22%', alignItems: 'center', backgroundColor: '#141424', borderRadius: 18, paddingVertical: 16, paddingHorizontal: 4, borderWidth: 1, borderColor: '#6C47FF22' },
+  cellFlag:  { fontSize: 32, marginBottom: 6 },
+  cellName:  { color: '#aaa', fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  cellCount: { color: '#6C47FF', fontSize: 9, fontWeight: '600', marginTop: 2 },
+});
+
+// ─── Bond Trail Card styles ────────────────────────────────────────────────────
+const bt = StyleSheet.create({
+  card:        { flexDirection: 'row', marginHorizontal: 14, marginBottom: 20 },
+  thread:      { width: 3, borderRadius: 3, marginRight: 12, minHeight: '100%' },
+  inner:       { flex: 1, backgroundColor: '#0d0d0d', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#1a1a1a' },
+  header:      { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
+  av:          { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  avTxt:       { color: '#fff', fontWeight: '900', fontSize: 16 },
+  mood:        { position: 'absolute', bottom: -2, right: -2, fontSize: 12 },
+  uname:       { color: '#fff', fontWeight: '800', fontSize: 13 },
+  meta:        { color: '#555', fontSize: 11, marginTop: 2 },
+  bondBtn:     { borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  bondBtnTxt:  { color: '#555', fontSize: 11, fontWeight: '700' },
+  photoRow:    { flexDirection: 'row' },
+  photoWrap:   { position: 'relative', overflow: 'hidden' },
+  photo:       { backgroundColor: '#111' },
+  photoGrad:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, paddingHorizontal: 10, paddingBottom: 10, flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  photoFlag:   { fontSize: 18 },
+  photoCountry:{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' },
+  actionsRail: { width: 52, alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 16 },
+  railBtn:     { alignItems: 'center', gap: 3 },
+  railIcon:    { fontSize: 20 },
+  railCount:   { color: '#666', fontSize: 11, fontWeight: '700' },
+  heartBurst:  { position: 'absolute', alignSelf: 'center', top: '30%', fontSize: 72 },
+  captionWrap: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, flexWrap: 'wrap' },
+  captionUser: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  captionTxt:  { color: '#888', fontSize: 12, flex: 1, flexWrap: 'wrap' },
+  commentHint: { paddingHorizontal: 12, paddingBottom: 10 },
+  commentHintTxt: { color: '#555', fontSize: 11 },
 });
