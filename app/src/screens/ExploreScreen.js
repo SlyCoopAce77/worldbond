@@ -589,13 +589,11 @@ export default function ExploreScreen({ navigation, user }) {
           <Text style={sv.backArrow}>←</Text>
           <Text style={sv.backTxt}>Explore</Text>
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={sv.title} numberOfLines={1}>{spotsHeading}</Text>
-          <Text style={sv.sub}>
-            {filteredSpots.length} spots
-            {!activeCountry && spots.length > 0 && ` · ${new Set(spots.map(p => p.country)).size} countries`}
-          </Text>
-        </View>
+        <Text style={sv.title}>{spotsHeading}</Text>
+        <Text style={sv.sub}>
+          {filteredSpots.length} spots
+          {!activeCountry && spots.length > 0 && ` · ${new Set(spots.map(p => p.country)).size} countries`}
+        </Text>
       </View>
 
       {/* ── FIXED: Search ── */}
@@ -788,13 +786,13 @@ const ds = StyleSheet.create({
 });
 
 const sv = StyleSheet.create({
-  header:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#111' },
-  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)' },
-  backArrow:       { color: '#6C47FF', fontSize: 16, fontWeight: '700', marginTop: -1 },
+  header:          { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 18, gap: 6, borderBottomWidth: 1, borderBottomColor: '#111' },
+  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)', marginBottom: 10 },
+  backArrow:       { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
   backTxt:         { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  title:           { color: '#fff', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
-  sub:             { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2 },
-  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 16, marginTop: 10, marginBottom: 2 },
+  title:           { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.6 },
+  sub:             { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 2 },
+  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 16, marginTop: 12, marginBottom: 2 },
   searchInput:     { flex: 1, color: '#fff', fontSize: 14 },
   filterRow:       { borderBottomWidth: 1, borderBottomColor: '#111' },
   cityRow:         { borderBottomWidth: 1, borderBottomColor: '#0d0d0d' },
