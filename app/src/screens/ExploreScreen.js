@@ -1,11 +1,14 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, ScrollView, Animated,
   Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../services/socket';
+
+const SAVED_KEY = 'wb_saved_spots';
 
 const { width } = Dimensions.get('window');
 
@@ -167,28 +170,43 @@ const cc = StyleSheet.create({
 });
 
 // ─── Compact spot card (used in horizontal group rows) ───────────────────────
-function CompactSpotCard({ item, onPress }) {
+function CompactSpotCard({ item, onPress, saved, onToggleSave }) {
   const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF' };
   return (
-    <TouchableOpacity style={csc.card} onPress={onPress} activeOpacity={0.85}>
-      <LinearGradient colors={[meta.color + '28', meta.color + '0d']} style={csc.inner}>
-        {item.isLive && <View style={csc.liveDot} />}
-        <Text style={csc.icon}>{meta.icon}</Text>
-        <Text style={csc.name} numberOfLines={2}>{item.name}</Text>
-        <Text style={csc.city} numberOfLines={1}>📍 {item.city}</Text>
-        {item.vibe ? <Text style={[csc.vibe, { color: meta.color }]} numberOfLines={1}>{item.vibe}</Text> : null}
-      </LinearGradient>
-    </TouchableOpacity>
+    // Outer View so the save button and the card tap are completely independent
+    <View style={csc.card}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ flex: 1 }}>
+        <LinearGradient colors={[meta.color + '28', meta.color + '0d']} style={csc.inner}>
+          {item.isLive && <View style={csc.liveDot} />}
+          <Text style={csc.icon}>{meta.icon}</Text>
+          <Text style={csc.name} numberOfLines={2}>{item.name}</Text>
+          <Text style={csc.city} numberOfLines={1}>📍 {item.city}</Text>
+          {item.vibe ? <Text style={[csc.vibe, { color: meta.color }]} numberOfLines={1}>{item.vibe}</Text> : null}
+        </LinearGradient>
+      </TouchableOpacity>
+      {/* Save button sits outside the card TouchableOpacity — always gets its own tap */}
+      <TouchableOpacity
+        style={[csc.saveBtn, saved && csc.saveBtnOn]}
+        onPress={() => onToggleSave?.(item)}
+        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+        activeOpacity={0.7}
+      >
+        <Text style={csc.saveBtnTxt}>{saved ? '🔖' : '＋'}</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 const csc = StyleSheet.create({
-  card:  { width: 145, marginRight: 0 },
-  inner: { borderRadius: 18, padding: 14, gap: 5, minHeight: 130, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', justifyContent: 'flex-end' },
-  liveDot: { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff5252' },
-  icon:  { fontSize: 32, marginBottom: 2 },
-  name:  { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 17 },
-  city:  { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600' },
-  vibe:  { fontSize: 10, fontWeight: '700' },
+  card:      { width: 145, marginRight: 0 },
+  inner:     { borderRadius: 18, padding: 14, gap: 5, minHeight: 130, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', justifyContent: 'flex-end' },
+  liveDot:   { position: 'absolute', top: 10, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff5252' },
+  saveBtn:   { position: 'absolute', top: 9, left: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', zIndex: 10 },
+  saveBtnOn: { backgroundColor: 'rgba(108,71,255,0.45)', borderColor: 'rgba(108,71,255,0.8)' },
+  saveBtnTxt:{ fontSize: 13 },
+  icon:      { fontSize: 32, marginBottom: 2 },
+  name:      { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 17 },
+  city:      { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600' },
+  vibe:      { fontSize: 10, fontWeight: '700' },
 });
 
 // ─── Spot card ────────────────────────────────────────────────────────────────
@@ -299,7 +317,27 @@ export default function ExploreScreen({ navigation, user }) {
   const [cityFilter,    setCityFilter]    = useState('all');
   const [region,        setRegion]        = useState('all');
   const [loading,       setLoading]       = useState(false);
+  const [savedSpots,    setSavedSpots]    = useState([]);   // persisted full spot objects
   const headerAnim = useFade(true);
+
+  // ── Saved spots persistence ──
+  useEffect(() => {
+    AsyncStorage.getItem(SAVED_KEY).then(raw => {
+      if (raw) { try { setSavedSpots(JSON.parse(raw)); } catch {} }
+    });
+  }, []);
+
+  const savedIds = useMemo(() => new Set(savedSpots.map(s => s.id)), [savedSpots]);
+
+  const toggleSave = useCallback((place) => {
+    setSavedSpots(prev => {
+      const next = prev.some(s => s.id === place.id)
+        ? prev.filter(s => s.id !== place.id)
+        : [...prev, place];
+      AsyncStorage.setItem(SAVED_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   // ── Socket setup ──
   useEffect(() => {
@@ -455,6 +493,27 @@ export default function ExploreScreen({ navigation, user }) {
             )}
           </View>
 
+          {/* Saved spots — quick jump from discover view */}
+          {savedSpots.length > 0 && (
+            <View style={ds.section}>
+              <View style={ds.sectionRow}>
+                <Text style={{ fontSize: 15 }}>🔖</Text>
+                <Text style={[ds.sectionTitle, { marginLeft: 6 }]}>Your Saved Spots</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20, paddingBottom: 4 }}>
+                {savedSpots.map(s => (
+                  <CompactSpotCard
+                    key={s.id}
+                    item={{ ...s, isLive: liveIds.has(s.id) }}
+                    onPress={() => openSpot(s)}
+                    saved={true}
+                    onToggleSave={toggleSave}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Upcoming Events strip */}
           {upcomingEvents.length > 0 && (
             <View style={ds.section}>
@@ -583,7 +642,7 @@ export default function ExploreScreen({ navigation, user }) {
     <LinearGradient colors={['#0d001a', '#050010', '#000000']} style={{ flex: 1 }}>
     <SafeAreaView style={{ flex: 1 }}>
 
-      {/* ── FIXED: Header — always visible, never scrolls away ── */}
+      {/* ── FIXED: Header only — back button + title, nothing else ── */}
       <View style={sv.header}>
         <TouchableOpacity style={sv.backBtn} onPress={goBack} activeOpacity={0.82}>
           <Text style={sv.backArrow}>←</Text>
@@ -596,61 +655,86 @@ export default function ExploreScreen({ navigation, user }) {
         </Text>
       </View>
 
-      {/* ── FIXED: Search ── */}
-      <View style={sv.searchWrap}>
-        <Text style={{ color: '#555', fontSize: 14 }}>🔍</Text>
-        <TextInput
-          style={sv.searchInput}
-          placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
-          placeholderTextColor="#444"
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-        />
-        {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444' }}>✕</Text></TouchableOpacity>}
-      </View>
+      {/* ── SCROLLABLE: Content ── */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-      {/* ── FIXED: Vibe type filter chips ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={sv.filterRow}
-        contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 8 }}
-      >
-        {[{ key: 'all', icon: '✨', label: 'All Vibes', color: '#6C47FF' }, ...VIBES].map(v => (
-          <TouchableOpacity
-            key={v.key}
-            style={[sv.filterChip, typeFilter === v.key && { backgroundColor: v.color + '28', borderColor: v.color }]}
-            onPress={() => setTypeFilter(v.key)}
-          >
-            <Text style={{ fontSize: 13 }}>{v.icon}</Text>
-            <Text style={[sv.filterTxt, typeFilter === v.key && { color: v.color, fontWeight: '800' }]}>{v.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        {/* Search — inside scroll so it doesn't add to fixed header height */}
+        <View style={sv.searchWrap}>
+          <Text style={{ color: '#555', fontSize: 14 }}>🔍</Text>
+          <TextInput
+            style={sv.searchInput}
+            placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
+            placeholderTextColor="#444"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+          />
+          {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444' }}>✕</Text></TouchableOpacity>}
+        </View>
 
-      {/* ── FIXED: City filter (country view only) ── */}
-      {activeCountry && cities.length > 1 && (
+        {/* Vibe type filter chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={sv.cityRow}
-          contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 6 }}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 14 }}
         >
-          {[{ key: 'all', label: '🏙️ All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
+          {[{ key: 'all', icon: '✨', label: 'All Vibes', color: '#6C47FF' }, ...VIBES].map(v => (
             <TouchableOpacity
-              key={c.key}
-              style={[sv.cityChip, cityFilter === c.key && sv.cityChipOn]}
-              onPress={() => setCityFilter(c.key)}
+              key={v.key}
+              style={[sv.filterChip, typeFilter === v.key && { backgroundColor: v.color + '28', borderColor: v.color }]}
+              onPress={() => setTypeFilter(v.key)}
             >
-              <Text style={[sv.cityTxt, cityFilter === c.key && sv.cityTxtOn]}>{c.label}</Text>
+              <Text style={{ fontSize: 14 }}>{v.icon}</Text>
+              <Text style={[sv.filterTxt, typeFilter === v.key && { color: v.color, fontWeight: '800' }]}>{v.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-      )}
 
-      {/* ── SCROLLABLE: Content ── */}
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* City filter (country view only) */}
+        {activeCountry && cities.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 14 }}
+          >
+            {[{ key: 'all', label: '🏙️ All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
+              <TouchableOpacity
+                key={c.key}
+                style={[sv.cityChip, cityFilter === c.key && sv.cityChipOn]}
+                onPress={() => setCityFilter(c.key)}
+              >
+                <Text style={[sv.cityTxt, cityFilter === c.key && sv.cityTxtOn]}>{c.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Saved spots — pinned quick-access row */}
+        {savedSpots.length > 0 && (
+          <View style={sv.section}>
+            <View style={sv.sectionRow}>
+              <Text style={{ fontSize: 15 }}>🔖</Text>
+              <Text style={sv.sectionTitle}>Saved Spots</Text>
+              <TouchableOpacity
+                onPress={() => { setSavedSpots([]); AsyncStorage.setItem(SAVED_KEY, '[]'); }}
+                style={{ marginLeft: 'auto', paddingHorizontal: 10 }}
+              >
+                <Text style={{ color: '#444', fontSize: 12 }}>Clear all</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 4 }}>
+              {savedSpots.map(s => (
+                <CompactSpotCard
+                  key={s.id}
+                  item={{ ...s, isLive: liveIds.has(s.id) }}
+                  onPress={() => openSpot(s)}
+                  saved={true}
+                  onToggleSave={toggleSave}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Live strip */}
         {liveSpots.length > 0 && (
@@ -726,6 +810,8 @@ export default function ExploreScreen({ navigation, user }) {
                       key={s.id}
                       item={{ ...s, isLive: s.isLive || liveIds.has(s.id) }}
                       onPress={() => openSpot(s)}
+                      saved={savedIds.has(s.id)}
+                      onToggleSave={toggleSave}
                     />
                   ))}
                 </ScrollView>
@@ -786,13 +872,13 @@ const ds = StyleSheet.create({
 });
 
 const sv = StyleSheet.create({
-  header:          { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 18, gap: 6, borderBottomWidth: 1, borderBottomColor: '#111' },
-  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)', marginBottom: 10 },
+  header:          { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 26, gap: 4 },
+  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)', marginBottom: 14 },
   backArrow:       { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
   backTxt:         { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  title:           { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.6 },
-  sub:             { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 2 },
-  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 16, marginTop: 12, marginBottom: 2 },
+  title:           { color: '#fff', fontSize: 30, fontWeight: '900', letterSpacing: -0.8 },
+  sub:             { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 6 },
+  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 16, marginTop: 6, marginBottom: 14 },
   searchInput:     { flex: 1, color: '#fff', fontSize: 14 },
   filterRow:       { borderBottomWidth: 1, borderBottomColor: '#111' },
   cityRow:         { borderBottomWidth: 1, borderBottomColor: '#0d0d0d' },

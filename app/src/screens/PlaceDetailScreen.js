@@ -1,11 +1,14 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView,
   Modal, Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../services/socket';
+
+const SAVED_KEY = 'wb_saved_spots';
 
 const EVENT_TYPES = [
   { key: 'concert',  icon: '🎵', label: 'Concert',      color: '#8b5cf6' },
@@ -46,9 +49,28 @@ export default function PlaceDetailScreen({ route, navigation }) {
   const [evtType,   setEvtType]   = useState('concert');
   const [evtDesc,   setEvtDesc]   = useState('');
   const [evtPrice,  setEvtPrice]  = useState('Free');
+  const [saved,         setSaved]         = useState(false);
   const flatRef      = useRef(null);
   const checkedInRef = useRef(false);
   const socket       = getSocket();
+
+  // ── Saved spot persistence ──
+  useEffect(() => {
+    AsyncStorage.getItem(SAVED_KEY).then(raw => {
+      if (raw) { try { setSaved(JSON.parse(raw).some(s => s.id === place?.id)); } catch {} }
+    });
+  }, [place?.id]);
+
+  const toggleSave = useCallback(() => {
+    AsyncStorage.getItem(SAVED_KEY).then(raw => {
+      let list = [];
+      try { list = JSON.parse(raw || '[]'); } catch {}
+      const exists = list.some(s => s.id === place.id);
+      const next = exists ? list.filter(s => s.id !== place.id) : [...list, place];
+      AsyncStorage.setItem(SAVED_KEY, JSON.stringify(next));
+      setSaved(!exists);
+    });
+  }, [place]);
 
   useEffect(() => {
     function fetchPlaceData() {
@@ -177,11 +199,14 @@ export default function PlaceDetailScreen({ route, navigation }) {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerIcon}>{place.typeInfo?.icon || '📍'}</Text>
-          <View>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.headerName} numberOfLines={1}>{place.name}</Text>
             <Text style={styles.headerCity}>{place.city}, {place.country?.split(' ').slice(1).join(' ')}</Text>
           </View>
         </View>
+        <TouchableOpacity style={[styles.saveBtn, saved && styles.saveBtnOn]} onPress={toggleSave}>
+          <Text style={{ fontSize: 18 }}>{saved ? '🔖' : '＋'}</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.checkinBtn, checkedIn && styles.checkinBtnActive]}
           onPress={toggleCheckin}
@@ -221,19 +246,37 @@ export default function PlaceDetailScreen({ route, navigation }) {
       </View>
 
       {/* Tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ borderBottomWidth: 1, borderBottomColor: '#1C1F23' }}
-        contentContainerStyle={styles.tabs}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabBar}
+        contentContainerStyle={styles.tabBarContent}
+      >
         {[
-          { key: 'info',    label: '📋 Info' },
-          { key: 'events',  label: `📅 Events${venueEvents.length > 0 ? ` (${venueEvents.length})` : ''}` },
-          { key: 'reviews', label: `⭐ Reviews${reviews.length > 0 ? ` (${reviews.length})` : ''}` },
-          { key: 'chat',    label: `💬 Chat${messages.length > 0 ? ` (${messages.length})` : ''}` },
-          { key: 'people',  label: `👥 (${checkins.length})` },
-        ].map(t => (
-          <TouchableOpacity key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
+          { key: 'info',    icon: '📋', label: 'Info',    badge: null },
+          { key: 'events',  icon: '📅', label: 'Events',  badge: venueEvents.length || null },
+          { key: 'reviews', icon: '⭐', label: 'Reviews', badge: reviews.length || null },
+          { key: 'chat',    icon: '💬', label: 'Chat',    badge: messages.length || null },
+          { key: 'people',  icon: '👥', label: 'People',  badge: checkins.length || null },
+        ].map(t => {
+          const active = tab === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[styles.tab, active && styles.tabActive]}
+              onPress={() => setTab(t.key)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.tabIcon}>{t.icon}</Text>
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
+              {t.badge ? (
+                <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                  <Text style={[styles.tabBadgeTxt, active && styles.tabBadgeTxtActive]}>{t.badge}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {/* INFO TAB */}
@@ -516,6 +559,11 @@ const styles = StyleSheet.create({
   headerIcon: { fontSize: 28 },
   headerName: { color: '#fff', fontSize: 15, fontWeight: '700', maxWidth: 160 },
   headerCity: { color: '#888', fontSize: 11, marginTop: 2 },
+  saveBtn: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#1C1F23',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2F3336',
+  },
+  saveBtnOn: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF66' },
   checkinBtn: {
     backgroundColor: '#1C1F23', borderRadius: 20, paddingHorizontal: 12,
     paddingVertical: 7, borderWidth: 1, borderColor: '#2F3336',
@@ -528,11 +576,22 @@ const styles = StyleSheet.create({
   },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4caf50' },
   liveText: { color: '#4caf50', fontSize: 13, fontWeight: '600' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#6C47FF' },
-  tabText: { color: '#888', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#6C47FF' },
+  tabBar: { borderBottomWidth: 1, borderBottomColor: '#1C1F23', flexGrow: 0 },
+  tabBarContent: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  tab: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 22, backgroundColor: '#16181C',
+    borderWidth: 1, borderColor: '#2F3336',
+  },
+  tabActive: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF66' },
+  tabIcon:  { fontSize: 16 },
+  tabLabel: { color: '#666', fontSize: 13, fontWeight: '700' },
+  tabLabelActive: { color: '#6C47FF' },
+  tabBadge: { backgroundColor: '#2F3336', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, minWidth: 22, alignItems: 'center' },
+  tabBadgeActive: { backgroundColor: '#6C47FF44' },
+  tabBadgeTxt: { color: '#888', fontSize: 11, fontWeight: '800' },
+  tabBadgeTxtActive: { color: '#a78bff' },
   infoScroll: { padding: 20, gap: 16 },
   infoCard: { backgroundColor: '#1C1F23', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
   infoDesc: { color: '#ccc', fontSize: 15, lineHeight: 22 },
