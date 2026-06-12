@@ -2,521 +2,602 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, ScrollView, Animated,
-  Dimensions, Image,
+  Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
-import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
 const TYPE_META = {
-  bar:        { icon: '🍺', label: 'Bar',          color: '#f59e0b', grad: ['#2a1a00', '#1a1000'] },
-  club:       { icon: '🎉', label: 'Nightclub',     color: '#8b5cf6', grad: ['#1a0a2e', '#120820'] },
-  karaoke:    { icon: '🎤', label: 'Karaoke',       color: '#ec4899', grad: ['#2a0a1a', '#1a0810'] },
-  gaming:     { icon: '🎮', label: 'Gaming Cafe',   color: '#3b82f6', grad: ['#0a1a2e', '#061220'] },
-  restaurant: { icon: '🍜', label: 'Restaurant',    color: '#ef4444', grad: ['#2a0a0a', '#1a0606'] },
-  park:       { icon: '🌳', label: 'Park',          color: '#22c55e', grad: ['#0a1e0a', '#061206'] },
-  beach:      { icon: '🏖️', label: 'Beach',         color: '#06b6d4', grad: ['#001e2a', '#001218'] },
-  sports:     { icon: '⚽', label: 'Sports Bar',    color: '#f97316', grad: ['#2a1200', '#1a0c00'] },
-  lounge:     { icon: '🛋️', label: 'Lounge',        color: '#a78bfa', grad: ['#1a1030', '#100820'] },
-  arcade:     { icon: '🕹️', label: 'Arcade',        color: '#6366f1', grad: ['#0e0e2e', '#080820'] },
+  bar:        { icon: '🍺', label: 'Bars',       color: '#f59e0b', grad: ['#2a1a00', '#0d0800'] },
+  club:       { icon: '🎉', label: 'Clubs',       color: '#8b5cf6', grad: ['#1a0a2e', '#080412'] },
+  karaoke:    { icon: '🎤', label: 'Karaoke',     color: '#ec4899', grad: ['#2a0a1a', '#0d0408'] },
+  gaming:     { icon: '🎮', label: 'Gaming',      color: '#3b82f6', grad: ['#0a1a2e', '#030810'] },
+  restaurant: { icon: '🍜', label: 'Food',        color: '#ef4444', grad: ['#2a0808', '#0d0303'] },
+  park:       { icon: '🌳', label: 'Parks',       color: '#22c55e', grad: ['#0a1e0a', '#030a03'] },
+  beach:      { icon: '🏖️', label: 'Beach',       color: '#06b6d4', grad: ['#001e2a', '#00080f'] },
+  sports:     { icon: '⚽', label: 'Sports',      color: '#f97316', grad: ['#2a1000', '#0d0600'] },
+  lounge:     { icon: '🛋️', label: 'Lounges',     color: '#a78bfa', grad: ['#1a1030', '#07040f'] },
+  arcade:     { icon: '🕹️', label: 'Arcade',      color: '#6366f1', grad: ['#0e0e2e', '#030310'] },
 };
 
-const FILTERS = [
-  { key: 'all',        label: '🌍 All' },
-  { key: 'bar',        label: '🍺 Bars' },
-  { key: 'club',       label: '🎉 Clubs' },
-  { key: 'restaurant', label: '🍜 Food' },
-  { key: 'gaming',     label: '🎮 Gaming' },
-  { key: 'karaoke',    label: '🎤 Karaoke' },
-  { key: 'beach',      label: '🏖️ Beach' },
-  { key: 'park',       label: '🌳 Parks' },
-  { key: 'lounge',     label: '🛋️ Lounge' },
+const VIBES = [
+  { key: 'bar',        icon: '🍺', label: 'Bars',       color: '#f59e0b' },
+  { key: 'club',       icon: '🎉', label: 'Clubs',       color: '#8b5cf6' },
+  { key: 'restaurant', icon: '🍜', label: 'Food',        color: '#ef4444' },
+  { key: 'beach',      icon: '🏖️', label: 'Beach',       color: '#06b6d4' },
+  { key: 'gaming',     icon: '🎮', label: 'Gaming',      color: '#3b82f6' },
+  { key: 'park',       icon: '🌳', label: 'Parks',       color: '#22c55e' },
+  { key: 'karaoke',    icon: '🎤', label: 'Karaoke',     color: '#ec4899' },
+  { key: 'lounge',     icon: '🛋️', label: 'Lounges',     color: '#a78bfa' },
+  { key: 'sports',     icon: '⚽', label: 'Sports',      color: '#f97316' },
+  { key: 'arcade',     icon: '🕹️', label: 'Arcade',      color: '#6366f1' },
 ];
 
-const SPOT_CATEGORIES = [
-  { key: 'bar',        icon: '🍺', label: 'Bar Spots',    desc: 'Grab a drink & meet locals',    color: '#f59e0b', grad: ['#2a1a00', '#1a1000'] },
-  { key: 'club',       icon: '🎉', label: 'Club Spots',   desc: 'Dance floors & nightlife',       color: '#8b5cf6', grad: ['#1a0a2e', '#120820'] },
-  { key: 'restaurant', icon: '🍜', label: 'Food Spots',   desc: 'Local eats & dining',            color: '#ef4444', grad: ['#2a0a0a', '#1a0606'] },
-  { key: 'beach',      icon: '🏖️', label: 'Beach Spots',  desc: 'Sun, sand & vibes',              color: '#06b6d4', grad: ['#001e2a', '#001218'] },
-  { key: 'park',       icon: '🌳', label: 'Park Spots',   desc: 'Outdoor hangouts & chill zones', color: '#22c55e', grad: ['#0a1e0a', '#061206'] },
-  { key: 'lounge',     icon: '🛋️', label: 'Lounge Spots', desc: 'Relaxed vibes & good company',  color: '#a78bfa', grad: ['#1a1030', '#100820'] },
-  { key: 'all',        icon: '🌍', label: 'All Spots',    desc: 'Browse everything in this city', color: '#6C47FF', grad: ['#2a0010', '#1a000a'] },
+const REGIONS = [
+  { key: 'all',     label: '🌍 All',      match: null },
+  { key: 'asia',    label: '🌏 Asia',     match: ['Japan', 'Korea', 'Thailand', 'Singapore', 'Philippines', 'Indonesia', 'India', 'Vietnam', 'China'] },
+  { key: 'europe',  label: '🇪🇺 Europe',  match: ['United Kingdom', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Turkey', 'Greece', 'Portugal', 'Ireland'] },
+  { key: 'americas',label: '🌎 Americas', match: ['United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'Colombia'] },
+  { key: 'africa',  label: '🌍 Africa',   match: ['Nigeria', 'South Africa', 'Egypt', 'Morocco', 'Ghana', 'Kenya', 'Ethiopia'] },
+  { key: 'mideast', label: '🕌 Middle East', match: ['Saudi Arabia', 'United Arab Emirates', 'Turkey', 'Lebanon', 'Jordan', 'Kuwait', 'Qatar'] },
+  { key: 'pacific', label: '🌊 Pacific',  match: ['Australia', 'New Zealand'] },
+];
+
+const EVENT_TYPES = [
+  { key: 'concert',  icon: '🎵', label: 'Concert',     color: '#8b5cf6' },
+  { key: 'party',    icon: '🎉', label: 'Party',        color: '#ec4899' },
+  { key: 'sports',   icon: '⚽', label: 'Sports Night', color: '#f97316' },
+  { key: 'comedy',   icon: '😂', label: 'Comedy',       color: '#f59e0b' },
+  { key: 'open mic', icon: '🎙️', label: 'Open Mic',     color: '#22c55e' },
+  { key: 'festival', icon: '🎪', label: 'Festival',     color: '#06b6d4' },
+  { key: 'special',  icon: '✨', label: 'Special',      color: '#6366f1' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function useFadeSlide(trigger = true, delay = 0) {
-  const fade  = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(28)).current;
+
+function useFade(trigger = true, delay = 0) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(16)).current;
   useEffect(() => {
     if (!trigger) return;
     Animated.parallel([
-      Animated.timing(fade,  { toValue: 1, duration: 420, delay, useNativeDriver: true }),
-      Animated.spring(slide, { toValue: 0, friction: 8, tension: 50, delay, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 380, delay, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, friction: 9, tension: 55, delay, useNativeDriver: true }),
     ]).start();
   }, [trigger]);
-  return { opacity: fade, transform: [{ translateY: slide }] };
+  return { opacity, transform: [{ translateY }] };
 }
 
-// ─── Search bar ───────────────────────────────────────────────────────────────
-function SearchBar({ value, onChange, placeholder }) {
+function countryName(str) { return str?.split(' ').slice(1).join(' ') || str; }
+function countryFlag(str) { return str?.split(' ')[0] || '🌍'; }
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return dateStr; }
+}
+
+// ─── Event pill (horizontal strip) ───────────────────────────────────────────
+function EventPill({ event, onPress }) {
+  const et = EVENT_TYPES.find(e => e.key === event.type) || EVENT_TYPES[0];
   return (
-    <View style={sb.wrap}>
-      <Text style={sb.icon}>🔍</Text>
-      <TextInput
-        style={sb.input}
-        placeholder={placeholder || 'Search…'}
-        placeholderTextColor="#444"
-        value={value}
-        onChangeText={onChange}
-        autoCapitalize="none"
-      />
-      {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChange('')}>
-          <Text style={sb.clear}>✕</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <TouchableOpacity style={[ep.pill, { borderColor: et.color + '50' }]} onPress={onPress} activeOpacity={0.85}>
+      <LinearGradient colors={[et.color + '22', et.color + '08']} style={ep.inner}>
+        <Text style={ep.etIcon}>{et.icon}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={ep.name} numberOfLines={1}>{event.title}</Text>
+          <Text style={ep.meta} numberOfLines={1}>{countryFlag(event.placeCountry)} {event.placeName}</Text>
+          <Text style={ep.date}>{formatDate(event.date)}</Text>
+        </View>
+        {event.price && event.price !== 'Free' && (
+          <View style={[ep.price, { backgroundColor: et.color + '22' }]}>
+            <Text style={[ep.priceTxt, { color: et.color }]}>{event.price}</Text>
+          </View>
+        )}
+        {(!event.price || event.price === 'Free') && (
+          <View style={[ep.price, { backgroundColor: '#22c55e22' }]}>
+            <Text style={[ep.priceTxt, { color: '#22c55e' }]}>Free</Text>
+          </View>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
   );
 }
-const sb = StyleSheet.create({
-  wrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 16 },
-  icon:  { fontSize: 15 },
-  input: { flex: 1, color: '#fff', fontSize: 15 },
-  clear: { color: '#444', fontSize: 15, paddingHorizontal: 4 },
+const ep = StyleSheet.create({
+  pill:  { width: 210, borderRadius: 18, overflow: 'hidden', borderWidth: 1 },
+  inner: { padding: 14, gap: 5, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  etIcon:{ fontSize: 22 },
+  name:  { color: '#fff', fontSize: 13, fontWeight: '800' },
+  meta:  { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+  date:  { color: 'rgba(255,255,255,0.35)', fontSize: 10 },
+  price: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  priceTxt: { fontSize: 10, fontWeight: '800' },
 });
 
-// ─── Breadcrumb nav ───────────────────────────────────────────────────────────
-function Breadcrumb({ country, city, onCountry, onCity }) {
+// ─── Vibe button ──────────────────────────────────────────────────────────────
+function VibeButton({ vibe, onPress }) {
+  const anim = useFade(true);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}
-      contentContainerStyle={bc.row}>
-      <TouchableOpacity onPress={onCountry}>
-        <Text style={bc.link}>Explore</Text>
+    <Animated.View style={[{ flex: 1 }, anim]}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.82}>
+        <LinearGradient colors={[vibe.color + '22', vibe.color + '0a']} style={[vb.card, { borderColor: vibe.color + '40' }]}>
+          <Text style={vb.icon}>{vibe.icon}</Text>
+          <Text style={[vb.label, { color: vibe.color }]}>{vibe.label}</Text>
+        </LinearGradient>
       </TouchableOpacity>
-      {country && <>
-        <Text style={bc.sep}>›</Text>
-        <TouchableOpacity onPress={onCity}>
-          <Text style={city ? bc.link : bc.active}>{country.split(' ').slice(1).join(' ')}</Text>
-        </TouchableOpacity>
-      </>}
-      {city && <>
-        <Text style={bc.sep}>›</Text>
-        <Text style={bc.active}>{city}</Text>
-      </>}
-    </ScrollView>
+    </Animated.View>
   );
 }
-const bc = StyleSheet.create({
-  row:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, gap: 6 },
-  link:   { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
-  sep:    { color: '#333', fontSize: 14 },
-  active: { color: '#888', fontSize: 13 },
+const vb = StyleSheet.create({
+  card:  { borderRadius: 20, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, margin: 4 },
+  icon:  { fontSize: 28 },
+  label: { fontSize: 12, fontWeight: '800', textAlign: 'center' },
 });
 
 // ─── Country card ─────────────────────────────────────────────────────────────
-function CountryCard({ item, onPress, index }) {
-  const anim = useFadeSlide(true, index * 40);
-  const flag = item.split(' ')[0];
-  const name = item.split(' ').slice(1).join(' ');
+function CountryCard({ item, onPress, isLive, hasEvents, index }) {
+  const anim = useFade(true, index * 30);
+  const flag = countryFlag(item);
+  const name = countryName(item);
   return (
     <Animated.View style={[{ flex: 1 }, anim]}>
-      <TouchableOpacity style={crc.card} onPress={onPress} activeOpacity={0.82}>
-        <Text style={crc.flag}>{flag}</Text>
-        <Text style={crc.name} numberOfLines={2}>{name}</Text>
-        <Text style={crc.arrow}>›</Text>
+      <TouchableOpacity style={cc.card} onPress={onPress} activeOpacity={0.82}>
+        {isLive && <View style={cc.liveDot} />}
+        {hasEvents && !isLive && <View style={cc.eventDot} />}
+        <Text style={cc.flag}>{flag}</Text>
+        <Text style={cc.name} numberOfLines={2}>{name}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 }
-const crc = StyleSheet.create({
-  card:  { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 18, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#2F3336', margin: 5 },
-  flag:  { fontSize: 42 },
-  name:  { color: '#fff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  arrow: { color: '#6C47FF', fontSize: 14 },
+const cc = StyleSheet.create({
+  card:     { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#2F3336', margin: 5, minHeight: 100 },
+  flag:     { fontSize: 36 },
+  name:     { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
+  liveDot:  { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff5252' },
+  eventDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b' },
 });
 
-// ─── City card ────────────────────────────────────────────────────────────────
-function CityCard({ name, index, onPress }) {
-  const anim = useFadeSlide(true, index * 50);
-  const colors = [
-    ['#1C1F23', '#0f0f28'], ['#1a2a1a', '#0f1a0f'], ['#2a1a0e', '#1a0e06'],
-    ['#0a1e2e', '#061218'], ['#1a0a2e', '#100820'], ['#2a0a1a', '#1a0810'],
-  ];
-  const [c1, c2] = colors[index % colors.length];
+// ─── Spot card ────────────────────────────────────────────────────────────────
+function SpotCard({ item, onPress, showCity, index }) {
+  const anim = useFade(true, Math.min(index * 40, 300));
+  const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF', grad: ['#1C1F23', '#16181C'] };
+
   return (
     <Animated.View style={anim}>
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-        <LinearGradient colors={[c1, c2]} style={city.card}>
-          <View style={city.left}>
-            <Text style={city.icon}>🏙️</Text>
-            <View>
-              <Text style={city.name}>{name}</Text>
-              <Text style={city.sub}>Tap to explore spots</Text>
-            </View>
-          </View>
-          <Text style={city.arrow}>›</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-const city = StyleSheet.create({
-  card:  { borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#ffffff10' },
-  left:  { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  icon:  { fontSize: 34 },
-  name:  { color: '#fff', fontSize: 20, fontWeight: '800' },
-  sub:   { color: '#ffffff66', fontSize: 12, marginTop: 2 },
-  arrow: { color: '#6C47FF', fontSize: 26, fontWeight: '300' },
-});
-
-// ─── Spot type card ───────────────────────────────────────────────────────────
-function SpotTypeCard({ item, onPress, index, count }) {
-  const anim = useFadeSlide(true, index * 60);
-  return (
-    <Animated.View style={[stc.wrap, anim]}>
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-        <LinearGradient colors={item.grad} style={stc.card}>
-          <View style={[stc.iconCircle, { backgroundColor: item.color + '22', borderColor: item.color + '44' }]}>
-            <Text style={stc.icon}>{item.icon}</Text>
-          </View>
-          <View style={stc.info}>
-            <Text style={stc.label}>{item.label}</Text>
-            <Text style={stc.desc}>{item.desc}</Text>
-          </View>
-          <View style={stc.right}>
-            {count > 0 && (
-              <View style={[stc.countBadge, { backgroundColor: item.color + '22', borderColor: item.color + '44' }]}>
-                <Text style={[stc.countText, { color: item.color }]}>{count}</Text>
+      <TouchableOpacity style={sc.card} onPress={onPress} activeOpacity={0.88}>
+        <LinearGradient colors={meta.grad} style={sc.header}>
+          <Text style={sc.headerIcon}>{meta.icon}</Text>
+          <View style={sc.headerRight}>
+            {item.isLive && (
+              <View style={sc.liveBadge}>
+                <View style={sc.liveDot} />
+                <Text style={sc.liveTxt}>LIVE</Text>
               </View>
             )}
-            <Text style={[stc.arrow, { color: item.color }]}>›</Text>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-const stc = StyleSheet.create({
-  wrap:        { marginBottom: 12 },
-  card:        { borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#ffffff10' },
-  iconCircle:  { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  icon:        { fontSize: 26 },
-  info:        { flex: 1, gap: 3 },
-  label:       { color: '#fff', fontSize: 17, fontWeight: '800' },
-  desc:        { color: '#ffffff66', fontSize: 12 },
-  right:       { alignItems: 'center', gap: 6 },
-  countBadge:  { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
-  countText:   { fontSize: 12, fontWeight: '800' },
-  arrow:       { fontSize: 24, fontWeight: '300' },
-});
-
-// ─── Place card ───────────────────────────────────────────────────────────────
-function PlaceCard({ item, onPress, index }) {
-  const anim = useFadeSlide(true, index * 60);
-  const meta  = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF', grad: ['#1C1F23', '#16181C'] };
-
-  return (
-    <Animated.View style={anim}>
-      <TouchableOpacity style={pc.card} onPress={onPress} activeOpacity={0.88}>
-        {/* Cover header */}
-        <LinearGradient colors={meta.grad} style={pc.cover}>
-          <Text style={pc.coverIcon}>{meta.icon}</Text>
-          <View style={pc.coverRight}>
-            <View style={[pc.typeBadge, { backgroundColor: meta.color + '33', borderColor: meta.color + '66' }]}>
-              <Text style={[pc.typeText, { color: meta.color }]}>{meta.label}</Text>
-            </View>
+            {item.eventCount > 0 && !item.isLive && (
+              <View style={sc.eventBadge}>
+                <Text style={sc.eventTxt}>📅 {item.eventCount} event{item.eventCount > 1 ? 's' : ''}</Text>
+              </View>
+            )}
             {item.checkinCount > 0 && (
-              <View style={pc.liveBadge}>
-                <View style={pc.liveDot} />
-                <Text style={pc.liveText}>{item.checkinCount} here now</Text>
+              <View style={sc.hereBadge}>
+                <View style={sc.hereDot} />
+                <Text style={sc.hereTxt}>{item.checkinCount} here</Text>
               </View>
             )}
+            <View style={[sc.typeBadge, { backgroundColor: meta.color + '28', borderColor: meta.color + '55' }]}>
+              <Text style={[sc.typeLabel, { color: meta.color }]}>{meta.label}</Text>
+            </View>
           </View>
         </LinearGradient>
 
-        {/* Body */}
-        <View style={pc.body}>
-          <Text style={pc.name}>{item.name}</Text>
-          <Text style={pc.desc} numberOfLines={2}>{item.description}</Text>
+        <View style={sc.body}>
+          <Text style={sc.name}>{item.name}</Text>
+          {showCity && <Text style={sc.city}>📍 {item.city}</Text>}
+          <Text style={sc.desc} numberOfLines={2}>{item.description}</Text>
 
-          <View style={pc.metaRow}>
-            <Text style={pc.vibe}>{item.vibe}</Text>
-            <View style={pc.bestTime}>
-              <Text style={pc.bestTimeIcon}>⏰</Text>
-              <Text style={pc.bestTimeText}>{item.bestTime}</Text>
-            </View>
+          <View style={sc.metaRow}>
+            <Text style={sc.vibe}>{item.vibe}</Text>
+            <Text style={sc.bestTime}>⏰ {item.bestTime}</Text>
           </View>
 
           {item.tags?.length > 0 && (
-            <View style={pc.tags}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sc.tags}>
               {item.tags.slice(0, 4).map(tag => (
-                <View key={tag} style={[pc.tag, { backgroundColor: meta.color + '18', borderColor: meta.color + '40' }]}>
-                  <Text style={[pc.tagText, { color: meta.color }]}>#{tag}</Text>
+                <View key={tag} style={[sc.tag, { backgroundColor: meta.color + '15', borderColor: meta.color + '35' }]}>
+                  <Text style={[sc.tagTxt, { color: meta.color }]}>#{tag}</Text>
                 </View>
               ))}
-            </View>
+            </ScrollView>
           )}
 
-          <TouchableOpacity style={[pc.checkinBtn, { borderColor: meta.color + '55' }]} onPress={onPress}>
-            <Text style={[pc.checkinText, { color: meta.color }]}>📍  Check In & Chat</Text>
+          <TouchableOpacity style={[sc.cta, { borderColor: meta.color + '55' }]} onPress={onPress}>
+            <Text style={[sc.ctaTxt, { color: meta.color }]}>📍 Check In & Chat</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
-const pc = StyleSheet.create({
-  card:         { backgroundColor: '#16181C', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336' },
-  cover:        { height: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
-  coverIcon:    { fontSize: 52 },
-  coverRight:   { gap: 8, alignItems: 'flex-end' },
-  typeBadge:    { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
-  typeText:     { fontSize: 12, fontWeight: '700' },
-  liveBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ff525222', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#ff525244' },
-  liveDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
-  liveText:     { color: '#ff5252', fontSize: 10, fontWeight: '700' },
-  body:         { padding: 16, gap: 10 },
-  name:         { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
-  desc:         { color: '#888', fontSize: 13, lineHeight: 20 },
-  metaRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  vibe:         { color: '#fff', fontSize: 13, fontWeight: '600' },
-  bestTime:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bestTimeIcon: { fontSize: 12 },
-  bestTimeText: { color: '#555', fontSize: 12 },
-  tags:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag:          { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, borderWidth: 1 },
-  tagText:      { fontSize: 11, fontWeight: '600' },
-  checkinBtn:   { borderRadius: 13, paddingVertical: 12, alignItems: 'center', borderWidth: 1, backgroundColor: '#ffffff08' },
-  checkinText:  { fontSize: 14, fontWeight: '700' },
+const sc = StyleSheet.create({
+  card:       { backgroundColor: '#16181C', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336' },
+  header:     { height: 90, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
+  headerIcon: { fontSize: 46 },
+  headerRight:{ gap: 6, alignItems: 'flex-end', flexShrink: 1 },
+  liveBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ff525222', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#ff525244' },
+  liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
+  liveTxt:    { color: '#ff5252', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  eventBadge: { backgroundColor: '#f59e0b22', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#f59e0b44' },
+  eventTxt:   { color: '#f59e0b', fontSize: 11, fontWeight: '700' },
+  hereBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e18', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#22c55e33' },
+  hereDot:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22c55e' },
+  hereTxt:    { color: '#22c55e', fontSize: 10, fontWeight: '700' },
+  typeBadge:  { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
+  typeLabel:  { fontSize: 11, fontWeight: '700' },
+  body:       { padding: 16, gap: 9 },
+  name:       { color: '#fff', fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
+  city:       { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
+  desc:       { color: '#777', fontSize: 13, lineHeight: 19 },
+  metaRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  vibe:       { color: '#bbb', fontSize: 12, fontWeight: '600', flex: 1 },
+  bestTime:   { color: '#555', fontSize: 11 },
+  tags:       { gap: 6 },
+  tag:        { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, borderWidth: 1 },
+  tagTxt:     { fontSize: 11, fontWeight: '600' },
+  cta:        { borderRadius: 13, paddingVertical: 12, alignItems: 'center', borderWidth: 1, backgroundColor: '#ffffff07', marginTop: 2 },
+  ctaTxt:     { fontSize: 14, fontWeight: '700' },
 });
 
-// ─── Main Screen ───────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function ExploreScreen({ navigation, user }) {
-  const { colors } = useTheme();
   const socket = getSocket();
 
-  const [view,     setView]     = useState('countries');
-  const [countries,setCountries]= useState([]);
-  const [cities,   setCities]   = useState([]);
-  const [places,   setPlaces]   = useState([]);
-  const [selCountry, setSelCountry] = useState(null);
-  const [selCity,    setSelCity]    = useState(null);
-  const [search,     setSearch]     = useState('');
-  const [filter,     setFilter]     = useState('all');
-  const [selSpotType, setSelSpotType] = useState(null);
+  // ── State ──
+  const [countries,     setCountries]     = useState([]);
+  const [spots,         setSpots]         = useState([]);        // active list being shown
+  const [upcomingEvents,setUpcomingEvents] = useState([]);
+  const [liveVenues,    setLiveVenues]    = useState([]);
+  const [view,          setView]          = useState('discover'); // 'discover' | 'spots'
+  const [activeCountry, setActiveCountry] = useState(null);
+  const [activeVibe,    setActiveVibe]    = useState(null);
+  const [search,        setSearch]        = useState('');
+  const [typeFilter,    setTypeFilter]    = useState('all');
+  const [cityFilter,    setCityFilter]    = useState('all');
+  const [region,        setRegion]        = useState('all');
+  const [loading,       setLoading]       = useState(false);
+  const headerAnim = useFade(true);
 
-  const headerAnim = useFadeSlide(true);
-
+  // ── Socket setup ──
   useEffect(() => {
-    if (socket.connected) socket.emit('get_countries');
-    else socket.once('connect', () => socket.emit('get_countries'));
-    socket.on('countries_list', list => setCountries(list));
-    socket.on('cities_list', ({ cities: c }) => { setCities(c); setView('cities'); });
-    socket.on('places_list', ({ places: p }) => { setPlaces(p); setView('spot_types'); });
+    function init() {
+      socket.emit('get_countries');
+      socket.emit('get_upcoming_events');
+      socket.emit('get_live_venues');
+    }
+    if (socket.connected) init();
+    else socket.once('connect', init);
+
+    socket.on('countries_list',    list  => setCountries(list));
+    socket.on('upcoming_events',   evts  => setUpcomingEvents(evts || []));
+    socket.on('live_venues',       venues=> setLiveVenues(venues || []));
+    socket.on('country_places_list', ({ places }) => { setSpots(places || []); setLoading(false); });
+    socket.on('vibe_spots_list',     ({ places }) => { setSpots(places || []); setLoading(false); });
+    socket.on('venue_live_update',  () => socket.emit('get_live_venues'));
+
     return () => {
       socket.off('countries_list');
-      socket.off('cities_list');
-      socket.off('places_list');
+      socket.off('upcoming_events');
+      socket.off('live_venues');
+      socket.off('country_places_list');
+      socket.off('vibe_spots_list');
+      socket.off('venue_live_update');
     };
   }, []);
 
-  function selectCountry(c) { setSelCountry(c); setSearch(''); socket.emit('get_cities', { country: c }); }
-  function selectCity(c)    { setSelCity(c);    setSearch(''); setFilter('all'); socket.emit('get_places', { country: selCountry, city: c }); }
+  // ── Navigation ──
+  function openByCountry(country) {
+    setActiveCountry(country);
+    setActiveVibe(null);
+    setTypeFilter('all');
+    setCityFilter('all');
+    setSearch('');
+    setLoading(true);
+    socket.emit('get_country_places', { country });
+    setView('spots');
+  }
+
+  function openByVibe(vibeKey) {
+    setActiveVibe(vibeKey);
+    setActiveCountry(null);
+    setTypeFilter(vibeKey);
+    setCityFilter('all');
+    setSearch('');
+    setLoading(true);
+    socket.emit('get_spots_by_vibe', { type: vibeKey });
+    setView('spots');
+  }
 
   function goBack() {
+    setView('discover');
+    setActiveCountry(null);
+    setActiveVibe(null);
+    setSpots([]);
     setSearch('');
-    if (view === 'places') { setView('spot_types'); setSelSpotType(null); }
-    else if (view === 'spot_types') { setView('cities'); setSelCity(null); setPlaces([]); setSelSpotType(null); }
-    else if (view === 'cities') { setView('countries'); setSelCountry(null); setCities([]); }
+    setTypeFilter('all');
+    setCityFilter('all');
   }
 
-  function goToCountries() {
-    setView('countries'); setSelCountry(null); setSelCity(null);
-    setCities([]); setPlaces([]); setSearch(''); setSelSpotType(null);
-  }
-  function goToCities() {
-    setView('cities'); setSelCity(null); setPlaces([]); setSearch(''); setSelSpotType(null);
-  }
-
-  function selectSpotType(cat) {
-    setSelSpotType(cat.key);
-    setFilter(cat.key);
-    setSearch('');
-    setView('places');
-  }
-
-  function openPlace(place) {
+  function openSpot(place) {
     navigation.navigate('PlaceDetail', { place, user });
   }
 
-  const filteredPlaces = useMemo(() => {
-    return places.filter(p => {
+  // ── Derived data ──
+  const liveIds    = useMemo(() => new Set(liveVenues.map(v => v.id)), [liveVenues]);
+  const eventMap   = useMemo(() => {
+    const m = {};
+    upcomingEvents.forEach(e => { m[e.placeId] = (m[e.placeId] || 0) + 1; });
+    return m;
+  }, [upcomingEvents]);
+
+  const filteredCountries = useMemo(() => {
+    let list = countries;
+    if (search) list = list.filter(c => c.toLowerCase().includes(search.toLowerCase()));
+    if (region !== 'all') {
+      const reg = REGIONS.find(r => r.key === region);
+      if (reg?.match) list = list.filter(c => reg.match.some(m => c.includes(m)));
+    }
+    return list;
+  }, [countries, search, region]);
+
+  const filteredSpots = useMemo(() => {
+    return spots.filter(p => {
       const q = search.toLowerCase();
       const matchSearch = !q ||
         p.name.toLowerCase().includes(q) ||
         p.description?.toLowerCase().includes(q) ||
+        p.city?.toLowerCase().includes(q) ||
         p.vibe?.toLowerCase().includes(q) ||
         p.tags?.some(t => t.toLowerCase().includes(q));
-      const matchFilter = filter === 'all' || p.type === filter;
-      return matchSearch && matchFilter;
+      const matchType = typeFilter === 'all' || p.type === typeFilter;
+      const matchCity = cityFilter === 'all' || p.city === cityFilter;
+      return matchSearch && matchType && matchCity;
     });
-  }, [places, search, filter]);
+  }, [spots, search, typeFilter, cityFilter]);
 
-  const hotPlaces = useMemo(() => places.filter(p => (p.checkinCount || 0) > 0).slice(0, 5), [places]);
+  const cities = useMemo(() => {
+    const seen = new Set();
+    spots.forEach(p => seen.add(p.city));
+    return Array.from(seen).sort();
+  }, [spots]);
 
-  // ── Countries ──
-  if (view === 'countries') {
-    const filtered = countries.filter(c => c.toLowerCase().includes(search.toLowerCase()));
+  const liveSpots  = useMemo(() => filteredSpots.filter(p => p.isLive || liveIds.has(p.id)), [filteredSpots, liveIds]);
+  const eventSpots = useMemo(() => filteredSpots.filter(p => (p.eventCount || eventMap[p.id] || 0) > 0), [filteredSpots, eventMap]);
+
+  // ════════════════════════ DISCOVER VIEW ═══════════════════════════════════
+
+  if (view === 'discover') {
+    const activeVibeMeta = activeVibe ? VIBES.find(v => v.key === activeVibe) : null;
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-        <Animated.View style={[styles.header, headerAnim]}>
-          <Text style={[styles.title, { color: colors.text }]}>Explore ✈️</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>Find where people hang out worldwide</Text>
-        </Animated.View>
-        <SearchBar value={search} onChange={setSearch} placeholder="Search countries…" />
-        <FlatList
-          data={filtered}
-          keyExtractor={c => c}
-          numColumns={2}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={30}
-          contentContainerStyle={styles.countryGrid}
-          renderItem={({ item, index }) => (
-            <CountryCard item={item} index={index} onPress={() => selectCountry(item)} />
-          )}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 36 }}>🌍</Text>
-              <Text style={styles.emptyText}>No countries match "{search}"</Text>
-            </View>
-          }
-        />
-      </SafeAreaView>
-    );
-  }
+      <LinearGradient colors={['#0d001a', '#050010', '#000000']} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ds.scroll}>
 
-  // ── Cities ──
-  if (view === 'cities') {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-        <Animated.View style={[styles.header, headerAnim]}>
-          <Breadcrumb country={selCountry} onCountry={goToCountries} onCity={null} />
-          <Text style={styles.title}>{selCountry?.split(' ').slice(1).join(' ')}</Text>
-          <Text style={styles.subtitle}>Choose a city to explore</Text>
-        </Animated.View>
-        <FlatList
-          data={cities}
-          keyExtractor={c => c}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={30}
-          contentContainerStyle={styles.cityList}
-          renderItem={({ item, index }) => (
-            <CityCard name={item} index={index} onPress={() => selectCity(item)} />
-          )}
-        />
-      </SafeAreaView>
-    );
-  }
+          {/* Header */}
+          <Animated.View style={[ds.header, headerAnim]}>
+            <Text style={ds.title}>Globe Pulse 🌍</Text>
+            <Text style={ds.sub}>Find where the world hangs out</Text>
+          </Animated.View>
 
-  // ── Spot Types ──
-  if (view === 'spot_types') {
-    const countForType = key => key === 'all' ? places.length : places.filter(p => p.type === key).length;
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-        <Animated.View style={[styles.header, headerAnim]}>
-          <Breadcrumb country={selCountry} city={selCity} onCountry={goToCountries} onCity={goToCities} />
-          <View style={styles.placesHeadRow}>
-            <View>
-              <Text style={styles.title}>🏙️ {selCity}</Text>
-              <Text style={styles.subtitle}>Where do you want to hang out?</Text>
-            </View>
-            <TouchableOpacity style={styles.backBtn} onPress={goBack}>
-              <Text style={styles.backBtnText}>← Back</Text>
-            </TouchableOpacity>
+          {/* Search */}
+          <View style={ds.searchWrap}>
+            <Text style={ds.searchIcon}>🔍</Text>
+            <TextInput
+              style={ds.searchInput}
+              placeholder="Search countries, cities, spots…"
+              placeholderTextColor="#444"
+              value={search}
+              onChangeText={setSearch}
+              autoCapitalize="none"
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444', paddingHorizontal: 6 }}>✕</Text></TouchableOpacity>
+            )}
           </View>
-        </Animated.View>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.spotTypeList}>
-          {SPOT_CATEGORIES.map((cat, index) => {
-            const cnt = countForType(cat.key);
-            if (cat.key !== 'all' && cnt === 0) return null;
-            return (
-              <SpotTypeCard
-                key={cat.key}
-                item={cat}
-                index={index}
-                count={cnt}
-                onPress={() => selectSpotType(cat)}
-              />
-            );
-          })}
+
+          {/* Upcoming Events strip */}
+          {upcomingEvents.length > 0 && (
+            <View style={ds.section}>
+              <View style={ds.sectionRow}>
+                <View style={ds.sectionDot} />
+                <Text style={ds.sectionTitle}>Events Happening Soon</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+                {upcomingEvents.slice(0, 15).map((evt, i) => (
+                  <EventPill key={evt.id || i} event={evt} onPress={() => {
+                    const spot = { id: evt.placeId, name: evt.placeName, country: evt.placeCountry, city: evt.placeCity, type: evt.placeType };
+                    navigation.navigate('PlaceDetail', { place: spot, user });
+                  }} />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Live Right Now */}
+          {liveVenues.length > 0 && (
+            <View style={ds.section}>
+              <View style={ds.sectionRow}>
+                <View style={[ds.sectionDot, { backgroundColor: '#ff5252' }]} />
+                <Text style={ds.sectionTitle}>🔴 Live Right Now</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+                {liveVenues.map((v, i) => {
+                  const meta = TYPE_META[v.type] || { icon: '📍', color: '#6C47FF' };
+                  return (
+                    <TouchableOpacity key={v.id || i} style={ds.liveCard} onPress={() => navigation.navigate('PlaceDetail', { place: v, user })} activeOpacity={0.85}>
+                      <LinearGradient colors={['#ff525218', '#ff525208']} style={ds.liveInner}>
+                        <Text style={{ fontSize: 28 }}>{meta.icon}</Text>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={ds.liveName} numberOfLines={1}>{v.name}</Text>
+                          <Text style={ds.liveInfo}>{countryFlag(v.country)} {v.city}</Text>
+                          {v.liveHost && <Text style={ds.liveHost}>🎙 {v.liveHost.username}</Text>}
+                        </View>
+                        <View style={ds.livePill}><View style={ds.livePillDot}/><Text style={ds.livePillTxt}>LIVE</Text></View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* What's your vibe? */}
+          <View style={ds.section}>
+            <View style={ds.sectionRow}>
+              <Text style={ds.sectionTitle}>What's your vibe?</Text>
+              <Text style={ds.sectionHint}>tap to explore globally</Text>
+            </View>
+            <View style={ds.vibeGrid}>
+              {VIBES.map(v => (
+                <VibeButton key={v.key} vibe={v} onPress={() => openByVibe(v.key)} />
+              ))}
+            </View>
+          </View>
+
+          {/* Region pills */}
+          <View style={ds.section}>
+            <View style={ds.sectionRow}>
+              <Text style={ds.sectionTitle}>Browse by Region</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+              {REGIONS.map(r => (
+                <TouchableOpacity
+                  key={r.key}
+                  style={[ds.regionPill, region === r.key && ds.regionPillOn]}
+                  onPress={() => setRegion(r.key)}
+                >
+                  <Text style={[ds.regionTxt, region === r.key && ds.regionTxtOn]}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Countries */}
+          <View style={[ds.section, { paddingHorizontal: 0 }]}>
+            <View style={[ds.sectionRow, { paddingHorizontal: 20 }]}>
+              <Text style={ds.sectionTitle}>{countryName(REGIONS.find(r => r.key === region)?.label || 'All')} Countries</Text>
+              <Text style={ds.sectionHint}>{filteredCountries.length} countries</Text>
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={c => c}
+              numColumns={3}
+              scrollEnabled={false}
+              contentContainerStyle={{ paddingHorizontal: 12 }}
+              renderItem={({ item, index }) => (
+                <CountryCard
+                  item={item}
+                  index={index}
+                  isLive={liveVenues.some(v => v.country === item)}
+                  hasEvents={upcomingEvents.some(e => e.placeCountry === item)}
+                  onPress={() => openByCountry(item)}
+                />
+              )}
+              ListEmptyComponent={
+                <View style={ds.empty}>
+                  <Text style={{ fontSize: 36 }}>🌍</Text>
+                  <Text style={ds.emptyTxt}>No countries match "{search}"</Text>
+                </View>
+              }
+            />
+          </View>
+
         </ScrollView>
       </SafeAreaView>
+      </LinearGradient>
     );
   }
 
-  // ── Places ──
+  // ════════════════════════ SPOTS VIEW ══════════════════════════════════════
+
+  const spotVibeMeta  = activeVibe   ? VIBES.find(v => v.key === activeVibe)   : null;
+  const spotsHeading  = activeCountry
+    ? `${countryFlag(activeCountry)} ${countryName(activeCountry)}`
+    : spotVibeMeta ? `${spotVibeMeta.icon} ${spotVibeMeta.label} Worldwide` : 'Spots';
+
+  const countryUpcoming = activeCountry
+    ? upcomingEvents.filter(e => e.placeCountry === activeCountry)
+    : [];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.placesScroll}>
+    <LinearGradient colors={['#0d001a', '#050010', '#000000']} style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
 
         {/* Header */}
-        <Animated.View style={[styles.header, headerAnim]}>
-          <Breadcrumb country={selCountry} city={selCity} onCountry={goToCountries} onCity={goToCities} />
-          <View style={styles.placesHeadRow}>
-            <View>
-              <Text style={styles.title}>
-                {SPOT_CATEGORIES.find(c => c.key === selSpotType)?.icon ?? '📍'} {selCity}
-              </Text>
-              <Text style={styles.subtitle}>
-                {filteredPlaces.length} {SPOT_CATEGORIES.find(c => c.key === selSpotType)?.label ?? 'spots'} to explore
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.backBtn} onPress={goBack}>
-              <Text style={styles.backBtnText}>← Back</Text>
-            </TouchableOpacity>
+        <View style={sv.header}>
+          <TouchableOpacity style={sv.backBtn} onPress={goBack}>
+            <Text style={sv.backTxt}>← Back</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={sv.title}>{spotsHeading}</Text>
+            <Text style={sv.sub}>{filteredSpots.length} spots{activeCountry ? '' : ` across ${new Set(spots.map(p => p.country)).size} countries`}</Text>
           </View>
-        </Animated.View>
+        </View>
 
         {/* Search */}
-        <SearchBar value={search} onChange={setSearch} placeholder="Search spots, vibes, tags…" />
+        <View style={sv.searchWrap}>
+          <Text style={{ color: '#555', fontSize: 14 }}>🔍</Text>
+          <TextInput
+            style={sv.searchInput}
+            placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
+            placeholderTextColor="#444"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+          />
+          {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444' }}>✕</Text></TouchableOpacity>}
+        </View>
 
-        {/* Filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}
-          contentContainerStyle={styles.filters}>
-          {FILTERS.map(f => (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.filterChip, filter === f.key && styles.filterChipOn]}
-              onPress={() => setFilter(f.key)}
-            >
-              <Text style={[styles.filterText, filter === f.key && styles.filterTextOn]}>{f.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Hot right now */}
-        {hotPlaces.length > 0 && !search && filter === 'all' && (
-          <View style={styles.hotSection}>
-            <View style={styles.hotHead}>
-              <Text style={styles.sectionTitle}>🔴 Active Right Now</Text>
-              <View style={styles.liveTag}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveTagText}>live</Text>
-              </View>
+        {/* Upcoming events strip for this country */}
+        {countryUpcoming.length > 0 && (
+          <View style={{ marginBottom: 20 }}>
+            <View style={sv.sectionRow}>
+              <View style={sv.dot} />
+              <Text style={sv.sectionTitle}>Events Coming Up</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-              {hotPlaces.map(p => {
-                const m = TYPE_META[p.type] || { icon: '📍', color: '#6C47FF' };
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+              {countryUpcoming.map((evt, i) => (
+                <EventPill key={evt.id || i} event={evt} onPress={() => {
+                  const spot = spots.find(s => s.id === evt.placeId) || { id: evt.placeId, name: evt.placeName, country: evt.placeCountry, city: evt.placeCity };
+                  navigation.navigate('PlaceDetail', { place: spot, user });
+                }} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Live spots strip */}
+        {liveSpots.length > 0 && (
+          <View style={{ marginBottom: 20 }}>
+            <View style={sv.sectionRow}>
+              <View style={[sv.dot, { backgroundColor: '#ff5252' }]} />
+              <Text style={sv.sectionTitle}>🔴 Live Right Now</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+              {liveSpots.map((p, i) => {
+                const meta = TYPE_META[p.type] || { icon: '📍', color: '#6C47FF' };
                 return (
-                  <TouchableOpacity key={p.id} style={[hot.card, { borderColor: m.color + '44' }]} onPress={() => openPlace(p)}>
-                    <Text style={hot.icon}>{m.icon}</Text>
-                    <Text style={hot.name} numberOfLines={1}>{p.name}</Text>
-                    <View style={hot.countRow}>
-                      <View style={hot.dot} />
-                      <Text style={hot.count}>{p.checkinCount}</Text>
-                    </View>
+                  <TouchableOpacity key={p.id} style={sv.liveCard} onPress={() => openSpot(p)} activeOpacity={0.85}>
+                    <Text style={{ fontSize: 26 }}>{meta.icon}</Text>
+                    <Text style={sv.liveName} numberOfLines={2}>{p.name}</Text>
+                    <View style={sv.livePill}><View style={sv.liveDot}/><Text style={sv.liveTxt}>LIVE</Text></View>
                   </TouchableOpacity>
                 );
               })}
@@ -524,66 +605,119 @@ export default function ExploreScreen({ navigation, user }) {
           </View>
         )}
 
-        {/* Place list */}
-        <View style={styles.placesList}>
-          {filteredPlaces.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 36 }}>🔍</Text>
-              <Text style={styles.emptyText}>No spots match your search</Text>
-            </View>
-          ) : (
-            filteredPlaces.map((item, index) => (
-              <PlaceCard key={item.id} item={item} index={index} onPress={() => openPlace(item)} />
-            ))
-          )}
-        </View>
+        {/* Type filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}
+          contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+          {[{ key: 'all', icon: '🌍', label: 'All', color: '#6C47FF' }, ...VIBES].map(v => (
+            <TouchableOpacity
+              key={v.key}
+              style={[sv.filterChip, typeFilter === v.key && { backgroundColor: v.color + '22', borderColor: v.color }]}
+              onPress={() => setTypeFilter(v.key)}
+            >
+              <Text style={{ fontSize: 13 }}>{v.icon}</Text>
+              <Text style={[sv.filterTxt, typeFilter === v.key && { color: v.color, fontWeight: '800' }]}>{v.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* City filter (only for country view) */}
+        {activeCountry && cities.length > 1 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+            {[{ key: 'all', label: '🏙️ All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
+              <TouchableOpacity
+                key={c.key}
+                style={[sv.cityChip, cityFilter === c.key && sv.cityChipOn]}
+                onPress={() => setCityFilter(c.key)}
+              >
+                <Text style={[sv.cityTxt, cityFilter === c.key && sv.cityTxtOn]}>{c.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Spots list */}
+        {loading ? (
+          <View style={{ alignItems: 'center', paddingTop: 60 }}>
+            <Text style={{ color: '#555', fontSize: 15 }}>Loading spots…</Text>
+          </View>
+        ) : filteredSpots.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+            <Text style={{ fontSize: 40 }}>🔍</Text>
+            <Text style={{ color: '#555', fontSize: 15 }}>No spots match your search</Text>
+          </View>
+        ) : (
+          <View style={{ paddingHorizontal: 20, gap: 14 }}>
+            {filteredSpots.map((item, index) => (
+              <SpotCard
+                key={item.id}
+                item={{ ...item, isLive: item.isLive || liveIds.has(item.id), eventCount: item.eventCount || eventMap[item.id] || 0 }}
+                index={index}
+                showCity={!activeCountry || cityFilter !== 'all'}
+                onPress={() => openSpot(item)}
+              />
+            ))}
+          </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
+    </LinearGradient>
   );
 }
 
-const hot = StyleSheet.create({
-  card:     { width: 96, backgroundColor: '#16181C', borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1 },
-  icon:     { fontSize: 28 },
-  name:     { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  countRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot:      { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
-  count:    { color: '#ff5252', fontSize: 11, fontWeight: '700' },
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const ds = StyleSheet.create({
+  scroll:       { paddingBottom: 60 },
+  header:       { paddingHorizontal: 22, paddingTop: 18, paddingBottom: 8 },
+  title:        { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  sub:          { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 3 },
+  searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 24 },
+  searchIcon:   { fontSize: 15 },
+  searchInput:  { flex: 1, color: '#fff', fontSize: 15 },
+  section:      { marginBottom: 28 },
+  sectionRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 14 },
+  sectionDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF' },
+  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  sectionHint:  { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginLeft: 'auto' },
+  liveCard:     { width: 200, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#ff525230' },
+  liveInner:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  liveName:     { color: '#fff', fontSize: 13, fontWeight: '800', flex: 1 },
+  liveInfo:     { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
+  liveHost:     { color: '#ff5252', fontSize: 10, marginTop: 2 },
+  livePill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  livePillDot:  { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
+  livePillTxt:  { color: '#ff5252', fontSize: 10, fontWeight: '900' },
+  vibeGrid:     { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 },
+  regionPill:   { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  regionPillOn: { backgroundColor: 'rgba(108,71,255,0.18)', borderColor: '#6C47FF' },
+  regionTxt:    { color: '#555', fontSize: 13, fontWeight: '600' },
+  regionTxtOn:  { color: '#6C47FF', fontWeight: '800' },
+  empty:        { alignItems: 'center', paddingTop: 40, gap: 10 },
+  emptyTxt:     { color: '#555', fontSize: 14 },
 });
 
-const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#000000' },
-
-  header:         { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 10, gap: 4 },
-  title:          { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-  subtitle:       { color: '#555', fontSize: 13 },
-
-  placesHeadRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  backBtn:        { backgroundColor: '#6C47FF18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#6C47FF40' },
-  backBtnText:    { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
-
-  countryGrid:    { paddingHorizontal: 15, paddingBottom: 40 },
-
-  cityList:       { paddingHorizontal: 20, paddingBottom: 40, gap: 12 },
-  spotTypeList:   { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
-
-  placesScroll:   { paddingBottom: 60 },
-  placesList:     { paddingHorizontal: 20, gap: 14 },
-
-  filters:        { paddingHorizontal: 20, gap: 8 },
-  filterChip:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  filterChipOn:   { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
-  filterText:     { color: '#555', fontSize: 13, fontWeight: '600' },
-  filterTextOn:   { color: '#fff' },
-
-  hotSection:     { paddingHorizontal: 20, marginBottom: 20, gap: 12 },
-  hotHead:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionTitle:   { color: '#fff', fontSize: 16, fontWeight: '800' },
-  liveTag:        { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ff525215', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#ff525230' },
-  liveDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
-  liveTagText:    { color: '#ff5252', fontSize: 11, fontWeight: '700' },
-
-  empty:          { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText:      { color: '#555', fontSize: 15 },
+const sv = StyleSheet.create({
+  header:     { flexDirection: 'row', alignItems: 'flex-end', gap: 14, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14 },
+  backBtn:    { backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)' },
+  backTxt:    { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
+  title:      { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  sub:        { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 3 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 16 },
+  searchInput:{ flex: 1, color: '#fff', fontSize: 14 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 12 },
+  dot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF' },
+  sectionTitle:{ color: '#fff', fontSize: 15, fontWeight: '800' },
+  liveCard:   { width: 130, backgroundColor: '#1a0505', borderRadius: 16, padding: 12, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#ff525230' },
+  liveName:   { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  livePill:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  liveDot:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
+  liveTxt:    { color: '#ff5252', fontSize: 10, fontWeight: '800' },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  filterTxt:  { color: '#555', fontSize: 12, fontWeight: '600' },
+  cityChip:   { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
+  cityChipOn: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF' },
+  cityTxt:    { color: '#555', fontSize: 12, fontWeight: '600' },
+  cityTxtOn:  { color: '#6C47FF', fontWeight: '800' },
 });

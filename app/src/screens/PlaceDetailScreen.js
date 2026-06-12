@@ -2,8 +2,29 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView,
+  Modal, Alert,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
+
+const EVENT_TYPES = [
+  { key: 'concert',  icon: '🎵', label: 'Concert',      color: '#8b5cf6' },
+  { key: 'party',    icon: '🎉', label: 'Party',         color: '#ec4899' },
+  { key: 'sports',   icon: '⚽', label: 'Sports Night',  color: '#f97316' },
+  { key: 'comedy',   icon: '😂', label: 'Comedy',        color: '#f59e0b' },
+  { key: 'open mic', icon: '🎙️', label: 'Open Mic',      color: '#22c55e' },
+  { key: 'festival', icon: '🎪', label: 'Festival',      color: '#06b6d4' },
+  { key: 'special',  icon: '✨', label: 'Special',       color: '#6366f1' },
+];
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' +
+           d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch { return dateStr; }
+}
 
 export default function PlaceDetailScreen({ route, navigation }) {
   const { place, user } = route.params || {};
@@ -17,6 +38,14 @@ export default function PlaceDetailScreen({ route, navigation }) {
   const [myRating, setMyRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [venueEvents,   setVenueEvents]   = useState([]);
+  const [isVenueLive,   setIsVenueLive]   = useState(place?.isLive || false);
+  const [showPostEvent, setShowPostEvent] = useState(false);
+  const [evtTitle,  setEvtTitle]  = useState('');
+  const [evtDate,   setEvtDate]   = useState('');
+  const [evtType,   setEvtType]   = useState('concert');
+  const [evtDesc,   setEvtDesc]   = useState('');
+  const [evtPrice,  setEvtPrice]  = useState('Free');
   const flatRef      = useRef(null);
   const checkedInRef = useRef(false);
   const socket       = getSocket();
@@ -25,6 +54,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
     function fetchPlaceData() {
       socket.emit('get_place_checkins', { placeId: place?.id });
       socket.emit('get_reviews', { placeId: place?.id });
+      socket.emit('get_venue_events', { placeId: place?.id });
     }
     if (socket.connected) fetchPlaceData();
     else socket.once('connect', fetchPlaceData);
@@ -38,8 +68,12 @@ export default function PlaceDetailScreen({ route, navigation }) {
     socket.on('place_history', ({ placeId, messages: hist }) => {
       if (placeId === place?.id) setMessages(hist);
     });
-    socket.on('place_message', (msg) => {
-      setMessages(prev => [...prev, msg]);
+    socket.on('place_message', msg => setMessages(prev => [...prev, msg]));
+    socket.on('venue_events', ({ placeId, events }) => {
+      if (placeId === place?.id) setVenueEvents(events || []);
+    });
+    socket.on('venue_live_update', ({ placeId, isLive }) => {
+      if (placeId === place?.id) setIsVenueLive(isLive);
     });
 
     return () => {
@@ -48,6 +82,8 @@ export default function PlaceDetailScreen({ route, navigation }) {
       socket.off('place_reviews');
       socket.off('place_history');
       socket.off('place_message');
+      socket.off('venue_events');
+      socket.off('venue_live_update');
     };
   }, []);
 
@@ -74,6 +110,28 @@ export default function PlaceDetailScreen({ route, navigation }) {
     if (!text.trim() || !checkedIn) return;
     socket.emit('place_message', { placeId: place?.id, text: text.trim() });
     setText('');
+  }
+
+  function toggleVenueLive() {
+    if (isVenueLive) {
+      Alert.alert('End Live?', 'Stop broadcasting from this venue?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'End Live', style: 'destructive', onPress: () => {
+          socket.emit('venue_end_live', { placeId: place?.id });
+          setIsVenueLive(false);
+        }},
+      ]);
+    } else {
+      socket.emit('venue_go_live', { placeId: place?.id });
+      setIsVenueLive(true);
+    }
+  }
+
+  function submitVenueEvent() {
+    if (!evtTitle.trim() || !evtDate.trim()) return Alert.alert('Required', 'Title and date are required');
+    socket.emit('post_venue_event', { placeId: place?.id, title: evtTitle, date: evtDate, type: evtType, description: evtDesc, price: evtPrice });
+    setEvtTitle(''); setEvtDate(''); setEvtDesc(''); setEvtPrice('Free');
+    setShowPostEvent(false);
   }
 
   function submitReview() {
@@ -149,23 +207,34 @@ export default function PlaceDetailScreen({ route, navigation }) {
         </View>
       )}
 
+      {/* Venue owner actions */}
+      <View style={styles.ownerBar}>
+        <TouchableOpacity style={[styles.ownerBtn, isVenueLive && styles.ownerBtnLive]} onPress={toggleVenueLive}>
+          <View style={styles.ownerBtnDot} />
+          <Text style={[styles.ownerBtnTxt, isVenueLive && { color: '#ff5252' }]}>
+            {isVenueLive ? 'End Live' : 'Go Live'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.ownerBtn} onPress={() => setShowPostEvent(true)}>
+          <Text style={styles.ownerBtnTxt}>📅 Post Event</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Tabs */}
-      <View style={styles.tabs}>
-        {['info', 'reviews', 'chat', 'people'].map(t => (
-          <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
-          >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'info' && '📋 Info'}
-              {t === 'reviews' && `⭐ Reviews${reviews.length > 0 ? ` (${reviews.length})` : ''}`}
-              {t === 'chat' && `💬 Chat${messages.length > 0 ? ` (${messages.length})` : ''}`}
-              {t === 'people' && `👥 (${checkins.length})`}
-            </Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ borderBottomWidth: 1, borderBottomColor: '#1C1F23' }}
+        contentContainerStyle={styles.tabs}>
+        {[
+          { key: 'info',    label: '📋 Info' },
+          { key: 'events',  label: `📅 Events${venueEvents.length > 0 ? ` (${venueEvents.length})` : ''}` },
+          { key: 'reviews', label: `⭐ Reviews${reviews.length > 0 ? ` (${reviews.length})` : ''}` },
+          { key: 'chat',    label: `💬 Chat${messages.length > 0 ? ` (${messages.length})` : ''}` },
+          { key: 'people',  label: `👥 (${checkins.length})` },
+        ].map(t => (
+          <TouchableOpacity key={t.key} style={[styles.tab, tab === t.key && styles.tabActive]} onPress={() => setTab(t.key)}>
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {/* INFO TAB */}
       {tab === 'info' && (
@@ -321,6 +390,50 @@ export default function PlaceDetailScreen({ route, navigation }) {
         </ScrollView>
       )}
 
+      {/* EVENTS TAB */}
+      {tab === 'events' && (
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
+          {venueEvents.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingTop: 50, gap: 12 }}>
+              <Text style={{ fontSize: 42 }}>📅</Text>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>No events posted yet</Text>
+              <Text style={{ color: '#555', fontSize: 13, textAlign: 'center' }}>Venue owners can post upcoming concerts, parties, and events.</Text>
+              <TouchableOpacity style={styles.postEventCta} onPress={() => setShowPostEvent(true)}>
+                <Text style={styles.postEventCtaTxt}>Post the first event →</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            venueEvents.map((evt, i) => {
+              const et = EVENT_TYPES.find(e => e.key === evt.type) || EVENT_TYPES[0];
+              return (
+                <View key={evt.id || i} style={[styles.eventCard, { borderLeftColor: et.color }]}>
+                  <LinearGradient colors={[et.color + '18', et.color + '06']} style={styles.eventInner}>
+                    <View style={styles.eventTop}>
+                      <View style={[styles.eventTypeBadge, { backgroundColor: et.color + '22', borderColor: et.color + '55' }]}>
+                        <Text style={{ fontSize: 14 }}>{et.icon}</Text>
+                        <Text style={[styles.eventTypeTxt, { color: et.color }]}>{et.label}</Text>
+                      </View>
+                      {evt.price && (
+                        <View style={[styles.eventPriceBadge, evt.price === 'Free' ? { backgroundColor: '#22c55e18', borderColor: '#22c55e40' } : { backgroundColor: '#f59e0b18', borderColor: '#f59e0b40' }]}>
+                          <Text style={{ color: evt.price === 'Free' ? '#22c55e' : '#f59e0b', fontSize: 12, fontWeight: '800' }}>{evt.price}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.eventTitle}>{evt.title}</Text>
+                    <Text style={styles.eventDate}>📅 {formatDate(evt.date)}</Text>
+                    {evt.description ? <Text style={styles.eventDesc}>{evt.description}</Text> : null}
+                    <Text style={styles.eventPostedBy}>Posted by {evt.postedBy} {evt.postedByCountry}</Text>
+                  </LinearGradient>
+                </View>
+              );
+            })
+          )}
+          <TouchableOpacity style={styles.addEventBtn} onPress={() => setShowPostEvent(true)}>
+            <Text style={styles.addEventTxt}>+ Post an Event</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
       {/* PEOPLE TAB */}
       {tab === 'people' && (
         <FlatList
@@ -349,6 +462,37 @@ export default function PlaceDetailScreen({ route, navigation }) {
           )}
         />
       )}
+      {/* Post Event Modal */}
+      <Modal visible={showPostEvent} animationType="slide" transparent onRequestClose={() => setShowPostEvent(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowPostEvent(false)} />
+          <View style={styles.evtSheet}>
+            <View style={styles.evtHandle} />
+            <Text style={styles.evtSheetTitle}>Post Event at {place?.name}</Text>
+
+            <TextInput style={styles.evtInput} placeholder="Event title…" placeholderTextColor="#444" value={evtTitle} onChangeText={setEvtTitle} />
+            <TextInput style={styles.evtInput} placeholder="Date & time (e.g. Dec 25, 9pm)…" placeholderTextColor="#444" value={evtDate} onChangeText={setEvtDate} />
+            <TextInput style={styles.evtInput} placeholder="Price (e.g. Free, $20, €15)…" placeholderTextColor="#444" value={evtPrice} onChangeText={setEvtPrice} />
+            <TextInput style={[styles.evtInput, { minHeight: 70 }]} placeholder="Description (optional)…" placeholderTextColor="#444" value={evtDesc} onChangeText={setEvtDesc} multiline />
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {EVENT_TYPES.map(et => (
+                <TouchableOpacity key={et.key}
+                  style={[styles.evtTypeChip, evtType === et.key && { backgroundColor: et.color + '28', borderColor: et.color }]}
+                  onPress={() => setEvtType(et.key)}>
+                  <Text>{et.icon}</Text>
+                  <Text style={[styles.evtTypeLabel, evtType === et.key && { color: et.color }]}>{et.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.evtSubmitBtn} onPress={submitVenueEvent}>
+              <Text style={styles.evtSubmitTxt}>Post Event 📅</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -507,4 +651,37 @@ const styles = StyleSheet.create({
   reviewStarsText: { color: '#f59e0b', fontSize: 16 },
   reviewText: { color: '#ccc', fontSize: 14, lineHeight: 20 },
   reviewDate: { color: '#555', fontSize: 11 },
+
+  // Owner bar
+  ownerBar:      { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
+  ownerBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, backgroundColor: '#1C1F23', borderWidth: 1, borderColor: '#2F3336' },
+  ownerBtnLive:  { backgroundColor: '#ff525215', borderColor: '#ff525230' },
+  ownerBtnDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
+  ownerBtnTxt:   { color: '#aaa', fontSize: 12, fontWeight: '700' },
+
+  // Events tab
+  eventCard:     { borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderLeftWidth: 3 },
+  eventInner:    { padding: 16, gap: 8 },
+  eventTop:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  eventTypeBadge:{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
+  eventTypeTxt:  { fontSize: 12, fontWeight: '700' },
+  eventPriceBadge:{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, marginLeft: 'auto' },
+  eventTitle:    { color: '#fff', fontSize: 17, fontWeight: '900' },
+  eventDate:     { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+  eventDesc:     { color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 19 },
+  eventPostedBy: { color: '#444', fontSize: 11 },
+  addEventBtn:   { backgroundColor: 'rgba(108,71,255,0.12)', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(108,71,255,0.25)', marginTop: 4 },
+  addEventTxt:   { color: '#6C47FF', fontSize: 14, fontWeight: '700' },
+  postEventCta:  { backgroundColor: '#6C47FF', borderRadius: 14, paddingHorizontal: 22, paddingVertical: 12 },
+  postEventCtaTxt:{ color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // Post Event modal
+  evtSheet:      { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, paddingBottom: 44 },
+  evtHandle:     { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  evtSheetTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  evtInput:      { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, borderWidth: 1, borderColor: '#2a2a2a' },
+  evtTypeChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
+  evtTypeLabel:  { color: '#666', fontSize: 13, fontWeight: '600' },
+  evtSubmitBtn:  { backgroundColor: '#6C47FF', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
+  evtSubmitTxt:  { color: '#fff', fontSize: 16, fontWeight: '800' },
 });

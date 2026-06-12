@@ -13,9 +13,9 @@ Sound.setCategory('Playback');
 import { launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 import { getSocket } from '../services/socket';
-import { logout, getAccessToken } from '../services/authApi';
+import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
-import { usePremium, TIERS } from '../context/PremiumContext';
+import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
@@ -44,25 +44,21 @@ const LANGUAGES = [
   { code: 'id', flag: '🇮🇩', label: 'Indonesian' },
 ];
 
-
-const CULTURE_CATS = ['food', 'tradition', 'music', 'humor', 'language', 'places', 'daily life', 'celebration'];
+const CULTURE_CATS   = ['food', 'tradition', 'music', 'humor', 'language', 'places', 'daily life', 'celebration'];
 const CULTURE_EMOJIS = ['🌍', '🍜', '🎵', '😂', '🏛️', '🗺️', '🎉', '🤝', '🏠', '👨‍👩‍👧‍👦', '🎭', '🌺'];
+
+// World Impressions — the 3 footprint prompts
+const IMPRESSION_PROMPTS = [
+  { key: 'give',    icon: '🌍', prompt: 'One thing my country gave the world…' },
+  { key: 'draw',    icon: '🤝', prompt: 'What draws me to meeting new people…' },
+  { key: 'moment',  icon: '👣', prompt: 'The moment that left the biggest footprint on me…' },
+];
 
 function completionPct(profile) {
   const fields = ['photo_url', 'voice_note_url', 'bio', 'age', 'city'];
   const filled = fields.filter(f => profile?.[f]).length;
   const hasTypes = (profile?.connection_types || []).length > 0;
   return Math.round(((filled + (hasTypes ? 1 : 0)) / (fields.length + 1)) * 100);
-}
-
-function getReliability(score) {
-  if (!score) return { label: 'New', color: '#888', pct: 0 };
-  const pct = ((score - 1) / 4) * 100;
-  if (score >= 4.5) return { label: 'Excellent', color: '#ffd700', pct };
-  if (score >= 3.5) return { label: 'Great',     color: '#57f287', pct };
-  if (score >= 2.5) return { label: 'Good',      color: '#57c4ff', pct };
-  if (score >= 1.5) return { label: 'Fair',      color: '#fee75c', pct };
-  return               { label: 'Low',       color: '#f04747', pct };
 }
 
 // ─── Voice note player ────────────────────────────────────────────────────────
@@ -117,12 +113,7 @@ function VoiceNotePlayer({ url }) {
   }
 
   return (
-    <TouchableOpacity
-      style={vStyles.container}
-      onPress={togglePlay}
-      activeOpacity={0.85}
-      disabled={loading || loadErr}
-    >
+    <TouchableOpacity style={vStyles.container} onPress={togglePlay} activeOpacity={0.85} disabled={loading || loadErr}>
       {loading ? (
         <ActivityIndicator color="#6C47FF" size="small" />
       ) : (
@@ -191,104 +182,65 @@ function EditModal({ visible, profile, onSave, onClose }) {
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={eStyles.container}>
         <View style={eStyles.header}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={eStyles.cancel}>Cancel</Text>
-          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose}><Text style={eStyles.cancel}>Cancel</Text></TouchableOpacity>
           <Text style={eStyles.title}>Edit Profile</Text>
           <TouchableOpacity onPress={save} disabled={saving}>
             {saving ? <ActivityIndicator color="#6C47FF" /> : <Text style={eStyles.save}>Save</Text>}
           </TouchableOpacity>
         </View>
-
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={eStyles.body} showsVerticalScrollIndicator={false}>
-
             <View style={eStyles.group}>
               <Text style={eStyles.label}>Display Name</Text>
-              <TextInput
-                style={eStyles.input}
-                value={form.display_name}
-                onChangeText={t => setForm(f => ({ ...f, display_name: t }))}
-                maxLength={30} placeholderTextColor="#555"
-              />
+              <TextInput style={eStyles.input} value={form.display_name} onChangeText={t => setForm(f => ({ ...f, display_name: t }))} maxLength={30} placeholderTextColor="#555" />
             </View>
-
             <View style={eStyles.row}>
               <View style={[eStyles.group, { flex: 1 }]}>
                 <Text style={eStyles.label}>Age</Text>
-                <TextInput
-                  style={eStyles.input}
-                  value={form.age}
-                  onChangeText={t => setForm(f => ({ ...f, age: t }))}
-                  keyboardType="number-pad" maxLength={3} placeholderTextColor="#555"
-                />
+                <TextInput style={eStyles.input} value={form.age} onChangeText={t => setForm(f => ({ ...f, age: t }))} keyboardType="number-pad" maxLength={3} placeholderTextColor="#555" />
               </View>
               <View style={[eStyles.group, { flex: 2 }]}>
                 <Text style={eStyles.label}>City</Text>
-                <TextInput
-                  style={eStyles.input}
-                  value={form.city}
-                  onChangeText={t => setForm(f => ({ ...f, city: t }))}
-                  placeholder="Your city" placeholderTextColor="#555"
-                />
+                <TextInput style={eStyles.input} value={form.city} onChangeText={t => setForm(f => ({ ...f, city: t }))} placeholder="Your city" placeholderTextColor="#555" />
               </View>
             </View>
-
             <View style={eStyles.group}>
               <Text style={eStyles.label}>Bio <Text style={{ color: '#555', fontWeight: '400' }}>(optional)</Text></Text>
-              <TextInput
-                style={[eStyles.input, { minHeight: 90 }]}
-                value={form.bio}
-                onChangeText={t => setForm(f => ({ ...f, bio: t }))}
-                placeholder="What makes you interesting?"
-                placeholderTextColor="#555" multiline maxLength={200} textAlignVertical="top"
-              />
+              <TextInput style={[eStyles.input, { minHeight: 90 }]} value={form.bio} onChangeText={t => setForm(f => ({ ...f, bio: t }))} placeholder="What makes you interesting?" placeholderTextColor="#555" multiline maxLength={200} textAlignVertical="top" />
               <Text style={{ color: '#555', fontSize: 11, textAlign: 'right' }}>{(form.bio || '').length}/200</Text>
             </View>
-
             <View style={eStyles.group}>
-              <Text style={eStyles.label}>Primary Language</Text>
+              <Text style={eStyles.label}>Language</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {LANGUAGES.map(l => (
-                  <TouchableOpacity
-                    key={l.code}
-                    style={[eStyles.chip, form.language === l.code && eStyles.chipOn]}
-                    onPress={() => setForm(f => ({ ...f, language: l.code }))}
-                  >
+                  <TouchableOpacity key={l.code} style={[eStyles.chip, form.language === l.code && eStyles.chipOn]} onPress={() => setForm(f => ({ ...f, language: l.code }))}>
                     <Text>{l.flag}</Text>
                     <Text style={[eStyles.chipText, form.language === l.code && { color: '#6C47FF', fontWeight: '700' }]}>{l.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
-
             <View style={eStyles.group}>
               <Text style={eStyles.label}>Here For</Text>
               <View style={eStyles.ctGrid}>
                 {CONNECTION_TYPES.map(ct => {
                   const on = form.connection_types?.includes(ct.key);
                   return (
-                    <TouchableOpacity
-                      key={ct.key}
-                      style={[eStyles.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]}
-                      onPress={() => toggleType(ct.key)}
-                    >
+                    <TouchableOpacity key={ct.key} style={[eStyles.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]} onPress={() => toggleType(ct.key)}>
                       <Text style={{ fontSize: 18 }}>{ct.emoji}</Text>
                       <Text style={[eStyles.ctLabel, on && { color: ct.color }]}>{ct.label}</Text>
-                      {on && <Text style={[{ fontSize: 11, fontWeight: '800', color: ct.color, marginLeft: 'auto' }]}>✓</Text>}
+                      {on && <Text style={{ fontSize: 11, fontWeight: '800', color: ct.color, marginLeft: 'auto' }}>✓</Text>}
                     </TouchableOpacity>
                   );
                 })}
               </View>
             </View>
-
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
 }
-
 const eStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
   header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
@@ -308,6 +260,80 @@ const eStyles = StyleSheet.create({
   ctLabel:   { color: '#666', fontSize: 14, fontWeight: '700' },
 });
 
+// ─── World Impression card ─────────────────────────────────────────────────
+function ImpressionCard({ data, onEdit }) {
+  return (
+    <TouchableOpacity style={imp.card} onPress={onEdit} activeOpacity={0.85}>
+      <View style={imp.topRow}>
+        <Text style={imp.icon}>{data.icon}</Text>
+        <Text style={imp.prompt}>{data.prompt}</Text>
+      </View>
+      {data.answer ? (
+        <Text style={imp.answer}>"{data.answer}"</Text>
+      ) : (
+        <View style={imp.emptyRow}>
+          <Text style={imp.emptyText}>Tap to leave your impression…</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+const imp = StyleSheet.create({
+  card:      { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', gap: 10 },
+  topRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  icon:      { fontSize: 20 },
+  prompt:    { color: 'rgba(255,255,255,0.38)', fontSize: 12, fontWeight: '700', flex: 1, lineHeight: 17 },
+  answer:    { color: '#fff', fontSize: 15, fontStyle: 'italic', lineHeight: 23, paddingLeft: 30 },
+  emptyRow:  { paddingLeft: 30 },
+  emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 13, fontStyle: 'italic' },
+});
+
+// ─── Impression edit modal ─────────────────────────────────────────────────
+function ImpressionEditModal({ visible, item, onSave, onClose }) {
+  const [text, setText] = useState('');
+  useEffect(() => { if (visible) setText(item?.answer || ''); }, [visible]);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <View style={impEdit.sheet}>
+          <View style={impEdit.handle} />
+          <Text style={impEdit.icon}>{item?.icon}</Text>
+          <Text style={impEdit.prompt}>{item?.prompt}</Text>
+          <TextInput
+            style={impEdit.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="Write your impression…"
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            multiline
+            maxLength={180}
+            autoFocus
+          />
+          <Text style={impEdit.count}>{text.length}/180</Text>
+          <TouchableOpacity
+            style={[impEdit.saveBtn, !text.trim() && { opacity: 0.4 }]}
+            onPress={() => { onSave(text.trim()); onClose(); }}
+            disabled={!text.trim()}
+          >
+            <Text style={impEdit.saveTxt}>Save Impression</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+const impEdit = StyleSheet.create({
+  sheet:   { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14, paddingBottom: 40 },
+  handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  icon:    { fontSize: 28, textAlign: 'center' },
+  prompt:  { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  input:   { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2a2a2a', lineHeight: 23 },
+  count:   { color: '#333', fontSize: 11, textAlign: 'right' },
+  saveBtn: { backgroundColor: '#6C47FF', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  saveTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
+});
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { tier, tierInfo, isPremium } = usePremium();
@@ -318,9 +344,9 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const [loading, setLoading]         = useState(true);
   const [myExps, setMyExps]           = useState([]);
   const [matchCount, setMatchCount]   = useState(0);
-  const [flagsPlanted, setFlagsPlanted] = useState(0);
+  const [flagsPlanted, setFlagsPlanted]   = useState([]);   // array of country strings
   const [showEdit, setShowEdit]       = useState(false);
-  const [tab, setTab]                 = useState('bond');
+  const [tab, setTab]                 = useState('profile');
   const [galleryUploading, setGalleryUploading] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(null);
 
@@ -328,6 +354,10 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const [cultureText, setCultureText]   = useState('');
   const [cultureEmoji, setCultureEmoji] = useState('🌍');
   const [cultureCat, setCultureCat]     = useState('daily life');
+
+  // World Impressions
+  const [impressions, setImpressions]       = useState({ give: '', draw: '', moment: '' });
+  const [editingImp,  setEditingImp]        = useState(null); // the prompt object being edited
 
   const fadeAnim  = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -345,20 +375,22 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       if (pRes.status === 'fulfilled') setProfile(pRes.value.data);
       if (eRes.status === 'fulfilled') setMyExps(eRes.value.data);
       if (mRes.status === 'fulfilled') setMatchCount(mRes.value.data.length);
-      // Load flags planted count from AsyncStorage
+
+      // Load footprint countries
       const raw = await AsyncStorage.getItem('bond_saved_countries');
-      setFlagsPlanted(raw ? JSON.parse(raw).length : 0);
+      setFlagsPlanted(raw ? JSON.parse(raw) : []);
+
+      // Load World Impressions
+      const impRaw = await AsyncStorage.getItem('world_impressions');
+      if (impRaw) setImpressions(JSON.parse(impRaw));
     } catch {}
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
     loadData();
-    if (socket.connected) {
-      socket.emit('get_cultural_posts');
-    } else {
-      socket.once('connect', () => socket.emit('get_cultural_posts'));
-    }
+    if (socket.connected) socket.emit('get_cultural_posts');
+    else socket.once('connect', () => socket.emit('get_cultural_posts'));
     socket.on('cultural_posts', setCulturePosts);
     return () => socket.off('cultural_posts');
   }, [loadData]);
@@ -385,9 +417,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       form.append('country',  profile?.country || user?.country || '');
       form.append('language', profile?.language || 'en');
       const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
       });
       if (!uploadRes.ok) throw new Error('upload failed');
       const data = await uploadRes.json();
@@ -397,9 +427,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
         body: JSON.stringify({ photo_url: data.imageUrl }),
       });
       setProfile(p => ({ ...p, photo_url: data.imageUrl }));
-    } catch {
-      Alert.alert('Error', 'Could not upload photo. Try again.');
-    }
+    } catch { Alert.alert('Error', 'Could not upload photo. Try again.'); }
   }
 
   async function saveProfile(updates) {
@@ -417,7 +445,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
   async function addGalleryPhoto() {
     const gallery = profile?.gallery_photos || [];
-    if (gallery.length >= 9) return Alert.alert('Gallery full', 'Remove a photo to add a new one.');
+    if (gallery.length >= 6) return Alert.alert('Gallery full', 'Remove a photo to add a new one.');
     const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.85 });
     if (!result.assets?.[0]) return;
     const asset = result.assets[0];
@@ -431,9 +459,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       form.append('country', profile?.country || user?.country || '');
       form.append('language', profile?.language || 'en');
       const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
       });
       if (!uploadRes.ok) throw new Error('upload failed');
       const data = await uploadRes.json();
@@ -445,11 +471,8 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       if (!addRes.ok) throw new Error('gallery update failed');
       const { gallery_photos } = await addRes.json();
       setProfile(p => ({ ...p, gallery_photos }));
-    } catch {
-      Alert.alert('Error', 'Could not upload photo. Try again.');
-    } finally {
-      setGalleryUploading(false);
-    }
+    } catch { Alert.alert('Error', 'Could not upload photo. Try again.'); }
+    finally { setGalleryUploading(false); }
   }
 
   async function removeGalleryPhoto(index) {
@@ -459,24 +482,20 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
         try {
           const token = await getAccessToken();
           const res = await fetch(`${SERVER_URL}/api/profiles/me/gallery/${index}`, {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
+            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
           });
           if (!res.ok) throw new Error('delete failed');
           const { gallery_photos } = await res.json();
           setProfile(p => ({ ...p, gallery_photos }));
-        } catch {
-          Alert.alert('Error', 'Could not remove photo.');
-        }
+        } catch { Alert.alert('Error', 'Could not remove photo.'); }
       }},
     ]);
   }
 
-  function handleLogout() {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { await logout(); onLogout?.(); } },
-    ]);
+  async function saveImpression(key, text) {
+    const updated = { ...impressions, [key]: text };
+    setImpressions(updated);
+    await AsyncStorage.setItem('world_impressions', JSON.stringify(updated));
   }
 
   function submitCulturePost() {
@@ -486,324 +505,270 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   }
 
   const pct         = completionPct(profile);
-  const rel         = getReliability(profile?.ghost_score);
   const displayName = profile?.display_name || user?.username || 'You';
   const tierColor   = tierInfo?.color || '#6C47FF';
 
+  const countryStr = profile?.country || user?.country || '';
+  const countryFlag = getCountryFlag(countryStr);
+  const countryCity = [profile?.city, countryStr].filter(Boolean).join(', ');
+
   return (
-    <LinearGradient
-      colors={['#1e0025', '#110018', '#070010', '#000000']}
-      locations={[0, 0.3, 0.65, 1]}
-      style={{ flex: 1 }}
-    >
-    <SafeAreaView style={styles.container}>
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.topBarTitle}>My Profile</Text>
-        <View style={styles.topBarActions}>
-          <TouchableOpacity style={styles.editBtn} onPress={() => setShowEdit(true)}>
-            <Text style={styles.editBtnText}>Edit</Text>
+    <LinearGradient colors={['#1e0025', '#110018', '#070010', '#000000']} locations={[0, 0.3, 0.65, 1]} style={{ flex: 1 }}>
+    <SafeAreaView style={s.container}>
+
+      {/* ── Top bar ── */}
+      <View style={s.topBar}>
+        <Text style={s.topBarTitle}>Me</Text>
+        <View style={s.topBarActions}>
+          <TouchableOpacity style={s.editBtn} onPress={() => setShowEdit(true)}>
+            <Text style={s.editBtnTxt}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Text style={styles.settingsBtnText}>⚙️</Text>
+          <TouchableOpacity style={s.settingsBtn} onPress={() => navigation.navigate('Settings')}>
+            <Text style={{ fontSize: 18 }}>⚙️</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {[{ key: 'bond', label: '✨ Bond' }, { key: 'culture', label: '🌍 Culture' }].map(t => (
-          <TouchableOpacity
-            key={t.key}
-            style={[styles.tab, tab === t.key && styles.tabActive]}
-            onPress={() => setTab(t.key)}
-          >
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+      {/* ── Tab bar ── */}
+      <View style={s.tabBar}>
+        {[{ key: 'profile', label: '👤 Profile' }, { key: 'culture', label: '🌍 My World' }].map(t => (
+          <TouchableOpacity key={t.key} style={[s.tab, tab === t.key && s.tabActive]} onPress={() => setTab(t.key)}>
+            <Text style={[s.tabTxt, tab === t.key && s.tabTxtActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {tab === 'bond' && (
+      {/* ════════════════════════ PROFILE TAB ════════════════════════ */}
+      {tab === 'profile' && (
         <Animated.ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
-          {/* ── Hero banner ─────────────────────────────────── */}
-          <View style={styles.heroBanner}>
-            <LinearGradient
-              colors={[tierColor + '80', tierColor + '35', 'transparent']}
-              style={styles.bannerGradient}
-            />
-            {/* Ambient glow blob behind avatar */}
-            <View style={[styles.avatarGlow, { backgroundColor: tierColor }]} />
+          {/* ── Hero ── */}
+          <View style={s.hero}>
+            <LinearGradient colors={[tierColor + '70', tierColor + '25', 'transparent']} style={s.heroGrad} />
+            <View style={[s.avatarGlow, { backgroundColor: tierColor }]} />
 
-            <View style={styles.avatarArea}>
-              {/* Outer decorative ring */}
-              <View style={[styles.avatarOuterRing, { borderColor: tierColor + '45' }]}>
-                <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85}>
-                  <View style={[styles.avatarRing, { borderColor: tierColor }]}>
-                    {profile?.photo_url ? (
-                      <Image source={{ uri: profile.photo_url }} style={styles.avatar} />
-                    ) : (
-                      <LinearGradient colors={[tierColor, tierColor + 'aa']} style={styles.avatarFallback}>
-                        <Text style={styles.avatarInitial}>{displayName[0]?.toUpperCase()}</Text>
-                      </LinearGradient>
-                    )}
-                  </View>
-                  <View style={styles.cameraBtn}>
-                    <Text style={styles.cameraIcon}>📷</Text>
-                  </View>
-                </TouchableOpacity>
+            <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85} style={s.avatarWrap}>
+              <View style={[s.avatarRing, { borderColor: tierColor }]}>
+                {profile?.photo_url ? (
+                  <Image source={{ uri: profile.photo_url }} style={s.avatar} />
+                ) : (
+                  <LinearGradient colors={[tierColor, tierColor + 'aa']} style={s.avatarFallback}>
+                    <Text style={s.avatarInitial}>{displayName[0]?.toUpperCase()}</Text>
+                  </LinearGradient>
+                )}
               </View>
-            </View>
+              <View style={s.cameraBtn}><Text style={{ fontSize: 13 }}>📷</Text></View>
+            </TouchableOpacity>
 
-            <Text style={styles.heroName}>
-              {displayName}{profile?.age ? `, ${profile.age}` : ''}
-            </Text>
-            {profile?.gender ? <Text style={styles.heroGender}>{profile.gender}</Text> : null}
-            <Text style={styles.heroLocation}>
-              {(() => {
-                const country = profile?.country || user?.country;
-                const flag = getCountryFlag(country);
-                const parts = [profile?.city, country].filter(Boolean);
-                return parts.length ? `${parts.join(', ')}${flag ? ` ${flag}` : ''}` : '';
-              })()}
-            </Text>
+            <Text style={s.heroName}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
+            {countryCity ? <Text style={s.heroLoc}>{countryCity} {countryFlag}</Text> : null}
+            {profile?.gender ? <Text style={s.heroGender}>{profile.gender}</Text> : null}
 
-            <View style={[styles.tierPill, { borderColor: tierColor + '60', backgroundColor: tierColor + '18' }]}>
-              <Text style={[styles.tierPillText, { color: tierColor }]}>
+            <View style={[s.tierPill, { borderColor: tierColor + '60', backgroundColor: tierColor + '18' }]}>
+              <Text style={[s.tierPillTxt, { color: tierColor }]}>
                 {tier === 'free' ? '🆓 Bond Free' : tier === 'plus' ? '💜 Bond Plus' : '⭐ Bond Pro'}
               </Text>
             </View>
+
+            {/* Footprint strip — pinned countries */}
+            {flagsPlanted.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.fpStrip} contentContainerStyle={s.fpStripContent}>
+                <Text style={s.fpLabel}>👣</Text>
+                {flagsPlanted.map((c, i) => (
+                  <View key={i} style={s.fpFlag}>
+                    <Text style={s.fpFlagEmoji}>{getCountryFlag(c)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
 
-          {/* ── Profile completion ───────────────────────────── */}
+          {/* ── Profile completion ── */}
           {pct < 100 && (
-            <TouchableOpacity style={styles.completionCard} onPress={() => setShowEdit(true)} activeOpacity={0.85}>
-              <View style={styles.completionRow}>
-                <Text style={styles.completionLabel}>Profile {pct}% complete</Text>
-                <Text style={styles.completionHint}>Finish for 2× more matches →</Text>
-              </View>
-              <View style={styles.completionTrack}>
-                <View style={[styles.completionFill, { width: `${pct}%` }]} />
+            <TouchableOpacity style={s.completionBar} onPress={() => setShowEdit(true)} activeOpacity={0.85}>
+              <View style={{ flex: 1, gap: 5 }}>
+                <View style={s.completionRow}>
+                  <Text style={s.completionLbl}>Profile {pct}% complete</Text>
+                  <Text style={s.completionHint}>Finish for 2× more matches →</Text>
+                </View>
+                <View style={s.completionTrack}>
+                  <View style={[s.completionFill, { width: `${pct}%` }]} />
+                </View>
               </View>
             </TouchableOpacity>
           )}
 
-          {/* ── Stats row ────────────────────────────────────── */}
-          <View style={styles.statsRow}>
+          {/* ── Stats ── */}
+          <View style={s.statsRow}>
             {[
-              { value: matchCount,    label: 'Bonds',          icon: '🤝' },
-              { value: flagsPlanted,  label: 'Pins Dropped',   icon: '📍' },
-              { value: myExps.length, label: 'Experiences',    icon: '✨' },
-            ].map(s => (
-              <View key={s.label} style={styles.statCard}>
-                <Text style={styles.statIcon}>{s.icon}</Text>
-                <Text style={styles.statValue}>{s.value ?? '—'}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
+              { value: matchCount,         label: 'Bonds',       icon: '🤝' },
+              { value: flagsPlanted.length, label: 'Footprints',  icon: '👣' },
+              { value: myExps.length,      label: 'Experiences', icon: '✨' },
+            ].map(st => (
+              <View key={st.label} style={s.statCard}>
+                <Text style={s.statIcon}>{st.icon}</Text>
+                <Text style={s.statValue}>{st.value ?? '—'}</Text>
+                <Text style={s.statLabel}>{st.label}</Text>
               </View>
             ))}
           </View>
 
-          {/* ── Go Live ─────────────────────────────────────── */}
-          <TouchableOpacity
-            style={styles.goLiveRow}
-            onPress={() => navigation.navigate('Live', { user: { username: profile?.display_name || user?.username, userId: user?.userId, photo_url: profile?.photo_url || user?.photo_url } })}
-            activeOpacity={0.85}
-          >
-            <LinearGradient colors={['#380808', '#200404']} style={styles.goLiveCard}>
-              <View style={styles.goLiveBadge}>
-                <View style={styles.goLiveDot} />
-                <Text style={styles.goLiveBadgeText}>LIVE</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.goLiveTitle}>Go Live</Text>
-                <Text style={styles.goLiveSub}>Broadcast to people around the world in real time</Text>
-              </View>
-              <Text style={styles.goLiveArrow}>›</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* ── Voice note ───────────────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Voice Note</Text>
+          {/* ── Voice Signature ── */}
+          <View style={s.section}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionLabel}>🎙 Voice Signature</Text>
+            </View>
             {profile?.voice_note_url ? (
               <VoiceNotePlayer url={profile.voice_note_url} />
             ) : (
-              <View style={styles.voiceEmpty}>
-                <Text style={{ fontSize: 36 }}>🎙️</Text>
-                <Text style={styles.voiceEmptyTitle}>No voice note yet</Text>
-                <Text style={styles.voiceEmptyHint}>Add one to get 2× more matches</Text>
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.ghostBtn}
-              onPress={() => Alert.alert('Coming soon', 'Voice recording will be available in the next update.')}
-            >
-              <Text style={styles.ghostBtnText}>🎙  {profile?.voice_note_url ? 'Record New Note' : 'Record Voice Note'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ── Reliability bar ──────────────────────────────── */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Reliability</Text>
-              <Text style={[styles.relLabel, { color: rel.color }]}>{rel.label}</Text>
-            </View>
-            <View style={styles.relTrack}>
-              <View style={[styles.relFill, { width: `${rel.pct}%`, backgroundColor: rel.color }]} />
-            </View>
-            <Text style={styles.relHint}>Based on how quickly you respond to matches</Text>
-          </View>
-
-          {/* ── Bio ──────────────────────────────────────────── */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <TouchableOpacity onPress={() => setShowEdit(true)}>
-                <Text style={styles.editLink}>Edit</Text>
+              <TouchableOpacity
+                style={s.voiceEmpty}
+                onPress={() => Alert.alert('Coming soon', 'Voice recording will be available in the next update.')}
+                activeOpacity={0.85}
+              >
+                <Text style={{ fontSize: 30 }}>🎙️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.voiceEmptyTitle}>Record your voice</Text>
+                  <Text style={s.voiceEmptyHint}>Let people hear you before they Bond</Text>
+                </View>
+                <Text style={s.voiceArrow}>+</Text>
               </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ── My Story (bio) ── */}
+          <View style={s.section}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionLabel}>📖 My Story</Text>
+              <TouchableOpacity onPress={() => setShowEdit(true)}><Text style={s.editLink}>Edit</Text></TouchableOpacity>
             </View>
             {profile?.bio ? (
-              <View style={styles.bioCard}>
-                <Text style={styles.bioText}>{profile.bio}</Text>
-              </View>
+              <LinearGradient colors={['rgba(108,71,255,0.08)', 'rgba(108,71,255,0.03)']} style={s.storyCard}>
+                <Text style={s.storyQuote}>"</Text>
+                <Text style={s.storyText}>{profile.bio}</Text>
+              </LinearGradient>
             ) : (
-              <TouchableOpacity style={styles.dashedCard} onPress={() => setShowEdit(true)}>
-                <Text style={styles.dashedCardText}>+ Add a bio</Text>
+              <TouchableOpacity style={s.dashedCard} onPress={() => setShowEdit(true)}>
+                <Text style={s.dashedTxt}>+ Tell your story</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* ── Here For ─────────────────────────────────────── */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Here For</Text>
-              <TouchableOpacity onPress={() => setShowEdit(true)}>
-                <Text style={styles.editLink}>Edit</Text>
-              </TouchableOpacity>
+          {/* ── World Impressions (1 of 1 footprint feature) ── */}
+          <View style={s.section}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionLabel}>👣 World Impressions</Text>
+              <Text style={s.sectionSub}>3 questions · your permanent mark</Text>
             </View>
-            {(profile?.connection_types || []).length > 0 ? (
-              <View style={styles.ctWrap}>
+            {IMPRESSION_PROMPTS.map(p => (
+              <ImpressionCard
+                key={p.key}
+                data={{ ...p, answer: impressions[p.key] }}
+                onEdit={() => setEditingImp(p)}
+              />
+            ))}
+          </View>
+
+          {/* ── Mission Stamps (Here For) ── */}
+          {(profile?.connection_types || []).length > 0 && (
+            <View style={s.section}>
+              <View style={s.sectionRow}>
+                <Text style={s.sectionLabel}>🎯 Mission</Text>
+                <TouchableOpacity onPress={() => setShowEdit(true)}><Text style={s.editLink}>Edit</Text></TouchableOpacity>
+              </View>
+              <View style={s.stampsGrid}>
                 {profile.connection_types.map(key => {
                   const ct = CONNECTION_TYPES.find(c => c.key === key);
                   if (!ct) return null;
                   return (
-                    <View key={key} style={[styles.ctBadge, { backgroundColor: ct.color + '18', borderColor: ct.color + '55' }]}>
-                      <Text style={{ fontSize: 15 }}>{ct.emoji}</Text>
-                      <Text style={[styles.ctBadgeText, { color: ct.color }]}>{ct.label}</Text>
+                    <View key={key} style={[s.stamp, { borderColor: ct.color + '60', backgroundColor: ct.color + '12' }]}>
+                      <Text style={s.stampEmoji}>{ct.emoji}</Text>
+                      <Text style={[s.stampLabel, { color: ct.color }]}>{ct.label}</Text>
                     </View>
                   );
                 })}
               </View>
-            ) : (
-              <TouchableOpacity style={styles.dashedCard} onPress={() => setShowEdit(true)}>
-                <Text style={styles.dashedCardText}>+ Choose what you're here for</Text>
+            </View>
+          )}
+          {(profile?.connection_types || []).length === 0 && (
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>🎯 Mission</Text>
+              <TouchableOpacity style={s.dashedCard} onPress={() => setShowEdit(true)}>
+                <Text style={s.dashedTxt}>+ What are you here for?</Text>
               </TouchableOpacity>
-            )}
-          </View>
-
-          {/* ── Photo Gallery ────────────────────────────────── */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Photos</Text>
-              <Text style={styles.galleryCount}>{(profile?.gallery_photos || []).length}/9</Text>
-            </View>
-            <View style={styles.galleryGrid}>
-              {Array.from({ length: 9 }).map((_, i) => {
-                const url = (profile?.gallery_photos || [])[i];
-                return url ? (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.gallerySlot}
-                    onPress={() => setViewingPhoto(url)}
-                    onLongPress={() => removeGalleryPhoto(i)}
-                    activeOpacity={0.85}
-                  >
-                    <Image source={{ uri: url }} style={styles.galleryImg} />
-                    <TouchableOpacity style={styles.galleryRemoveBtn} onPress={() => removeGalleryPhoto(i)}>
-                      <Text style={styles.galleryRemoveIcon}>✕</Text>
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    key={i}
-                    style={styles.gallerySlotEmpty}
-                    onPress={addGalleryPhoto}
-                    disabled={galleryUploading}
-                    activeOpacity={0.7}
-                  >
-                    {galleryUploading && i === (profile?.gallery_photos || []).length ? (
-                      <ActivityIndicator color="#6C47FF" size="small" />
-                    ) : (
-                      <Text style={styles.galleryAddIcon}>+</Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <Text style={styles.galleryHint}>Hold a photo to remove it</Text>
-          </View>
-
-          {/* ── My Experiences ───────────────────────────────── */}
-          {myExps.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>My Experiences</Text>
-              {myExps.map(exp => (
-                <View key={exp.id} style={styles.expCard}>
-                  <Text style={styles.expTitle}>{exp.title}</Text>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.expCat}>{exp.category}</Text>
-                    <View style={[styles.expStatus, { backgroundColor: exp.status === 'active' ? '#57f28720' : '#88888820' }]}>
-                      <Text style={[styles.expStatusText, { color: exp.status === 'active' ? '#57f287' : '#888' }]}>{exp.status}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
             </View>
           )}
 
-          {/* ── Subscription card ────────────────────────────── */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Subscription</Text>
-            {isPremium ? (
-              <LinearGradient
-                colors={tier === 'pro' ? ['#1C1F23', '#1C1F23'] : ['#000000', '#16181C']}
-                style={[styles.subCard, { borderColor: tierColor + '55' }]}
-              >
-                <View>
-                  <Text style={[styles.subTierName, { color: tierColor }]}>
-                    {tier === 'plus' ? '💜 Bond Plus' : '⭐ Bond Pro'}
-                  </Text>
-                  <Text style={styles.subPrice}>Free during beta</Text>
+          {/* ── Go Live ── */}
+          <View style={s.section}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Live', { user: { username: profile?.display_name || user?.username, userId: user?.userId, photo_url: profile?.photo_url || user?.photo_url } })}
+              activeOpacity={0.85}
+            >
+              <LinearGradient colors={['#380808', '#200404']} style={s.liveCard}>
+                <View style={s.liveBadge}><View style={s.liveDot} /><Text style={s.liveBadgeTxt}>LIVE</Text></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.liveTitle}>Go Live</Text>
+                  <Text style={s.liveSub}>Broadcast to the world in real time</Text>
                 </View>
+                <Text style={s.liveArrow}>›</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Photo Strip (horizontal polaroids) ── */}
+          <View style={s.section}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionLabel}>📸 Moments</Text>
+              <Text style={s.galleryCount}>{(profile?.gallery_photos || []).length}/6</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.polaroidRow}>
+              {/* Add button */}
+              <TouchableOpacity style={s.polaroidAdd} onPress={addGalleryPhoto} disabled={galleryUploading} activeOpacity={0.8}>
+                {galleryUploading ? <ActivityIndicator color="#6C47FF" size="small" /> : <Text style={s.polaroidAddIcon}>+</Text>}
+              </TouchableOpacity>
+              {(profile?.gallery_photos || []).map((url, i) => (
                 <TouchableOpacity
-                  style={[styles.manageBtn, { backgroundColor: tierColor + '22', borderColor: tierColor + '66' }]}
-                  onPress={() => navigation.navigate('Subscription')}
+                  key={i}
+                  style={s.polaroid}
+                  onPress={() => setViewingPhoto(url)}
+                  onLongPress={() => removeGalleryPhoto(i)}
+                  activeOpacity={0.9}
                 >
-                  <Text style={[styles.manageBtnText, { color: tierColor }]}>Manage</Text>
+                  <Image source={{ uri: url }} style={s.polaroidImg} />
+                  <TouchableOpacity style={s.polaroidRemove} onPress={() => removeGalleryPhoto(i)}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '900' }}>✕</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={s.galleryHint}>Hold a photo to remove it</Text>
+          </View>
+
+          {/* ── Subscription ── */}
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>💎 Subscription</Text>
+            {isPremium ? (
+              <LinearGradient colors={['#1C1F23', '#1C1F23']} style={[s.subCard, { borderColor: tierColor + '55' }]}>
+                <View>
+                  <Text style={[s.subName, { color: tierColor }]}>{tier === 'plus' ? '💜 Bond Plus' : '⭐ Bond Pro'}</Text>
+                  <Text style={s.subPrice}>Free during beta</Text>
+                </View>
+                <TouchableOpacity style={[s.manageBtn, { backgroundColor: tierColor + '22', borderColor: tierColor + '66' }]} onPress={() => navigation.navigate('Subscription')}>
+                  <Text style={[s.manageTxt, { color: tierColor }]}>Manage</Text>
                 </TouchableOpacity>
               </LinearGradient>
             ) : (
-              <TouchableOpacity
-                style={styles.upgradeCard}
-                onPress={() => navigation.navigate('Subscription')}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#6C47FF', '#5533DD']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={styles.upgradeCardInner}
-                >
+              <TouchableOpacity style={s.upgradeCard} onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85}>
+                <LinearGradient colors={['#6C47FF', '#5533DD']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.upgradeInner}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.upgradeCardTitle}>Upgrade to Bond Plus</Text>
-                    <Text style={styles.upgradeCardSub}>Unlimited gifts · See who viewed you · Priority listing</Text>
+                    <Text style={s.upgradeTitle}>Upgrade to Bond Plus</Text>
+                    <Text style={s.upgradeSub}>Unlimited gifts · See who viewed you · Priority listing</Text>
                   </View>
-                  <Text style={styles.upgradeCardArrow}>→</Text>
+                  <Text style={s.upgradeArrow}>→</Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -812,44 +777,33 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
         </Animated.ScrollView>
       )}
 
+      {/* ════════════════════════ MY WORLD TAB ════════════════════════ */}
       {tab === 'culture' && (
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.cultureForm}>
-            <Text style={styles.cultureFormTitle}>🌍 Share something about your culture</Text>
+          <View style={s.cultureForm}>
+            <Text style={s.cultureFormTitle}>🌍 Share something about your culture</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               {CULTURE_EMOJIS.map(e => (
-                <TouchableOpacity
-                  key={e}
-                  style={[styles.emojiBtn, cultureEmoji === e && styles.emojiBtnOn]}
-                  onPress={() => setCultureEmoji(e)}
-                >
+                <TouchableOpacity key={e} style={[s.emojiBtn, cultureEmoji === e && s.emojiBtnOn]} onPress={() => setCultureEmoji(e)}>
                   <Text style={{ fontSize: 22 }}>{e}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {CULTURE_CATS.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.catChip, cultureCat === c && styles.catChipOn]}
-                  onPress={() => setCultureCat(c)}
-                >
-                  <Text style={[styles.catChipText, cultureCat === c && { color: '#fff', fontWeight: '700' }]}>{c}</Text>
+                <TouchableOpacity key={c} style={[s.catChip, cultureCat === c && s.catChipOn]} onPress={() => setCultureCat(c)}>
+                  <Text style={[s.catChipTxt, cultureCat === c && { color: '#fff', fontWeight: '700' }]}>{c}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <TextInput
-              style={styles.cultureInput}
+              style={s.cultureInput}
               placeholder={`${cultureEmoji} Tell the world something about your culture...`}
               placeholderTextColor="rgba(255,255,255,0.2)"
-              value={cultureText} onChangeText={setCultureText}
-              multiline maxLength={280}
+              value={cultureText} onChangeText={setCultureText} multiline maxLength={280}
             />
-            <TouchableOpacity
-              style={[styles.postBtn, !cultureText.trim() && styles.postBtnOff]}
-              onPress={submitCulturePost} disabled={!cultureText.trim()}
-            >
-              <Text style={styles.postBtnText}>Post to the World 🌍</Text>
+            <TouchableOpacity style={[s.postBtn, !cultureText.trim() && s.postBtnOff]} onPress={submitCulturePost} disabled={!cultureText.trim()}>
+              <Text style={s.postBtnTxt}>Post to the World 🌍</Text>
             </TouchableOpacity>
           </View>
 
@@ -859,203 +813,196 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             scrollEnabled={false}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, gap: 12 }}
             renderItem={({ item }) => (
-              <View style={styles.postCard}>
-                <View style={styles.postHeader}>
+              <View style={s.postCard}>
+                <View style={s.postHeader}>
                   <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.postUser}>{item.username} · {item.country}</Text>
-                    <View style={styles.postCatBadge}>
-                      <Text style={styles.postCatText}>{item.category}</Text>
-                    </View>
+                    <Text style={s.postUser}>{item.username} · {item.country}</Text>
+                    <View style={s.postCatBadge}><Text style={s.postCatTxt}>{item.category}</Text></View>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => socket.emit('like_cultural_post', { postId: item.id })}
-                    style={{ alignItems: 'center', gap: 2 }}
-                  >
+                  <TouchableOpacity onPress={() => socket.emit('like_cultural_post', { postId: item.id })} style={{ alignItems: 'center', gap: 2 }}>
                     <Text style={{ fontSize: 18 }}>❤️</Text>
                     <Text style={{ color: '#e57373', fontSize: 11, fontWeight: '700' }}>{item.likes}</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.postText}>{item.text}</Text>
+                <Text style={s.postTxt}>{item.text}</Text>
               </View>
             )}
-            ListEmptyComponent={
-              <Text style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 40, fontSize: 15 }}>
-                No posts yet — be the first! 🌍
-              </Text>
-            }
+            ListEmptyComponent={<Text style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 40, fontSize: 15 }}>No posts yet — be the first! 🌍</Text>}
           />
         </ScrollView>
       )}
 
-      <EditModal
-        visible={showEdit}
-        profile={profile}
-        onSave={saveProfile}
-        onClose={() => setShowEdit(false)}
+      <EditModal visible={showEdit} profile={profile} onSave={saveProfile} onClose={() => setShowEdit(false)} />
+
+      <ImpressionEditModal
+        visible={!!editingImp}
+        item={editingImp}
+        onSave={text => saveImpression(editingImp?.key, text)}
+        onClose={() => setEditingImp(null)}
       />
 
       {loading && (
-        <View style={styles.loadingOverlay} pointerEvents="none">
+        <View style={s.loadingOverlay} pointerEvents="none">
           <ActivityIndicator color="#6C47FF" size="large" />
         </View>
       )}
 
       <Modal visible={!!viewingPhoto} transparent animationType="fade" onRequestClose={() => setViewingPhoto(null)}>
-        <View style={styles.photoModal}>
-          <Image source={{ uri: viewingPhoto }} style={styles.photoModalImg} resizeMode="contain" />
-          <TouchableOpacity style={styles.photoModalClose} onPress={() => setViewingPhoto(null)}>
-            <Text style={styles.photoModalCloseText}>✕</Text>
+        <View style={s.photoModal}>
+          <Image source={{ uri: viewingPhoto }} style={s.photoModalImg} resizeMode="contain" />
+          <TouchableOpacity style={s.photoModalClose} onPress={() => setViewingPhoto(null)}>
+            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>✕</Text>
           </TouchableOpacity>
         </View>
       </Modal>
+
     </SafeAreaView>
     </LinearGradient>
   );
 }
 
-const GLASS   = 'rgba(255,255,255,0.06)';
-const BORDER  = 'rgba(255,255,255,0.1)';
-const BORDER2 = 'rgba(255,255,255,0.07)';
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: 'transparent' },
-  loadingOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
+const GLASS  = 'rgba(255,255,255,0.05)';
+const BORDER = 'rgba(255,255,255,0.09)';
 
-  topBar:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 10 },
-  topBarTitle:      { color: '#ffffff', fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
-  topBarActions:    { flexDirection: 'row', gap: 8 },
-  editBtn:          { backgroundColor: 'rgba(232,0,61,0.15)', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(232,0,61,0.35)' },
-  editBtnText:      { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  logoutBtn:        { backgroundColor: 'rgba(229,57,53,0.12)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(229,57,53,0.25)' },
-  logoutBtnText:    { color: '#e53935', fontSize: 13, fontWeight: '700' },
-  settingsBtn:      { width: 40, height: 40, borderRadius: 14, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  settingsBtnText:  { fontSize: 18 },
+const s = StyleSheet.create({
+  container:       { flex: 1, backgroundColor: 'transparent' },
+  loadingOverlay:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
 
-  tabBar:           { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER2, marginHorizontal: 20 },
-  tab:              { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  tabActive:        { borderBottomWidth: 2, borderBottomColor: '#6C47FF' },
-  tabText:          { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '700' },
-  tabTextActive:    { color: '#6C47FF' },
+  topBar:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 10 },
+  topBarTitle:     { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  topBarActions:   { flexDirection: 'row', gap: 10 },
+  editBtn:         { backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(108,71,255,0.35)' },
+  editBtnTxt:      { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
+  settingsBtn:     { width: 40, height: 40, borderRadius: 14, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
 
-  scroll:           { paddingBottom: 80, gap: 24 },
+  tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)', marginHorizontal: 20, marginBottom: 2 },
+  tab:             { flex: 1, paddingVertical: 13, alignItems: 'center' },
+  tabActive:       { borderBottomWidth: 2, borderBottomColor: '#6C47FF' },
+  tabTxt:          { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '700' },
+  tabTxtActive:    { color: '#6C47FF' },
 
-  heroBanner:       { alignItems: 'center', paddingTop: 38, paddingBottom: 34, paddingHorizontal: 20 },
-  bannerGradient:   { position: 'absolute', top: 0, left: 0, right: 0, height: 280 },
+  scroll:          { paddingBottom: 90, gap: 26 },
 
-  avatarGlow:       { position: 'absolute', width: 240, height: 240, borderRadius: 120, top: 0, opacity: 0.14 },
-  avatarArea:       { marginBottom: 18 },
-  avatarOuterRing:  { width: 150, height: 150, borderRadius: 75, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  avatarRing:       { width: 132, height: 132, borderRadius: 66, borderWidth: 3.5, padding: 3, backgroundColor: 'rgba(0,0,0,0.6)' },
-  avatar:           { width: '100%', height: '100%', borderRadius: 59 },
-  avatarFallback:   { width: '100%', height: '100%', borderRadius: 59, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial:    { color: '#fff', fontSize: 52, fontWeight: '900' },
-  cameraBtn:        { position: 'absolute', bottom: 2, right: 2, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(10,0,15,0.9)', borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  cameraIcon:       { fontSize: 14 },
-  moodDot:          { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(10,0,15,0.9)', borderRadius: 14, padding: 3, borderWidth: 2, borderColor: BORDER },
+  // Hero
+  hero:            { alignItems: 'center', paddingTop: 32, paddingBottom: 28, paddingHorizontal: 20 },
+  heroGrad:        { position: 'absolute', top: 0, left: 0, right: 0, height: 260 },
+  avatarGlow:      { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: 0, opacity: 0.12 },
+  avatarWrap:      { marginBottom: 16, position: 'relative' },
+  avatarRing:      { width: 128, height: 128, borderRadius: 64, borderWidth: 3, padding: 3, backgroundColor: 'rgba(0,0,0,0.5)' },
+  avatar:          { width: '100%', height: '100%', borderRadius: 56 },
+  avatarFallback:  { width: '100%', height: '100%', borderRadius: 56, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial:   { color: '#fff', fontSize: 46, fontWeight: '900' },
+  cameraBtn:       { position: 'absolute', bottom: 2, right: 2, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  heroName:        { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.6 },
+  heroLoc:         { color: 'rgba(255,255,255,0.38)', fontSize: 13, marginTop: 4 },
+  heroGender:      { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 2 },
+  tierPill:        { marginTop: 12, borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 7 },
+  tierPillTxt:     { fontSize: 13, fontWeight: '800' },
 
-  heroName:         { color: '#ffffff', fontSize: 30, fontWeight: '900', letterSpacing: -0.8 },
-  heroGender:       { color: 'rgba(255,255,255,0.45)', fontSize: 14, marginTop: 3 },
-  heroLocation:     { color: 'rgba(255,255,255,0.32)', fontSize: 14, marginTop: 4 },
-  tierPill:         { marginTop: 14, borderWidth: 1, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 7 },
-  tierPillText:     { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  // Footprint strip
+  fpStrip:         { marginTop: 16, maxHeight: 44 },
+  fpStripContent:  { alignItems: 'center', gap: 8, paddingHorizontal: 4 },
+  fpLabel:         { fontSize: 16, marginRight: 4 },
+  fpFlag:          { width: 34, height: 34, borderRadius: 17, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  fpFlagEmoji:     { fontSize: 18 },
 
-  completionCard:   { marginHorizontal: 20, backgroundColor: 'rgba(232,0,61,0.1)', borderRadius: 18, padding: 16, gap: 10, borderWidth: 1, borderColor: 'rgba(232,0,61,0.25)' },
-  completionRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  completionLabel:  { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
-  completionHint:   { color: 'rgba(232,0,61,0.7)', fontSize: 11, fontWeight: '600' },
-  completionTrack:  { height: 5, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' },
-  completionFill:   { height: '100%', backgroundColor: '#6C47FF', borderRadius: 3 },
+  // Completion
+  completionBar:   { marginHorizontal: 20, backgroundColor: 'rgba(108,71,255,0.08)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(108,71,255,0.2)' },
+  completionRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  completionLbl:   { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
+  completionHint:  { color: 'rgba(108,71,255,0.6)', fontSize: 11, fontWeight: '600' },
+  completionTrack: { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  completionFill:  { height: '100%', backgroundColor: '#6C47FF', borderRadius: 2 },
 
-  statsRow:         { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
-  statCard:         { flex: 1, backgroundColor: GLASS, borderRadius: 20, padding: 16, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: BORDER },
-  statEmoji:        { fontSize: 22 },
-  statIcon:         { fontSize: 18, marginBottom: 2 },
-  statValue:        { color: '#ffffff', fontSize: 17, fontWeight: '900', textAlign: 'center' },
-  statLabel:        { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, textAlign: 'center' },
+  // Stats
+  statsRow:        { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
+  statCard:        { flex: 1, backgroundColor: GLASS, borderRadius: 20, padding: 16, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: BORDER },
+  statIcon:        { fontSize: 18 },
+  statValue:       { color: '#fff', fontSize: 18, fontWeight: '900' },
+  statLabel:       { color: 'rgba(255,255,255,0.32)', fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, textAlign: 'center' },
 
-  section:          { paddingHorizontal: 20, gap: 12 },
-  sectionTitle:     { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4, color: 'rgba(255,255,255,0.38)' },
-  sectionRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  editLink:         { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  // Sections
+  section:         { paddingHorizontal: 20, gap: 12 },
+  sectionRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionLabel:    { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
+  sectionSub:      { color: 'rgba(255,255,255,0.22)', fontSize: 10, fontWeight: '600' },
+  editLink:        { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
 
-  voiceEmpty:       { backgroundColor: GLASS, borderRadius: 18, padding: 28, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: BORDER },
-  voiceEmptyTitle:  { color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '700' },
-  voiceEmptyHint:   { color: 'rgba(255,255,255,0.28)', fontSize: 13 },
-  ghostBtn:         { backgroundColor: GLASS, borderRadius: 16, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: BORDER },
-  ghostBtnText:     { color: 'rgba(255,255,255,0.45)', fontSize: 14, fontWeight: '700' },
+  // Voice
+  voiceEmpty:      { flexDirection: 'row', alignItems: 'center', backgroundColor: GLASS, borderRadius: 18, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed' },
+  voiceEmptyTitle: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700' },
+  voiceEmptyHint:  { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 3 },
+  voiceArrow:      { color: '#6C47FF', fontSize: 22, fontWeight: '300' },
 
-  relLabel:         { fontSize: 13, fontWeight: '700' },
-  relTrack:         { height: 6, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 3, overflow: 'hidden' },
-  relFill:          { height: '100%', borderRadius: 3 },
-  relHint:          { color: 'rgba(255,255,255,0.28)', fontSize: 11 },
+  // Story card
+  storyCard:       { borderRadius: 18, padding: 20, borderWidth: 1, borderColor: 'rgba(108,71,255,0.18)' },
+  storyQuote:      { color: '#6C47FF', fontSize: 36, fontWeight: '900', lineHeight: 36, marginBottom: -8 },
+  storyText:       { color: 'rgba(255,255,255,0.78)', fontSize: 15, lineHeight: 24, fontStyle: 'italic' },
 
-  bioCard:          { backgroundColor: GLASS, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: BORDER },
-  bioText:          { color: 'rgba(255,255,255,0.75)', fontSize: 15, lineHeight: 24 },
-  dashedCard:       { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, paddingVertical: 20, alignItems: 'center', borderWidth: 1, borderColor: BORDER2, borderStyle: 'dashed' },
-  dashedCardText:   { color: 'rgba(255,255,255,0.28)', fontSize: 14, fontWeight: '600' },
+  dashedCard:      { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, paddingVertical: 20, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderStyle: 'dashed' },
+  dashedTxt:       { color: 'rgba(255,255,255,0.28)', fontSize: 14, fontWeight: '600' },
 
-  ctWrap:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  ctBadge:          { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1 },
-  ctBadgeText:      { fontSize: 13, fontWeight: '700' },
+  // Mission Stamps
+  stampsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  stamp:           { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 22, borderWidth: 1.5 },
+  stampEmoji:      { fontSize: 16 },
+  stampLabel:      { fontSize: 13, fontWeight: '800' },
 
-  galleryCount:     { color: 'rgba(255,255,255,0.28)', fontSize: 12, fontWeight: '700' },
-  galleryGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gallerySlot:      { width: (width - 40 - 16) / 3, aspectRatio: 1, borderRadius: 16, overflow: 'hidden', position: 'relative' },
-  galleryImg:       { width: '100%', height: '100%' },
-  galleryRemoveBtn: { position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
-  galleryRemoveIcon:{ color: '#fff', fontSize: 11, fontWeight: '900' },
-  gallerySlotEmpty: { width: (width - 40 - 16) / 3, aspectRatio: 1, borderRadius: 16, backgroundColor: GLASS, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  galleryAddIcon:   { color: 'rgba(255,255,255,0.3)', fontSize: 28, fontWeight: '200' },
-  galleryHint:      { color: 'rgba(255,255,255,0.2)', fontSize: 11, textAlign: 'center' },
+  // Go Live
+  liveCard:        { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(229,57,53,0.25)' },
+  liveBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
+  liveDot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveBadgeTxt:    { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
+  liveTitle:       { color: '#fff', fontWeight: '800', fontSize: 15 },
+  liveSub:         { color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 2 },
+  liveArrow:       { color: 'rgba(255,255,255,0.3)', fontSize: 26 },
 
-  expCard:          { backgroundColor: GLASS, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, gap: 8 },
-  expTitle:         { color: '#ffffff', fontSize: 14, fontWeight: '700' },
-  expCat:           { color: 'rgba(255,255,255,0.35)', fontSize: 12 },
-  expStatus:        { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
-  expStatusText:    { fontSize: 11, fontWeight: '700' },
+  // Polaroid photo strip
+  polaroidRow:     { gap: 10, paddingVertical: 4 },
+  polaroid:        { width: 120, height: 130, borderRadius: 12, backgroundColor: '#111', overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: BORDER },
+  polaroidImg:     { width: '100%', height: '100%', borderRadius: 10 },
+  polaroidRemove:  { position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
+  polaroidAdd:     { width: 120, height: 130, borderRadius: 12, backgroundColor: GLASS, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  polaroidAddIcon: { color: 'rgba(255,255,255,0.3)', fontSize: 32, fontWeight: '200' },
+  galleryCount:    { color: 'rgba(255,255,255,0.28)', fontSize: 12, fontWeight: '700' },
+  galleryHint:     { color: 'rgba(255,255,255,0.18)', fontSize: 11, textAlign: 'center' },
 
-  subCard:          { borderRadius: 20, padding: 18, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  subTierName:      { fontSize: 17, fontWeight: '900' },
-  subPrice:         { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 4 },
-  manageBtn:        { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1 },
-  manageBtnText:    { fontSize: 13, fontWeight: '700' },
-  upgradeCard:      { borderRadius: 20, overflow: 'hidden' },
-  upgradeCardInner: { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 12 },
-  upgradeCardTitle: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  upgradeCardSub:   { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4, lineHeight: 18 },
-  upgradeCardArrow: { color: '#fff', fontSize: 24, fontWeight: '200' },
+  // Subscription
+  subCard:         { borderRadius: 20, padding: 18, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  subName:         { fontSize: 16, fontWeight: '900' },
+  subPrice:        { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 4 },
+  manageBtn:       { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1 },
+  manageTxt:       { fontSize: 13, fontWeight: '700' },
+  upgradeCard:     { borderRadius: 20, overflow: 'hidden' },
+  upgradeInner:    { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 12 },
+  upgradeTitle:    { color: '#fff', fontSize: 15, fontWeight: '900' },
+  upgradeSub:      { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4, lineHeight: 18 },
+  upgradeArrow:    { color: '#fff', fontSize: 24, fontWeight: '200' },
 
-  cultureForm:      { backgroundColor: GLASS, margin: 16, borderRadius: 22, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER },
-  cultureFormTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
-  emojiBtn:         { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER2 },
-  emojiBtnOn:       { backgroundColor: 'rgba(232,0,61,0.22)', borderColor: 'rgba(232,0,61,0.5)' },
-  catChip:          { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: BORDER2 },
-  catChipOn:        { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
-  catChipText:      { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600' },
-  cultureInput:     { backgroundColor: 'rgba(0,0,0,0.3)', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: BORDER2 },
-  postBtn:          { backgroundColor: '#6C47FF', borderRadius: 16, padding: 15, alignItems: 'center' },
-  postBtnOff:       { backgroundColor: 'rgba(255,255,255,0.08)' },
-  postBtnText:      { color: '#fff', fontSize: 15, fontWeight: '800' },
+  // Culture / My World tab
+  cultureForm:     { backgroundColor: GLASS, margin: 16, borderRadius: 22, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER },
+  cultureFormTitle:{ color: '#fff', fontSize: 15, fontWeight: '800' },
+  emojiBtn:        { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  emojiBtnOn:      { backgroundColor: 'rgba(108,71,255,0.22)', borderColor: 'rgba(108,71,255,0.5)' },
+  catChip:         { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  catChipOn:       { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  catChipTxt:      { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600' },
+  cultureInput:    { backgroundColor: 'rgba(0,0,0,0.3)', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
+  postBtn:         { backgroundColor: '#6C47FF', borderRadius: 16, padding: 15, alignItems: 'center' },
+  postBtnOff:      { backgroundColor: 'rgba(255,255,255,0.08)' },
+  postBtnTxt:      { color: '#fff', fontSize: 15, fontWeight: '800' },
+  postCard:        { backgroundColor: GLASS, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: BORDER, gap: 12 },
+  postHeader:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  postUser:        { color: '#fff', fontWeight: '800', fontSize: 13 },
+  postCatBadge:    { backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 5, borderWidth: 1, borderColor: 'rgba(108,71,255,0.28)' },
+  postCatTxt:      { color: '#6C47FF', fontSize: 10, fontWeight: '800' },
+  postTxt:         { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 22 },
 
-  postCard:         { backgroundColor: GLASS, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: BORDER, gap: 12 },
-  postHeader:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  postUser:         { color: '#fff', fontWeight: '800', fontSize: 13 },
-  postCatBadge:     { backgroundColor: 'rgba(232,0,61,0.15)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 5, borderWidth: 1, borderColor: 'rgba(232,0,61,0.28)' },
-  postCatText:      { color: '#6C47FF', fontSize: 10, fontWeight: '800' },
-  postText:         { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 22 },
-
-  goLiveRow:        { marginHorizontal: 20, marginBottom: 4 },
-  goLiveCard:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(229,57,53,0.25)' },
-  goLiveBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
-  goLiveDot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  goLiveBadgeText:  { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
-  goLiveTitle:      { color: '#fff', fontWeight: '800', fontSize: 15 },
-  goLiveSub:        { color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 2 },
-  goLiveArrow:      { color: 'rgba(255,255,255,0.3)', fontSize: 26 },
-
-  photoModal:          { flex: 1, backgroundColor: '#000000f2', alignItems: 'center', justifyContent: 'center' },
-  photoModalImg:       { width: width, height: width },
-  photoModalClose:     { position: 'absolute', top: 60, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: '#ffffff18', borderWidth: 1, borderColor: '#ffffff30', alignItems: 'center', justifyContent: 'center' },
-  photoModalCloseText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  // Photo modal
+  photoModal:      { flex: 1, backgroundColor: '#000000f2', alignItems: 'center', justifyContent: 'center' },
+  photoModalImg:   { width, height: width },
+  photoModalClose: { position: 'absolute', top: 60, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: '#ffffff18', borderWidth: 1, borderColor: '#ffffff30', alignItems: 'center', justifyContent: 'center' },
 });

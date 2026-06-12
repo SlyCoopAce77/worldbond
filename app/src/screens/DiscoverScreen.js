@@ -477,9 +477,9 @@ const tab = StyleSheet.create({
 
 // ─── Random connect tab ───────────────────────────────────────────────────────
 const SIGNAL_OPTIONS = [
-  { id: 'male',   label: 'Guys',       emoji: '🔵', color: '#1da1f2' },
+  { id: 'male',   label: 'Men',        emoji: '🔵', color: '#1da1f2' },
   { id: 'any',    label: 'Open World', emoji: '🌍', color: '#6C47FF' },
-  { id: 'female', label: 'Girls',      emoji: '💜', color: '#e91e63' },
+  { id: 'female', label: 'Women',      emoji: '💜', color: '#e91e63' },
 ];
 
 function RandomTab({ user, navigation }) {
@@ -684,8 +684,8 @@ function RandomTab({ user, navigation }) {
             {genderPref === 'any'
               ? '🌍 Open to everyone — matched worldwide'
               : genderPref === 'male'
-              ? '🔵 Signal locked — connecting with guys only'
-              : '💜 Signal locked — connecting with girls only'}
+              ? '🔵 Signal locked — connecting with men only'
+              : '💜 Signal locked — connecting with women only'}
           </Text>
         </View>
       )}

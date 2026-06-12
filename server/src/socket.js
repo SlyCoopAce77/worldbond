@@ -6,6 +6,9 @@ const {
   addPlaceMessage, getPlaceMessages, getPlaceById,
   addReview, getReviews, getAverageRating,
   getCountries, getCitiesInCountry, getPlacesInCity, PLACE_TYPES,
+  getPlacesInCountry, getPlacesByType,
+  postVenueEvent, getVenueEvents, getAllUpcomingEvents,
+  setVenueLive, getVenueLiveStatus, getAllLiveVenues,
 } = require('./places');
 const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment } = require('./icebreaker');
 const { createEvent, getEvents, getEventById, joinEvent, leaveEvent, addEventMessage, getEventMessages } = require('./events');
@@ -244,8 +247,40 @@ function setupSocket(io) {
         ...p,
         typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
         checkinCount: getCheckins(p.id).length,
+        isLive: getVenueLiveStatus(p.id).isLive,
+        eventCount: getVenueEvents(p.id).length,
       }));
       socket.emit('places_list', { country, city, places });
+    });
+
+    socket.on('get_country_places', ({ country }) => {
+      const places = getPlacesInCountry(country).map(p => ({
+        ...p,
+        typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
+        checkinCount: getCheckins(p.id).length,
+        isLive: getVenueLiveStatus(p.id).isLive,
+        eventCount: getVenueEvents(p.id).length,
+      }));
+      socket.emit('country_places_list', { country, places });
+    });
+
+    socket.on('get_spots_by_vibe', ({ type }) => {
+      const places = getPlacesByType(type).map(p => ({
+        ...p,
+        typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
+        checkinCount: getCheckins(p.id).length,
+        isLive: getVenueLiveStatus(p.id).isLive,
+        eventCount: getVenueEvents(p.id).length,
+      }));
+      socket.emit('vibe_spots_list', { type, places });
+    });
+
+    socket.on('get_upcoming_events', () => {
+      socket.emit('upcoming_events', getAllUpcomingEvents());
+    });
+
+    socket.on('get_live_venues', () => {
+      socket.emit('live_venues', getAllLiveVenues());
     });
 
     socket.on('checkin_place', ({ placeId }) => {
@@ -328,6 +363,43 @@ function setupSocket(io) {
         reviews: getReviews(placeId),
         avgRating: getAverageRating(placeId),
       });
+    });
+
+    // ── VENUE EVENTS ──
+
+    socket.on('post_venue_event', ({ placeId, title, date, type, description, price }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !title?.trim() || !date) return;
+      postVenueEvent(placeId, {
+        title: title.trim(),
+        date,
+        type: type || 'event',
+        description: description?.trim() || '',
+        price: price || 'Free',
+        postedBy: user.username,
+        postedByCountry: user.country,
+      });
+      const events = getVenueEvents(placeId);
+      io.to(`place:${placeId}`).emit('venue_events', { placeId, events });
+      socket.emit('venue_events', { placeId, events });
+    });
+
+    socket.on('get_venue_events', ({ placeId }) => {
+      socket.emit('venue_events', { placeId, events: getVenueEvents(placeId) });
+    });
+
+    // ── VENUE LIVE ──
+
+    socket.on('venue_go_live', ({ placeId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user) return;
+      setVenueLive(placeId, true, { username: user.username, country: user.country, socketId: socket.id });
+      io.emit('venue_live_update', { placeId, isLive: true, host: user.username, country: user.country });
+    });
+
+    socket.on('venue_end_live', ({ placeId }) => {
+      setVenueLive(placeId, false);
+      io.emit('venue_live_update', { placeId, isLive: false });
     });
 
     // ── GIFTS ──
