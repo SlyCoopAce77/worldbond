@@ -478,22 +478,24 @@ const tab = StyleSheet.create({
 });
 
 // ─── Signal Trail Discovery ───────────────────────────────────────────────────
-const FREQ_OPTIONS = [
-  { id: 'romantic',  emoji: '❤️',  label: 'Romantic',  color: '#e91e63' },
-  { id: 'friends',   emoji: '🤝',  label: 'Friends',   color: '#4fc3f7' },
-  { id: 'adventure', emoji: '✈️',  label: 'Adventure', color: '#ff9800' },
-  { id: 'cultural',  emoji: '🌍',  label: 'Cultural',  color: '#6C47FF' },
-];
 
 function buildSignalCfg(tierInfo) {
-  if (!tierInfo) return { label: 'Basic Signal', color: '#555', ringColor: '#33333388', ringCount: 1, emoji: '📶', upgradeHint: 'Upgrade to boost your signal' };
+  if (!tierInfo) return {
+    label: 'Basic Signal', color: '#555', ringColor: '#33333388', ringCount: 1, bars: 1,
+    emoji: '📶', upgradeHint: 'Upgrade to boost your signal',
+    lockTitle: 'Searching…', lockSub: 'Basic Signal · 5 bonds per day',
+  };
+  const lockSubs = { free: '5 bonds/day', plus: '30 bonds/day', pro: 'Unlimited bonds' };
   return {
-    label:       tierInfo.signalName,
-    color:       tierInfo.signalColor,
-    ringColor:   tierInfo.signalColor + '55',
-    ringCount:   tierInfo.signalRings,
-    emoji:       tierInfo.signalEmoji,
+    label:      tierInfo.signalName,
+    color:      tierInfo.signalColor,
+    ringColor:  tierInfo.signalColor + '55',
+    ringCount:  tierInfo.signalRings,
+    bars:       tierInfo.signalRings,
+    emoji:      tierInfo.signalEmoji,
     upgradeHint: tierInfo.id === 'free' ? 'Upgrade to boost your signal' : null,
+    lockTitle:  tierInfo.id === 'pro' ? 'Priority Match…' : 'Searching…',
+    lockSub:    lockSubs[tierInfo.id] ?? '5 bonds/day',
   };
 }
 
@@ -602,138 +604,8 @@ const REACH_OPTIONS = [
   { id: 'worldwide', label: 'Worldwide',  icon: '🌍', desc: 'Anyone on the planet',  color: '#6C47FF' },
 ];
 
-const COUNTRY_LIST = [
-  { code: 'US', name: 'United States',   flag: '🇺🇸' },
-  { code: 'GB', name: 'United Kingdom',  flag: '🇬🇧' },
-  { code: 'NG', name: 'Nigeria',         flag: '🇳🇬' },
-  { code: 'GH', name: 'Ghana',           flag: '🇬🇭' },
-  { code: 'ZA', name: 'South Africa',    flag: '🇿🇦' },
-  { code: 'KE', name: 'Kenya',           flag: '🇰🇪' },
-  { code: 'EG', name: 'Egypt',           flag: '🇪🇬' },
-  { code: 'ET', name: 'Ethiopia',        flag: '🇪🇹' },
-  { code: 'BR', name: 'Brazil',          flag: '🇧🇷' },
-  { code: 'MX', name: 'Mexico',          flag: '🇲🇽' },
-  { code: 'CO', name: 'Colombia',        flag: '🇨🇴' },
-  { code: 'AR', name: 'Argentina',       flag: '🇦🇷' },
-  { code: 'IN', name: 'India',           flag: '🇮🇳' },
-  { code: 'PK', name: 'Pakistan',        flag: '🇵🇰' },
-  { code: 'BD', name: 'Bangladesh',      flag: '🇧🇩' },
-  { code: 'PH', name: 'Philippines',     flag: '🇵🇭' },
-  { code: 'ID', name: 'Indonesia',       flag: '🇮🇩' },
-  { code: 'JP', name: 'Japan',           flag: '🇯🇵' },
-  { code: 'KR', name: 'South Korea',     flag: '🇰🇷' },
-  { code: 'CN', name: 'China',           flag: '🇨🇳' },
-  { code: 'VN', name: 'Vietnam',         flag: '🇻🇳' },
-  { code: 'TH', name: 'Thailand',        flag: '🇹🇭' },
-  { code: 'TR', name: 'Turkey',          flag: '🇹🇷' },
-  { code: 'SA', name: 'Saudi Arabia',    flag: '🇸🇦' },
-  { code: 'AE', name: 'UAE',             flag: '🇦🇪' },
-  { code: 'IR', name: 'Iran',            flag: '🇮🇷' },
-  { code: 'IQ', name: 'Iraq',            flag: '🇮🇶' },
-  { code: 'DE', name: 'Germany',         flag: '🇩🇪' },
-  { code: 'FR', name: 'France',          flag: '🇫🇷' },
-  { code: 'IT', name: 'Italy',           flag: '🇮🇹' },
-  { code: 'ES', name: 'Spain',           flag: '🇪🇸' },
-  { code: 'PT', name: 'Portugal',        flag: '🇵🇹' },
-  { code: 'NL', name: 'Netherlands',     flag: '🇳🇱' },
-  { code: 'SE', name: 'Sweden',          flag: '🇸🇪' },
-  { code: 'NO', name: 'Norway',          flag: '🇳🇴' },
-  { code: 'CA', name: 'Canada',          flag: '🇨🇦' },
-  { code: 'AU', name: 'Australia',       flag: '🇦🇺' },
-  { code: 'RU', name: 'Russia',          flag: '🇷🇺' },
-  { code: 'UA', name: 'Ukraine',         flag: '🇺🇦' },
-  { code: 'MA', name: 'Morocco',         flag: '🇲🇦' },
-  { code: 'TZ', name: 'Tanzania',        flag: '🇹🇿' },
-  { code: 'SN', name: 'Senegal',         flag: '🇸🇳' },
-  { code: 'CM', name: 'Cameroon',        flag: '🇨🇲' },
-  { code: 'CD', name: 'DR Congo',        flag: '🇨🇩' },
-  { code: 'MX', name: 'Mexico',          flag: '🇲🇽' },
-  { code: 'PL', name: 'Poland',          flag: '🇵🇱' },
-  { code: 'RO', name: 'Romania',         flag: '🇷🇴' },
-  { code: 'MY', name: 'Malaysia',        flag: '🇲🇾' },
-  { code: 'SG', name: 'Singapore',       flag: '🇸🇬' },
-  { code: 'NZ', name: 'New Zealand',     flag: '🇳🇿' },
-].filter((c, i, arr) => arr.findIndex(x => x.code === c.code) === i)
- .sort((a, b) => a.name.localeCompare(b.name));
 
 // Blip dot positions around the radar (offsets from center of 160×160 orb)
-const BLIP_DOTS = [
-  { left: 22,  top: 38  },
-  { left: 112, top: 18  },
-  { left: 134, top: 88  },
-  { left: 88,  top: 128 },
-  { left: 18,  top: 105 },
-  { left: 55,  top: 145 },
-  { left: 140, top: 44  },
-];
-
-// ─── Signal Card ──────────────────────────────────────────────────────────────
-function SignalCard({ signal, onLock }) {
-  const freq    = FREQ_OPTIONS.find(f => f.id === signal.freq) || FREQ_OPTIONS[1];
-  const sColor  = signal.strength >= 80 ? '#57f287' : signal.strength >= 60 ? '#fee75c' : '#ff9060';
-  const pulse   = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!signal.online) return;
-    Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
-    ])).start();
-  }, []);
-
-  const dotScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] });
-  const dotOp    = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.4] });
-
-  return (
-    <View style={st.card}>
-      {/* Left — flag + online dot */}
-      <View style={st.cardLeft}>
-        <Text style={st.cardFlag}>{signal.flag}</Text>
-        {signal.online ? (
-          <Animated.View style={[st.onlineDot, { transform: [{ scale: dotScale }], opacity: dotOp }]} />
-        ) : (
-          <View style={[st.onlineDot, { backgroundColor: '#333' }]} />
-        )}
-      </View>
-
-      {/* Mid — trail + strength + tagline */}
-      <View style={st.cardMid}>
-        <View style={st.cardTopRow}>
-          <Text style={st.cardCountry}>{signal.country}</Text>
-          <View style={[st.freqBadge, { backgroundColor: freq.color + '22', borderColor: freq.color + '55' }]}>
-            <Text style={[st.freqTxt, { color: freq.color }]}>{freq.emoji} {freq.label}</Text>
-          </View>
-        </View>
-
-        {/* Trail */}
-        <View style={st.trail}>
-          {signal.trail.map((f, i) => (
-            <React.Fragment key={i}>
-              <Text style={st.trailFlag}>{f}</Text>
-              {i < signal.trail.length - 1 && <Text style={st.trailArrow}>›</Text>}
-            </React.Fragment>
-          ))}
-        </View>
-
-        {/* Signal strength bar */}
-        <View style={st.strengthRow}>
-          <View style={st.strengthTrack}>
-            <View style={[st.strengthFill, { width: `${signal.strength}%`, backgroundColor: sColor }]} />
-          </View>
-          <Text style={[st.strengthNum, { color: sColor }]}>{signal.strength}%</Text>
-        </View>
-
-        <Text style={st.tagline} numberOfLines={1}>{signal.tagline}</Text>
-      </View>
-
-      {/* Right — Lock button */}
-      <TouchableOpacity style={st.lockBtn} onPress={() => onLock(signal)} activeOpacity={0.8}>
-        <Text style={st.lockTxt}>Lock{'\n'}Signal</Text>
-        <Text style={st.lockArrow}>›</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 // ─── Upgrade Modal ────────────────────────────────────────────────────────────
 function UpgradeModal({ visible, onClose, navigation }) {
@@ -1308,7 +1180,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           style={[fp2.vibeChip, hasFilter && { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' }]}
           onPress={() => setShowFilterSheet(true)} activeOpacity={0.8}
         >
-          <Text style={fp2.vibeIcon}>{hasFilter ? (genderFilter !== 'everyone' ? genderMeta.icon : vibeMeta.icon) : '🎛️'}</Text>
+          <Text style={fp2.vibeIcon}>{hasFilter ? (genderFilter !== 'everyone' ? genderMeta.icon : reachMeta.icon) : '🎛️'}</Text>
           <Text style={[fp2.vibeTxt, hasFilter && { color: '#6C47FF' }]}>{filterLabel}</Text>
           <Text style={fp2.caret}>▾</Text>
         </TouchableOpacity>
@@ -1595,7 +1467,7 @@ const fp = StyleSheet.create({
 const fp2 = StyleSheet.create({
   // Signal header
   signalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                   paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
+                   paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   signalBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14,
                    borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
   signalEmoji:   { fontSize: 13 },
@@ -1607,7 +1479,7 @@ const fp2 = StyleSheet.create({
                    paddingVertical: 6, borderWidth: 1, borderColor: '#e9193640' },
   bondsOutTxt:   { color: '#e91936', fontSize: 11, fontWeight: '800' },
 
-  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6 },
+  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6 },
   vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#1e2028' },
   vibeIcon:     { fontSize: 16 },
   vibeTxt:      { color: '#555', fontSize: 13, fontWeight: '800', flex: 1 },
