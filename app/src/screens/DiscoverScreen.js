@@ -885,6 +885,27 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const bondsLeft   = isUnlimited ? Infinity : Math.max(0, bondsPerDay - bondsUsed);
   const outOfBonds  = !isUnlimited && bondsLeft === 0;
 
+  // Countdown timer — ticks every second when bonds are exhausted
+  const [cooldownStr, setCooldownStr] = useState('');
+  useEffect(() => {
+    if (!outOfBonds) { setCooldownStr(''); return; }
+    function tick() {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diff = midnight - now;
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setCooldownStr(
+        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      );
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [outOfBonds]);
+
   async function consumeBond() {
     const next = bondsUsed + 1;
     setBondsUsed(next);
@@ -1159,19 +1180,14 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           <Text style={fp2.signalEmoji}>{signalCfg.emoji}</Text>
           <Text style={[fp2.signalName, { color: signalCfg.color }]}>{signalCfg.label}</Text>
         </View>
-        {outOfBonds ? (
-          <TouchableOpacity
-            style={fp2.bondsOut}
-            onPress={() => setShowUpgrade(true)} activeOpacity={0.8}
-          >
-            <Text style={fp2.bondsOutTxt}>No bonds left  ·  Upgrade ›</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={fp2.bondsLeft}>
-            <Text style={fp2.bondsLeftNum}>{isUnlimited ? '∞' : bondsLeft}</Text>
-            <Text style={fp2.bondsLeftLabel}>{isUnlimited ? 'bonds' : `bond${bondsLeft !== 1 ? 's' : ''} left`}</Text>
-          </View>
-        )}
+        <View style={fp2.bondsLeft}>
+          <Text style={[fp2.bondsLeftNum, outOfBonds && { color: '#e91936' }]}>
+            {isUnlimited ? '∞' : bondsLeft}
+          </Text>
+          <Text style={fp2.bondsLeftLabel}>
+            {isUnlimited ? 'bonds' : `bond${bondsLeft !== 1 ? 's' : ''} left`}
+          </Text>
+        </View>
       </View>
 
       {/* ── Filter chip + shuffle ─────────────────────────────────────────── */}
@@ -1191,8 +1207,26 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
 
 
+      {/* ── Cooldown wall (free users out of bonds) ──────────────────────── */}
+      {outOfBonds && (
+        <View style={fp2.cooldownWall}>
+          <Text style={fp2.cooldownLock}>🔒</Text>
+          <Text style={fp2.cooldownTitle}>Out of Bonds</Text>
+          <Text style={fp2.cooldownSub}>You've used all your bonds for today</Text>
+          <View style={fp2.cooldownTimerBox}>
+            <Text style={fp2.cooldownTimerLabel}>Resets in</Text>
+            <Text style={fp2.cooldownTimer}>{cooldownStr}</Text>
+            <Text style={fp2.cooldownTimerNote}>Daily at midnight</Text>
+          </View>
+          <TouchableOpacity style={fp2.cooldownUpgradeBtn} onPress={() => setShowUpgrade(true)} activeOpacity={0.85}>
+            <Text style={fp2.cooldownUpgradeTxt}>⚡  Get WorldBond Plus</Text>
+          </TouchableOpacity>
+          <Text style={fp2.cooldownOr}>Unlimited bonds · Better signal · Priority matches</Text>
+        </View>
+      )}
+
       {/* ── Footprint Card (swipeable) ───────────────────────────────────── */}
-      <Animated.View
+      {!outOfBonds && <Animated.View
         {...panResponder.panHandlers}
         style={[fp2.card, {
           opacity: cardOpA,
@@ -1271,17 +1305,17 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           </View>
 
         </LinearGradient>
-      </Animated.View>
+      </Animated.View>}
 
       {/* ── Bond / Next buttons ───────────────────────────────────────────── */}
-      <View style={fp2.actions}>
+      {!outOfBonds && <View style={fp2.actions}>
         <TouchableOpacity style={fp2.nextBtn} onPress={doNext} activeOpacity={0.8}>
           <Text style={fp2.nextTxt}>Next  →</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[fp2.bondBtn, { shadowColor: sig.avatarColor }]} onPress={doConnect} activeOpacity={0.82}>
           <Text style={fp2.bondTxt}>🌐  Bond</Text>
         </TouchableOpacity>
-      </View>
+      </View>}
 
       {/* ── Full Profile View ────────────────────────────────────────────── */}
       <Modal visible={showProfile} transparent={false} animationType="slide" onRequestClose={() => setShowProfile(false)}>
@@ -1475,10 +1509,6 @@ const fp2 = StyleSheet.create({
   bondsLeft:     { alignItems: 'flex-end' },
   bondsLeftNum:  { color: '#fff', fontSize: 16, fontWeight: '900', lineHeight: 18 },
   bondsLeftLabel:{ color: '#333', fontSize: 10, fontWeight: '700' },
-  bondsOut:      { backgroundColor: '#e9193620', borderRadius: 14, paddingHorizontal: 12,
-                   paddingVertical: 6, borderWidth: 1, borderColor: '#e9193640' },
-  bondsOutTxt:   { color: '#e91936', fontSize: 11, fontWeight: '800' },
-
   topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6 },
   vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#1e2028' },
   vibeIcon:     { fontSize: 16 },
@@ -1525,6 +1555,22 @@ const fp2 = StyleSheet.create({
   bondBtn:      { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
                   shadowOpacity: 0.45, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   bondTxt:      { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.4 },
+
+  // Cooldown wall
+  cooldownWall:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
+  cooldownLock:      { fontSize: 54, marginBottom: 4 },
+  cooldownTitle:     { color: '#fff', fontSize: 26, fontWeight: '900', textAlign: 'center' },
+  cooldownSub:       { color: '#444', fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
+  cooldownTimerBox:  { alignItems: 'center', backgroundColor: '#0e1016', borderRadius: 24, borderWidth: 1,
+                       borderColor: '#1e2028', paddingHorizontal: 32, paddingVertical: 20, gap: 4, width: '100%' },
+  cooldownTimerLabel:{ color: '#333', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  cooldownTimer:     { color: '#fff', fontSize: 46, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: 2 },
+  cooldownTimerNote: { color: '#2a2c34', fontSize: 11, fontWeight: '700' },
+  cooldownUpgradeBtn:{ marginTop: 12, width: '100%', borderRadius: 24, paddingVertical: 17, alignItems: 'center',
+                       backgroundColor: '#6C47FF', shadowColor: '#6C47FF', shadowOpacity: 0.5,
+                       shadowRadius: 18, shadowOffset: { width: 0, height: 6 } },
+  cooldownUpgradeTxt:{ color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+  cooldownOr:        { color: '#2a2c34', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 4 },
 
   // Bond Signal strip
   signalStrip:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginBottom: 8,
