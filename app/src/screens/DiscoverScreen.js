@@ -1550,8 +1550,8 @@ const fp2 = StyleSheet.create({
   swipeHintBond: { color: '#2a2c34', fontSize: 11, fontWeight: '800' },
 
   actions:      { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 },
-  nextBtn:      { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#1e2028' },
-  nextTxt:      { color: '#444', fontSize: 15, fontWeight: '800' },
+  nextBtn:      { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#161820', borderWidth: 1, borderColor: '#353744' },
+  nextTxt:      { color: '#aaa', fontSize: 15, fontWeight: '800' },
   bondBtn:      { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
                   shadowOpacity: 0.45, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   bondTxt:      { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.4 },
