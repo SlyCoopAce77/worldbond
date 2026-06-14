@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
   Platform, Animated, Image, RefreshControl, ActivityIndicator,
-  Dimensions, Modal, Alert,
+  Dimensions, Modal, Alert, PanResponder,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -840,6 +840,151 @@ const up = StyleSheet.create({
 
 const CARD_W = width - 32;
 
+// ─── Full Profile View ────────────────────────────────────────────────────────
+function ProfileView({ sig, onClose, onNext, onBond }) {
+  const [activePhoto, setActivePhoto] = useState(0);
+  const allPhotos = [{ type: 'avatar' }, ...(sig.photos || []).map(url => ({ type: 'photo', url }))];
+
+  return (
+    <View style={pv.root}>
+      <View style={pv.header}>
+        <TouchableOpacity style={pv.backBtn} onPress={onClose} activeOpacity={0.8}>
+          <Text style={pv.backIcon}>←</Text>
+        </TouchableOpacity>
+        {sig.online && (
+          <View style={pv.onlinePill}>
+            <View style={pv.onlineDot} />
+            <Text style={pv.onlineTxt}>Online now</Text>
+          </View>
+        )}
+      </View>
+
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+
+        {/* Photo gallery */}
+        <ScrollView
+          horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+          style={pv.photoScroll}
+          onMomentumScrollEnd={e => setActivePhoto(Math.round(e.nativeEvent.contentOffset.x / width))}
+        >
+          {allPhotos.map((item, i) => {
+            if (item.type === 'avatar') {
+              return (
+                <View key="av" style={[pv.photoTile, { backgroundColor: sig.avatarColor + '22' }]}>
+                  <LinearGradient colors={[sig.avatarColor + '44', '#050507']} style={pv.photoTileGrad}>
+                    <Avatar photo_url={sig.photo_url} name={sig.name} size={140} />
+                    {allPhotos.length > 1 && (
+                      <View style={pv.swipeHint}><Text style={pv.swipeHintTxt}>swipe for photos  →</Text></View>
+                    )}
+                  </LinearGradient>
+                </View>
+              );
+            }
+            return (
+              <View key={i} style={[pv.photoTile, { backgroundColor: '#080a0f' }]}>
+                {item.url
+                  ? <Image source={{ uri: item.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  : <View style={pv.emptyPhotoTile}><Text style={pv.emptyPhotoIcon}>📷</Text><Text style={pv.emptyPhotoTxt}>No photo</Text></View>
+                }
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        {/* Dot indicators */}
+        <View style={pv.photoDots}>
+          {allPhotos.map((_, i) => (
+            <View key={i} style={[pv.photoDot, i === activePhoto && pv.photoDotActive]} />
+          ))}
+        </View>
+
+        {/* Identity */}
+        <View style={pv.identity}>
+          <Text style={pv.name}>{sig.name}, {sig.age}</Text>
+          <Text style={pv.handle}>{sig.username}</Text>
+          <View style={pv.locRow}>
+            <Text style={{ fontSize: 18 }}>{sig.flag}</Text>
+            <Text style={pv.locTxt}>{sig.country}</Text>
+          </View>
+        </View>
+
+        {/* Stats row */}
+        <View style={pv.statsRow}>
+          <View style={pv.statItem}>
+            <Text style={pv.statVal}>{sig.strength ?? '—'}%</Text>
+            <Text style={pv.statLabel}>Bond Match</Text>
+          </View>
+          <View style={pv.statDiv} />
+          <View style={pv.statItem}>
+            <Text style={pv.statVal}>{sig.trail.length}</Text>
+            <Text style={pv.statLabel}>Countries</Text>
+          </View>
+          <View style={pv.statDiv} />
+          <View style={pv.statItem}>
+            <Text style={pv.statVal}>{sig.age}</Text>
+            <Text style={pv.statLabel}>Age</Text>
+          </View>
+        </View>
+
+        {/* Bio */}
+        {sig.bio ? (
+          <View style={pv.section}>
+            <Text style={pv.sectionLabel}>ABOUT</Text>
+            <Text style={pv.bioTxt}>{sig.bio}</Text>
+          </View>
+        ) : null}
+
+        {/* Tagline */}
+        <View style={pv.taglineBox}>
+          <Text style={pv.taglineTxt}>"{sig.tagline}"</Text>
+        </View>
+
+        {/* Interests */}
+        {sig.interests?.length > 0 && (
+          <View style={pv.section}>
+            <Text style={pv.sectionLabel}>INTERESTS</Text>
+            <View style={pv.tagsRow}>
+              {sig.interests.map((t, i) => (
+                <View key={i} style={pv.tag}><Text style={pv.tagTxt}>{t}</Text></View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* World Footprint */}
+        <View style={pv.section}>
+          <Text style={pv.sectionLabel}>WORLD FOOTPRINT</Text>
+          <View style={pv.trail}>
+            {sig.trail.map((flag, i) => (
+              <React.Fragment key={i}>
+                <View style={[pv.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
+                  <Text style={pv.trailFlag}>{flag}</Text>
+                </View>
+                {i < sig.trail.length - 1 && (
+                  <View style={pv.trailConnector}>
+                    <View style={pv.trailDot} /><View style={pv.trailLine} /><View style={pv.trailDot} />
+                  </View>
+                )}
+              </React.Fragment>
+            ))}
+          </View>
+        </View>
+
+      </ScrollView>
+
+      {/* Fixed action buttons */}
+      <View style={pv.actions}>
+        <TouchableOpacity style={pv.nextBtn} onPress={onNext} activeOpacity={0.8}>
+          <Text style={pv.nextTxt}>Next  →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[pv.bondBtn, { shadowColor: sig.avatarColor }]} onPress={onBond} activeOpacity={0.85}>
+          <Text style={pv.bondTxt}>🌐  Bond</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 function RandomTab({ user, navigation, onMatch, switchTab }) {
   const { isPremium, tier, tierInfo } = usePremium();
   const signalCfg = BOND_SIGNAL_CONFIG[tier] || BOND_SIGNAL_CONFIG.free;
@@ -851,6 +996,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const [cardIndex,       setCardIndex]       = useState(0);
   const [genderFilter,    setGenderFilter]    = useState('everyone');
   const [vibeFilter,      setVibeFilter]      = useState('any');
+  const [countryFilter,   setCountryFilter]   = useState(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);
@@ -884,8 +1030,44 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
   const sig = DEMO_SIGNALS[cardIndex % DEMO_SIGNALS.length];
 
+  // Swipe gesture
+  const pan     = useRef(new Animated.ValueXY()).current;
+  const swipeOp = useRef(new Animated.Value(0)).current; // positive = BOND, negative = PASS
+
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderMove: (_, g) => {
+      pan.setValue({ x: g.dx, y: g.dy * 0.25 });
+      swipeOp.setValue(g.dx / (width * 0.35));
+    },
+    onPanResponderRelease: (_, g) => {
+      const THRESHOLD = width * 0.32;
+      if (g.dx > THRESHOLD) {
+        Animated.timing(pan, { toValue: { x: width * 1.4, y: 0 }, duration: 280, useNativeDriver: true }).start(() => {
+          pan.setValue({ x: 0, y: 0 }); swipeOp.setValue(0);
+          doConnect();
+        });
+      } else if (g.dx < -THRESHOLD) {
+        Animated.timing(pan, { toValue: { x: -width * 1.4, y: 0 }, duration: 280, useNativeDriver: true }).start(() => {
+          pan.setValue({ x: 0, y: 0 }); swipeOp.setValue(0);
+          doNext();
+        });
+      } else {
+        Animated.parallel([
+          Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 8 }),
+          Animated.timing(swipeOp, { toValue: 0, duration: 200, useNativeDriver: true }),
+        ]).start();
+      }
+    },
+  })).current;
+
+  const cardRotate = pan.x.interpolate({ inputRange: [-width, width], outputRange: ['-18deg', '18deg'] });
+  const bondStampOp = swipeOp.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
+  const passStampOp = swipeOp.interpolate({ inputRange: [-1, 0], outputRange: [1, 0], extrapolate: 'clamp' });
+
   function animateCardIn() {
     cardSlide.setValue(60); cardOpA.setValue(0);
+    pan.setValue({ x: 0, y: 0 }); swipeOp.setValue(0);
     Animated.parallel([
       Animated.spring(cardSlide, { toValue: 0, friction: 10, tension: 60, useNativeDriver: true }),
       Animated.timing(cardOpA,   { toValue: 1, duration: 240, useNativeDriver: true }),
@@ -1067,9 +1249,10 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   // ── Idle: WorldBond Footprint ────────────────────────────────────────────────
   const vibeMeta   = VIBE_OPTIONS.find(v => v.id === vibeFilter) || VIBE_OPTIONS[0];
   const genderMeta = GENDER_OPTIONS_FP.find(g => g.id === genderFilter) || GENDER_OPTIONS_FP[0];
-  const hasFilter  = genderFilter !== 'everyone' || vibeFilter !== 'any';
+  const hasFilter  = genderFilter !== 'everyone' || vibeFilter !== 'any' || countryFilter !== null;
+  const countryMeta = COUNTRY_LIST.find(c => c.code === countryFilter);
   const filterLabel = hasFilter
-    ? [genderFilter !== 'everyone' && genderMeta.label, vibeFilter !== 'any' && vibeMeta.label].filter(Boolean).join(' · ')
+    ? [genderFilter !== 'everyone' && genderMeta.label, vibeFilter !== 'any' && vibeMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
     : 'Filters';
 
   // ── Demo Bond Match celebration ──────────────────────────────────────────────
@@ -1174,8 +1357,28 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
         {tier !== 'pro' && <Text style={[fp2.signalUpgradeArrow, { color: signalCfg.color }]}>Upgrade ›</Text>}
       </TouchableOpacity>
 
-      {/* ── Footprint Card ───────────────────────────────────────────────── */}
-      <Animated.View style={[fp2.card, { opacity: cardOpA, transform: [{ translateY: cardSlide }] }]}>
+      {/* ── Footprint Card (swipeable) ───────────────────────────────────── */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[fp2.card, {
+          opacity: cardOpA,
+          transform: [
+            { translateY: cardSlide },
+            { translateX: pan.x },
+            { translateY: pan.y },
+            { rotate: cardRotate },
+          ],
+        }]}
+      >
+        {/* BOND stamp */}
+        <Animated.View style={[st.swipeLabel, st.connectLabel, { opacity: bondStampOp }]} pointerEvents="none">
+          <Text style={st.connectLabelTxt}>BOND</Text>
+        </Animated.View>
+        {/* PASS stamp */}
+        <Animated.View style={[st.swipeLabel, st.passLabel, { opacity: passStampOp }]} pointerEvents="none">
+          <Text style={st.passLabelTxt}>PASS</Text>
+        </Animated.View>
+
         <LinearGradient colors={[sig.avatarColor + '22', '#08090d', '#000']} style={fp2.cardGrad}>
 
           {/* Avatar + online */}
@@ -1226,6 +1429,13 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             <Text style={fp2.profileHintTxt}>View full profile  ↗</Text>
           </TouchableOpacity>
 
+          {/* Swipe hint */}
+          <View style={fp2.swipeHintRow}>
+            <Text style={fp2.swipeHintPass}>← Pass</Text>
+            <Text style={fp2.swipeHintDot}>·</Text>
+            <Text style={fp2.swipeHintBond}>Bond →</Text>
+          </View>
+
         </LinearGradient>
       </Animated.View>
 
@@ -1241,163 +1451,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
       {/* ── Full Profile View ────────────────────────────────────────────── */}
       <Modal visible={showProfile} transparent={false} animationType="slide" onRequestClose={() => setShowProfile(false)}>
-        <View style={pv.root}>
-          {/* Header bar */}
-          <View style={pv.header}>
-            <TouchableOpacity style={pv.backBtn} onPress={() => setShowProfile(false)} activeOpacity={0.8}>
-              <Text style={pv.backIcon}>←</Text>
-            </TouchableOpacity>
-            {sig.online && (
-              <View style={pv.onlinePill}>
-                <View style={pv.onlineDot} />
-                <Text style={pv.onlineTxt}>Online now</Text>
-              </View>
-            )}
-          </View>
-
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 120 }}>
-
-            {/* ── Photo Gallery ── */}
-            {(() => {
-              const allPhotos = [
-                { type: 'avatar' },
-                ...(sig.photos || []).map(url => ({ type: 'photo', url })),
-              ];
-              return (
-                <>
-                  <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
-                    style={pv.photoScroll}
-                    onMomentumScrollEnd={e => {
-                      const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-                      // track active dot via ref if needed — for now dots just show count
-                    }}>
-                    {allPhotos.map((item, i) => {
-                      if (item.type === 'avatar') {
-                        return (
-                          <View key="av" style={[pv.photoTile, { backgroundColor: sig.avatarColor + '22' }]}>
-                            <LinearGradient colors={[sig.avatarColor + '44', '#050507']} style={pv.photoTileGrad}>
-                              <Avatar photo_url={sig.photo_url} name={sig.name} size={140} />
-                              {allPhotos.length > 1 && (
-                                <View style={pv.swipeHint}>
-                                  <Text style={pv.swipeHintTxt}>swipe for photos  →</Text>
-                                </View>
-                              )}
-                            </LinearGradient>
-                          </View>
-                        );
-                      }
-                      return (
-                        <View key={i} style={[pv.photoTile, { backgroundColor: '#080a0f' }]}>
-                          {item.url ? (
-                            <Image source={{ uri: item.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                          ) : (
-                            <View style={pv.emptyPhotoTile}>
-                              <Text style={pv.emptyPhotoIcon}>📷</Text>
-                              <Text style={pv.emptyPhotoTxt}>No photo</Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                  {/* Dot indicators */}
-                  <View style={pv.photoDots}>
-                    {allPhotos.map((_, i) => (
-                      <View key={i} style={[pv.photoDot, i === 0 && pv.photoDotActive]} />
-                    ))}
-                  </View>
-                </>
-              );
-            })()}
-
-            {/* ── Identity ── */}
-            <View style={pv.identity}>
-              <Text style={pv.name}>{sig.name}, {sig.age}</Text>
-              <Text style={pv.handle}>{sig.username}</Text>
-              <View style={pv.locRow}>
-                <Text style={{ fontSize: 18 }}>{sig.flag}</Text>
-                <Text style={pv.locTxt}>{sig.country}</Text>
-              </View>
-            </View>
-
-            {/* ── Stats row ── */}
-            <View style={pv.statsRow}>
-              <View style={pv.statItem}>
-                <Text style={pv.statVal}>{sig.strength ?? '—'}%</Text>
-                <Text style={pv.statLabel}>Bond Match</Text>
-              </View>
-              <View style={pv.statDiv} />
-              <View style={pv.statItem}>
-                <Text style={pv.statVal}>{sig.trail.length}</Text>
-                <Text style={pv.statLabel}>Countries</Text>
-              </View>
-              <View style={pv.statDiv} />
-              <View style={pv.statItem}>
-                <Text style={pv.statVal}>{sig.age}</Text>
-                <Text style={pv.statLabel}>Age</Text>
-              </View>
-            </View>
-
-            {/* ── Bio ── */}
-            {sig.bio ? (
-              <View style={pv.section}>
-                <Text style={pv.sectionLabel}>ABOUT</Text>
-                <Text style={pv.bioTxt}>{sig.bio}</Text>
-              </View>
-            ) : null}
-
-            {/* ── Tagline ── */}
-            <View style={pv.taglineBox}>
-              <Text style={pv.taglineTxt}>"{sig.tagline}"</Text>
-            </View>
-
-            {/* ── Interests ── */}
-            {sig.interests?.length > 0 && (
-              <View style={pv.section}>
-                <Text style={pv.sectionLabel}>INTERESTS</Text>
-                <View style={pv.tagsRow}>
-                  {sig.interests.map((t, i) => (
-                    <View key={i} style={pv.tag}>
-                      <Text style={pv.tagTxt}>{t}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* ── World Footprint ── */}
-            <View style={pv.section}>
-              <Text style={pv.sectionLabel}>WORLD FOOTPRINT</Text>
-              <View style={pv.trail}>
-                {sig.trail.map((flag, i) => (
-                  <React.Fragment key={i}>
-                    <View style={[pv.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
-                      <Text style={pv.trailFlag}>{flag}</Text>
-                    </View>
-                    {i < sig.trail.length - 1 && (
-                      <View style={pv.trailConnector}>
-                        <View style={pv.trailDot} /><View style={pv.trailLine} /><View style={pv.trailDot} />
-                      </View>
-                    )}
-                  </React.Fragment>
-                ))}
-              </View>
-            </View>
-
-          </ScrollView>
-
-          {/* ── Fixed action buttons ── */}
-          <View style={pv.actions}>
-            <TouchableOpacity style={pv.nextBtn} onPress={() => { setShowProfile(false); doNext(); }} activeOpacity={0.8}>
-              <Text style={pv.nextTxt}>Next  →</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[pv.bondBtn, { shadowColor: sig.avatarColor }]}
-              onPress={() => { setShowProfile(false); doConnect(); }} activeOpacity={0.85}>
-              <Text style={pv.bondTxt}>🌐  Bond</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ProfileView sig={sig} onClose={() => setShowProfile(false)} onNext={() => { setShowProfile(false); doNext(); }} onBond={() => { setShowProfile(false); doConnect(); }} />
       </Modal>
 
       {/* ── All-in-one Filter Sheet ──────────────────────────────────────── */}
@@ -1436,6 +1490,29 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             ))}
           </View>
 
+          {/* — Country — */}
+          <Text style={[fp.sectionLabel, { marginTop: 20 }]}>COUNTRY</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+              <TouchableOpacity
+                style={[fp.countryPill, countryFilter === null && fp.countryPillActive]}
+                onPress={() => setCountryFilter(null)} activeOpacity={0.8}
+              >
+                <Text style={fp.countryPillTxt}>🌍  Any</Text>
+              </TouchableOpacity>
+              {COUNTRY_LIST.slice(0, 30).map(c => (
+                <TouchableOpacity
+                  key={c.code}
+                  style={[fp.countryPill, countryFilter === c.code && fp.countryPillActive]}
+                  onPress={() => setCountryFilter(countryFilter === c.code ? null : c.code)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={fp.countryPillTxt}>{c.flag}  {c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
           {/* — Apply — */}
           <TouchableOpacity style={fp.applyBtn} onPress={() => setShowFilterSheet(false)} activeOpacity={0.85}>
             <Text style={fp.applyTxt}>Apply Filters</Text>
@@ -1471,6 +1548,12 @@ const fp = StyleSheet.create({
   vibeGridIcon:   { fontSize: 22 },
   vibeGridTxt:    { color: '#444', fontSize: 12, fontWeight: '800' },
   vibeGridDot:    { position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },
+
+  // Country pills (horizontal scroll)
+  countryPill:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#111318',
+                       borderWidth: 1.5, borderColor: '#1e2028' },
+  countryPillActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
+  countryPillTxt:    { color: '#555', fontSize: 13, fontWeight: '700' },
 
   // Apply button
   applyBtn:       { marginTop: 24, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
@@ -1515,6 +1598,10 @@ const fp2 = StyleSheet.create({
   tagline:      { color: '#444', fontSize: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 22, marginTop: 8, paddingHorizontal: 20 },
   profileHint:  { marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#1e2028' },
   profileHintTxt:{ color: '#333', fontSize: 12, fontWeight: '700' },
+  swipeHintRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
+  swipeHintPass: { color: '#2a2c34', fontSize: 11, fontWeight: '800' },
+  swipeHintDot:  { color: '#1e2028', fontSize: 11 },
+  swipeHintBond: { color: '#2a2c34', fontSize: 11, fontWeight: '800' },
 
   actions:      { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 },
   nextBtn:      { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#1e2028' },
