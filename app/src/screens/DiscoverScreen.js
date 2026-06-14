@@ -596,13 +596,10 @@ const TOP_COUNTRIES = [
   { code: 'FR',  flag: '🇫🇷', name: 'France'    },
 ];
 
-const VIBE_OPTIONS = [
-  { id: 'any',       label: 'Any Vibe',  icon: '🌐', color: '#6C47FF' },
-  { id: 'cultural',  label: 'Culture',   icon: '🎭', color: '#e17055' },
-  { id: 'language',  label: 'Language',  icon: '🗣️', color: '#0984e3' },
-  { id: 'adventure', label: 'Adventure', icon: '✈️', color: '#00b894' },
-  { id: 'music',     label: 'Music',     icon: '🎵', color: '#a29bfe' },
-  { id: 'foodie',    label: 'Food',      icon: '🍜', color: '#fdcb6e' },
+const REACH_OPTIONS = [
+  { id: 'nearby',    label: 'Near Me',    icon: '📍', desc: 'Bonds in your city',    color: '#57f287' },
+  { id: 'country',   label: 'My Country', icon: '🏠', desc: 'Same country as you',   color: '#4fc3f7' },
+  { id: 'worldwide', label: 'Worldwide',  icon: '🌍', desc: 'Anyone on the planet',  color: '#6C47FF' },
 ];
 
 const COUNTRY_LIST = [
@@ -1000,12 +997,13 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const [cardIndex,       setCardIndex]       = useState(0);
   const [bondsUsed,       setBondsUsed]       = useState(0);
   const [genderFilter,    setGenderFilter]    = useState('everyone');
-  const [vibeFilter,      setVibeFilter]      = useState('any');
+  const [reachFilter,     setReachFilter]     = useState('worldwide');
+  const [ageMin,          setAgeMin]          = useState(18);
+  const [ageMax,          setAgeMax]          = useState(40);
   const [countryFilter,   setCountryFilter]   = useState(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);
-  const [demoMatch,       setDemoMatch]       = useState(null);
 
   // Load today's bond usage from storage
   useEffect(() => {
@@ -1157,27 +1155,12 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     return () => anims.forEach(a => a.stop());
   }, [state, tier]);
 
-  function buildPayload() { return { vibe: vibeFilter }; }
+  function buildPayload() { return { reach: reachFilter, gender: genderFilter, ageMin, ageMax }; }
   function doNext()    { setCardIndex(i => i + 1); }
   function doConnect() {
     if (outOfBonds) { setShowUpgrade(true); return; }
     consumeBond();
-    const demoUser = {
-      user_id:      sig.id,
-      display_name: sig.name,
-      username:     sig.username,
-      photo_url:    null,
-      flag:         sig.flag,
-      country:      sig.country,
-      avatarColor:  sig.avatarColor,
-      trail:        sig.trail,
-      tagline:      sig.tagline,
-      interests:    sig.interests,
-      bio:          sig.bio,
-      age:          sig.age,
-    };
-    const demoRoomKey = `demo_${sig.id}_${Date.now()}`;
-    setDemoMatch({ demoUser, demoRoomKey });
+    doNext();
   }
   function disconnect() {
     socket.emit('leave_random_connect');
@@ -1286,74 +1269,14 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   }
 
   // ── Idle: WorldBond Footprint ────────────────────────────────────────────────
-  const vibeMeta   = VIBE_OPTIONS.find(v => v.id === vibeFilter) || VIBE_OPTIONS[0];
-  const genderMeta = GENDER_OPTIONS_FP.find(g => g.id === genderFilter) || GENDER_OPTIONS_FP[0];
-  const hasFilter  = genderFilter !== 'everyone' || vibeFilter !== 'any' || countryFilter !== null;
-  const countryMeta = COUNTRY_LIST.find(c => c.code === countryFilter);
+  const genderMeta  = GENDER_OPTIONS_FP.find(g => g.id === genderFilter) || GENDER_OPTIONS_FP[0];
+  const reachMeta   = REACH_OPTIONS.find(r => r.id === reachFilter) || REACH_OPTIONS[2];
+  const countryMeta = TOP_COUNTRIES.find(c => c.code === countryFilter);
+  const hasFilter   = genderFilter !== 'everyone' || reachFilter !== 'worldwide' || countryFilter !== null || ageMin !== 18 || ageMax !== 40;
   const filterLabel = hasFilter
-    ? [genderFilter !== 'everyone' && genderMeta.label, vibeFilter !== 'any' && vibeMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
+    ? [genderFilter !== 'everyone' && genderMeta.label, reachFilter !== 'worldwide' && reachMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
     : 'Filters';
 
-  // ── Demo Bond Sent (pending — not a match yet) ──────────────────────────────
-  if (demoMatch) {
-    const dm      = demoMatch.demoUser;
-    const myColor = stringToColor(user?.display_name || user?.username || 'me');
-    const myInit  = (user?.display_name || user?.username || 'M')[0].toUpperCase();
-    return (
-      <View style={{ flex: 1, backgroundColor: '#050507' }}>
-        <LinearGradient
-          colors={[dm.avatarColor + '18', '#050507', '#050507']}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 16 }}>
-
-          {/* Avatars — pending connector */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: myColor,
-              alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: '#ffffff22' }}>
-              <Text style={{ color: '#fff', fontSize: 30, fontWeight: '900' }}>{myInit}</Text>
-            </View>
-
-            {/* Dashed pending connector */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginHorizontal: 8 }}>
-              {[0,1,2,3,4].map(i => (
-                <View key={i} style={{ width: 5, height: 5, borderRadius: 2.5,
-                  backgroundColor: i < 2 ? '#6C47FF' : '#1e2028' }} />
-              ))}
-            </View>
-
-            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: dm.avatarColor + '55',
-              alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
-              borderColor: dm.avatarColor + '44', borderStyle: 'dashed' }}>
-              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 30, fontWeight: '900' }}>{(dm.display_name || 'B')[0]}</Text>
-            </View>
-          </View>
-
-          <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.4, textAlign: 'center' }}>
-            Bond Sent ✈️
-          </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15, textAlign: 'center', lineHeight: 22 }}>
-            We let {dm.display_name} know you bonded them.{'\n'}When they bond you back, you'll match and unlock chat.
-          </Text>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <Text style={{ fontSize: 16 }}>{dm.flag}</Text>
-            <Text style={{ color: dm.avatarColor, fontSize: 13, fontWeight: '700' }}>{dm.country}</Text>
-          </View>
-
-          {/* Single CTA — keep exploring */}
-          <TouchableOpacity
-            style={{ marginTop: 20, width: '100%', borderRadius: 28, paddingVertical: 17,
-              alignItems: 'center', backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028' }}
-            onPress={() => { setDemoMatch(null); doNext(); }}
-            activeOpacity={0.8}
-          >
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Keep Exploring  →</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -1500,45 +1423,79 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           <View style={fp.handle} />
           <Text style={fp.sheetTitle}>Find people</Text>
 
-          {/* — Looking to meet — */}
-          <View style={fp.sectionRow}>
-            <Text style={fp.sectionLabel}>LOOKING TO MEET</Text>
+          {/* ── Reach ── */}
+          <Text style={fp.sectionLabel}>LOCATION</Text>
+          <View style={fp.reachRow}>
+            {REACH_OPTIONS.map(r => {
+              const active  = reachFilter === r.id;
+              const locked  = r.id === 'nearby' && !tierInfo?.canFilterGender;
+              return (
+                <TouchableOpacity
+                  key={r.id}
+                  style={[fp.reachTile, active && { borderColor: r.color, backgroundColor: r.color + '15' }]}
+                  onPress={() => locked ? setShowUpgrade(true) : setReachFilter(r.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={fp.reachIcon}>{r.icon}</Text>
+                  <Text style={[fp.reachLabel, active && { color: r.color }]}>{r.label}</Text>
+                  <Text style={fp.reachDesc} numberOfLines={1}>{r.desc}</Text>
+                  {locked && <View style={fp.reachLock}><Text style={{ fontSize: 9 }}>🔒</Text></View>}
+                  {active && <View style={[fp.reachDot, { backgroundColor: r.color }]} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* ── Looking for ── */}
+          <View style={[fp.sectionRow, { marginTop: 22 }]}>
+            <Text style={fp.sectionLabel}>LOOKING FOR</Text>
             {!tierInfo?.canFilterGender && <Text style={fp.lockBadge}>🔒 Plus+</Text>}
           </View>
           <View style={[fp.genderRow, !tierInfo?.canFilterGender && fp.lockedSection]}>
-            {GENDER_OPTIONS_FP.map(g => (
-              <TouchableOpacity key={g.id}
-                style={[fp.genderPill, genderFilter === g.id && tierInfo?.canFilterGender && { backgroundColor: g.color, borderColor: g.color }]}
-                onPress={() => tierInfo?.canFilterGender ? setGenderFilter(g.id) : setShowUpgrade(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={fp.genderPillIcon}>{g.icon}</Text>
-                <Text style={[fp.genderPillTxt, genderFilter === g.id && tierInfo?.canFilterGender && { color: '#fff' }]}>{g.label}</Text>
-              </TouchableOpacity>
-            ))}
+            {GENDER_OPTIONS_FP.map(g => {
+              const active = genderFilter === g.id && tierInfo?.canFilterGender;
+              return (
+                <TouchableOpacity key={g.id}
+                  style={[fp.genderPill, active && { backgroundColor: g.color, borderColor: g.color }]}
+                  onPress={() => tierInfo?.canFilterGender ? setGenderFilter(g.id) : setShowUpgrade(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={fp.genderPillIcon}>{g.icon}</Text>
+                  <Text style={[fp.genderPillTxt, active && { color: '#fff' }]}>{g.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* — Vibe — */}
-          <View style={[fp.sectionRow, { marginTop: 20 }]}>
-            <Text style={fp.sectionLabel}>VIBE</Text>
-            {!tierInfo?.canFilterVibe && <Text style={fp.lockBadge}>🔒 Plus+</Text>}
+          {/* ── Age range ── */}
+          <View style={[fp.sectionRow, { marginTop: 22 }]}>
+            <Text style={fp.sectionLabel}>AGE RANGE</Text>
+            <Text style={fp.ageRangeVal}>{ageMin} – {ageMax}</Text>
           </View>
-          <View style={[fp.vibeGrid, !tierInfo?.canFilterVibe && fp.lockedSection]}>
-            {VIBE_OPTIONS.map(v => (
-              <TouchableOpacity key={v.id}
-                style={[fp.vibeGridItem, vibeFilter === v.id && tierInfo?.canFilterVibe && { backgroundColor: v.color + '22', borderColor: v.color }]}
-                onPress={() => tierInfo?.canFilterVibe ? setVibeFilter(v.id) : setShowUpgrade(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={fp.vibeGridIcon}>{v.icon}</Text>
-                <Text style={[fp.vibeGridTxt, vibeFilter === v.id && tierInfo?.canFilterVibe && { color: v.color }]}>{v.label}</Text>
-                {vibeFilter === v.id && tierInfo?.canFilterVibe && <View style={[fp.vibeGridDot, { backgroundColor: v.color }]} />}
+          <View style={fp.ageRow}>
+            <View style={fp.ageStepper}>
+              <TouchableOpacity style={fp.ageBtn} onPress={() => setAgeMin(a => Math.max(18, a - 1))} activeOpacity={0.7}>
+                <Text style={fp.ageBtnTxt}>−</Text>
               </TouchableOpacity>
-            ))}
+              <Text style={fp.ageVal}>{ageMin}</Text>
+              <TouchableOpacity style={fp.ageBtn} onPress={() => setAgeMin(a => Math.min(ageMax - 1, a + 1))} activeOpacity={0.7}>
+                <Text style={fp.ageBtnTxt}>+</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={fp.ageTo}>to</Text>
+            <View style={fp.ageStepper}>
+              <TouchableOpacity style={fp.ageBtn} onPress={() => setAgeMax(a => Math.max(ageMin + 1, a - 1))} activeOpacity={0.7}>
+                <Text style={fp.ageBtnTxt}>−</Text>
+              </TouchableOpacity>
+              <Text style={fp.ageVal}>{ageMax}</Text>
+              <TouchableOpacity style={fp.ageBtn} onPress={() => setAgeMax(a => Math.min(60, a + 1))} activeOpacity={0.7}>
+                <Text style={fp.ageBtnTxt}>+</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* — Country — */}
-          <View style={[fp.sectionRow, { marginTop: 20 }]}>
+          {/* ── Country ── */}
+          <View style={[fp.sectionRow, { marginTop: 22 }]}>
             <Text style={fp.sectionLabel}>COUNTRY</Text>
             {!tierInfo?.canFilterCountry && <Text style={fp.lockBadge}>🔒 Pro</Text>}
           </View>
@@ -1584,6 +1541,17 @@ const fp = StyleSheet.create({
                     borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#f59e0b33' },
   lockedSection:  { opacity: 0.35 },
 
+  // Reach — 3 wide tiles
+  reachRow:       { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  reachTile:      { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 14, paddingHorizontal: 6,
+                    borderRadius: 18, backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028',
+                    position: 'relative' },
+  reachIcon:      { fontSize: 22 },
+  reachLabel:     { color: '#bbb', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  reachDesc:      { color: '#333', fontSize: 9, fontWeight: '600', textAlign: 'center' },
+  reachDot:       { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5 },
+  reachLock:      { position: 'absolute', top: 6, right: 6 },
+
   // Gender pills — full-width 3-up row
   genderRow:      { flexDirection: 'row', gap: 10 },
   genderPill:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
@@ -1592,13 +1560,17 @@ const fp = StyleSheet.create({
   genderPillIcon: { fontSize: 20 },
   genderPillTxt:  { color: '#555', fontSize: 13, fontWeight: '800' },
 
-  // Vibe grid — 3 columns
-  vibeGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  vibeGridItem:   { width: '30.5%', alignItems: 'center', gap: 6, paddingVertical: 14, borderRadius: 18,
-                    backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028', position: 'relative' },
-  vibeGridIcon:   { fontSize: 22 },
-  vibeGridTxt:    { color: '#444', fontSize: 12, fontWeight: '800' },
-  vibeGridDot:    { position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },
+  // Age range steppers
+  ageRangeVal:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
+  ageRow:         { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  ageStepper:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    backgroundColor: '#111318', borderRadius: 18, borderWidth: 1.5, borderColor: '#1e2028',
+                    paddingHorizontal: 4, paddingVertical: 6 },
+  ageBtn:         { width: 38, height: 38, borderRadius: 19, backgroundColor: '#0e1016',
+                    alignItems: 'center', justifyContent: 'center' },
+  ageBtnTxt:      { color: '#fff', fontSize: 20, fontWeight: '300', lineHeight: 24 },
+  ageVal:         { color: '#fff', fontSize: 18, fontWeight: '900', minWidth: 34, textAlign: 'center' },
+  ageTo:          { color: '#333', fontSize: 13, fontWeight: '700' },
 
   // Country flag grid
   flagGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
