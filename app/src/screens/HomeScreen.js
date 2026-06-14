@@ -16,6 +16,28 @@ import { getCountryFlag } from '../utils/countryUtils';
 const { width } = Dimensions.get('window');
 const CARD_W = 160;
 
+// ─── Shared event type metadata (icon + color only) ──────────────────────────
+const EV_TYPE = {
+  watch_party:  { icon: '🎬', color: '#e91e63' },
+  game_night:   { icon: '🎮', color: '#7b5ea7' },
+  cooking:      { icon: '🍳', color: '#ff9800' },
+  study:        { icon: '📚', color: '#2196f3' },
+  music:        { icon: '🎵', color: '#f06292' },
+  language:     { icon: '🗣️', color: '#26c6da' },
+  travel_talk:  { icon: '✈️', color: '#42a5f5' },
+  workout:      { icon: '💪', color: '#ff7043' },
+  art:          { icon: '🎨', color: '#ab47bc' },
+  just_chill:   { icon: '😎', color: '#57f287' },
+};
+
+const DEMO_TOP_EVENTS = [
+  { id: 'dt1', title: 'K-Drama Watch Party 🍜', type: 'watch_party',  attendees: { length: 312 }, hostName: 'JiMin',    hostCountry: 'KR', scheduledFor: null },
+  { id: 'dt2', title: 'Global English Practice', type: 'language',    attendees: { length: 247 }, hostName: 'Sarah',    hostCountry: 'GB', scheduledFor: null },
+  { id: 'dt3', title: 'Friday Game Night 🎮',    type: 'game_night',  attendees: { length: 189 }, hostName: 'Carlos',   hostCountry: 'MX', scheduledFor: Date.now() + 3600000 },
+  { id: 'dt4', title: 'African Cuisine Cook-Along', type: 'cooking',  attendees: { length: 134 }, hostName: 'Amara',    hostCountry: 'NG', scheduledFor: Date.now() + 7200000 },
+  { id: 'dt5', title: 'Meditation & Mindfulness',  type: 'just_chill',attendees: { length: 98  }, hostName: 'Aiko',     hostCountry: 'JP', scheduledFor: Date.now() + 1800000 },
+];
+
 const CONNECTION_TYPES = {
   dating:     { emoji: '❤️',  label: 'Dating',           color: '#e91e63' },
   friendship: { emoji: '🤝',  label: 'Friendship',       color: '#2196f3' },
@@ -298,6 +320,67 @@ const expS = StyleSheet.create({
   interestText:{ color: '#6C47FF', fontSize: 14, fontWeight: '700' },
 });
 
+// ─── Event leaderboard row ────────────────────────────────────────────────────
+const RANK_ICONS = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+function EventLeaderRow({ item, rank, onPress }) {
+  const meta   = EV_TYPE[item.type] || EV_TYPE.just_chill;
+  const count  = item.attendees?.length || 0;
+  const isLive = item.scheduledFor && item.scheduledFor <= Date.now() + 60000;
+  const isHot  = count >= 150;
+
+  return (
+    <TouchableOpacity style={lb.row} onPress={onPress} activeOpacity={0.8}>
+      <Text style={lb.rankTxt}>{RANK_ICONS[rank] ?? `#${rank}`}</Text>
+      <View style={[lb.typeIcon, { backgroundColor: meta.color + '22' }]}>
+        <Text style={{ fontSize: 18 }}>{meta.icon}</Text>
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <Text style={lb.title} numberOfLines={1}>{item.title}</Text>
+          {isHot && <Text style={{ fontSize: 11 }}>🔥</Text>}
+        </View>
+        <Text style={lb.host} numberOfLines={1}>
+          {item.hostName}
+          {item.hostCountry ? `  ${getCountryFlag(item.hostCountry)}` : ''}
+          {isLive ? '  · LIVE' : ''}
+        </Text>
+      </View>
+      <View style={lb.countCol}>
+        <Text style={[lb.countNum, isHot && { color: '#ff7043' }]}>
+          {count >= 1000 ? `${(count / 1000).toFixed(1)}k` : count}
+        </Text>
+        <Text style={lb.countLabel}>going</Text>
+      </View>
+      <Text style={lb.arrow}>›</Text>
+    </TouchableOpacity>
+  );
+}
+const lb = StyleSheet.create({
+  card:       { backgroundColor: '#0d0f14', borderRadius: 22, borderWidth: 1, borderColor: '#1e2028', overflow: 'hidden' },
+  headerStrip:{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12,
+                borderBottomWidth: 1, borderBottomColor: '#1e2028' },
+  stripEmoji: { fontSize: 18 },
+  stripTitle: { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
+  stripLive:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#e5393520',
+                borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#e5393540' },
+  stripDot:   { width: 5, height: 5, borderRadius: 3, backgroundColor: '#e53935' },
+  stripLiveTxt:{ color: '#e53935', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  row:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+  divider:    { height: 1, backgroundColor: '#1e2028', marginHorizontal: 16 },
+  rankTxt:    { fontSize: 20, width: 28, textAlign: 'center' },
+  typeIcon:   { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  title:      { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
+  host:       { color: '#444', fontSize: 11, fontWeight: '600' },
+  countCol:   { alignItems: 'flex-end', gap: 1 },
+  countNum:   { color: '#6C47FF', fontSize: 16, fontWeight: '900', lineHeight: 18 },
+  countLabel: { color: '#2a2c34', fontSize: 9, fontWeight: '700' },
+  arrow:      { color: '#2a2c34', fontSize: 22, fontWeight: '300', marginLeft: -4 },
+  seeAllRow:  { borderTopWidth: 1, borderTopColor: '#1e2028', borderRadius: 0, overflow: 'hidden' },
+  seeAllGrad: { paddingVertical: 14, alignItems: 'center' },
+  seeAllTxt:  { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
+});
+
 // ─── Section header ───────────────────────────────────────────────────────────
 function SectionHead({ title, sub, action, onAction }) {
   const { colors } = useTheme();
@@ -352,6 +435,7 @@ export default function HomeScreen({ navigation, user }) {
   const [experiences,   setExperiences]   = useState([]);
   const [icebreaker,    setIcebreaker]    = useState({ question: '', responseCount: 0 });
   const [liveStreams,   setLiveStreams]   = useState([]);
+  const [topEvents,     setTopEvents]     = useState([]);
   const [loadingMatches,setLoadingM]      = useState(true);
   const [loadingExps,   setLoadingE]      = useState(true);
   const [refreshing,    setRefreshing]    = useState(false);
@@ -361,7 +445,7 @@ export default function HomeScreen({ navigation, user }) {
   const heroOpacity   = scrollY.interpolate({ inputRange: [0, 120], outputRange: [1, 0], extrapolate: 'clamp' });
   const heroScale     = scrollY.interpolate({ inputRange: [0, 120], outputRange: [1, 0.92], extrapolate: 'clamp' });
 
-  const sectionsAnim = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(0))).current;
+  const sectionsAnim = useRef([0, 1, 2, 3, 4, 5, 6].map(() => new Animated.Value(0))).current;
 
   const fetchBondData = useCallback(async () => {
     try {
@@ -413,12 +497,28 @@ export default function HomeScreen({ navigation, user }) {
     const handleIcebreaker   = ({ question, responses }) => setIcebreaker({ question, responseCount: responses?.length || 0 });
     const handleIncomingCall = ({ from, callerName, callerCountry, offer, callType }) => navigation.navigate('Call', { mode: 'incoming', from, callerName, callerCountry, offer, callType });
     const handleLiveStreams  = streams => setLiveStreams(streams);
+    const handleEventsList   = list => {
+      const sorted = (list || [])
+        .slice()
+        .sort((a, b) => (b.attendees?.length || 0) - (a.attendees?.length || 0));
+      setTopEvents(sorted.slice(0, 5));
+    };
+    const handleEventUpdated = updated => {
+      setTopEvents(prev => {
+        const next = prev.map(e => e.id === updated?.id ? updated : e)
+          .sort((a, b) => (b.attendees?.length || 0) - (a.attendees?.length || 0));
+        return next;
+      });
+    };
 
     socket.on('user_list',      handleUserList);
     socket.on('icebreaker_data',handleIcebreaker);
     socket.on('incoming_call',  handleIncomingCall);
     socket.on('live_streams',   handleLiveStreams);
+    socket.on('events_list',    handleEventsList);
+    socket.on('event_updated',  handleEventUpdated);
     socket.emit('get_live_streams');
+    socket.emit('get_events');
 
     fetchBondData();
     return () => {
@@ -427,6 +527,8 @@ export default function HomeScreen({ navigation, user }) {
       socket.off('icebreaker_data',handleIcebreaker);
       socket.off('incoming_call', handleIncomingCall);
       socket.off('live_streams',  handleLiveStreams);
+      socket.off('events_list',   handleEventsList);
+      socket.off('event_updated', handleEventUpdated);
     };
   }, [fetchBondData]);
 
@@ -436,6 +538,7 @@ export default function HomeScreen({ navigation, user }) {
       socket.emit('get_users');
       socket.emit('get_icebreaker');
       socket.emit('get_live_streams');
+      socket.emit('get_events');
     }
     await fetchBondData();
     setRefreshing(false);
@@ -649,8 +752,42 @@ export default function HomeScreen({ navigation, user }) {
           />
         </Animated.View>
 
-        {/* ── Experiences near you ── */}
+        {/* ── Top Events Leaderboard ── */}
         <Animated.View style={[styles.section, sectionStyle(5)]}>
+          <SectionHead
+            title="🔥 Top Events"
+            sub="Most talked about right now"
+            action="See All"
+            onAction={() => navigation.navigate('Events')}
+          />
+          <View style={lb.card}>
+            {(topEvents.length > 0 ? topEvents : DEMO_TOP_EVENTS).map((ev, i) => (
+              <React.Fragment key={ev.id}>
+                {i > 0 && <View style={lb.divider} />}
+                <EventLeaderRow
+                  item={ev}
+                  rank={i + 1}
+                  onPress={() => navigation.navigate('Events')}
+                />
+              </React.Fragment>
+            ))}
+            <TouchableOpacity
+              style={lb.seeAllRow}
+              onPress={() => navigation.navigate('Events')}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#6C47FF22', '#6C47FF08']}
+                style={lb.seeAllGrad}
+              >
+                <Text style={lb.seeAllTxt}>See all events  →</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* ── Experiences near you ── */}
+        <Animated.View style={[styles.section, sectionStyle(6)]}>
           <SectionHead
             title="Experiences Near You"
             sub={experiences.length ? `${experiences.length} posted recently` : null}
