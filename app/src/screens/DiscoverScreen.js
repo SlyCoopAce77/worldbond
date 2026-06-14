@@ -781,7 +781,21 @@ const REACH_OPTIONS = [
 ];
 
 
-// Blip dot positions around the radar (offsets from center of 160×160 orb)
+const REGION_CODES = {
+  africa:   ['DZ','AO','BJ','BW','BF','BI','CM','CV','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','SZ','TZ','TG','TN','UG','ZM','ZW'],
+  americas: ['AG','AR','BS','BB','BZ','BO','BR','CA','CL','CO','CR','CU','DM','DO','EC','SV','GD','GT','GY','HT','HN','JM','MX','NI','PA','PY','PE','KN','LC','VC','SR','TT','US','UY','VE'],
+  asia:     ['AF','AM','AZ','BH','BD','BT','BN','KH','CN','GE','IN','ID','IR','IQ','IL','JP','JO','KZ','KW','KG','LA','LB','MY','MV','MN','MM','NP','OM','PK','PH','QA','RU','SA','SG','LK','SY','TW','TJ','TH','TL','TM','AE','UZ','VN','YE'],
+  europe:   ['AL','AD','AT','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','MD','MC','ME','NL','NO','PL','PT','RO','SM','RS','SK','SI','ES','SE','CH','TR','UA','GB'],
+  oceania:  ['AU','FJ','KI','MH','FM','NR','NZ','PW','PG','WS','SB','TO','TV','VU'],
+};
+
+function getRegionForCode(code) {
+  if (!code) return 'all';
+  for (const [region, codes] of Object.entries(REGION_CODES)) {
+    if (codes.includes(code)) return region;
+  }
+  return 'all';
+}
 
 // ─── Upgrade Modal ────────────────────────────────────────────────────────────
 function UpgradeModal({ visible, onClose, navigation }) {
@@ -1048,9 +1062,9 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const [reachFilter,     setReachFilter]     = useState('worldwide');
   const [ageMin,          setAgeMin]          = useState(18);
   const [ageMax,          setAgeMax]          = useState(40);
-  const [countryFilter,   setCountryFilter]   = useState(null);
+  const [countryFilter,   setCountryFilter]   = useState(user?.country ?? null);
   const [countrySearch,   setCountrySearch]   = useState('');
-  const [countryRegion,   setCountryRegion]   = useState('all');
+  const [countryRegion,   setCountryRegion]   = useState(() => getRegionForCode(user?.country));
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);
@@ -1352,20 +1366,14 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     { id: 'europe',  label: 'Europe'   },
     { id: 'oceania', label: 'Oceania'  },
   ];
-  const REGION_CODES = {
-    africa:   ['DZ','AO','BJ','BW','BF','BI','CM','CV','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','SZ','TZ','TG','TN','UG','ZM','ZW'],
-    americas: ['AG','AR','BS','BB','BZ','BO','BR','CA','CL','CO','CR','CU','DM','DO','EC','SV','GD','GT','GY','HT','HN','JM','MX','NI','PA','PY','PE','KN','LC','VC','SR','TT','US','UY','VE'],
-    asia:     ['AF','AM','AZ','BH','BD','BT','BN','KH','CN','GE','IN','ID','IR','IQ','IL','JP','JO','KZ','KW','KG','LA','LB','MY','MV','MN','MM','NP','OM','PK','PH','QA','RU','SA','SG','LK','SY','TW','TJ','TH','TL','TM','AE','UZ','VN','YE'],
-    europe:   ['AL','AD','AT','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','MD','MC','ME','NL','NO','PL','PT','RO','SM','RS','SK','SI','ES','SE','CH','TR','UA','GB'],
-    oceania:  ['AU','FJ','KI','MH','FM','NR','NZ','PW','PG','WS','SB','TO','TV','VU'],
-  };
   const filteredCountries = ALL_COUNTRIES.filter(c => {
     if (c.code === null) return false; // Anywhere shown separately
     const matchSearch = c.name.toLowerCase().includes(countrySearch.toLowerCase());
     const matchRegion = countryRegion === 'all' || (REGION_CODES[countryRegion] || []).includes(c.code);
     return matchSearch && matchRegion;
   });
-  const hasFilter   = genderFilter !== 'everyone' || reachFilter !== 'worldwide' || countryFilter !== null || ageMin !== 18 || ageMax !== 40;
+  const defaultCountry = user?.country ?? null;
+  const hasFilter   = genderFilter !== 'everyone' || reachFilter !== 'worldwide' || countryFilter !== defaultCountry || ageMin !== 18 || ageMax !== 40;
   const filterLabel = hasFilter
     ? [genderFilter !== 'everyone' && genderMeta.label, reachFilter !== 'worldwide' && reachMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
     : 'Filters';
