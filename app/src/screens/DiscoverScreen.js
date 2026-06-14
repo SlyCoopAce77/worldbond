@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Swipeable } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAccessToken } from '../services/authApi';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
@@ -484,41 +485,17 @@ const FREQ_OPTIONS = [
   { id: 'cultural',  emoji: '🌍',  label: 'Cultural',  color: '#6C47FF' },
 ];
 
-const BOND_SIGNAL_CONFIG = {
-  free: {
-    label:      'Basic Signal',
-    bars:       1,
-    color:      '#555',
-    ringColor:  '#33333388',
-    ringCount:  1,
-    lockTitle:  'Searching…',
-    lockSub:    'Basic Signal · 1 connect per day',
-    upgradeHint:'Upgrade to boost your signal',
-    emoji:      '📶',
-  },
-  plus: {
-    label:      'Enhanced Signal',
-    bars:       3,
-    color:      '#6C47FF',
-    ringColor:  '#6C47FF55',
-    ringCount:  3,
-    lockTitle:  'Boosted Signal…',
-    lockSub:    'Enhanced Signal · 5 connects per day',
-    upgradeHint:null,
-    emoji:      '📶',
-  },
-  pro: {
-    label:      null,
-    bars:       5,
-    color:      '#f59e0b',
-    ringColor:  '#f59e0b55',
-    ringCount:  5,
-    lockTitle:  'Priority Match…',
-    lockSub:    'Unlimited · Priority Matching',
-    upgradeHint:null,
-    emoji:      '📡',
-  },
-};
+function buildSignalCfg(tierInfo) {
+  if (!tierInfo) return { label: 'Basic Signal', color: '#555', ringColor: '#33333388', ringCount: 1, emoji: '📶', upgradeHint: 'Upgrade to boost your signal' };
+  return {
+    label:       tierInfo.signalName,
+    color:       tierInfo.signalColor,
+    ringColor:   tierInfo.signalColor + '55',
+    ringCount:   tierInfo.signalRings,
+    emoji:       tierInfo.signalEmoji,
+    upgradeHint: tierInfo.id === 'free' ? 'Upgrade to boost your signal' : null,
+  };
+}
 
 function SignalBars({ count, activeCount, color, size = 4 }) {
   return (
@@ -598,6 +575,25 @@ const GENDER_OPTIONS_FP = [
   { id: 'everyone', label: 'Everyone', icon: '🌍', color: '#6C47FF' },
   { id: 'women',    label: 'Women',    icon: '👩', color: '#e91e63' },
   { id: 'men',      label: 'Men',      icon: '👨', color: '#0984e3' },
+];
+
+const TOP_COUNTRIES = [
+  { code: null,  flag: '🌍', name: 'Anywhere' },
+  { code: 'NG',  flag: '🇳🇬', name: 'Nigeria'  },
+  { code: 'US',  flag: '🇺🇸', name: 'USA'       },
+  { code: 'BR',  flag: '🇧🇷', name: 'Brazil'    },
+  { code: 'IN',  flag: '🇮🇳', name: 'India'     },
+  { code: 'JP',  flag: '🇯🇵', name: 'Japan'     },
+  { code: 'GB',  flag: '🇬🇧', name: 'UK'        },
+  { code: 'PH',  flag: '🇵🇭', name: 'Philippines'},
+  { code: 'MX',  flag: '🇲🇽', name: 'Mexico'    },
+  { code: 'GH',  flag: '🇬🇭', name: 'Ghana'     },
+  { code: 'KR',  flag: '🇰🇷', name: 'Korea'     },
+  { code: 'TR',  flag: '🇹🇷', name: 'Turkey'    },
+  { code: 'EG',  flag: '🇪🇬', name: 'Egypt'     },
+  { code: 'DE',  flag: '🇩🇪', name: 'Germany'   },
+  { code: 'ID',  flag: '🇮🇩', name: 'Indonesia' },
+  { code: 'FR',  flag: '🇫🇷', name: 'France'    },
 ];
 
 const VIBE_OPTIONS = [
@@ -985,22 +981,54 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
   );
 }
 
+function todayKey() {
+  const d = new Date();
+  return `bond_used_${d.getFullYear()}_${d.getMonth()}_${d.getDate()}`;
+}
+
 function RandomTab({ user, navigation, onMatch, switchTab }) {
   const { isPremium, tier, tierInfo } = usePremium();
-  const signalCfg = BOND_SIGNAL_CONFIG[tier] || BOND_SIGNAL_CONFIG.free;
+  const signalCfg = buildSignalCfg(tierInfo);
+
+  const bondsPerDay  = tierInfo?.bondsPerDay ?? 5;
+  const isUnlimited  = bondsPerDay === Infinity;
 
   const [state,          setState]         = useState('idle');
   const [matchedUser,    setMatchedUser]    = useState(null);
   const [roomKey,        setRoomKey]        = useState(null);
   const [messages,       setMessages]       = useState([]);
   const [cardIndex,       setCardIndex]       = useState(0);
+  const [bondsUsed,       setBondsUsed]       = useState(0);
   const [genderFilter,    setGenderFilter]    = useState('everyone');
   const [vibeFilter,      setVibeFilter]      = useState('any');
   const [countryFilter,   setCountryFilter]   = useState(null);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);
-  const [demoMatch,       setDemoMatch]       = useState(null); // { demoUser, demoRoomKey }
+  const [demoMatch,       setDemoMatch]       = useState(null);
+
+  // Load today's bond usage from storage
+  useEffect(() => {
+    AsyncStorage.getItem(todayKey()).then(v => setBondsUsed(v ? parseInt(v, 10) : 0));
+  }, []);
+
+  const bondsLeft   = isUnlimited ? Infinity : Math.max(0, bondsPerDay - bondsUsed);
+  const outOfBonds  = !isUnlimited && bondsLeft === 0;
+
+  async function consumeBond() {
+    const next = bondsUsed + 1;
+    setBondsUsed(next);
+    await AsyncStorage.setItem(todayKey(), String(next));
+  }
+
+  // Build ordered card pool based on tier
+  const cardPool = useMemo(() => {
+    let pool = [...DEMO_SIGNALS];
+    if (tierInfo?.cardOrder === 'priority') {
+      pool.sort((a, b) => b.strength - a.strength);
+    }
+    return pool;
+  }, [tierInfo?.cardOrder]);
 
   const socket      = getSocket();
   const matchScaleA = useRef(new Animated.Value(0.7)).current;
@@ -1028,7 +1056,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const [ring1, ring2, ring3] = rings;
   const [op1, op2, op3] = ringOps;
 
-  const sig = DEMO_SIGNALS[cardIndex % DEMO_SIGNALS.length];
+  const sig = cardPool[cardIndex % cardPool.length];
 
   // Swipe gesture
   const pan     = useRef(new Animated.ValueXY()).current;
@@ -1043,6 +1071,13 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     onPanResponderRelease: (_, g) => {
       const THRESHOLD = width * 0.32;
       if (g.dx > THRESHOLD) {
+        if (outOfBonds) {
+          Animated.parallel([
+            Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 8 }),
+            Animated.timing(swipeOp, { toValue: 0, duration: 200, useNativeDriver: true }),
+          ]).start(() => setShowUpgrade(true));
+          return;
+        }
         Animated.timing(pan, { toValue: { x: width * 1.4, y: 0 }, duration: 280, useNativeDriver: true }).start(() => {
           pan.setValue({ x: 0, y: 0 }); swipeOp.setValue(0);
           doConnect();
@@ -1125,6 +1160,8 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   function buildPayload() { return { vibe: vibeFilter }; }
   function doNext()    { setCardIndex(i => i + 1); }
   function doConnect() {
+    if (outOfBonds) { setShowUpgrade(true); return; }
+    consumeBond();
     const demoUser = {
       user_id:      sig.id,
       display_name: sig.name,
@@ -1201,26 +1238,30 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     );
   }
 
-  // ── Match ─────────────────────────────────────────────────────────────────────
+  // ── Mutual Match (both bonded each other — chat now unlocked) ────────────────
   if (state === 'matching' && matchedUser) {
     const mu      = matchedUser;
     const myColor = stringToColor(user?.display_name || user?.username || 'me');
     const muColor = stringToColor(mu.display_name || mu.username);
     const myInit  = (user?.display_name || user?.username || 'M')[0].toUpperCase();
     const muInit  = (mu.display_name || mu.username || '?')[0].toUpperCase();
+    function clearMatch() {
+      setState('idle'); setMatchedUser(null); setRoomKey(null);
+      matchScaleA.setValue(0.7); matchOpA.setValue(0);
+    }
     return (
       <View style={st.matchScreen}>
         <LinearGradient colors={['#0a0010','#1a0030','#0a0010']} style={StyleSheet.absoluteFill} />
         <Animated.View style={[st.matchContent, { transform: [{ scale: matchScaleA }], opacity: matchOpA }]}>
-          <Text style={st.matchEmoji}>💜</Text>
+          <Text style={st.matchEmoji}>🌐</Text>
           <Text style={st.matchTitle}>It's a Match!</Text>
-          <Text style={st.matchSub}>You and {mu.display_name || mu.username} connected</Text>
+          <Text style={st.matchSub}>You both bonded each other — chat is now unlocked</Text>
           <View style={st.matchAvatarRow}>
             <View style={st.matchAvatarWrap}>
               <View style={[st.matchAvatar, { backgroundColor: myColor }]}><Text style={st.matchAvatarInitial}>{myInit}</Text></View>
               <Text style={st.matchAvatarLabel}>You</Text>
             </View>
-            <Text style={st.matchHeart}>♡</Text>
+            <Text style={st.matchHeart}>💜</Text>
             <View style={st.matchAvatarWrap}>
               <View style={[st.matchAvatar, { backgroundColor: muColor }]}><Text style={st.matchAvatarInitial}>{muInit}</Text></View>
               <Text style={st.matchAvatarLabel}>{mu.display_name || mu.username}</Text>
@@ -1228,18 +1269,16 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           </View>
           <TouchableOpacity style={st.matchMsgBtn} onPress={() => {
             if (onMatch) onMatch(matchedUser, roomKey);
-            setState('idle'); setMatchedUser(null); setRoomKey(null);
-            matchScaleA.setValue(0.7); matchOpA.setValue(0);
+            clearMatch();
             if (switchTab) switchTab('people');
           }} activeOpacity={0.85}>
-            <Text style={st.matchMsgTxt}>💬  Message in People</Text>
+            <Text style={st.matchMsgTxt}>💬  Start Chatting</Text>
           </TouchableOpacity>
           <TouchableOpacity style={st.matchSkipBtn} onPress={() => {
             if (onMatch) onMatch(matchedUser, roomKey);
-            setState('idle'); setMatchedUser(null); setRoomKey(null); setCardIndex(i => i + 1);
-            matchScaleA.setValue(0.7); matchOpA.setValue(0);
+            clearMatch(); setCardIndex(i => i + 1);
           }} activeOpacity={0.8}>
-            <Text style={st.matchSkipTxt}>Save & Keep Swiping</Text>
+            <Text style={st.matchSkipTxt}>Save & Keep Exploring</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -1255,71 +1294,62 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     ? [genderFilter !== 'everyone' && genderMeta.label, vibeFilter !== 'any' && vibeMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
     : 'Filters';
 
-  // ── Demo Bond Match celebration ──────────────────────────────────────────────
+  // ── Demo Bond Sent (pending — not a match yet) ──────────────────────────────
   if (demoMatch) {
-    const dm   = demoMatch.demoUser;
+    const dm      = demoMatch.demoUser;
     const myColor = stringToColor(user?.display_name || user?.username || 'me');
     const myInit  = (user?.display_name || user?.username || 'M')[0].toUpperCase();
     return (
       <View style={{ flex: 1, backgroundColor: '#050507' }}>
         <LinearGradient
-          colors={[dm.avatarColor + '22', '#0a0010', '#050507']}
+          colors={[dm.avatarColor + '18', '#050507', '#050507']}
           style={StyleSheet.absoluteFill}
         />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 18 }}>
-          {/* Avatars */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
-            <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: myColor,
-              alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff',
-              shadowColor: myColor, shadowOpacity: 0.6, shadowRadius: 16, elevation: 8 }}>
-              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900' }}>{myInit}</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 16 }}>
+
+          {/* Avatars — pending connector */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: myColor,
+              alignItems: 'center', justifyContent: 'center', borderWidth: 2.5, borderColor: '#ffffff22' }}>
+              <Text style={{ color: '#fff', fontSize: 30, fontWeight: '900' }}>{myInit}</Text>
             </View>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1a0030',
-              alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#6C47FF',
-              marginHorizontal: -10, zIndex: 1 }}>
-              <Text style={{ fontSize: 16 }}>🌐</Text>
+
+            {/* Dashed pending connector */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginHorizontal: 8 }}>
+              {[0,1,2,3,4].map(i => (
+                <View key={i} style={{ width: 5, height: 5, borderRadius: 2.5,
+                  backgroundColor: i < 2 ? '#6C47FF' : '#1e2028' }} />
+              ))}
             </View>
-            <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: dm.avatarColor,
-              alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff',
-              shadowColor: dm.avatarColor, shadowOpacity: 0.6, shadowRadius: 16, elevation: 8 }}>
-              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900' }}>{(dm.display_name || 'B')[0]}</Text>
+
+            <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: dm.avatarColor + '55',
+              alignItems: 'center', justifyContent: 'center', borderWidth: 2.5,
+              borderColor: dm.avatarColor + '44', borderStyle: 'dashed' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 30, fontWeight: '900' }}>{(dm.display_name || 'B')[0]}</Text>
             </View>
           </View>
 
-          <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -0.5, textAlign: 'center' }}>
-            It's a Bond! 🌐
+          <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.4, textAlign: 'center' }}>
+            Bond Sent ✈️
           </Text>
-          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, textAlign: 'center', lineHeight: 24 }}>
-            You and {dm.display_name} are now connected
+          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 15, textAlign: 'center', lineHeight: 22 }}>
+            We let {dm.display_name} know you bonded them.{'\n'}When they bond you back, you'll match and unlock chat.
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 18 }}>{dm.flag}</Text>
-            <Text style={{ color: '#6C47FF', fontSize: 14, fontWeight: '700' }}>{dm.country}</Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <Text style={{ fontSize: 16 }}>{dm.flag}</Text>
+            <Text style={{ color: dm.avatarColor, fontSize: 13, fontWeight: '700' }}>{dm.country}</Text>
           </View>
 
-          {/* Actions */}
-          <View style={{ width: '100%', gap: 12, marginTop: 16 }}>
-            <TouchableOpacity
-              style={{ borderRadius: 28, paddingVertical: 18, alignItems: 'center',
-                backgroundColor: '#6C47FF', shadowColor: '#6C47FF',
-                shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }}
-              onPress={() => {
-                onMatch && onMatch(demoMatch.demoUser, demoMatch.demoRoomKey);
-                switchTab && switchTab('people');
-                setDemoMatch(null);
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>💬  Send a Message</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ paddingVertical: 14, alignItems: 'center' }}
-              onPress={() => { setDemoMatch(null); doNext(); }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ color: '#444', fontSize: 15, fontWeight: '700' }}>Keep Exploring  →</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Single CTA — keep exploring */}
+          <TouchableOpacity
+            style={{ marginTop: 20, width: '100%', borderRadius: 28, paddingVertical: 17,
+              alignItems: 'center', backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028' }}
+            onPress={() => { setDemoMatch(null); doNext(); }}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Keep Exploring  →</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -1327,6 +1357,27 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
   return (
     <View style={{ flex: 1 }}>
+
+      {/* ── Signal badge + bonds counter ─────────────────────────────────── */}
+      <View style={fp2.signalHeader}>
+        <View style={[fp2.signalBadge, { backgroundColor: signalCfg.color + '15', borderColor: signalCfg.color + '40' }]}>
+          <Text style={fp2.signalEmoji}>{signalCfg.emoji}</Text>
+          <Text style={[fp2.signalName, { color: signalCfg.color }]}>{signalCfg.label}</Text>
+        </View>
+        {outOfBonds ? (
+          <TouchableOpacity
+            style={fp2.bondsOut}
+            onPress={() => setShowUpgrade(true)} activeOpacity={0.8}
+          >
+            <Text style={fp2.bondsOutTxt}>No bonds left  ·  Upgrade ›</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={fp2.bondsLeft}>
+            <Text style={fp2.bondsLeftNum}>{isUnlimited ? '∞' : bondsLeft}</Text>
+            <Text style={fp2.bondsLeftLabel}>{isUnlimited ? 'bonds' : `bond${bondsLeft !== 1 ? 's' : ''} left`}</Text>
+          </View>
+        )}
+      </View>
 
       {/* ── Filter chip + shuffle ─────────────────────────────────────────── */}
       <View style={fp2.topRow}>
@@ -1343,19 +1394,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
         </TouchableOpacity>
       </View>
 
-      {/* ── Bond Signal strip ────────────────────────────────────────────── */}
-      <TouchableOpacity
-        style={[fp2.signalStrip, { borderColor: signalCfg.color + '33', backgroundColor: signalCfg.color + '0a' }]}
-        onPress={() => navigation.navigate('Subscription')}
-        activeOpacity={0.8}
-      >
-        <SignalBars count={5} activeCount={signalCfg.bars} color={signalCfg.color} size={5} />
-        {signalCfg.label && <Text style={[fp2.signalStripLabel, { color: signalCfg.color }]}>{signalCfg.label}</Text>}
-        <Text style={fp2.signalStripSub}>
-          {tierInfo?.randomConnectsPerDay === Infinity ? 'Unlimited connects' : `${tierInfo?.randomConnectsPerDay ?? 1} connect${(tierInfo?.randomConnectsPerDay ?? 1) !== 1 ? 's' : ''}/day`}
-        </Text>
-        {tier !== 'pro' && <Text style={[fp2.signalUpgradeArrow, { color: signalCfg.color }]}>Upgrade ›</Text>}
-      </TouchableOpacity>
+
 
       {/* ── Footprint Card (swipeable) ───────────────────────────────────── */}
       <Animated.View
@@ -1462,56 +1501,64 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           <Text style={fp.sheetTitle}>Find people</Text>
 
           {/* — Looking to meet — */}
-          <Text style={fp.sectionLabel}>LOOKING TO MEET</Text>
-          <View style={fp.genderRow}>
+          <View style={fp.sectionRow}>
+            <Text style={fp.sectionLabel}>LOOKING TO MEET</Text>
+            {!tierInfo?.canFilterGender && <Text style={fp.lockBadge}>🔒 Plus+</Text>}
+          </View>
+          <View style={[fp.genderRow, !tierInfo?.canFilterGender && fp.lockedSection]}>
             {GENDER_OPTIONS_FP.map(g => (
               <TouchableOpacity key={g.id}
-                style={[fp.genderPill, genderFilter === g.id && { backgroundColor: g.color, borderColor: g.color }]}
-                onPress={() => setGenderFilter(g.id)} activeOpacity={0.8}
+                style={[fp.genderPill, genderFilter === g.id && tierInfo?.canFilterGender && { backgroundColor: g.color, borderColor: g.color }]}
+                onPress={() => tierInfo?.canFilterGender ? setGenderFilter(g.id) : setShowUpgrade(true)}
+                activeOpacity={0.8}
               >
                 <Text style={fp.genderPillIcon}>{g.icon}</Text>
-                <Text style={[fp.genderPillTxt, genderFilter === g.id && { color: '#fff' }]}>{g.label}</Text>
+                <Text style={[fp.genderPillTxt, genderFilter === g.id && tierInfo?.canFilterGender && { color: '#fff' }]}>{g.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {/* — Vibe — */}
-          <Text style={[fp.sectionLabel, { marginTop: 20 }]}>VIBE</Text>
-          <View style={fp.vibeGrid}>
+          <View style={[fp.sectionRow, { marginTop: 20 }]}>
+            <Text style={fp.sectionLabel}>VIBE</Text>
+            {!tierInfo?.canFilterVibe && <Text style={fp.lockBadge}>🔒 Plus+</Text>}
+          </View>
+          <View style={[fp.vibeGrid, !tierInfo?.canFilterVibe && fp.lockedSection]}>
             {VIBE_OPTIONS.map(v => (
               <TouchableOpacity key={v.id}
-                style={[fp.vibeGridItem, vibeFilter === v.id && { backgroundColor: v.color + '22', borderColor: v.color }]}
-                onPress={() => setVibeFilter(v.id)} activeOpacity={0.8}
+                style={[fp.vibeGridItem, vibeFilter === v.id && tierInfo?.canFilterVibe && { backgroundColor: v.color + '22', borderColor: v.color }]}
+                onPress={() => tierInfo?.canFilterVibe ? setVibeFilter(v.id) : setShowUpgrade(true)}
+                activeOpacity={0.8}
               >
                 <Text style={fp.vibeGridIcon}>{v.icon}</Text>
-                <Text style={[fp.vibeGridTxt, vibeFilter === v.id && { color: v.color }]}>{v.label}</Text>
-                {vibeFilter === v.id && <View style={[fp.vibeGridDot, { backgroundColor: v.color }]} />}
+                <Text style={[fp.vibeGridTxt, vibeFilter === v.id && tierInfo?.canFilterVibe && { color: v.color }]}>{v.label}</Text>
+                {vibeFilter === v.id && tierInfo?.canFilterVibe && <View style={[fp.vibeGridDot, { backgroundColor: v.color }]} />}
               </TouchableOpacity>
             ))}
           </View>
 
           {/* — Country — */}
-          <Text style={[fp.sectionLabel, { marginTop: 20 }]}>COUNTRY</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-            <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
-              <TouchableOpacity
-                style={[fp.countryPill, countryFilter === null && fp.countryPillActive]}
-                onPress={() => setCountryFilter(null)} activeOpacity={0.8}
-              >
-                <Text style={fp.countryPillTxt}>🌍  Any</Text>
-              </TouchableOpacity>
-              {COUNTRY_LIST.slice(0, 30).map(c => (
+          <View style={[fp.sectionRow, { marginTop: 20 }]}>
+            <Text style={fp.sectionLabel}>COUNTRY</Text>
+            {!tierInfo?.canFilterCountry && <Text style={fp.lockBadge}>🔒 Pro</Text>}
+          </View>
+          <View style={[fp.flagGrid, !tierInfo?.canFilterCountry && fp.lockedSection]}>
+            {TOP_COUNTRIES.map(c => {
+              const active = countryFilter === c.code && tierInfo?.canFilterCountry;
+              return (
                 <TouchableOpacity
-                  key={c.code}
-                  style={[fp.countryPill, countryFilter === c.code && fp.countryPillActive]}
-                  onPress={() => setCountryFilter(countryFilter === c.code ? null : c.code)}
-                  activeOpacity={0.8}
+                  key={c.code ?? 'any'}
+                  style={[fp.flagTile, active && fp.flagTileActive]}
+                  onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(active ? null : c.code) : setShowUpgrade(true)}
+                  activeOpacity={0.75}
                 >
-                  <Text style={fp.countryPillTxt}>{c.flag}  {c.name}</Text>
+                  <Text style={fp.flagEmoji}>{c.flag}</Text>
+                  <Text style={[fp.flagName, active && fp.flagNameActive]} numberOfLines={1}>{c.name}</Text>
+                  {active && <View style={fp.flagCheck}><Text style={fp.flagCheckTxt}>✓</Text></View>}
                 </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+              );
+            })}
+          </View>
 
           {/* — Apply — */}
           <TouchableOpacity style={fp.applyBtn} onPress={() => setShowFilterSheet(false)} activeOpacity={0.85}>
@@ -1531,7 +1578,11 @@ const fp = StyleSheet.create({
   filterSheet:    { backgroundColor: '#0d0f14', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, position: 'absolute', bottom: 0, left: 0, right: 0 },
   handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2a2c34', alignSelf: 'center', marginBottom: 18 },
   sheetTitle:     { color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 18 },
-  sectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 12 },
+  sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  lockBadge:      { color: '#f59e0b', fontSize: 10, fontWeight: '800', backgroundColor: '#f59e0b18',
+                    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#f59e0b33' },
+  lockedSection:  { opacity: 0.35 },
 
   // Gender pills — full-width 3-up row
   genderRow:      { flexDirection: 'row', gap: 10 },
@@ -1549,11 +1600,18 @@ const fp = StyleSheet.create({
   vibeGridTxt:    { color: '#444', fontSize: 12, fontWeight: '800' },
   vibeGridDot:    { position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },
 
-  // Country pills (horizontal scroll)
-  countryPill:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#111318',
-                       borderWidth: 1.5, borderColor: '#1e2028' },
-  countryPillActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
-  countryPillTxt:    { color: '#555', fontSize: 13, fontWeight: '700' },
+  // Country flag grid
+  flagGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  flagTile:       { width: '22%', alignItems: 'center', gap: 5, paddingVertical: 10,
+                    borderRadius: 16, backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028',
+                    position: 'relative' },
+  flagTileActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
+  flagEmoji:      { fontSize: 26 },
+  flagName:       { color: '#444', fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  flagNameActive: { color: '#6C47FF' },
+  flagCheck:      { position: 'absolute', top: 5, right: 5, width: 14, height: 14,
+                    borderRadius: 7, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  flagCheckTxt:   { color: '#fff', fontSize: 8, fontWeight: '900' },
 
   // Apply button
   applyBtn:       { marginTop: 24, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
@@ -1563,7 +1621,21 @@ const fp = StyleSheet.create({
 
 // ── WorldBond Footprint card styles ──────────────────────────────────────────
 const fp2 = StyleSheet.create({
-  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  // Signal header
+  signalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                   paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
+  signalBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14,
+                   borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+  signalEmoji:   { fontSize: 13 },
+  signalName:    { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  bondsLeft:     { alignItems: 'flex-end' },
+  bondsLeftNum:  { color: '#fff', fontSize: 16, fontWeight: '900', lineHeight: 18 },
+  bondsLeftLabel:{ color: '#333', fontSize: 10, fontWeight: '700' },
+  bondsOut:      { backgroundColor: '#e9193620', borderRadius: 14, paddingHorizontal: 12,
+                   paddingVertical: 6, borderWidth: 1, borderColor: '#e9193640' },
+  bondsOutTxt:   { color: '#e91936', fontSize: 11, fontWeight: '800' },
+
+  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6 },
   vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#1e2028' },
   vibeIcon:     { fontSize: 16 },
   vibeTxt:      { color: '#555', fontSize: 13, fontWeight: '800', flex: 1 },
