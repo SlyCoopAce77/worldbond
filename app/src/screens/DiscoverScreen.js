@@ -3,9 +3,10 @@ import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
   Platform, Animated, Image, RefreshControl, ActivityIndicator,
-  Dimensions,
+  Dimensions, Modal, Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { Swipeable } from 'react-native-gesture-handler';
 import { getAccessToken } from '../services/authApi';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
@@ -475,302 +476,1297 @@ const tab = StyleSheet.create({
   lockedSub:         { color: 'rgba(232,0,61,0.6)', fontSize: 12 },
 });
 
-// ─── Random connect tab ───────────────────────────────────────────────────────
-const SIGNAL_OPTIONS = [
-  { id: 'male',   label: 'Men',        emoji: '🔵', color: '#1da1f2' },
-  { id: 'any',    label: 'Open World', emoji: '🌍', color: '#6C47FF' },
-  { id: 'female', label: 'Women',      emoji: '💜', color: '#e91e63' },
+// ─── Signal Trail Discovery ───────────────────────────────────────────────────
+const FREQ_OPTIONS = [
+  { id: 'romantic',  emoji: '❤️',  label: 'Romantic',  color: '#e91e63' },
+  { id: 'friends',   emoji: '🤝',  label: 'Friends',   color: '#4fc3f7' },
+  { id: 'adventure', emoji: '✈️',  label: 'Adventure', color: '#ff9800' },
+  { id: 'cultural',  emoji: '🌍',  label: 'Cultural',  color: '#6C47FF' },
 ];
 
-function RandomTab({ user, navigation }) {
-  const [state,       setState]       = useState('idle');
-  const [matchedUser, setMatchedUser] = useState(null);
-  const [roomKey,     setRoomKey]     = useState(null);
-  const [messages,    setMessages]    = useState([]);
-  const [text,        setText]        = useState('');
-  const [genderPref,  setGenderPref]  = useState('any');
-  const flatRef   = useRef(null);
-  const socket    = getSocket();
-  const ring1     = useRef(new Animated.Value(1)).current;
-  const ring2     = useRef(new Animated.Value(1)).current;
-  const ring3     = useRef(new Animated.Value(1)).current;
-  const op1       = useRef(new Animated.Value(0.5)).current;
-  const op2       = useRef(new Animated.Value(0.35)).current;
-  const op3       = useRef(new Animated.Value(0.2)).current;
+const BOND_SIGNAL_CONFIG = {
+  free: {
+    label:      'Basic Signal',
+    bars:       1,
+    color:      '#555',
+    ringColor:  '#33333388',
+    ringCount:  1,
+    lockTitle:  'Searching…',
+    lockSub:    'Basic Signal · 1 connect per day',
+    upgradeHint:'Upgrade to boost your signal',
+    emoji:      '📶',
+  },
+  plus: {
+    label:      'Enhanced Signal',
+    bars:       3,
+    color:      '#6C47FF',
+    ringColor:  '#6C47FF55',
+    ringCount:  3,
+    lockTitle:  'Boosted Signal…',
+    lockSub:    'Enhanced Signal · 5 connects per day',
+    upgradeHint:null,
+    emoji:      '📶',
+  },
+  pro: {
+    label:      null,
+    bars:       5,
+    color:      '#f59e0b',
+    ringColor:  '#f59e0b55',
+    ringCount:  5,
+    lockTitle:  'Priority Match…',
+    lockSub:    'Unlimited · Priority Matching',
+    upgradeHint:null,
+    emoji:      '📡',
+  },
+};
 
-  const signalColor = SIGNAL_OPTIONS.find(o => o.id === genderPref)?.color || '#6C47FF';
+function SignalBars({ count, activeCount, color, size = 4 }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View key={i} style={{
+          width: size,
+          height: size + i * (size * 0.8),
+          borderRadius: 1.5,
+          backgroundColor: i < activeCount ? color : '#1e2028',
+        }} />
+      ))}
+    </View>
+  );
+}
+
+const DEMO_SIGNALS = [
+  {
+    id: 'd1', name: 'Kenji',  initials: 'KT', age: 26, flag: '🇯🇵', country: 'Japan',    username: '@kenji_tokyo',
+    trail: ['🇯🇵', '🇧🇷', '🇳🇬', '🇮🇳'], strength: 91, freq: 'cultural',  online: true,
+    tagline: 'Exploring world music & art 🎵',   avatarColor: '#6C47FF',
+    bio: 'Music producer & culture traveller. I\'ve played in bands across 3 continents and still searching for the perfect beat. Let\'s talk art, food, and everything in between.',
+    interests: ['🎵 Music', '🎨 Art', '🌍 Travel', '🍜 Food', '🎭 Culture'],
+    photos: [null, null, null],
+  },
+  {
+    id: 'd2', name: 'Amara',  initials: 'AL', age: 23, flag: '🇳🇬', country: 'Nigeria',  username: '@amara_lagos',
+    trail: ['🇳🇬', '🇬🇭', '🇵🇹', '🇸🇪'], strength: 78, freq: 'friends',   online: true,
+    tagline: 'Looking for genuine connection',    avatarColor: '#00b894',
+    bio: 'Software engineer by day, storyteller by night. I believe every person carries a unique world inside them — I want to hear yours.',
+    interests: ['💻 Tech', '📚 Books', '🌿 Nature', '✍️ Writing'],
+    photos: [null, null, null],
+  },
+  {
+    id: 'd3', name: 'Lucas',  initials: 'LS', age: 29, flag: '🇧🇷', country: 'Brazil',   username: '@lucas_sp',
+    trail: ['🇧🇷', '🇦🇷', '🇯🇵', '🇺🇸'], strength: 72, freq: 'adventure', online: false,
+    tagline: 'Digital nomad · always moving ✈️', avatarColor: '#e17055',
+    bio: 'Remote designer living out of a backpack. Currently in Asia, was in Europe last month. Ask me about the best street food anywhere in the world.',
+    interests: ['✈️ Travel', '🎨 Design', '🍢 Street Food', '📸 Photography'],
+    photos: [null, null, null],
+  },
+  {
+    id: 'd4', name: 'Sofia',  initials: 'SS', age: 25, flag: '🇸🇪', country: 'Sweden',   username: '@sofia_stockholm',
+    trail: ['🇸🇪', '🇩🇪', '🇫🇷', '🇮🇳'], strength: 65, freq: 'cultural',  online: true,
+    tagline: 'Language nerd · speaks 4 languages', avatarColor: '#0984e3',
+    bio: 'Fluent in Swedish, German, French and Hindi. Learning Mandarin. I think language is the most beautiful bridge between cultures.',
+    interests: ['🗣️ Languages', '📖 Literature', '🎻 Classical Music', '🌸 Mindfulness'],
+    photos: [null, null, null],
+  },
+  {
+    id: 'd5', name: 'Priya',  initials: 'PM', age: 24, flag: '🇮🇳', country: 'India',    username: '@priya_mumbai',
+    trail: ['🇮🇳', '🇦🇪', '🇬🇧', '🇧🇷'], strength: 60, freq: 'romantic',  online: false,
+    tagline: 'Coffee lover · global art explorer ☕', avatarColor: '#e91e63',
+    bio: 'Architect with a passion for public art installations. My dream is to leave something beautiful in every city I visit. Coffee is my love language.',
+    interests: ['🏛️ Architecture', '☕ Coffee', '🎨 Art', '🌆 Cities', '📷 Photos'],
+    photos: [null, null, null],
+  },
+  {
+    id: 'd6', name: 'Yusuf',  initials: 'YC', age: 28, flag: '🇪🇬', country: 'Egypt',    username: '@yusuf_cairo',
+    trail: ['🇪🇬', '🇸🇦', '🇹🇷', '🇩🇪'], strength: 54, freq: 'friends',   online: true,
+    tagline: 'History buff · open to all cultures', avatarColor: '#fdcb6e',
+    bio: 'Archaeologist working on digs across the Middle East. History isn\'t just the past — it\'s the map to understanding every culture alive today.',
+    interests: ['🏺 History', '📜 Archaeology', '🕌 Architecture', '🌍 Culture'],
+    photos: [null, null, null],
+  },
+  {
+    id: 'd7', name: 'Lucia',  initials: 'LC', age: 22, flag: '🇲🇽', country: 'Mexico',   username: '@lucia_cdmx',
+    trail: ['🇲🇽', '🇨🇴', '🇪🇸', '🇯🇵'], strength: 49, freq: 'adventure', online: true,
+    tagline: 'Salsa & street food enthusiast 🌮', avatarColor: '#a29bfe',
+    bio: 'Dance instructor & foodie. Salsa is my therapy and tacos are my religion. Looking for people who want to actually experience life, not just scroll through it.',
+    interests: ['💃 Dance', '🌮 Food', '🎶 Latin Music', '✈️ Adventure'],
+    photos: [null, null, null],
+  },
+];
+
+const GENDER_OPTIONS_FP = [
+  { id: 'everyone', label: 'Everyone', icon: '🌍', color: '#6C47FF' },
+  { id: 'women',    label: 'Women',    icon: '👩', color: '#e91e63' },
+  { id: 'men',      label: 'Men',      icon: '👨', color: '#0984e3' },
+];
+
+const VIBE_OPTIONS = [
+  { id: 'any',       label: 'Any Vibe',  icon: '🌐', color: '#6C47FF' },
+  { id: 'cultural',  label: 'Culture',   icon: '🎭', color: '#e17055' },
+  { id: 'language',  label: 'Language',  icon: '🗣️', color: '#0984e3' },
+  { id: 'adventure', label: 'Adventure', icon: '✈️', color: '#00b894' },
+  { id: 'music',     label: 'Music',     icon: '🎵', color: '#a29bfe' },
+  { id: 'foodie',    label: 'Food',      icon: '🍜', color: '#fdcb6e' },
+];
+
+const COUNTRY_LIST = [
+  { code: 'US', name: 'United States',   flag: '🇺🇸' },
+  { code: 'GB', name: 'United Kingdom',  flag: '🇬🇧' },
+  { code: 'NG', name: 'Nigeria',         flag: '🇳🇬' },
+  { code: 'GH', name: 'Ghana',           flag: '🇬🇭' },
+  { code: 'ZA', name: 'South Africa',    flag: '🇿🇦' },
+  { code: 'KE', name: 'Kenya',           flag: '🇰🇪' },
+  { code: 'EG', name: 'Egypt',           flag: '🇪🇬' },
+  { code: 'ET', name: 'Ethiopia',        flag: '🇪🇹' },
+  { code: 'BR', name: 'Brazil',          flag: '🇧🇷' },
+  { code: 'MX', name: 'Mexico',          flag: '🇲🇽' },
+  { code: 'CO', name: 'Colombia',        flag: '🇨🇴' },
+  { code: 'AR', name: 'Argentina',       flag: '🇦🇷' },
+  { code: 'IN', name: 'India',           flag: '🇮🇳' },
+  { code: 'PK', name: 'Pakistan',        flag: '🇵🇰' },
+  { code: 'BD', name: 'Bangladesh',      flag: '🇧🇩' },
+  { code: 'PH', name: 'Philippines',     flag: '🇵🇭' },
+  { code: 'ID', name: 'Indonesia',       flag: '🇮🇩' },
+  { code: 'JP', name: 'Japan',           flag: '🇯🇵' },
+  { code: 'KR', name: 'South Korea',     flag: '🇰🇷' },
+  { code: 'CN', name: 'China',           flag: '🇨🇳' },
+  { code: 'VN', name: 'Vietnam',         flag: '🇻🇳' },
+  { code: 'TH', name: 'Thailand',        flag: '🇹🇭' },
+  { code: 'TR', name: 'Turkey',          flag: '🇹🇷' },
+  { code: 'SA', name: 'Saudi Arabia',    flag: '🇸🇦' },
+  { code: 'AE', name: 'UAE',             flag: '🇦🇪' },
+  { code: 'IR', name: 'Iran',            flag: '🇮🇷' },
+  { code: 'IQ', name: 'Iraq',            flag: '🇮🇶' },
+  { code: 'DE', name: 'Germany',         flag: '🇩🇪' },
+  { code: 'FR', name: 'France',          flag: '🇫🇷' },
+  { code: 'IT', name: 'Italy',           flag: '🇮🇹' },
+  { code: 'ES', name: 'Spain',           flag: '🇪🇸' },
+  { code: 'PT', name: 'Portugal',        flag: '🇵🇹' },
+  { code: 'NL', name: 'Netherlands',     flag: '🇳🇱' },
+  { code: 'SE', name: 'Sweden',          flag: '🇸🇪' },
+  { code: 'NO', name: 'Norway',          flag: '🇳🇴' },
+  { code: 'CA', name: 'Canada',          flag: '🇨🇦' },
+  { code: 'AU', name: 'Australia',       flag: '🇦🇺' },
+  { code: 'RU', name: 'Russia',          flag: '🇷🇺' },
+  { code: 'UA', name: 'Ukraine',         flag: '🇺🇦' },
+  { code: 'MA', name: 'Morocco',         flag: '🇲🇦' },
+  { code: 'TZ', name: 'Tanzania',        flag: '🇹🇿' },
+  { code: 'SN', name: 'Senegal',         flag: '🇸🇳' },
+  { code: 'CM', name: 'Cameroon',        flag: '🇨🇲' },
+  { code: 'CD', name: 'DR Congo',        flag: '🇨🇩' },
+  { code: 'MX', name: 'Mexico',          flag: '🇲🇽' },
+  { code: 'PL', name: 'Poland',          flag: '🇵🇱' },
+  { code: 'RO', name: 'Romania',         flag: '🇷🇴' },
+  { code: 'MY', name: 'Malaysia',        flag: '🇲🇾' },
+  { code: 'SG', name: 'Singapore',       flag: '🇸🇬' },
+  { code: 'NZ', name: 'New Zealand',     flag: '🇳🇿' },
+].filter((c, i, arr) => arr.findIndex(x => x.code === c.code) === i)
+ .sort((a, b) => a.name.localeCompare(b.name));
+
+// Blip dot positions around the radar (offsets from center of 160×160 orb)
+const BLIP_DOTS = [
+  { left: 22,  top: 38  },
+  { left: 112, top: 18  },
+  { left: 134, top: 88  },
+  { left: 88,  top: 128 },
+  { left: 18,  top: 105 },
+  { left: 55,  top: 145 },
+  { left: 140, top: 44  },
+];
+
+// ─── Signal Card ──────────────────────────────────────────────────────────────
+function SignalCard({ signal, onLock }) {
+  const freq    = FREQ_OPTIONS.find(f => f.id === signal.freq) || FREQ_OPTIONS[1];
+  const sColor  = signal.strength >= 80 ? '#57f287' : signal.strength >= 60 ? '#fee75c' : '#ff9060';
+  const pulse   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    socket.on('random_match',     ({ matchedUser: mu, roomKey: rk }) => {
-      setMatchedUser(mu); setRoomKey(rk); setState('connected'); setMessages([]);
+    if (!signal.online) return;
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
+    ])).start();
+  }, []);
+
+  const dotScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] });
+  const dotOp    = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 0.4] });
+
+  return (
+    <View style={st.card}>
+      {/* Left — flag + online dot */}
+      <View style={st.cardLeft}>
+        <Text style={st.cardFlag}>{signal.flag}</Text>
+        {signal.online ? (
+          <Animated.View style={[st.onlineDot, { transform: [{ scale: dotScale }], opacity: dotOp }]} />
+        ) : (
+          <View style={[st.onlineDot, { backgroundColor: '#333' }]} />
+        )}
+      </View>
+
+      {/* Mid — trail + strength + tagline */}
+      <View style={st.cardMid}>
+        <View style={st.cardTopRow}>
+          <Text style={st.cardCountry}>{signal.country}</Text>
+          <View style={[st.freqBadge, { backgroundColor: freq.color + '22', borderColor: freq.color + '55' }]}>
+            <Text style={[st.freqTxt, { color: freq.color }]}>{freq.emoji} {freq.label}</Text>
+          </View>
+        </View>
+
+        {/* Trail */}
+        <View style={st.trail}>
+          {signal.trail.map((f, i) => (
+            <React.Fragment key={i}>
+              <Text style={st.trailFlag}>{f}</Text>
+              {i < signal.trail.length - 1 && <Text style={st.trailArrow}>›</Text>}
+            </React.Fragment>
+          ))}
+        </View>
+
+        {/* Signal strength bar */}
+        <View style={st.strengthRow}>
+          <View style={st.strengthTrack}>
+            <View style={[st.strengthFill, { width: `${signal.strength}%`, backgroundColor: sColor }]} />
+          </View>
+          <Text style={[st.strengthNum, { color: sColor }]}>{signal.strength}%</Text>
+        </View>
+
+        <Text style={st.tagline} numberOfLines={1}>{signal.tagline}</Text>
+      </View>
+
+      {/* Right — Lock button */}
+      <TouchableOpacity style={st.lockBtn} onPress={() => onLock(signal)} activeOpacity={0.8}>
+        <Text style={st.lockTxt}>Lock{'\n'}Signal</Text>
+        <Text style={st.lockArrow}>›</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── Upgrade Modal ────────────────────────────────────────────────────────────
+function UpgradeModal({ visible, onClose, navigation }) {
+  const TIERS = [
+    {
+      id: 'signal_plus',
+      name: 'Signal+',
+      price: '$4.99 / mo',
+      color: '#6C47FF',
+      perks: [
+        'Unlimited daily swipes',
+        'Filter by frequency (Romantic, Friends…)',
+        'See who locked your signal',
+        'Priority match queue',
+      ],
+    },
+    {
+      id: 'signal_pro',
+      name: 'Signal Pro',
+      price: '$9.99 / mo',
+      color: '#e91e63',
+      badge: 'BEST',
+      perks: [
+        'Everything in Signal+',
+        'See profile photos on cards',
+        '⚡ Super Lock — direct connection',
+        'Advanced country & language filters',
+        'Signal Resonance boost (+20%)',
+      ],
+    },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={up.overlay} activeOpacity={1} onPress={onClose}>
+        <View style={up.sheet}>
+          <View style={up.handle} />
+          <Text style={up.title}>Upgrade Your Signal</Text>
+          <Text style={up.sub}>Better frequency = better connections</Text>
+          {TIERS.map(tier => (
+            <View key={tier.id} style={[up.tierCard, { borderColor: tier.color + '55' }]}>
+              <View style={[up.tierTop, { backgroundColor: tier.color + '18' }]}>
+                {tier.badge && (
+                  <View style={[up.tierBadge, { backgroundColor: tier.color }]}>
+                    <Text style={up.tierBadgeTxt}>{tier.badge}</Text>
+                  </View>
+                )}
+                <Text style={[up.tierName, { color: tier.color }]}>{tier.name}</Text>
+                <Text style={up.tierPrice}>{tier.price}</Text>
+              </View>
+              <View style={up.tierPerks}>
+                {tier.perks.map((p, i) => (
+                  <View key={i} style={up.perkRow}>
+                    <Text style={[up.perkDot, { color: tier.color }]}>●</Text>
+                    <Text style={up.perkTxt}>{p}</Text>
+                  </View>
+                ))}
+              </View>
+              <TouchableOpacity
+                style={[up.tierBtn, { backgroundColor: tier.color }]}
+                onPress={() => { onClose(); navigation?.navigate('Subscription'); }}
+                activeOpacity={0.85}
+              >
+                <Text style={up.tierBtnTxt}>Get {tier.name}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <TouchableOpacity style={up.closeBtn} onPress={onClose}>
+            <Text style={up.closeTxt}>Maybe later</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+const up = StyleSheet.create({
+  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet:        { backgroundColor: '#0a0c12', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 16, paddingBottom: 40 },
+  handle:       { width: 40, height: 4, borderRadius: 2, backgroundColor: '#2F3336', alignSelf: 'center', marginBottom: 4 },
+  title:        { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.4 },
+  sub:          { color: '#555', fontSize: 13, textAlign: 'center' },
+  tierCard:     { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  tierTop:      { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 10, position: 'relative' },
+  tierBadge:    { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  tierBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  tierName:     { fontSize: 17, fontWeight: '900', flex: 1 },
+  tierPrice:    { color: '#fff', fontSize: 14, fontWeight: '800' },
+  tierPerks:    { padding: 16, gap: 10, borderTopWidth: 1, borderTopColor: '#1e2028' },
+  perkRow:      { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  perkDot:      { fontSize: 7, marginTop: 5 },
+  perkTxt:      { color: '#bbb', fontSize: 13, lineHeight: 18, flex: 1 },
+  tierBtn:      { margin: 12, marginTop: 4, borderRadius: 14, paddingVertical: 13, alignItems: 'center' },
+  tierBtnTxt:   { color: '#fff', fontSize: 15, fontWeight: '900' },
+  closeBtn:     { alignItems: 'center', paddingVertical: 8 },
+  closeTxt:     { color: '#444', fontSize: 14 },
+});
+
+const CARD_W = width - 32;
+
+function RandomTab({ user, navigation, onMatch, switchTab }) {
+  const { isPremium, tier, tierInfo } = usePremium();
+  const signalCfg = BOND_SIGNAL_CONFIG[tier] || BOND_SIGNAL_CONFIG.free;
+
+  const [state,          setState]         = useState('idle');
+  const [matchedUser,    setMatchedUser]    = useState(null);
+  const [roomKey,        setRoomKey]        = useState(null);
+  const [messages,       setMessages]       = useState([]);
+  const [cardIndex,       setCardIndex]       = useState(0);
+  const [genderFilter,    setGenderFilter]    = useState('everyone');
+  const [vibeFilter,      setVibeFilter]      = useState('any');
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [showProfile,     setShowProfile]     = useState(false);
+  const [showUpgrade,     setShowUpgrade]     = useState(false);
+  const [demoMatch,       setDemoMatch]       = useState(null); // { demoUser, demoRoomKey }
+
+  const socket      = getSocket();
+  const matchScaleA = useRef(new Animated.Value(0.7)).current;
+  const matchOpA    = useRef(new Animated.Value(0)).current;
+
+  // Footprint card slide-in anim
+  const cardSlide = useRef(new Animated.Value(60)).current;
+  const cardOpA   = useRef(new Animated.Value(0)).current;
+
+  // Locking rings (up to 5 for Pro)
+  const rings = [
+    useRef(new Animated.Value(1)).current,
+    useRef(new Animated.Value(1)).current,
+    useRef(new Animated.Value(1)).current,
+    useRef(new Animated.Value(1)).current,
+    useRef(new Animated.Value(1)).current,
+  ];
+  const ringOps = [
+    useRef(new Animated.Value(0.5)).current,
+    useRef(new Animated.Value(0.3)).current,
+    useRef(new Animated.Value(0.15)).current,
+    useRef(new Animated.Value(0.10)).current,
+    useRef(new Animated.Value(0.07)).current,
+  ];
+  const [ring1, ring2, ring3] = rings;
+  const [op1, op2, op3] = ringOps;
+
+  const sig = DEMO_SIGNALS[cardIndex % DEMO_SIGNALS.length];
+
+  function animateCardIn() {
+    cardSlide.setValue(60); cardOpA.setValue(0);
+    Animated.parallel([
+      Animated.spring(cardSlide, { toValue: 0, friction: 10, tension: 60, useNativeDriver: true }),
+      Animated.timing(cardOpA,   { toValue: 1, duration: 240, useNativeDriver: true }),
+    ]).start();
+  }
+
+  useEffect(() => { animateCardIn(); }, [cardIndex]);
+
+  // Socket
+  useEffect(() => {
+    socket.on('random_match', ({ matchedUser: mu, roomKey: rk }) => {
+      setMatchedUser(mu); setRoomKey(rk); setMessages([]);
+      setState('matching');
+      Animated.parallel([
+        Animated.spring(matchScaleA, { toValue: 1, useNativeDriver: true, friction: 6 }),
+        Animated.timing(matchOpA,    { toValue: 1, duration: 280, useNativeDriver: true }),
+      ]).start();
     });
-    socket.on('random_waiting',   () => setState('waiting'));
+    socket.on('random_waiting',   () => setState('locking'));
     socket.on('random_cancelled', () => setState('idle'));
     socket.on('random_timeout',   () => setState('timeout'));
     socket.on('random_message',   msg => setMessages(prev => [...prev, msg]));
     return () => {
-      socket.off('random_match'); socket.off('random_waiting');
-      socket.off('random_cancelled'); socket.off('random_timeout');
-      socket.off('random_message');
+      ['random_match','random_waiting','random_cancelled','random_timeout','random_message']
+        .forEach(e => socket.off(e));
     };
   }, []);
 
+  // Locking rings — count and speed based on tier
   useEffect(() => {
-    if (state !== 'waiting') { [ring1,ring2,ring3].forEach(r => r.setValue(1)); return; }
-    const anims = [ring1,ring2,ring3].map((r, i) =>
+    if (state !== 'locking') { rings.forEach(r => r.setValue(1)); return; }
+    const count    = signalCfg.ringCount;
+    const duration = tier === 'pro' ? 900 : tier === 'plus' ? 1200 : 1600;
+    const activeRings = rings.slice(0, count);
+    const activeOps   = ringOps.slice(0, count);
+    const initOps     = [0.5, 0.3, 0.15, 0.10, 0.07].slice(0, count);
+    const anims = activeRings.map((r, i) =>
       Animated.loop(Animated.parallel([
         Animated.sequence([
-          Animated.delay(i * 500),
-          Animated.timing(r, { toValue: 2.4, duration: 1800, useNativeDriver: true }),
-          Animated.timing(r, { toValue: 1,   duration: 0,    useNativeDriver: true }),
+          Animated.delay(i * (duration * 0.32)),
+          Animated.timing(r,            { toValue: 2.8, duration, useNativeDriver: true }),
+          Animated.timing(r,            { toValue: 1,   duration: 0, useNativeDriver: true }),
         ]),
         Animated.sequence([
-          Animated.delay(i * 500),
-          Animated.timing([op1,op2,op3][i], { toValue: 0, duration: 1800, useNativeDriver: true }),
-          Animated.timing([op1,op2,op3][i], { toValue: [0.5,0.35,0.2][i], duration: 0, useNativeDriver: true }),
+          Animated.delay(i * (duration * 0.32)),
+          Animated.timing(activeOps[i], { toValue: 0,           duration, useNativeDriver: true }),
+          Animated.timing(activeOps[i], { toValue: initOps[i],  duration: 0, useNativeDriver: true }),
         ]),
       ]))
     );
     anims.forEach(a => a.start());
     return () => anims.forEach(a => a.stop());
-  }, [state]);
+  }, [state, tier]);
 
-  useEffect(() => {
-    if (messages.length > 0) flatRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
-
-  function connect()    { setState('waiting'); socket.emit('join_random_connect', { genderPref }); }
+  function buildPayload() { return { vibe: vibeFilter }; }
+  function doNext()    { setCardIndex(i => i + 1); }
+  function doConnect() {
+    const demoUser = {
+      user_id:      sig.id,
+      display_name: sig.name,
+      username:     sig.username,
+      photo_url:    null,
+      flag:         sig.flag,
+      country:      sig.country,
+      avatarColor:  sig.avatarColor,
+      trail:        sig.trail,
+      tagline:      sig.tagline,
+      interests:    sig.interests,
+      bio:          sig.bio,
+      age:          sig.age,
+    };
+    const demoRoomKey = `demo_${sig.id}_${Date.now()}`;
+    setDemoMatch({ demoUser, demoRoomKey });
+  }
   function disconnect() {
     socket.emit('leave_random_connect');
     setState('idle'); setMatchedUser(null); setRoomKey(null); setMessages([]);
-  }
-  function sendMsg() {
-    if (!text.trim() || !roomKey) return;
-    socket.emit('random_message', { roomKey, text: text.trim() });
-    setText('');
+    matchScaleA.setValue(0.7); matchOpA.setValue(0);
   }
 
-  // Connected: full chat
-  if (state === 'connected' && matchedUser) {
+  // ── Connected: chat ──────────────────────────────────────────────────────────
+  // ── Locking / timeout ────────────────────────────────────────────────────────
+  if (state === 'locking' || state === 'timeout') {
+    const sc = signalCfg;
+    const orbColors = state === 'timeout'
+      ? ['#2a0a0a', '#000']
+      : [sc.color + '30', '#000'];
     return (
-      <View style={{ flex: 1 }}>
-        <LinearGradient colors={['#000000', '#000000']} style={rc.connHeader}>
-          <View style={rc.connAvatar}>
-            <Avatar photo_url={matchedUser.photo_url} name={matchedUser.display_name || matchedUser.username} size={44} />
-            <View style={rc.onlineDot} />
+      <View style={st.lockScreen}>
+        <View style={st.lockOrbWrap}>
+          {state === 'locking' && rings.slice(0, sc.ringCount).map((r, i) => (
+            <Animated.View key={i} style={[
+              st.lockRing,
+              { borderColor: sc.ringColor, transform: [{ scale: r }], opacity: ringOps[i] }
+            ]} />
+          ))}
+          <LinearGradient colors={orbColors} style={st.lockOrb}>
+            <Text style={{ fontSize: 52 }}>{state === 'timeout' ? '😶' : sc.emoji}</Text>
+          </LinearGradient>
+        </View>
+
+        {/* Signal tier badge — only for free/plus */}
+        {state === 'locking' && sc.label && (
+          <View style={[st.signalBadge, { borderColor: sc.color + '44', backgroundColor: sc.color + '12' }]}>
+            <SignalBars count={5} activeCount={sc.bars} color={sc.color} size={4} />
+            <Text style={[st.signalBadgeTxt, { color: sc.color }]}>{sc.label}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={rc.connName}>{matchedUser.display_name || matchedUser.username}</Text>
-            <Text style={rc.connCountry}>{matchedUser.country} · Random Connect 🌀</Text>
-          </View>
-          <TouchableOpacity style={rc.endBtn} onPress={disconnect}>
-            <Text style={rc.endText}>End</Text>
+        )}
+
+        <Text style={st.lockTitle}>
+          {state === 'timeout' ? 'No one nearby' : sc.lockTitle}
+        </Text>
+        <Text style={st.lockSub}>
+          {state === 'timeout' ? 'Try again soon — more people join every day.' : sc.lockSub}
+        </Text>
+
+        {state === 'locking' && sc.upgradeHint && (
+          <TouchableOpacity
+            style={st.signalUpgradeBtn}
+            onPress={() => navigation.navigate('Subscription')}
+            activeOpacity={0.8}
+          >
+            <Text style={st.signalUpgradeTxt}>⚡  {sc.upgradeHint}</Text>
           </TouchableOpacity>
-        </LinearGradient>
-        <FlatList
-          ref={flatRef}
-          data={messages}
-          keyExtractor={m => String(m.id)}
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 16, gap: 8 }}
-          ListEmptyComponent={
-            <View style={rc.emptyChat}>
-              <Text style={{ fontSize: 36 }}>👋</Text>
-              <Text style={rc.emptyChatText}>Say hello to someone from {matchedUser.country}!</Text>
+        )}
+
+        <TouchableOpacity style={st.cancelBtn} onPress={disconnect} activeOpacity={0.8}>
+          <Text style={st.cancelTxt}>{state === 'timeout' ? 'Go Back' : 'Cancel'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── Match ─────────────────────────────────────────────────────────────────────
+  if (state === 'matching' && matchedUser) {
+    const mu      = matchedUser;
+    const myColor = stringToColor(user?.display_name || user?.username || 'me');
+    const muColor = stringToColor(mu.display_name || mu.username);
+    const myInit  = (user?.display_name || user?.username || 'M')[0].toUpperCase();
+    const muInit  = (mu.display_name || mu.username || '?')[0].toUpperCase();
+    return (
+      <View style={st.matchScreen}>
+        <LinearGradient colors={['#0a0010','#1a0030','#0a0010']} style={StyleSheet.absoluteFill} />
+        <Animated.View style={[st.matchContent, { transform: [{ scale: matchScaleA }], opacity: matchOpA }]}>
+          <Text style={st.matchEmoji}>💜</Text>
+          <Text style={st.matchTitle}>It's a Match!</Text>
+          <Text style={st.matchSub}>You and {mu.display_name || mu.username} connected</Text>
+          <View style={st.matchAvatarRow}>
+            <View style={st.matchAvatarWrap}>
+              <View style={[st.matchAvatar, { backgroundColor: myColor }]}><Text style={st.matchAvatarInitial}>{myInit}</Text></View>
+              <Text style={st.matchAvatarLabel}>You</Text>
             </View>
-          }
-          renderItem={({ item }) => {
-            const isMine = item.senderId === socket.id;
-            return (
-              <View style={[rc.msgRow, isMine && rc.msgRowMine]}>
-                <View style={[rc.bubble, isMine ? rc.bubbleMine : rc.bubbleOther]}>
-                  <Text style={rc.msgText}>{item.text}</Text>
-                  {item.wasTranslated && <Text style={rc.translated}>🌐 translated</Text>}
-                </View>
-              </View>
-            );
-          }}
-          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
+            <Text style={st.matchHeart}>♡</Text>
+            <View style={st.matchAvatarWrap}>
+              <View style={[st.matchAvatar, { backgroundColor: muColor }]}><Text style={st.matchAvatarInitial}>{muInit}</Text></View>
+              <Text style={st.matchAvatarLabel}>{mu.display_name || mu.username}</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={st.matchMsgBtn} onPress={() => {
+            if (onMatch) onMatch(matchedUser, roomKey);
+            setState('idle'); setMatchedUser(null); setRoomKey(null);
+            matchScaleA.setValue(0.7); matchOpA.setValue(0);
+            if (switchTab) switchTab('people');
+          }} activeOpacity={0.85}>
+            <Text style={st.matchMsgTxt}>💬  Message in People</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={st.matchSkipBtn} onPress={() => {
+            if (onMatch) onMatch(matchedUser, roomKey);
+            setState('idle'); setMatchedUser(null); setRoomKey(null); setCardIndex(i => i + 1);
+            matchScaleA.setValue(0.7); matchOpA.setValue(0);
+          }} activeOpacity={0.8}>
+            <Text style={st.matchSkipTxt}>Save & Keep Swiping</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // ── Idle: WorldBond Footprint ────────────────────────────────────────────────
+  const vibeMeta   = VIBE_OPTIONS.find(v => v.id === vibeFilter) || VIBE_OPTIONS[0];
+  const genderMeta = GENDER_OPTIONS_FP.find(g => g.id === genderFilter) || GENDER_OPTIONS_FP[0];
+  const hasFilter  = genderFilter !== 'everyone' || vibeFilter !== 'any';
+  const filterLabel = hasFilter
+    ? [genderFilter !== 'everyone' && genderMeta.label, vibeFilter !== 'any' && vibeMeta.label].filter(Boolean).join(' · ')
+    : 'Filters';
+
+  // ── Demo Bond Match celebration ──────────────────────────────────────────────
+  if (demoMatch) {
+    const dm   = demoMatch.demoUser;
+    const myColor = stringToColor(user?.display_name || user?.username || 'me');
+    const myInit  = (user?.display_name || user?.username || 'M')[0].toUpperCase();
+    return (
+      <View style={{ flex: 1, backgroundColor: '#050507' }}>
+        <LinearGradient
+          colors={[dm.avatarColor + '22', '#0a0010', '#050507']}
+          style={StyleSheet.absoluteFill}
         />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={rc.inputRow}>
-            <TextInput
-              style={rc.input}
-              placeholder="Say something…"
-              placeholderTextColor="#444"
-              value={text}
-              onChangeText={setText}
-              returnKeyType="send"
-              onSubmitEditing={sendMsg}
-            />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 18 }}>
+          {/* Avatars */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+            <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: myColor,
+              alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff',
+              shadowColor: myColor, shadowOpacity: 0.6, shadowRadius: 16, elevation: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900' }}>{myInit}</Text>
+            </View>
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1a0030',
+              alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#6C47FF',
+              marginHorizontal: -10, zIndex: 1 }}>
+              <Text style={{ fontSize: 16 }}>🌐</Text>
+            </View>
+            <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: dm.avatarColor,
+              alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff',
+              shadowColor: dm.avatarColor, shadowOpacity: 0.6, shadowRadius: 16, elevation: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900' }}>{(dm.display_name || 'B')[0]}</Text>
+            </View>
+          </View>
+
+          <Text style={{ color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -0.5, textAlign: 'center' }}>
+            It's a Bond! 🌐
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, textAlign: 'center', lineHeight: 24 }}>
+            You and {dm.display_name} are now connected
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 18 }}>{dm.flag}</Text>
+            <Text style={{ color: '#6C47FF', fontSize: 14, fontWeight: '700' }}>{dm.country}</Text>
+          </View>
+
+          {/* Actions */}
+          <View style={{ width: '100%', gap: 12, marginTop: 16 }}>
             <TouchableOpacity
-              style={[rc.sendBtn, { backgroundColor: text.trim() ? '#4caf50' : '#2F3336' }]}
-              onPress={sendMsg}
-              disabled={!text.trim()}
+              style={{ borderRadius: 28, paddingVertical: 18, alignItems: 'center',
+                backgroundColor: '#6C47FF', shadowColor: '#6C47FF',
+                shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } }}
+              onPress={() => {
+                onMatch && onMatch(demoMatch.demoUser, demoMatch.demoRoomKey);
+                switchTab && switchTab('people');
+                setDemoMatch(null);
+              }}
+              activeOpacity={0.85}
             >
-              <Text style={rc.sendIcon}>➤</Text>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '900' }}>💬  Send a Message</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ paddingVertical: 14, alignItems: 'center' }}
+              onPress={() => { setDemoMatch(null); doNext(); }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#444', fontSize: 15, fontWeight: '700' }}>Keep Exploring  →</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={rc.scroll} showsVerticalScrollIndicator={false}>
-      {/* Orb */}
-      <View style={rc.orbWrap}>
-        {state === 'waiting' && (
-          <>
-            {[ring1, ring2, ring3].map((r, i) => (
-              <Animated.View key={i} style={[rc.ring, { borderColor: signalColor + '55', transform: [{ scale: r }], opacity: [op1,op2,op3][i] }]} />
-            ))}
-          </>
-        )}
-        <LinearGradient
-          colors={
-            state === 'waiting'
-              ? [signalColor + '30', '#000000']
-              : state === 'timeout'
-              ? ['#3a1a1a', '#000000']
-              : ['#16181C', '#000000']
-          }
-          style={[rc.orb, state === 'idle' && { borderColor: signalColor + '40' }]}
+    <View style={{ flex: 1 }}>
+
+      {/* ── Filter chip + shuffle ─────────────────────────────────────────── */}
+      <View style={fp2.topRow}>
+        <TouchableOpacity
+          style={[fp2.vibeChip, hasFilter && { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' }]}
+          onPress={() => setShowFilterSheet(true)} activeOpacity={0.8}
         >
-          <Text style={{ fontSize: 52 }}>{state === 'waiting' ? '🔍' : state === 'timeout' ? '😔' : '🌀'}</Text>
+          <Text style={fp2.vibeIcon}>{hasFilter ? (genderFilter !== 'everyone' ? genderMeta.icon : vibeMeta.icon) : '🎛️'}</Text>
+          <Text style={[fp2.vibeTxt, hasFilter && { color: '#6C47FF' }]}>{filterLabel}</Text>
+          <Text style={fp2.caret}>▾</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={fp2.shuffleBtn} onPress={doNext} activeOpacity={0.8}>
+          <Text style={fp2.shuffleIcon}>🌀</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Bond Signal strip ────────────────────────────────────────────── */}
+      <TouchableOpacity
+        style={[fp2.signalStrip, { borderColor: signalCfg.color + '33', backgroundColor: signalCfg.color + '0a' }]}
+        onPress={() => navigation.navigate('Subscription')}
+        activeOpacity={0.8}
+      >
+        <SignalBars count={5} activeCount={signalCfg.bars} color={signalCfg.color} size={5} />
+        {signalCfg.label && <Text style={[fp2.signalStripLabel, { color: signalCfg.color }]}>{signalCfg.label}</Text>}
+        <Text style={fp2.signalStripSub}>
+          {tierInfo?.randomConnectsPerDay === Infinity ? 'Unlimited connects' : `${tierInfo?.randomConnectsPerDay ?? 1} connect${(tierInfo?.randomConnectsPerDay ?? 1) !== 1 ? 's' : ''}/day`}
+        </Text>
+        {tier !== 'pro' && <Text style={[fp2.signalUpgradeArrow, { color: signalCfg.color }]}>Upgrade ›</Text>}
+      </TouchableOpacity>
+
+      {/* ── Footprint Card ───────────────────────────────────────────────── */}
+      <Animated.View style={[fp2.card, { opacity: cardOpA, transform: [{ translateY: cardSlide }] }]}>
+        <LinearGradient colors={[sig.avatarColor + '22', '#08090d', '#000']} style={fp2.cardGrad}>
+
+          {/* Avatar + online */}
+          <View style={fp2.avatarZone}>
+            <Avatar photo_url={sig.photo_url} name={sig.name} size={90} />
+            {sig.online && (
+              <View style={fp2.onlinePill}>
+                <View style={fp2.onlineDot} />
+                <Text style={fp2.onlineTxt}>Online now</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Name + handle */}
+          <Text style={fp2.name}>{sig.name}, {sig.age}</Text>
+          <Text style={fp2.handle}>{sig.username}</Text>
+          <View style={fp2.locRow}>
+            <Text style={{ fontSize: 17 }}>{sig.flag}</Text>
+            <Text style={fp2.locTxt}>{sig.country}</Text>
+          </View>
+
+          {/* ── World Footprint Trail ── */}
+          <View style={fp2.trailWrap}>
+            <Text style={fp2.trailLabel}>WORLD FOOTPRINT</Text>
+            <View style={fp2.trail}>
+              {sig.trail.map((flag, i) => (
+                <React.Fragment key={i}>
+                  <View style={[fp2.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
+                    <Text style={fp2.trailFlag}>{flag}</Text>
+                  </View>
+                  {i < sig.trail.length - 1 && (
+                    <View style={fp2.trailConnector}>
+                      <View style={fp2.trailDot} />
+                      <View style={fp2.trailLine} />
+                      <View style={fp2.trailDot} />
+                    </View>
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
+          </View>
+
+          {/* Tagline */}
+          <Text style={fp2.tagline}>"{sig.tagline}"</Text>
+
+          {/* Tap hint */}
+          <TouchableOpacity onPress={() => setShowProfile(true)} activeOpacity={0.7} style={fp2.profileHint}>
+            <Text style={fp2.profileHintTxt}>View full profile  ↗</Text>
+          </TouchableOpacity>
+
         </LinearGradient>
+      </Animated.View>
+
+      {/* ── Bond / Next buttons ───────────────────────────────────────────── */}
+      <View style={fp2.actions}>
+        <TouchableOpacity style={fp2.nextBtn} onPress={doNext} activeOpacity={0.8}>
+          <Text style={fp2.nextTxt}>Next  →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[fp2.bondBtn, { shadowColor: sig.avatarColor }]} onPress={doConnect} activeOpacity={0.82}>
+          <Text style={fp2.bondTxt}>🌐  Bond</Text>
+        </TouchableOpacity>
       </View>
 
-      <Text style={rc.title}>
-        {state === 'waiting' ? 'Finding someone for you…' : state === 'timeout' ? 'No one available right now' : 'Random World Connect'}
-      </Text>
-      <Text style={rc.sub}>
-        {state === 'waiting'
-          ? 'Matching you with someone from a different country 🌍'
-          : state === 'timeout'
-          ? 'Nobody from another country is online right now. Try again in a moment!'
-          : 'Meet a stranger from anywhere on Earth. Messages auto-translate in real time.'}
-      </Text>
-
-      {/* ── Signal Tuner — only shown before connecting ── */}
-      {state !== 'waiting' && (
-        <View style={rc.signalWrap}>
-          <View style={rc.signalHeader}>
-            <Text style={rc.signalDot}>●</Text>
-            <Text style={rc.signalTitle}>Tune Your Signal</Text>
+      {/* ── Full Profile View ────────────────────────────────────────────── */}
+      <Modal visible={showProfile} transparent={false} animationType="slide" onRequestClose={() => setShowProfile(false)}>
+        <View style={pv.root}>
+          {/* Header bar */}
+          <View style={pv.header}>
+            <TouchableOpacity style={pv.backBtn} onPress={() => setShowProfile(false)} activeOpacity={0.8}>
+              <Text style={pv.backIcon}>←</Text>
+            </TouchableOpacity>
+            {sig.online && (
+              <View style={pv.onlinePill}>
+                <View style={pv.onlineDot} />
+                <Text style={pv.onlineTxt}>Online now</Text>
+              </View>
+            )}
           </View>
-          <View style={rc.signalRow}>
-            {SIGNAL_OPTIONS.map(opt => {
-              const active = genderPref === opt.id;
+
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 120 }}>
+
+            {/* ── Photo Gallery ── */}
+            {(() => {
+              const allPhotos = [
+                { type: 'avatar' },
+                ...(sig.photos || []).map(url => ({ type: 'photo', url })),
+              ];
               return (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[
-                    rc.signalCard,
-                    active && { borderColor: opt.color, backgroundColor: opt.color + '18' },
-                  ]}
-                  onPress={() => setGenderPref(opt.id)}
-                  activeOpacity={0.8}
-                >
-                  {active && <View style={[rc.signalLock, { backgroundColor: opt.color }]} />}
-                  <Text style={rc.signalEmoji}>{opt.emoji}</Text>
-                  <Text style={[rc.signalLabel, active && { color: opt.color }]}>{opt.label}</Text>
-                  {active && <Text style={[rc.signalLockedTxt, { color: opt.color }]}>Locked</Text>}
-                </TouchableOpacity>
+                <>
+                  <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+                    style={pv.photoScroll}
+                    onMomentumScrollEnd={e => {
+                      const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+                      // track active dot via ref if needed — for now dots just show count
+                    }}>
+                    {allPhotos.map((item, i) => {
+                      if (item.type === 'avatar') {
+                        return (
+                          <View key="av" style={[pv.photoTile, { backgroundColor: sig.avatarColor + '22' }]}>
+                            <LinearGradient colors={[sig.avatarColor + '44', '#050507']} style={pv.photoTileGrad}>
+                              <Avatar photo_url={sig.photo_url} name={sig.name} size={140} />
+                              {allPhotos.length > 1 && (
+                                <View style={pv.swipeHint}>
+                                  <Text style={pv.swipeHintTxt}>swipe for photos  →</Text>
+                                </View>
+                              )}
+                            </LinearGradient>
+                          </View>
+                        );
+                      }
+                      return (
+                        <View key={i} style={[pv.photoTile, { backgroundColor: '#080a0f' }]}>
+                          {item.url ? (
+                            <Image source={{ uri: item.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                          ) : (
+                            <View style={pv.emptyPhotoTile}>
+                              <Text style={pv.emptyPhotoIcon}>📷</Text>
+                              <Text style={pv.emptyPhotoTxt}>No photo</Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                  {/* Dot indicators */}
+                  <View style={pv.photoDots}>
+                    {allPhotos.map((_, i) => (
+                      <View key={i} style={[pv.photoDot, i === 0 && pv.photoDotActive]} />
+                    ))}
+                  </View>
+                </>
               );
-            })}
+            })()}
+
+            {/* ── Identity ── */}
+            <View style={pv.identity}>
+              <Text style={pv.name}>{sig.name}, {sig.age}</Text>
+              <Text style={pv.handle}>{sig.username}</Text>
+              <View style={pv.locRow}>
+                <Text style={{ fontSize: 18 }}>{sig.flag}</Text>
+                <Text style={pv.locTxt}>{sig.country}</Text>
+              </View>
+            </View>
+
+            {/* ── Stats row ── */}
+            <View style={pv.statsRow}>
+              <View style={pv.statItem}>
+                <Text style={pv.statVal}>{sig.strength ?? '—'}%</Text>
+                <Text style={pv.statLabel}>Bond Match</Text>
+              </View>
+              <View style={pv.statDiv} />
+              <View style={pv.statItem}>
+                <Text style={pv.statVal}>{sig.trail.length}</Text>
+                <Text style={pv.statLabel}>Countries</Text>
+              </View>
+              <View style={pv.statDiv} />
+              <View style={pv.statItem}>
+                <Text style={pv.statVal}>{sig.age}</Text>
+                <Text style={pv.statLabel}>Age</Text>
+              </View>
+            </View>
+
+            {/* ── Bio ── */}
+            {sig.bio ? (
+              <View style={pv.section}>
+                <Text style={pv.sectionLabel}>ABOUT</Text>
+                <Text style={pv.bioTxt}>{sig.bio}</Text>
+              </View>
+            ) : null}
+
+            {/* ── Tagline ── */}
+            <View style={pv.taglineBox}>
+              <Text style={pv.taglineTxt}>"{sig.tagline}"</Text>
+            </View>
+
+            {/* ── Interests ── */}
+            {sig.interests?.length > 0 && (
+              <View style={pv.section}>
+                <Text style={pv.sectionLabel}>INTERESTS</Text>
+                <View style={pv.tagsRow}>
+                  {sig.interests.map((t, i) => (
+                    <View key={i} style={pv.tag}>
+                      <Text style={pv.tagTxt}>{t}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* ── World Footprint ── */}
+            <View style={pv.section}>
+              <Text style={pv.sectionLabel}>WORLD FOOTPRINT</Text>
+              <View style={pv.trail}>
+                {sig.trail.map((flag, i) => (
+                  <React.Fragment key={i}>
+                    <View style={[pv.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
+                      <Text style={pv.trailFlag}>{flag}</Text>
+                    </View>
+                    {i < sig.trail.length - 1 && (
+                      <View style={pv.trailConnector}>
+                        <View style={pv.trailDot} /><View style={pv.trailLine} /><View style={pv.trailDot} />
+                      </View>
+                    )}
+                  </React.Fragment>
+                ))}
+              </View>
+            </View>
+
+          </ScrollView>
+
+          {/* ── Fixed action buttons ── */}
+          <View style={pv.actions}>
+            <TouchableOpacity style={pv.nextBtn} onPress={() => { setShowProfile(false); doNext(); }} activeOpacity={0.8}>
+              <Text style={pv.nextTxt}>Next  →</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[pv.bondBtn, { shadowColor: sig.avatarColor }]}
+              onPress={() => { setShowProfile(false); doConnect(); }} activeOpacity={0.85}>
+              <Text style={pv.bondTxt}>🌐  Bond</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={[rc.signalSub, { color: signalColor + 'cc' }]}>
-            {genderPref === 'any'
-              ? '🌍 Open to everyone — matched worldwide'
-              : genderPref === 'male'
-              ? '🔵 Signal locked — connecting with men only'
-              : '💜 Signal locked — connecting with women only'}
-          </Text>
         </View>
-      )}
+      </Modal>
 
-      {state === 'waiting' ? (
-        <TouchableOpacity style={rc.cancelBtn} onPress={disconnect}>
-          <Text style={rc.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity onPress={connect} activeOpacity={0.85} style={rc.connectWrap}>
-          <LinearGradient colors={[signalColor, signalColor + 'cc']} style={rc.connectBtn}>
-            <Text style={rc.connectText}>{state === 'timeout' ? '🔄  Retune & Try Again' : '🌀  Connect with a Stranger'}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
+      {/* ── All-in-one Filter Sheet ──────────────────────────────────────── */}
+      <Modal visible={showFilterSheet} transparent animationType="slide" onRequestClose={() => setShowFilterSheet(false)}>
+        <TouchableOpacity style={fp.overlay} activeOpacity={1} onPress={() => setShowFilterSheet(false)} />
+        <View style={fp.filterSheet}>
+          <View style={fp.handle} />
+          <Text style={fp.sheetTitle}>Find people</Text>
 
-      {state === 'idle' && <Text style={rc.hint}>Average wait: under 10 seconds</Text>}
-      {state === 'timeout' && <Text style={rc.hint}>Searched for 30 seconds — no match found</Text>}
-
-      {/* Stats */}
-      <View style={rc.statsRow}>
-        {[
-          { emoji: '🌍', label: 'Countries', value: '195' },
-          { emoji: '⚡', label: 'Avg Wait',  value: '<10s' },
-          { emoji: '🌐', label: 'Translated',value: 'Auto' },
-        ].map(s => (
-          <View key={s.label} style={rc.statCard}>
-            <Text style={{ fontSize: 22 }}>{s.emoji}</Text>
-            <Text style={rc.statVal}>{s.value}</Text>
-            <Text style={rc.statLbl}>{s.label}</Text>
+          {/* — Looking to meet — */}
+          <Text style={fp.sectionLabel}>LOOKING TO MEET</Text>
+          <View style={fp.genderRow}>
+            {GENDER_OPTIONS_FP.map(g => (
+              <TouchableOpacity key={g.id}
+                style={[fp.genderPill, genderFilter === g.id && { backgroundColor: g.color, borderColor: g.color }]}
+                onPress={() => setGenderFilter(g.id)} activeOpacity={0.8}
+              >
+                <Text style={fp.genderPillIcon}>{g.icon}</Text>
+                <Text style={[fp.genderPillTxt, genderFilter === g.id && { color: '#fff' }]}>{g.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        ))}
-      </View>
-    </ScrollView>
+
+          {/* — Vibe — */}
+          <Text style={[fp.sectionLabel, { marginTop: 20 }]}>VIBE</Text>
+          <View style={fp.vibeGrid}>
+            {VIBE_OPTIONS.map(v => (
+              <TouchableOpacity key={v.id}
+                style={[fp.vibeGridItem, vibeFilter === v.id && { backgroundColor: v.color + '22', borderColor: v.color }]}
+                onPress={() => setVibeFilter(v.id)} activeOpacity={0.8}
+              >
+                <Text style={fp.vibeGridIcon}>{v.icon}</Text>
+                <Text style={[fp.vibeGridTxt, vibeFilter === v.id && { color: v.color }]}>{v.label}</Text>
+                {vibeFilter === v.id && <View style={[fp.vibeGridDot, { backgroundColor: v.color }]} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* — Apply — */}
+          <TouchableOpacity style={fp.applyBtn} onPress={() => setShowFilterSheet(false)} activeOpacity={0.85}>
+            <Text style={fp.applyTxt}>Apply Filters</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <UpgradeModal visible={showUpgrade} onClose={() => setShowUpgrade(false)} navigation={navigation} />
+    </View>
   );
 }
-const rc = StyleSheet.create({
-  scroll:       { padding: 24, alignItems: 'center', gap: 18, paddingBottom: 50 },
-  orbWrap:      { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  ring:         { position: 'absolute', width: 140, height: 140, borderRadius: 70, borderWidth: 1.5, borderColor: '#57f28755' },
-  orb:          { width: 120, height: 120, borderRadius: 60, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ffffff15' },
-  title:        { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.3 },
-  sub:          { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
-  connectWrap:  { borderRadius: 18, overflow: 'hidden', width: '100%' },
-  connectBtn:   { paddingVertical: 16, alignItems: 'center' },
-  connectText:  { color: '#fff', fontSize: 16, fontWeight: '800' },
-  cancelBtn:    { backgroundColor: '#16181C', borderRadius: 18, paddingVertical: 16, paddingHorizontal: 40, borderWidth: 1, borderColor: '#2F3336' },
-  cancelText:   { color: '#aaa', fontSize: 15, fontWeight: '700' },
-  hint:         { color: '#444', fontSize: 12 },
-  statsRow:     { flexDirection: 'row', gap: 12, width: '100%', marginTop: 8 },
-  statCard:     { flex: 1, backgroundColor: '#16181C', borderRadius: 18, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#2F3336' },
-  statVal:      { color: '#fff', fontSize: 16, fontWeight: '900' },
-  statLbl:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  signalWrap:     { width: '100%', gap: 10 },
-  signalHeader:   { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  signalDot:      { color: '#6C47FF', fontSize: 8 },
-  signalTitle:    { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  signalRow:      { flexDirection: 'row', gap: 10 },
-  signalCard:     { flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 5, position: 'relative', overflow: 'hidden' },
-  signalLock:     { position: 'absolute', top: 0, left: 0, right: 0, height: 2, borderRadius: 1 },
-  signalEmoji:    { fontSize: 26 },
-  signalLabel:    { color: '#555', fontSize: 12, fontWeight: '800' },
-  signalLockedTxt:{ fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.8 },
-  signalSub:      { fontSize: 12, textAlign: 'center', fontWeight: '600' },
 
-  connHeader:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
-  connAvatar:   { position: 'relative' },
-  onlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
-  connName:     { color: '#fff', fontSize: 16, fontWeight: '800' },
-  connCountry:  { color: '#555', fontSize: 12, marginTop: 2 },
-  endBtn:       { backgroundColor: '#e5393522', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#e5393540' },
-  endText:      { color: '#e53935', fontSize: 13, fontWeight: '800' },
-  emptyChat:    { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyChatText:{ color: '#555', fontSize: 14, textAlign: 'center' },
-  msgRow:       { flexDirection: 'row' },
-  msgRowMine:   { justifyContent: 'flex-end' },
-  bubble:       { maxWidth: width * 0.72, borderRadius: 18, padding: 12 },
-  bubbleMine:   { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
-  bubbleOther:  { backgroundColor: '#16181C', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2F3336' },
-  msgText:      { color: '#fff', fontSize: 14, lineHeight: 20 },
-  translated:   { color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop: 2 },
-  inputRow:     { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#2F3336', gap: 10, alignItems: 'flex-end' },
-  input:        { flex: 1, backgroundColor: '#16181C', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#2F3336' },
-  sendBtn:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  sendIcon:     { color: '#fff', fontSize: 18 },
+const fp = StyleSheet.create({
+  overlay:        { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
+  sheet:          { backgroundColor: '#111318', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 22, paddingBottom: 38, gap: 4, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  filterSheet:    { backgroundColor: '#0d0f14', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2a2c34', alignSelf: 'center', marginBottom: 18 },
+  sheetTitle:     { color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 18 },
+  sectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 12 },
+
+  // Gender pills — full-width 3-up row
+  genderRow:      { flexDirection: 'row', gap: 10 },
+  genderPill:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    paddingVertical: 14, borderRadius: 18, backgroundColor: '#111318',
+                    borderWidth: 1.5, borderColor: '#1e2028' },
+  genderPillIcon: { fontSize: 20 },
+  genderPillTxt:  { color: '#555', fontSize: 13, fontWeight: '800' },
+
+  // Vibe grid — 3 columns
+  vibeGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  vibeGridItem:   { width: '30.5%', alignItems: 'center', gap: 6, paddingVertical: 14, borderRadius: 18,
+                    backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028', position: 'relative' },
+  vibeGridIcon:   { fontSize: 22 },
+  vibeGridTxt:    { color: '#444', fontSize: 12, fontWeight: '800' },
+  vibeGridDot:    { position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },
+
+  // Apply button
+  applyBtn:       { marginTop: 24, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
+                    shadowColor: '#6C47FF', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  applyTxt:       { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+});
+
+// ── WorldBond Footprint card styles ──────────────────────────────────────────
+const fp2 = StyleSheet.create({
+  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#1e2028' },
+  vibeIcon:     { fontSize: 16 },
+  vibeTxt:      { color: '#555', fontSize: 13, fontWeight: '800', flex: 1 },
+  caret:        { color: '#2a2c34', fontSize: 9 },
+  shuffleBtn:   { width: 46, height: 46, borderRadius: 23, backgroundColor: '#0e1016', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e2028' },
+  shuffleIcon:  { fontSize: 22 },
+
+  card:         { flex: 1, marginHorizontal: 14, marginBottom: 6, borderRadius: 30, overflow: 'hidden',
+                  shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 28, shadowOffset: { width: 0, height: 10 } },
+  cardGrad:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 20, gap: 8 },
+
+  avatarZone:   { alignItems: 'center', gap: 10, marginBottom: 4 },
+  onlinePill:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#57f28715', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#57f28730' },
+  onlineDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' },
+  onlineTxt:    { color: '#57f287', fontSize: 11, fontWeight: '700' },
+
+  name:         { color: '#fff', fontSize: 26, fontWeight: '900', textAlign: 'center' },
+  handle:       { color: '#444', fontSize: 13, textAlign: 'center', marginTop: -2 },
+  locRow:       { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  locTxt:       { color: '#777', fontSize: 14, fontWeight: '700' },
+
+  // World Footprint Trail — the hero unique element
+  trailWrap:    { alignSelf: 'stretch', marginTop: 18, marginBottom: 4 },
+  trailLabel:   { color: '#2a2c34', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 },
+  trail:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  trailNode:    { width: 52, height: 52, borderRadius: 26, backgroundColor: '#111318', borderWidth: 1, borderColor: '#1e2028', alignItems: 'center', justifyContent: 'center' },
+  trailFlag:    { fontSize: 26 },
+  trailConnector:{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 4 },
+  trailDot:     { width: 3, height: 3, borderRadius: 2, backgroundColor: '#2a2c34' },
+  trailLine:    { width: 16, height: 1, backgroundColor: '#1e2028' },
+
+  tagline:      { color: '#444', fontSize: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 22, marginTop: 8, paddingHorizontal: 20 },
+  profileHint:  { marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#1e2028' },
+  profileHintTxt:{ color: '#333', fontSize: 12, fontWeight: '700' },
+
+  actions:      { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 },
+  nextBtn:      { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#1e2028' },
+  nextTxt:      { color: '#444', fontSize: 15, fontWeight: '800' },
+  bondBtn:      { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
+                  shadowOpacity: 0.45, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  bondTxt:      { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.4 },
+
+  // Bond Signal strip
+  signalStrip:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginBottom: 8,
+                       paddingHorizontal: 14, paddingVertical: 9, borderRadius: 16, borderWidth: 1 },
+  signalStripLabel:  { fontSize: 12, fontWeight: '800' },
+  signalStripSub:    { color: '#2a2c34', fontSize: 11, fontWeight: '600', flex: 1 },
+  signalUpgradeArrow:{ fontSize: 11, fontWeight: '800' },
+});
+
+// ── Full Profile View styles ──────────────────────────────────────────────────
+const pv = StyleSheet.create({
+  root:        { flex: 1, backgroundColor: '#000' },
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                 paddingHorizontal: 16, paddingTop: 58, paddingBottom: 10 },
+  backBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#111318',
+                 alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e2028' },
+  backIcon:    { color: '#fff', fontSize: 18, fontWeight: '700' },
+  onlinePill:  { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#57f28715',
+                 borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6,
+                 borderWidth: 1, borderColor: '#57f28730' },
+  onlineDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' },
+  onlineTxt:   { color: '#57f287', fontSize: 12, fontWeight: '700' },
+
+  // Photo gallery
+  photoScroll: { height: 340 },
+  photoTile:   { width: width, height: 340, overflow: 'hidden' },
+  photoTileGrad: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  swipeHint:   { position: 'absolute', bottom: 14, right: 16, flexDirection: 'row', alignItems: 'center',
+                 backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  swipeHintTxt:{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700' },
+  emptyPhotoTile: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  emptyPhotoIcon: { fontSize: 36, opacity: 0.18 },
+  emptyPhotoTxt: { color: '#1e2028', fontSize: 12, fontWeight: '700' },
+  photoDots:   { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 10 },
+  photoDot:    { width: 5, height: 5, borderRadius: 3, backgroundColor: '#1e2028' },
+  photoDotActive: { backgroundColor: '#6C47FF', width: 16 },
+
+  // Identity
+  identity:    { paddingHorizontal: 20, paddingTop: 18, gap: 4 },
+  name:        { color: '#fff', fontSize: 30, fontWeight: '900' },
+  handle:      { color: '#333', fontSize: 14 },
+  locRow:      { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 },
+  locTxt:      { color: '#555', fontSize: 15, fontWeight: '700' },
+
+  // Stats
+  statsRow:    { flexDirection: 'row', marginHorizontal: 20, marginTop: 20, backgroundColor: '#0e1016',
+                 borderRadius: 18, paddingVertical: 16, borderWidth: 1, borderColor: '#1e2028' },
+  statItem:    { flex: 1, alignItems: 'center', gap: 4 },
+  statVal:     { color: '#fff', fontSize: 20, fontWeight: '900' },
+  statLabel:   { color: '#333', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  statDiv:     { width: 1, backgroundColor: '#1e2028' },
+
+  // Sections
+  section:     { paddingHorizontal: 20, marginTop: 24 },
+  sectionLabel:{ color: '#2a2c34', fontSize: 9, fontWeight: '900', letterSpacing: 1.8, marginBottom: 12 },
+  bioTxt:      { color: '#888', fontSize: 15, lineHeight: 24 },
+
+  taglineBox:  { marginHorizontal: 20, marginTop: 20, padding: 18, backgroundColor: '#0a0b10',
+                 borderRadius: 18, borderWidth: 1, borderColor: '#1a1b22' },
+  taglineTxt:  { color: '#444', fontSize: 15, fontStyle: 'italic', lineHeight: 24, textAlign: 'center' },
+
+  // Interests
+  tagsRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag:         { backgroundColor: '#111318', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+                 borderWidth: 1, borderColor: '#1e2028' },
+  tagTxt:      { color: '#666', fontSize: 13, fontWeight: '700' },
+
+  // World Footprint
+  trail:       { flexDirection: 'row', alignItems: 'center' },
+  trailNode:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#111318',
+                 borderWidth: 1, borderColor: '#1e2028', alignItems: 'center', justifyContent: 'center' },
+  trailFlag:   { fontSize: 28 },
+  trailConnector: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 5 },
+  trailDot:    { width: 3, height: 3, borderRadius: 2, backgroundColor: '#2a2c34' },
+  trailLine:   { width: 18, height: 1, backgroundColor: '#1e2028' },
+
+  // Action buttons
+  actions:     { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12,
+                 paddingHorizontal: 16, paddingBottom: 34, paddingTop: 14,
+                 backgroundColor: '#000', borderTopWidth: 1, borderTopColor: '#0e1016' },
+  nextBtn:     { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center',
+                 backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#1e2028' },
+  nextTxt:     { color: '#444', fontSize: 15, fontWeight: '800' },
+  bondBtn:     { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center',
+                 backgroundColor: '#6C47FF', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 5 } },
+  bondTxt:     { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+});
+
+const st = StyleSheet.create({
+  // Filter row (horizontal scroll)
+  filterScrollView:    { flexGrow: 0, flexShrink: 0 },
+  filterRow:           { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+  filterChip:          { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#0e1016', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#1e2028' },
+  filterChipActive:    { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' },
+  filterChipIcon:      { fontSize: 13 },
+  filterChipTxt:       { color: '#555', fontSize: 12, fontWeight: '700' },
+  filterChipTxtActive: { color: '#fff' },
+  filterChipCaret:     { color: '#2a2c34', fontSize: 9, marginLeft: 1 },
+
+  // Card deck
+  deckWrap:         { flex: 1, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  card:             { width: CARD_W, height: '100%', borderRadius: 26, overflow: 'hidden',
+                      shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+  cardPulseRing:    { borderRadius: 26, borderWidth: 2 },
+  cardGradient:     { flex: 1, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  cardAvatarWrap:   { alignItems: 'center', gap: 10, marginBottom: 110 },
+  cardAvatar:       { width: 118, height: 118, borderRadius: 59, alignItems: 'center', justifyContent: 'center',
+                      borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.12)' },
+  cardAvatarTxt:    { fontSize: 44, fontWeight: '900', color: 'rgba(255,255,255,0.9)' },
+  tapHint:          { color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
+  onlineDot:        { position: 'absolute', top: 16, right: 16, width: 11, height: 11, borderRadius: 5.5,
+                      backgroundColor: '#57f287', borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)' },
+  cardBottom:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 18, gap: 5 },
+  cardNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardName:         { color: '#fff', fontSize: 23, fontWeight: '900', flex: 1, letterSpacing: -0.4 },
+  cardFlagPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)',
+                      borderRadius: 13, paddingHorizontal: 9, paddingVertical: 5 },
+  cardFlagTxt:      { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' },
+  cardTagline:      { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 19 },
+  connectsLeft:     { position: 'absolute', bottom: 4, alignSelf: 'center' },
+  connectsLeftTxt:  { color: '#333', fontSize: 10 },
+
+  // Swipe stamp labels
+  swipeLabel:       { position: 'absolute', top: 34, paddingHorizontal: 14, paddingVertical: 7,
+                      borderRadius: 8, borderWidth: 2.5, zIndex: 20 },
+  connectLabel:     { right: 18, borderColor: '#6C47FF', transform: [{ rotate: '14deg' }] },
+  connectLabelTxt:  { color: '#6C47FF', fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
+  passLabel:        { left: 18, borderColor: '#888', transform: [{ rotate: '-14deg' }] },
+  passLabelTxt:     { color: '#888', fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
+
+  // Action buttons
+  actionRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: 18, paddingHorizontal: 28, paddingTop: 12, paddingBottom: 24 },
+  btnPass:          { alignItems: 'center', gap: 3, width: 64, height: 64, borderRadius: 32,
+                      backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: '#2a2a2a',
+                      justifyContent: 'center' },
+  btnPassIcon:      { color: '#555', fontSize: 22, fontWeight: '900' },
+  btnRandom:        { alignItems: 'center', justifyContent: 'center', gap: 2,
+                      width: 78, height: 78, borderRadius: 39,
+                      backgroundColor: '#6C47FF', shadowColor: '#6C47FF',
+                      shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
+  btnRandomIcon:    { fontSize: 28 },
+  btnRandomLabel:   { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  btnConnect:       { alignItems: 'center', gap: 3, width: 64, height: 64, borderRadius: 32,
+                      backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: '#6C47FF66',
+                      justifyContent: 'center' },
+  btnConnectIcon:   { fontSize: 22 },
+  btnLabel:         { color: '#555', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  btnDim:           { opacity: 0.3 },
+
+  // Profile sheet (redesigned)
+  profileSheet:          { backgroundColor: '#111318', borderTopLeftRadius: 26, borderTopRightRadius: 26,
+                           padding: 22, paddingBottom: 38, position: 'absolute', bottom: 0, left: 0, right: 0 },
+  profilePhotoHero:      { alignItems: 'center', marginBottom: 14, position: 'relative' },
+  profileOnlineBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8,
+                           backgroundColor: '#57f28720', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4,
+                           borderWidth: 1, borderColor: '#57f28740' },
+  profileOnlineDot:      { width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' },
+  profileOnlineTxt:      { color: '#57f287', fontSize: 11, fontWeight: '700' },
+  profileSheetName:      { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center' },
+  profileSheetHandle:    { color: '#555', fontSize: 13, textAlign: 'center', marginTop: 2, marginBottom: 6 },
+  profileSheetLoc:       { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginBottom: 12 },
+  profileSheetLocTxt:    { color: '#888', fontSize: 14, fontWeight: '700' },
+  profileSheetTagline:   { color: '#555', fontSize: 14, textAlign: 'center', fontStyle: 'italic', lineHeight: 20, marginBottom: 16 },
+  profileMeta:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+  profileMetaItem:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14 },
+  profileMetaSep:        { width: 1, height: 20, backgroundColor: '#1e2028' },
+  profileMetaIcon:       { fontSize: 14 },
+  profileMetaVal:        { color: '#777', fontSize: 12, fontWeight: '700' },
+  profileSectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.2,
+                           textTransform: 'uppercase', marginBottom: 8 },
+  profileTrailPill:      { backgroundColor: '#0e1016', borderRadius: 12, padding: 8,
+                           borderWidth: 1, borderColor: '#1e2028' },
+  profileBtns:           { flexDirection: 'row', gap: 12, marginTop: 4 },
+  profileBtnPass:        { flex: 1, borderRadius: 22, paddingVertical: 14, alignItems: 'center',
+                           backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#2a2a2a' },
+  profileBtnPassTxt:     { color: '#666', fontSize: 15, fontWeight: '800' },
+  profileBtnConnect:     { flex: 2, borderRadius: 22, paddingVertical: 14, alignItems: 'center',
+                           backgroundColor: '#6C47FF' },
+  profileBtnConnectTxt:  { color: '#fff', fontSize: 15, fontWeight: '900' },
+
+  // Locking / searching
+  lockScreen:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 22, padding: 32 },
+  lockOrbWrap:   { width: 160, height: 160, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  lockRing:      { position: 'absolute', width: 160, height: 160, borderRadius: 80, borderWidth: 1.5 },
+  lockOrb:       { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center',
+                   borderWidth: 1, borderColor: '#ffffff0d' },
+  lockTitle:     { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.4 },
+  lockSub:       { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  cancelBtn:     { backgroundColor: '#0e1016', borderRadius: 18, paddingVertical: 13, paddingHorizontal: 38,
+                   borderWidth: 1, borderColor: '#2F3336' },
+  cancelTxt:     { color: '#888', fontSize: 15, fontWeight: '700' },
+
+  // Match screen
+  matchScreen:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  matchContent:       { alignItems: 'center', gap: 18, paddingHorizontal: 32 },
+  matchEmoji:         { fontSize: 52 },
+  matchTitle:         { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -0.8 },
+  matchSub:           { color: 'rgba(255,255,255,0.45)', fontSize: 15, textAlign: 'center' },
+  matchAvatarRow:     { flexDirection: 'row', alignItems: 'center', gap: 16, marginVertical: 8 },
+  matchAvatarWrap:    { alignItems: 'center', gap: 8 },
+  matchAvatar:        { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center',
+                        borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.15)' },
+  matchAvatarInitial: { color: '#fff', fontSize: 30, fontWeight: '900' },
+  matchAvatarLabel:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700' },
+  matchHeart:         { color: '#6C47FF', fontSize: 30 },
+  matchMsgBtn:        { backgroundColor: '#6C47FF', borderRadius: 28, paddingVertical: 16,
+                        paddingHorizontal: 48, width: '100%', alignItems: 'center' },
+  matchMsgTxt:        { color: '#fff', fontSize: 16, fontWeight: '900' },
+  matchSkipBtn:       { paddingVertical: 12, alignItems: 'center' },
+  matchSkipTxt:       { color: '#444', fontSize: 14, fontWeight: '700' },
+
+  // Chat
+  connHeader:    { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12,
+                   borderBottomWidth: 1, borderBottomColor: '#1a1c22' },
+  connOnlineDot: { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6,
+                   backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000' },
+  connName:      { color: '#fff', fontSize: 16, fontWeight: '800' },
+  connSub:       { color: '#444', fontSize: 12, marginTop: 2 },
+  endBtn:        { backgroundColor: '#e5393520', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
+                   borderWidth: 1, borderColor: '#e5393540' },
+  endTxt:        { color: '#e53935', fontSize: 13, fontWeight: '800' },
+  emptyChat:     { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyChatTxt:  { color: '#555', fontSize: 14, textAlign: 'center' },
+  msgRow:        { flexDirection: 'row' },
+  msgRowMine:    { justifyContent: 'flex-end' },
+  bubble:        { maxWidth: width * 0.72, borderRadius: 18, padding: 12 },
+  bubbleMine:    { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
+  bubbleOther:   { backgroundColor: '#0e1016', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e2028' },
+  msgTxt:        { color: '#fff', fontSize: 14, lineHeight: 20 },
+  translated:    { color: 'rgba(255,255,255,0.3)', fontSize: 9, marginTop: 2 },
+  inputRow:      { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#1a1c22',
+                   gap: 10, alignItems: 'flex-end' },
+  input:         { flex: 1, backgroundColor: '#0e1016', color: '#fff', borderRadius: 22,
+                   paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#1e2028' },
+  sendBtn:       { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  sendIcon:      { color: '#fff', fontSize: 18 },
+
+  // Bond signal on locking screen
+  signalBadge:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, borderWidth: 1,
+                     paddingHorizontal: 14, paddingVertical: 8, marginBottom: 16 },
+  signalBadgeTxt:  { fontSize: 12, fontWeight: '800' },
+  signalUpgradeBtn:{ marginBottom: 12, backgroundColor: '#6C47FF18', borderRadius: 16, borderWidth: 1, borderColor: '#6C47FF33',
+                     paddingHorizontal: 18, paddingVertical: 10 },
+  signalUpgradeTxt:{ color: '#6C47FF', fontSize: 13, fontWeight: '800' },
 });
 
 // ─── Language exchange tab ────────────────────────────────────────────────────
@@ -901,41 +1897,14 @@ const lx = StyleSheet.create({
 });
 
 // ─── People tab ───────────────────────────────────────────────────────────────
-function PeopleTab({ user, navigation }) {
-  const [profiles,   setProfiles]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search,     setSearch]     = useState('');
-  const [ctFilter,   setCtFilter]   = useState(null);
-  const [online,     setOnline]     = useState({});
+function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
+  const [activeChat,     setActiveChat]     = useState(null);
+  const [chatMessages,   setChatMessages]   = useState([]);
+  const [chatText,       setChatText]       = useState('');
+  const [online,         setOnline]         = useState({});
+  const [showBondProfile, setShowBondProfile] = useState(false);
+  const chatListRef    = useRef(null);
   const socket = getSocket();
-
-  const CT_FILTERS = [
-    { id: null,               label: 'All',      emoji: '🌍' },
-    { id: 'dating',           label: 'Dating',   emoji: '❤️'  },
-    { id: 'friendship',       label: 'Friends',  emoji: '🤝'  },
-    { id: 'travel',           label: 'Travel',   emoji: '✈️'  },
-    { id: 'language',         label: 'Language', emoji: '🗣️' },
-    { id: 'mentorship',       label: 'Mentor',   emoji: '🎓'  },
-  ];
-
-  const fetchProfiles = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true); else setLoading(true);
-    try {
-      const headers = await authHeader();
-      const params  = { limit: 30 };
-      if (ctFilter) params.connection_type = ctFilter;
-      if (search.trim()) params.search = search.trim();
-      const { data } = await axios.get(`${SERVER_URL}/api/profiles`, { headers, params, timeout: 8000 });
-      setProfiles(data.profiles || data || []);
-    } catch {
-      setProfiles([]);
-    } finally {
-      setLoading(false); setRefreshing(false);
-    }
-  }, [ctFilter, search]);
-
-  useEffect(() => { fetchProfiles(); }, [ctFilter]);
 
   useEffect(() => {
     socket.on('user_list', users => {
@@ -948,126 +1917,327 @@ function PeopleTab({ user, navigation }) {
     return () => socket.off('user_list');
   }, []);
 
-  function ghostColor(s) {
-    if (!s) return '#555';
-    if (s >= 4.5) return '#ffd700';
-    if (s >= 3.5) return '#57f287';
-    if (s >= 2.5) return '#57c4ff';
-    return '#fee75c';
+  useEffect(() => {
+    if (!activeChat) return;
+    const handler = ({ text, sender }) => {
+      setChatMessages(prev => [...prev, { text, sender, ts: Date.now() }]);
+      setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 60);
+    };
+    socket.on('random_message', handler);
+    return () => socket.off('random_message', handler);
+  }, [activeChat]);
+
+  function openChat(match) {
+    setActiveChat(match);
+    setChatMessages(match.messages || []);
+    setChatText('');
   }
 
-  return (
-    <View style={{ flex: 1 }}>
-      {/* Search */}
-      <View style={pe.searchWrap}>
-        <Text style={pe.searchIcon}>🔍</Text>
-        <TextInput
-          style={pe.searchInput}
-          placeholder="Search by name or city…"
-          placeholderTextColor="#444"
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-          onSubmitEditing={() => fetchProfiles()}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => { setSearch(''); fetchProfiles(); }}>
-            <Text style={pe.searchClear}>✕</Text>
+  function sendChatMsg() {
+    if (!chatText.trim() || !activeChat) return;
+    const msg = { text: chatText.trim(), sender: 'me', ts: Date.now() };
+    socket.emit('random_message', { roomKey: activeChat.roomKey, text: chatText.trim() });
+    setChatMessages(prev => [...prev, msg]);
+    setChatText('');
+    setTimeout(() => chatListRef.current?.scrollToEnd({ animated: true }), 60);
+  }
+
+  function deleteMessage(index) {
+    Alert.alert('Delete message', 'Remove this message?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+          setChatMessages(prev => prev.filter((_, i) => i !== index));
+        }
+      },
+    ]);
+  }
+
+  function deleteConversation(roomKey) {
+    Alert.alert('Delete conversation', 'Remove this bond match and all messages?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+          setBondMatches(prev => prev.filter(m => m.roomKey !== roomKey));
+          if (activeChat?.roomKey === roomKey) setActiveChat(null);
+        }
+      },
+    ]);
+  }
+
+  // ── Full-screen chat view (shown instead of inbox when a thread is open) ──
+  if (activeChat) {
+    const mu   = activeChat.matchedUser || {};
+    const name = mu.display_name || mu.username || 'Bond';
+    return (
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        {/* Chat header */}
+        <View style={pe.chatHdr}>
+          <TouchableOpacity style={pe.chatBack} onPress={() => setActiveChat(null)} activeOpacity={0.8}>
+            <Text style={pe.chatBackTxt}>←</Text>
           </TouchableOpacity>
+
+          {/* Tappable avatar + name → profile */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 }}
+            onPress={() => setShowBondProfile(true)}
+            activeOpacity={0.75}
+          >
+            <View style={{ position: 'relative' }}>
+              <Avatar photo_url={mu.photo_url} name={name} size={38} />
+              {online[mu.user_id] && <View style={pe.chatOnlineDot} />}
+            </View>
+            <View>
+              <Text style={pe.chatHdrName}>{name}</Text>
+              <Text style={pe.chatHdrSub}>🌐 Bond Match  ›</Text>
+            </View>
+          </TouchableOpacity>
+
+        </View>
+
+        {/* Messages */}
+        <FlatList
+          ref={chatListRef}
+          data={chatMessages}
+          keyExtractor={(_, i) => String(i)}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1, justifyContent: chatMessages.length === 0 ? 'center' : 'flex-start' }}
+          ListEmptyComponent={
+            <View style={pe.chatEmpty}>
+              <Text style={{ fontSize: 44 }}>🌐</Text>
+              <Text style={pe.chatEmptyTitle}>You're bonded!</Text>
+              <Text style={pe.chatEmptySub}>Say hello to {name} 👋</Text>
+            </View>
+          }
+          renderItem={({ item, index }) => {
+            const isMe = item.sender === 'me' || item.sender === user?.user_id || item.sender === user?.username;
+            const swipeRef = React.createRef();
+            const renderMsgActions = (progress, dragX) => {
+              const scale = dragX.interpolate({ inputRange: [-120, 0], outputRange: [1, 0.8], extrapolate: 'clamp' });
+              return (
+                <Animated.View style={[pe.swipeActions, { transform: [{ scale }] }]}>
+                  <TouchableOpacity style={[pe.swipeAction, pe.swipeDelete]}
+                    onPress={() => { swipeRef.current?.close(); deleteMessage(index); }} activeOpacity={0.8}>
+                    <Text style={pe.swipeActionIcon}>🗑</Text>
+                    <Text style={pe.swipeActionTxt}>Delete</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[pe.swipeAction, pe.swipeFlag]}
+                    onPress={() => { swipeRef.current?.close(); Alert.alert('Message flagged', 'Thanks for letting us know.'); }} activeOpacity={0.8}>
+                    <Text style={pe.swipeActionIcon}>🚩</Text>
+                    <Text style={pe.swipeActionTxt}>Flag</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[pe.swipeAction, pe.swipeReport]}
+                    onPress={() => { swipeRef.current?.close(); Alert.alert('Report sent', 'Our team will review this message.'); }} activeOpacity={0.8}>
+                    <Text style={pe.swipeActionIcon}>🚫</Text>
+                    <Text style={pe.swipeActionTxt}>Report</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            };
+            return (
+              <Swipeable ref={swipeRef} renderRightActions={renderMsgActions} overshootRight={false} friction={2}>
+                <View style={{ alignItems: isMe ? 'flex-end' : 'flex-start', paddingVertical: 2 }}>
+                  <View style={[pe.bubble, isMe ? pe.bubbleMe : pe.bubbleThem]}>
+                    <Text style={[pe.bubbleTxt, isMe ? pe.bubbleTxtMe : pe.bubbleTxtThem]}>{item.text}</Text>
+                  </View>
+                </View>
+              </Swipeable>
+            );
+          }}
+        />
+
+        {/* Input */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={pe.inputRow}>
+            <TextInput
+              style={pe.input}
+              placeholder="Message…"
+              placeholderTextColor="#333"
+              value={chatText}
+              onChangeText={setChatText}
+              returnKeyType="send"
+              onSubmitEditing={sendChatMsg}
+              multiline
+            />
+            <TouchableOpacity style={[pe.sendBtn, chatText.trim() && { backgroundColor: '#6C47FF' }]}
+              onPress={sendChatMsg} activeOpacity={0.8}>
+              <Text style={pe.sendIcon}>➤</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+
+        {/* Bond profile modal */}
+        <Modal visible={showBondProfile} transparent animationType="slide" onRequestClose={() => setShowBondProfile(false)}>
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            {/* Header */}
+            <View style={{ paddingHorizontal: 16, paddingTop: 58, paddingBottom: 14,
+              flexDirection: 'row', alignItems: 'center', gap: 12,
+              borderBottomWidth: 1, borderBottomColor: '#0e1016' }}>
+              <TouchableOpacity style={pe.chatBack} onPress={() => setShowBondProfile(false)}>
+                <Text style={pe.chatBackTxt}>←</Text>
+              </TouchableOpacity>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '800' }}>{name}'s Profile</Text>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
+              {/* Avatar hero */}
+              <LinearGradient
+                colors={[mu.avatarColor ? mu.avatarColor + '44' : '#6C47FF44', '#050507']}
+                style={{ alignItems: 'center', paddingVertical: 36, gap: 12 }}
+              >
+                <Avatar photo_url={mu.photo_url} name={name} size={110} />
+                <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900' }}>{name}{mu.age ? `, ${mu.age}` : ''}</Text>
+                <Text style={{ color: '#555', fontSize: 13 }}>{mu.username}</Text>
+                {mu.flag || mu.country ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {mu.flag && <Text style={{ fontSize: 22 }}>{mu.flag}</Text>}
+                    {mu.country && <Text style={{ color: '#777', fontSize: 15, fontWeight: '700' }}>{mu.country}</Text>}
+                  </View>
+                ) : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
+                  backgroundColor: '#57f28715', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' }} />
+                  <Text style={{ color: '#57f287', fontSize: 12, fontWeight: '700' }}>🌐 Bond Match</Text>
+                </View>
+              </LinearGradient>
+
+              {/* Bio */}
+              {mu.bio ? (
+                <View style={{ marginHorizontal: 20, marginTop: 20 }}>
+                  <Text style={{ color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 }}>ABOUT</Text>
+                  <Text style={{ color: '#aaa', fontSize: 14, lineHeight: 22 }}>{mu.bio}</Text>
+                </View>
+              ) : null}
+
+              {/* Tagline */}
+              {mu.tagline ? (
+                <View style={{ marginHorizontal: 20, marginTop: 16, backgroundColor: '#111318',
+                  borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e2028' }}>
+                  <Text style={{ color: '#666', fontSize: 18 }}>"</Text>
+                  <Text style={{ color: '#aaa', fontSize: 14, fontStyle: 'italic', lineHeight: 22 }}>{mu.tagline}</Text>
+                </View>
+              ) : null}
+
+              {/* Interests */}
+              {mu.interests?.length > 0 ? (
+                <View style={{ marginHorizontal: 20, marginTop: 20 }}>
+                  <Text style={{ color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12 }}>INTERESTS</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {mu.interests.map((tag, i) => (
+                      <View key={i} style={{ backgroundColor: '#111318', borderRadius: 20,
+                        paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#1e2028' }}>
+                        <Text style={{ color: '#aaa', fontSize: 13, fontWeight: '600' }}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* World Footprint */}
+              {mu.trail?.length > 0 ? (
+                <View style={{ marginHorizontal: 20, marginTop: 24 }}>
+                  <Text style={{ color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 14 }}>WORLD FOOTPRINT</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {mu.trail.map((flag, i) => (
+                      <React.Fragment key={i}>
+                        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#111318',
+                          borderWidth: 1, borderColor: '#1e2028', alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 24 }}>{flag}</Text>
+                        </View>
+                        {i < mu.trail.length - 1 && (
+                          <Text style={{ color: '#2a2c34', marginHorizontal: 4, fontSize: 12 }}>›</Text>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </ScrollView>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
+
+  // ── Message Center (inbox) ──────────────────────────────────────────────────
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      {/* Header */}
+      <View style={pe.inboxHdr}>
+        <Text style={pe.inboxTitle}>Messages</Text>
+        {bondMatches.length > 0 && (
+          <View style={pe.inboxBadge}>
+            <Text style={pe.inboxBadgeTxt}>{bondMatches.length}</Text>
+          </View>
         )}
       </View>
 
-      {/* CT Filters */}
-      <FlatList
-        data={CT_FILTERS}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={f => String(f.id)}
-        contentContainerStyle={pe.filtersRow}
-        renderItem={({ item: f }) => {
-          const meta   = f.id ? CT_META[f.id] : null;
-          const active = ctFilter === f.id;
-          return (
-            <TouchableOpacity
-              style={[
-                pe.chip,
-                active && meta  && { backgroundColor: meta.color + '20', borderColor: meta.color + '55' },
-                active && !meta && { backgroundColor: '#6C47FF20', borderColor: '#6C47FF55' },
-              ]}
-              onPress={() => setCtFilter(f.id)}
-            >
-              <Text style={{ fontSize: 13 }}>{f.emoji}</Text>
-              <Text style={[pe.chipText, active && { color: meta ? meta.color : '#6C47FF' }]}>{f.label}</Text>
-            </TouchableOpacity>
-          );
-        }}
-        style={{ flexGrow: 0, marginBottom: 4 }}
-      />
-
-      {loading ? (
-        <View style={pe.loading}>
-          <ActivityIndicator color="#6C47FF" />
-          <Text style={pe.loadingText}>Loading people…</Text>
-        </View>
-      ) : profiles.length === 0 ? (
-        <View style={pe.loading}>
-          <Text style={{ fontSize: 48 }}>🌍</Text>
-          <Text style={pe.emptyTitle}>No profiles found</Text>
-          <Text style={pe.emptySub}>Try a different filter or check back later</Text>
+      {bondMatches.length === 0 ? (
+        /* ── Empty state ── */
+        <View style={pe.emptyWrap}>
+          <Text style={{ fontSize: 54 }}>💬</Text>
+          <Text style={pe.emptyTitle}>No messages yet</Text>
+          <Text style={pe.emptySub}>
+            Go to the Random tab, bond with someone,{'\n'}and your chat will appear here.
+          </Text>
+          <View style={pe.emptyArrow}>
+            <Text style={pe.emptyArrowTxt}>🌀  Try Random</Text>
+          </View>
         </View>
       ) : (
+        /* ── Conversation list ── */
         <FlatList
-          data={profiles}
-          keyExtractor={p => String(p.user_id)}
-          contentContainerStyle={pe.list}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchProfiles(true)} tintColor="#6C47FF" />}
-          renderItem={({ item: p }) => {
-            const isOnline = online[p.user_id];
-            const cts      = p.connection_types || [];
+          data={bondMatches}
+          keyExtractor={m => m.roomKey}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
+          ItemSeparatorComponent={() => <View style={pe.divider} />}
+          renderItem={({ item: m }) => {
+            const mu       = m.matchedUser || {};
+            const name     = mu.display_name || mu.username || 'Bond';
+            const isOnline = online[mu.user_id];
+            const lastMsg  = m.messages?.length > 0 ? m.messages[m.messages.length - 1] : null;
+            const preview  = lastMsg ? lastMsg.text : 'Say hello to your new bond 👋';
+            const isUnread = !lastMsg;
+            const ts       = m.ts ? new Date(m.ts) : null;
+            const timeStr  = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+            const threadRef = React.createRef();
+            const renderThreadActions = () => (
+              <View style={pe.threadSwipeActions}>
+                <TouchableOpacity style={[pe.threadSwipeAction, pe.threadSwipeDelete]}
+                  onPress={() => { threadRef.current?.close(); deleteConversation(m.roomKey); }} activeOpacity={0.8}>
+                  <Text style={pe.swipeActionIcon}>🗑</Text>
+                  <Text style={pe.threadSwipeActionTxt}>Delete</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[pe.threadSwipeAction, pe.threadSwipeReport]}
+                  onPress={() => { threadRef.current?.close(); Alert.alert('Reported', 'Thanks for keeping WorldBond safe.'); }} activeOpacity={0.8}>
+                  <Text style={pe.swipeActionIcon}>🚫</Text>
+                  <Text style={pe.threadSwipeActionTxt}>Report</Text>
+                </TouchableOpacity>
+              </View>
+            );
             return (
-              <TouchableOpacity
-                style={pe.card}
-                onPress={() => navigation.navigate('Profile', {
-                  profileUser: { userId: p.user_id, username: p.display_name, photo_url: p.photo_url, country: p.country, language: p.language },
-                  bondUserId: p.user_id,
-                })}
-                activeOpacity={0.85}
-              >
-                <View style={{ position: 'relative' }}>
-                  <Avatar photo_url={p.photo_url} name={p.display_name} size={58} />
-                  {isOnline && <View style={pe.onlineDot} />}
-                </View>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={pe.nameRow}>
-                    <Text style={pe.name}>{p.display_name}</Text>
-                    {p.age ? <Text style={pe.age}>{p.age}</Text> : null}
-                    {p.ghost_score != null && (
-                      <View style={[pe.ghostPill, { backgroundColor: ghostColor(p.ghost_score) + '20', borderColor: ghostColor(p.ghost_score) + '55' }]}>
-                        <Text style={[pe.ghostText, { color: ghostColor(p.ghost_score) }]}>⭐ {Number(p.ghost_score).toFixed(1)}</Text>
-                      </View>
-                    )}
+              <Swipeable ref={threadRef} renderRightActions={renderThreadActions} overshootRight={false} friction={2}>
+                <TouchableOpacity style={pe.thread} onPress={() => openChat(m)} activeOpacity={0.8}>
+                  {/* Avatar + online */}
+                  <View style={{ position: 'relative', marginRight: 14 }}>
+                    <Avatar photo_url={mu.photo_url} name={name} size={54} />
+                    {isOnline && <View style={pe.threadOnlineDot} />}
                   </View>
-                  <Text style={pe.location}>
-                    {[LANG_FLAGS[p.language] || '🌐', p.city, p.country].filter(Boolean).join('  ')}
-                  </Text>
-                  {cts.length > 0 && (
-                    <View style={pe.ctRow}>
-                      {cts.slice(0, 3).map(ct => {
-                        const m = CT_META[ct];
-                        if (!m) return null;
-                        return (
-                          <View key={ct} style={[pe.ctPill, { backgroundColor: m.color + '18', borderColor: m.color + '40' }]}>
-                            <Text style={{ fontSize: 10 }}>{m.emoji}</Text>
-                            <Text style={[pe.ctText, { color: m.color }]}>{m.label}</Text>
-                          </View>
-                        );
-                      })}
+                  {/* Text content */}
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={pe.threadName}>{name}</Text>
+                      <Text style={pe.threadTime}>{timeStr}</Text>
+                    </View>
+                    <Text style={[pe.threadPreview, isUnread && pe.threadPreviewUnread]}
+                      numberOfLines={1}>{preview}</Text>
+                  </View>
+                  {/* Unread badge */}
+                  {isUnread && (
+                    <View style={pe.threadNewBadge}>
+                      <Text style={pe.threadNewTxt}>NEW</Text>
                     </View>
                   )}
-                </View>
-                <Text style={pe.arrow}>›</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </Swipeable>
             );
           }}
         />
@@ -1076,36 +2246,85 @@ function PeopleTab({ user, navigation }) {
   );
 }
 const pe = StyleSheet.create({
-  searchWrap:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 12, marginBottom: 8, backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: '#2F3336' },
-  searchIcon:  { fontSize: 16 },
-  searchInput: { flex: 1, color: '#fff', fontSize: 15 },
-  searchClear: { color: '#444', fontSize: 15, paddingHorizontal: 4 },
-  filtersRow:  { paddingHorizontal: 20, gap: 8 },
-  chip:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  chipText:    { color: '#555', fontSize: 12, fontWeight: '700' },
-  loading:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: '#555', fontSize: 14 },
-  emptyTitle:  { color: '#fff', fontSize: 17, fontWeight: '700' },
-  emptySub:    { color: '#555', fontSize: 13, textAlign: 'center' },
-  list:        { padding: 16, gap: 10, paddingBottom: 60 },
-  card:        { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#16181C', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
-  onlineDot:   { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: 7, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
-  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name:        { color: '#fff', fontSize: 16, fontWeight: '800' },
-  age:         { color: '#555', fontSize: 14 },
-  ghostPill:   { borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1 },
-  ghostText:   { fontSize: 10, fontWeight: '800' },
-  location:    { color: '#555', fontSize: 12 },
-  ctRow:       { flexDirection: 'row', gap: 5, flexWrap: 'wrap' },
-  ctPill:      { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1 },
-  ctText:      { fontSize: 10, fontWeight: '700' },
-  arrow:       { color: '#333', fontSize: 22, fontWeight: '300' },
+  // ── Inbox header ──
+  inboxHdr:         { flexDirection: 'row', alignItems: 'center', gap: 10,
+                      paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
+  inboxTitle:       { color: '#fff', fontSize: 22, fontWeight: '900', flex: 1 },
+  inboxBadge:       { backgroundColor: '#6C47FF', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 },
+  inboxBadgeTxt:    { color: '#fff', fontSize: 12, fontWeight: '900' },
+
+  // ── Thread rows ──
+  thread:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  threadOnlineDot:  { position: 'absolute', bottom: 0, right: 0, width: 13, height: 13, borderRadius: 7,
+                      backgroundColor: '#57f287', borderWidth: 2.5, borderColor: '#000' },
+  threadName:       { color: '#fff', fontSize: 16, fontWeight: '800', flex: 1 },
+  threadTime:       { color: '#333', fontSize: 11, fontWeight: '600' },
+  threadPreview:    { color: '#444', fontSize: 13, lineHeight: 18 },
+  threadPreviewUnread: { color: '#6C47FF', fontWeight: '700' },
+  threadNewBadge:   { backgroundColor: '#6C47FF', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 10 },
+  threadNewTxt:     { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  divider:          { height: 1, backgroundColor: '#0e1016', marginLeft: 88 },
+
+  // ── Empty state ──
+  emptyWrap:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32, paddingBottom: 60 },
+  emptyTitle:       { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  emptySub:         { color: '#444', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  emptyArrow:       { marginTop: 8, backgroundColor: '#6C47FF18', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: '#6C47FF44' },
+  emptyArrowTxt:    { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
+
+  // ── Full-screen chat ──
+  chatHdr:          { flexDirection: 'row', alignItems: 'center', gap: 12,
+                      paddingHorizontal: 16, paddingTop: 54, paddingBottom: 14,
+                      borderBottomWidth: 1, borderBottomColor: '#0e1016', backgroundColor: '#000' },
+  chatBack:         { width: 36, height: 36, borderRadius: 18, backgroundColor: '#111318',
+                      alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e2028' },
+  chatBackTxt:      { color: '#fff', fontSize: 16, fontWeight: '700' },
+  chatOnlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6,
+                      backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000' },
+  chatHdrName:      { color: '#fff', fontSize: 16, fontWeight: '800' },
+  chatHdrSub:       { color: '#444', fontSize: 11, marginTop: 1 },
+  chatEmpty:        { alignItems: 'center', gap: 10 },
+  chatEmptyTitle:   { color: '#fff', fontSize: 18, fontWeight: '900' },
+  chatEmptySub:     { color: '#555', fontSize: 14 },
+  bubble:           { maxWidth: '78%', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 11 },
+  bubbleMe:         { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
+  bubbleThem:       { backgroundColor: '#111318', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e2028' },
+  bubbleTxt:        { fontSize: 15, lineHeight: 21 },
+  bubbleTxtMe:      { color: '#fff' },
+  bubbleTxtThem:    { color: '#ccc' },
+  inputRow:         { flexDirection: 'row', alignItems: 'flex-end', gap: 10,
+                      paddingHorizontal: 14, paddingVertical: 12, paddingBottom: 28,
+                      borderTopWidth: 1, borderTopColor: '#0e1016', backgroundColor: '#000' },
+  input:            { flex: 1, backgroundColor: '#111318', color: '#fff', borderRadius: 24,
+                      paddingHorizontal: 18, paddingVertical: 13, fontSize: 15,
+                      maxHeight: 100, borderWidth: 1, borderColor: '#1e2028' },
+  sendBtn:          { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1a1c22',
+                      alignItems: 'center', justifyContent: 'center' },
+  sendIcon:         { color: '#fff', fontSize: 16, marginLeft: 2 },
+
+  // ── Swipe-to-reveal (message bubbles) ──
+  swipeActions:       { flexDirection: 'row', alignItems: 'center', paddingLeft: 8 },
+  swipeAction:        { alignItems: 'center', justifyContent: 'center', width: 68,
+                        borderRadius: 16, marginLeft: 6, paddingVertical: 10, gap: 3 },
+  swipeDelete:        { backgroundColor: '#e5393520', borderWidth: 1, borderColor: '#e5393540' },
+  swipeFlag:          { backgroundColor: '#f59e0b20', borderWidth: 1, borderColor: '#f59e0b40' },
+  swipeReport:        { backgroundColor: '#55555520', borderWidth: 1, borderColor: '#55555540' },
+  swipeActionIcon:    { fontSize: 18 },
+  swipeActionTxt:     { color: '#888', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+
+  // ── Swipe-to-reveal (inbox threads) ──
+  threadSwipeActions: { flexDirection: 'row', alignItems: 'stretch' },
+  threadSwipeAction:  { alignItems: 'center', justifyContent: 'center', width: 80, gap: 4 },
+  threadSwipeDelete:  { backgroundColor: '#e53935' },
+  threadSwipeReport:  { backgroundColor: '#555' },
+  threadSwipeActionTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function DiscoverScreen({ navigation, user }) {
   const { colors } = useTheme();
-  const [activeTab, setActiveTab] = useState('icebreaker');
+  const [activeTab,   setActiveTab]   = useState('icebreaker');
+  const [bondMatches, setBondMatches] = useState([]);
   const indicatorX = useRef(new Animated.Value(0)).current;
   const headerAnim = useRef(new Animated.Value(0)).current;
 
@@ -1117,6 +2336,13 @@ export default function DiscoverScreen({ navigation, user }) {
     const idx = TABS.findIndex(t => t.id === id);
     Animated.spring(indicatorX, { toValue: idx * TAB_W, friction: 8, tension: 60, useNativeDriver: true }).start();
     setActiveTab(id);
+  }
+
+  function addBondMatch(matchedUser, roomKey) {
+    setBondMatches(prev => {
+      if (prev.find(m => m.roomKey === roomKey)) return prev;
+      return [{ matchedUser, roomKey, messages: [], ts: Date.now() }, ...prev];
+    });
   }
 
   const headerSlide = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] });
@@ -1152,9 +2378,9 @@ export default function DiscoverScreen({ navigation, user }) {
 
       {/* ── Content ── */}
       {activeTab === 'icebreaker' && <IcebreakerTab user={user} navigation={navigation} />}
-      {activeTab === 'random'     && <RandomTab user={user} navigation={navigation} />}
+      {activeTab === 'random'     && <RandomTab user={user} navigation={navigation} onMatch={addBondMatch} switchTab={switchTab} />}
       {activeTab === 'language'   && <LanguageTab user={user} navigation={navigation} />}
-      {activeTab === 'people'     && <PeopleTab user={user} navigation={navigation} />}
+      {activeTab === 'people'     && <PeopleTab user={user} navigation={navigation} bondMatches={bondMatches} setBondMatches={setBondMatches} />}
     </SafeAreaView>
   );
 }

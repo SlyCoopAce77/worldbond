@@ -65,7 +65,7 @@ function HeartBurst({ visible }) {
 
 // ─── Bond Footprint Card ──────────────────────────────────────────────────────
 
-function BondFootprintCard({ bondPhotos, followingCount, onPress }) {
+function BondFootprintCard({ bondPhotos, followingCount, isDemoMode, onPress }) {
   const countryData = useMemo(() => {
     const map = {};
     bondPhotos.forEach(p => {
@@ -101,7 +101,7 @@ function BondFootprintCard({ bondPhotos, followingCount, onPress }) {
             <Text style={fp.globe}>🌐</Text>
             <View>
               <Text style={fp.cardTitle}>Bond Footprint</Text>
-              <Text style={fp.cardSub}>Your reach across the world</Text>
+              <Text style={fp.cardSub}>{isDemoMode ? '✦ Preview — bond with people to build yours' : 'Your reach across the world'}</Text>
             </View>
           </View>
           <View style={fp.explorePill}>
@@ -228,7 +228,7 @@ function BondFootprintSheet({ visible, bondPhotos, onClose, onSelectCountry, act
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={bfs.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} onPress={() => {}} style={bfs.sheet}>
+        <View style={bfs.sheet}>
           <View style={bfs.handle} />
 
           {/* Header */}
@@ -295,7 +295,7 @@ function BondFootprintSheet({ visible, bondPhotos, onClose, onSelectCountry, act
               })
             )}
           </ScrollView>
-        </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
@@ -376,12 +376,18 @@ function BondTrailCard({ photo, user, onComment, onProfile, onFollow, followingI
             onPress={handleDoubleTap}
             style={[bt.photoWrap, { width: cardW - 56 }]}
           >
-            <FilteredImage
-              uri={photo.imageUrl}
-              filterId={photo.filter || 'normal'}
-              style={[bt.photo, { width: cardW - 56, height: (cardW - 56) * 1.1 }]}
-              resizeMode="cover"
-            />
+            {photo.imageUrl ? (
+              <FilteredImage
+                uri={photo.imageUrl}
+                filterId={photo.filter || 'normal'}
+                style={[bt.photo, { width: cardW - 56, height: (cardW - 56) * 1.1 }]}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[bt.photo, { width: cardW - 56, height: (cardW - 56) * 1.1, backgroundColor: stringToColor(photo.username) + '33', alignItems: 'center', justifyContent: 'center' }]}>
+                <Text style={{ fontSize: 42 }}>{countryFlag(photo.country)}</Text>
+              </View>
+            )}
             {showHeart && (
               <Animated.Text style={bt.heartBurst}>❤️</Animated.Text>
             )}
@@ -797,6 +803,19 @@ function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PhotoFeedScreen({ navigation, user }) {
+  const DEMO_PHOTOS = useMemo(() => [
+    { id: 'd1', userId: 'demo1', username: 'kenji_tokyo', country: '🇯🇵 Japan',       city: 'Tokyo',      imageUrl: '', caption: 'Night vibes 🌃', likes: [], echos: [], comments: [], createdAt: Date.now() - 3600000 },
+    { id: 'd2', userId: 'demo2', username: 'amara_lagos', country: '🇳🇬 Nigeria',     city: 'Lagos',      imageUrl: '', caption: 'Sunday mood 🔥', likes: [], echos: [], comments: [], createdAt: Date.now() - 7200000 },
+    { id: 'd3', userId: 'demo3', username: 'sofia_br',    country: '🇧🇷 Brazil',      city: 'São Paulo',  imageUrl: '', caption: 'Carnaval prep', likes: [], echos: [], comments: [], createdAt: Date.now() - 10800000 },
+    { id: 'd4', userId: 'demo4', username: 'priya_in',    country: '🇮🇳 India',       city: 'Mumbai',     imageUrl: '', caption: '🎶 rainy season', likes: [], echos: [], comments: [], createdAt: Date.now() - 14400000 },
+    { id: 'd5', userId: 'demo5', username: 'lars_se',     country: '🇸🇪 Sweden',      city: 'Stockholm',  imageUrl: '', caption: 'Midnight sun', likes: [], echos: [], comments: [], createdAt: Date.now() - 18000000 },
+    { id: 'd6', userId: 'demo6', username: 'yemi_gh',     country: '🇬🇭 Ghana',       city: 'Accra',      imageUrl: '', caption: 'Beach day 🏖', likes: [], echos: [], comments: [], createdAt: Date.now() - 21600000 },
+    { id: 'd7', userId: 'demo7', username: 'hiro_jp',     country: '🇯🇵 Japan',       city: 'Osaka',      imageUrl: '', caption: 'Ramen run 🍜', likes: [], echos: [], comments: [], createdAt: Date.now() - 25200000 },
+    { id: 'd8', userId: 'demo8', username: 'ines_pt',     country: '🇵🇹 Portugal',    city: 'Lisbon',     imageUrl: '', caption: 'Sunset fado 🎵', likes: [], echos: [], comments: [], createdAt: Date.now() - 28800000 },
+    { id: 'd9', userId: 'demo9', username: 'carlos_mx',   country: '🇲🇽 Mexico',      city: 'Mexico City',imageUrl: '', caption: 'Tacos at 2am 🌮', likes: [], echos: [], comments: [], createdAt: Date.now() - 32400000 },
+  ], []);
+  const DEMO_FOLLOWING = useMemo(() => DEMO_PHOTOS.map(p => p.userId), [DEMO_PHOTOS]);
+
   const [photos,            setPhotos]           = useState([]);
   const [stories,           setStories]          = useState([]);
   const [tab,               setTab]              = useState('world');
@@ -810,7 +829,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [savedCountries,    setSavedCountries]    = useState([]);
   const [currentCountry,    setCurrentCountry]    = useState(null); // null = globe prompt
   const [countryFlagCounts, setCountryFlagCounts] = useState({});   // country -> planted count
-  const [showBondFootprint,  setShowBondFootprint]  = useState(false);
+  const [showBondFootprint,  setShowBondFootprint]  = useState(true); // open on first load to demo
   const [bondCountryFilter, setBondCountryFilter] = useState(null);
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
@@ -880,13 +899,23 @@ export default function PhotoFeedScreen({ navigation, user }) {
   , [photos, currentCountry]);
 
   const myUserId = user?.userId || socket.id;
-  const allBondPhotos = useMemo(() =>
+  const realBondPhotos = useMemo(() =>
     photos.filter(p =>
       followingIds.includes(p.userId) ||
       p.userId === myUserId ||
       p.echos?.some(e => followingIds.includes(e.userId))
     )
   , [photos, followingIds, myUserId]);
+
+  // Show demo data when no real bonds exist yet so the footprint is visible
+  const isDemoMode = realBondPhotos.length === 0 && followingIds.length === 0;
+  const allBondPhotos = isDemoMode ? DEMO_PHOTOS : realBondPhotos;
+  const effectiveFollowingIds = isDemoMode ? DEMO_FOLLOWING : followingIds;
+
+  // Force-open the sheet in demo mode so the user can see it immediately
+  useEffect(() => {
+    if (isDemoMode && tab === 'bonds') setShowBondFootprint(true);
+  }, [isDemoMode, tab]);
 
   const bondPhotos = useMemo(() =>
     bondCountryFilter
@@ -1023,7 +1052,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
       {/* Bond Footprint Card */}
       <BondFootprintCard
         bondPhotos={allBondPhotos}
-        followingCount={followingIds.length}
+        followingCount={effectiveFollowingIds.length}
+        isDemoMode={isDemoMode}
         onPress={() => setShowBondFootprint(true)}
       />
 
