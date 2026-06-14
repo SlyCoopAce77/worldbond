@@ -1049,6 +1049,8 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const [ageMin,          setAgeMin]          = useState(18);
   const [ageMax,          setAgeMax]          = useState(40);
   const [countryFilter,   setCountryFilter]   = useState(null);
+  const [countrySearch,   setCountrySearch]   = useState('');
+  const [countryRegion,   setCountryRegion]   = useState('all');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);
@@ -1341,6 +1343,28 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const genderMeta  = GENDER_OPTIONS_FP.find(g => g.id === genderFilter) || GENDER_OPTIONS_FP[0];
   const reachMeta   = REACH_OPTIONS.find(r => r.id === reachFilter) || REACH_OPTIONS[2];
   const countryMeta = ALL_COUNTRIES.find(c => c.code === countryFilter);
+
+  const REGION_TABS = [
+    { id: 'all',     label: 'All'      },
+    { id: 'africa',  label: 'Africa'   },
+    { id: 'americas',label: 'Americas' },
+    { id: 'asia',    label: 'Asia'     },
+    { id: 'europe',  label: 'Europe'   },
+    { id: 'oceania', label: 'Oceania'  },
+  ];
+  const REGION_CODES = {
+    africa:   ['DZ','AO','BJ','BW','BF','BI','CM','CV','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','SZ','TZ','TG','TN','UG','ZM','ZW'],
+    americas: ['AG','AR','BS','BB','BZ','BO','BR','CA','CL','CO','CR','CU','DM','DO','EC','SV','GD','GT','GY','HT','HN','JM','MX','NI','PA','PY','PE','KN','LC','VC','SR','TT','US','UY','VE'],
+    asia:     ['AF','AM','AZ','BH','BD','BT','BN','KH','CN','GE','IN','ID','IR','IQ','IL','JP','JO','KZ','KW','KG','LA','LB','MY','MV','MN','MM','NP','OM','PK','PH','QA','RU','SA','SG','LK','SY','TW','TJ','TH','TL','TM','AE','UZ','VN','YE'],
+    europe:   ['AL','AD','AT','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','MD','MC','ME','NL','NO','PL','PT','RO','SM','RS','SK','SI','ES','SE','CH','TR','UA','GB'],
+    oceania:  ['AU','FJ','KI','MH','FM','NR','NZ','PW','PG','WS','SB','TO','TV','VU'],
+  };
+  const filteredCountries = ALL_COUNTRIES.filter(c => {
+    if (c.code === null) return false; // Anywhere shown separately
+    const matchSearch = c.name.toLowerCase().includes(countrySearch.toLowerCase());
+    const matchRegion = countryRegion === 'all' || (REGION_CODES[countryRegion] || []).includes(c.code);
+    return matchSearch && matchRegion;
+  });
   const hasFilter   = genderFilter !== 'everyone' || reachFilter !== 'worldwide' || countryFilter !== null || ageMin !== 18 || ageMax !== 40;
   const filterLabel = hasFilter
     ? [genderFilter !== 'everyone' && genderMeta.label, reachFilter !== 'worldwide' && reachMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
@@ -1582,22 +1606,72 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             <Text style={fp.sectionLabel}>COUNTRY</Text>
             {!tierInfo?.canFilterCountry && <Text style={fp.lockBadge}>🔒 Pro</Text>}
           </View>
-          <View style={[fp.flagGrid, !tierInfo?.canFilterCountry && fp.lockedSection]}>
-            {ALL_COUNTRIES.map(c => {
-              const active = countryFilter === c.code && tierInfo?.canFilterCountry;
-              return (
+          <View style={[!tierInfo?.canFilterCountry && fp.lockedSection]}>
+
+            {/* Search bar */}
+            <View style={fp.countrySearchBar}>
+              <Text style={fp.countrySearchIcon}>🔍</Text>
+              <TextInput
+                style={fp.countrySearchInput}
+                placeholder="Search country..."
+                placeholderTextColor="#333"
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+              />
+              {countrySearch.length > 0 && (
+                <TouchableOpacity onPress={() => setCountrySearch('')} hitSlop={{ top:8,bottom:8,left:8,right:8 }}>
+                  <Text style={fp.countrySearchClear}>✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Region tabs */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={fp.regionTabScroll} contentContainerStyle={fp.regionTabRow}>
+              {REGION_TABS.map(r => (
                 <TouchableOpacity
-                  key={c.code ?? 'any'}
-                  style={[fp.flagTile, active && fp.flagTileActive]}
-                  onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(active ? null : c.code) : setShowUpgrade(true)}
+                  key={r.id}
+                  style={[fp.regionTab, countryRegion === r.id && fp.regionTabActive]}
+                  onPress={() => setCountryRegion(r.id)}
                   activeOpacity={0.75}
                 >
-                  <Text style={fp.flagEmoji}>{c.flag}</Text>
-                  <Text style={[fp.flagName, active && fp.flagNameActive]} numberOfLines={1}>{c.name}</Text>
-                  {active && <View style={fp.flagCheck}><Text style={fp.flagCheckTxt}>✓</Text></View>}
+                  <Text style={[fp.regionTabTxt, countryRegion === r.id && fp.regionTabTxtActive]}>{r.label}</Text>
                 </TouchableOpacity>
-              );
-            })}
+              ))}
+            </ScrollView>
+
+            {/* Anywhere pill */}
+            {(countrySearch === '' || 'anywhere'.includes(countrySearch.toLowerCase())) && (
+              <TouchableOpacity
+                style={[fp.anywherePill, countryFilter === null && tierInfo?.canFilterCountry && fp.anywherePillActive]}
+                onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(null) : setShowUpgrade(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={fp.anywhereFlag}>🌍</Text>
+                <Text style={[fp.anywhereTxt, countryFilter === null && tierInfo?.canFilterCountry && { color: '#6C47FF' }]}>Anywhere</Text>
+                {countryFilter === null && tierInfo?.canFilterCountry && <Text style={fp.anywhereCheck}>✓</Text>}
+              </TouchableOpacity>
+            )}
+
+            {/* Fixed-height scrollable grid */}
+            <ScrollView style={fp.countryGridScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <View style={fp.flagGrid}>
+                {filteredCountries.map(c => {
+                  const active = countryFilter === c.code && tierInfo?.canFilterCountry;
+                  return (
+                    <TouchableOpacity
+                      key={c.code}
+                      style={[fp.flagTile, active && fp.flagTileActive]}
+                      onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(active ? null : c.code) : setShowUpgrade(true)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={fp.flagEmoji}>{c.flag}</Text>
+                      <Text style={[fp.flagName, active && fp.flagNameActive]} numberOfLines={1}>{c.name}</Text>
+                      {active && <View style={fp.flagCheck}><Text style={fp.flagCheckTxt}>✓</Text></View>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
 
           </ScrollView>
@@ -1656,18 +1730,45 @@ const fp = StyleSheet.create({
   ageVal:         { color: '#fff', fontSize: 18, fontWeight: '900', minWidth: 34, textAlign: 'center' },
   ageTo:          { color: '#333', fontSize: 13, fontWeight: '700' },
 
+  // Country search bar
+  countrySearchBar:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111318',
+                        borderRadius: 14, borderWidth: 1.5, borderColor: '#1e2028',
+                        paddingHorizontal: 12, paddingVertical: 10, gap: 8, marginBottom: 10 },
+  countrySearchIcon:  { fontSize: 14 },
+  countrySearchInput: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600', padding: 0 },
+  countrySearchClear: { color: '#444', fontSize: 13, fontWeight: '700' },
+
+  // Region tabs
+  regionTabScroll: { marginBottom: 10 },
+  regionTabRow:    { gap: 6, paddingRight: 4 },
+  regionTab:       { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
+                     backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028' },
+  regionTabActive: { backgroundColor: '#6C47FF20', borderColor: '#6C47FF' },
+  regionTabTxt:    { color: '#444', fontSize: 12, fontWeight: '800' },
+  regionTabTxtActive: { color: '#6C47FF' },
+
+  // Anywhere pill
+  anywherePill:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#111318',
+                     borderRadius: 14, borderWidth: 1.5, borderColor: '#1e2028',
+                     paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
+  anywherePillActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
+  anywhereFlag:    { fontSize: 20 },
+  anywhereTxt:     { color: '#bbb', fontSize: 13, fontWeight: '800', flex: 1 },
+  anywhereCheck:   { color: '#6C47FF', fontSize: 13, fontWeight: '900' },
+
   // Country flag grid
-  flagGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  flagTile:       { width: '22%', alignItems: 'center', gap: 5, paddingVertical: 10,
-                    borderRadius: 16, backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028',
+  countryGridScroll: { maxHeight: 220 },
+  flagGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  flagTile:       { width: '18%', alignItems: 'center', gap: 4, paddingVertical: 8,
+                    borderRadius: 14, backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028',
                     position: 'relative' },
   flagTileActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
-  flagEmoji:      { fontSize: 26 },
-  flagName:       { color: '#444', fontSize: 10, fontWeight: '700', textAlign: 'center' },
+  flagEmoji:      { fontSize: 22 },
+  flagName:       { color: '#444', fontSize: 9, fontWeight: '700', textAlign: 'center' },
   flagNameActive: { color: '#6C47FF' },
-  flagCheck:      { position: 'absolute', top: 5, right: 5, width: 14, height: 14,
-                    borderRadius: 7, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
-  flagCheckTxt:   { color: '#fff', fontSize: 8, fontWeight: '900' },
+  flagCheck:      { position: 'absolute', top: 4, right: 4, width: 13, height: 13,
+                    borderRadius: 6.5, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  flagCheckTxt:   { color: '#fff', fontSize: 7, fontWeight: '900' },
 
   // Apply button
   applyBtn:       { marginTop: 24, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
