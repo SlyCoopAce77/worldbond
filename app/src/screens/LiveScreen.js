@@ -76,7 +76,7 @@ function GiftBurst({ burst, onDone }) {
 
         {/* Emoji in a glowing orbit circle */}
         <Animated.View style={[gbS.orbitCircle, { backgroundColor: burst.gift.color + '20', borderColor: burst.gift.color + '55' }, { transform: [{ scale: emojiScale }] }]}>
-          <Text style={gbS.giftEmoji}>{burst.gift.emoji}</Text>
+          <WorldMark size={22} color={burst.gift.color} bondColor={burst.gift.color} />
         </Animated.View>
 
         <View style={gbS.info}>
@@ -105,7 +105,6 @@ const gbS = StyleSheet.create({
   accentBar:   { width: 4, alignSelf: 'stretch', borderRadius: 2, marginLeft: 0 },
   orbitCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 1,
                  alignItems: 'center', justifyContent: 'center' },
-  giftEmoji:   { fontSize: 24 },
   info:        { flex: 1 },
   senderName:  { color: '#fff', fontSize: 12, fontWeight: '900' },
   giftName:    { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
