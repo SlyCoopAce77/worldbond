@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
+import { ChallengeProvider } from '../context/ChallengeContext';
 import { navigationRef } from '../services/navigationRef';
 import NotificationToast from '../components/NotificationToast';
 import { WorldMark } from '../components/BondLogo';
@@ -34,6 +35,7 @@ import LiveWatchScreen from '../screens/LiveWatchScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import LegalScreen from '../screens/LegalScreen';
 import WalletScreen from '../screens/WalletScreen';
+import MonumentChallengeScreen from '../screens/MonumentChallengeScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -129,6 +131,7 @@ function HomeTabs({ user, onLogout }) {
 
 export default function AppNavigator({ user, onLogout }) {
   return (
+    <ChallengeProvider>
     <NotificationsProvider>
       <View style={{ flex: 1 }}>
         <NavigationContainer ref={navigationRef}>
@@ -170,6 +173,7 @@ export default function AppNavigator({ user, onLogout }) {
 
             {/* Wallet & monetization */}
             <Stack.Screen name="Wallet" component={WalletScreen} />
+            <Stack.Screen name="MonumentChallenge" component={MonumentChallengeScreen} />
           </Stack.Navigator>
         </NavigationContainer>
 
@@ -177,5 +181,6 @@ export default function AppNavigator({ user, onLogout }) {
         <NotificationToast />
       </View>
     </NotificationsProvider>
+    </ChallengeProvider>
   );
 }

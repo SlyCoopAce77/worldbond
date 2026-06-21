@@ -101,7 +101,8 @@ const p = StyleSheet.create({
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function WalletScreen({ navigation }) {
+export default function WalletScreen({ navigation, route }) {
+  const currentUser = route?.params?.currentUser || null;
   const {
     balance, spent, transactions, stamps, myStamps, myMonuments, monthlyEarned,
     earnCoins,
@@ -330,31 +331,18 @@ export default function WalletScreen({ navigation }) {
                       : <Text style={[s.fpEarned, { color: '#4ade80' }]}>Unclaimed — tap to claim!</Text>
                     }
                   </View>
-                  {unclaimed
-                    ? (
+                  {isMine
+                    ? <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>
+                    : (
                       <TouchableOpacity
-                        style={s.claimBtn}
-                        onPress={() => Alert.alert('Claim Monument', `Claim ${m.name}?\n\nYou'll earn 2% royalty on all gifts sent during streams in ${m.location}.`, [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Claim Free', style: 'default' },
-                        ])}
+                        style={unclaimed ? s.claimBtn : s.challengeBtn}
+                        onPress={() => navigation.navigate('MonumentChallenge', { monument: m, currentUser })}
                       >
-                        <Text style={s.claimBtnTxt}>Claim</Text>
+                        <Text style={unclaimed ? s.claimBtnTxt : s.challengeBtnTxt}>
+                          {unclaimed ? 'Claim' : 'Challenge'}
+                        </Text>
                       </TouchableOpacity>
                     )
-                    : isMine
-                      ? <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>
-                      : (
-                        <TouchableOpacity
-                          style={s.challengeBtn}
-                          onPress={() => Alert.alert('Challenge', `Challenge @${m.holder} for ${m.name}?\n\nHighest gifter over 7 days takes ownership.`, [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Start Challenge', style: 'default' },
-                          ])}
-                        >
-                          <Text style={s.challengeBtnTxt}>Challenge</Text>
-                        </TouchableOpacity>
-                      )
                   }
                 </View>
               );

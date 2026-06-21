@@ -14,6 +14,7 @@ import { SERVER_URL } from '../services/socket';
 import { useNotifications } from '../context/NotificationsContext';
 import { usePremium } from '../context/PremiumContext';
 import { useStreak } from '../context/StreakContext';
+import { BOND_MONUMENTS, DEMO_STAMPS } from '../context/WalletContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
@@ -40,7 +41,7 @@ const HERO_THEMES = {
     grad:       ['#060400', '#0a0700', '#050300'],
     nodeColor:  '#FFB700',
     badge:      { label: 'WorldBond Pro',  color: '#FFB700', bg: '#FFB70018', border: '#FFB70040' },
-    greetLabel: 'Priority Access',
+    greetLabel: null,
   },
 };
 
@@ -585,6 +586,171 @@ const qc = StyleSheet.create({
   arrow:      { fontSize: 22, fontWeight: '300', marginLeft: -4, flexShrink: 0 },
 });
 
+// ─── Pro: World Footprint Panel — replaces 4-tile quick grid ─────────────────
+function ProFootprintPanel({ navigation }) {
+  const glow      = useRef(new Animated.Value(0.04)).current;
+  const livePulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 0.10, duration: 2800, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0.04, duration: 2800, useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(livePulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+      Animated.timing(livePulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+    ])).start();
+  }, []);
+
+  const featured   = BOND_MONUMENTS.find(m => !m.holder) || BOND_MONUMENTS[0];
+  const stampFlags = Object.keys(DEMO_STAMPS).slice(0, 4);
+  const extraStamps = Math.max(0, Object.keys(DEMO_STAMPS).length - 4);
+
+  return (
+    <View style={fp.wrap}>
+
+      {/* ── Header ── */}
+      <View style={fp.head}>
+        <View>
+          <Text style={fp.headLabel}>WORLD FOOTPRINT</Text>
+          <Text style={fp.headSub}>1-of-1 identity across 195 countries</Text>
+        </View>
+        <View style={fp.goldTag}><Text style={fp.goldTagTxt}>GOLD</Text></View>
+      </View>
+
+      {/* ── Bond Monument Feature Card ── */}
+      <TouchableOpacity onPress={() => navigation.navigate('MonumentChallenge', { monument: featured })} activeOpacity={0.88} style={fp.monumentCard}>
+        <LinearGradient colors={['#1a1200', '#100c00', '#080600']} style={fp.monumentGrad}>
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFB700', opacity: glow, borderRadius: 16 }]} />
+          <LinearGradient colors={['#FFB700', '#FF8C00']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={fp.goldBar} />
+          <View style={fp.monumentBody}>
+            <View style={fp.monumentLeft}>
+              <Text style={fp.monumentIcon}>{featured.icon}</Text>
+              <View style={fp.monumentMeta}>
+                <Text style={fp.monumentName}>{featured.name}</Text>
+                <Text style={fp.monumentLocation}>{featured.location}</Text>
+              </View>
+            </View>
+            <View style={[fp.claimBadge, featured.holder ? fp.claimBadgeHeld : fp.claimBadgeFree]}>
+              <Text style={[fp.claimTxt, { color: featured.holder ? '#ef4444' : '#57f287' }]}>
+                {featured.holder ? 'HELD' : 'CLAIM'}
+              </Text>
+            </View>
+          </View>
+          <View style={fp.monumentFooter}>
+            <Text style={fp.monumentCountry}>{featured.country}</Text>
+            <Text style={fp.oneOfOne}>1 OF 1</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* ── Country Stamps ── */}
+      <TouchableOpacity onPress={() => navigation.navigate('Wallet')} activeOpacity={0.88} style={fp.stampsCard}>
+        <Text style={fp.stampsTitle}>COUNTRY STAMPS</Text>
+        <View style={fp.stampsRow}>
+          {stampFlags.map((flag, i) => (
+            <View key={i} style={fp.stamp}>
+              <Text style={fp.stampFlag}>{flag}</Text>
+            </View>
+          ))}
+          {extraStamps > 0 && (
+            <View style={[fp.stamp, fp.stampMore]}>
+              <Text style={fp.stampMoreTxt}>+{extraStamps}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={fp.stampsArrow}>View your full footprint →</Text>
+      </TouchableOpacity>
+
+      {/* ── Go Live Portal ── */}
+      <TouchableOpacity onPress={() => navigation.navigate('Events')} activeOpacity={0.88} style={fp.livePortal}>
+        <LinearGradient colors={['#1a0000', '#120000', '#080000']} style={fp.liveGrad}>
+
+          {/* Pulsing red ambient glow */}
+          <Animated.View style={[StyleSheet.absoluteFill, {
+            backgroundColor: '#ef4444',
+            borderRadius: 16,
+            opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.03, 0.10] }),
+          }]} />
+
+          {/* Live indicator row */}
+          <View style={fp.liveTopRow}>
+            <Animated.View style={[fp.liveDot, {
+              opacity: livePulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
+            }]} />
+            <Text style={fp.liveDotTxt}>LIVE</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={fp.liveReach}>🌍 195 countries</Text>
+          </View>
+
+          {/* Center — icon + title */}
+          <View style={fp.liveCenter}>
+            <Text style={fp.liveBigIcon}>📡</Text>
+            <Text style={fp.liveTitle}>WORLD LIVE</Text>
+            <Text style={fp.liveSub}>Broadcast to every corner of the world</Text>
+          </View>
+
+          {/* Bottom row */}
+          <View style={fp.liveBottom}>
+            <Text style={fp.liveHint}>Pro members go live first</Text>
+            <View style={fp.liveCTA}>
+              <Text style={fp.liveCTATxt}>ENTER →</Text>
+            </View>
+          </View>
+
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+}
+const fp = StyleSheet.create({
+  wrap:             { gap: 10 },
+  head:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2 },
+  headLabel:        { color: '#FFB700', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  headSub:          { color: '#555555', fontSize: 10, marginTop: 2 },
+  goldTag:          { backgroundColor: '#FFB70020', borderRadius: 8, borderWidth: 1, borderColor: '#FFB70050', paddingHorizontal: 8, paddingVertical: 4 },
+  goldTagTxt:       { color: '#FFB700', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  monumentCard:     { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#FFB70025' },
+  monumentGrad:     { borderRadius: 16 },
+  goldBar:          { height: 3 },
+  monumentBody:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  monumentLeft:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  monumentIcon:     { fontSize: 32 },
+  monumentMeta:     { gap: 2 },
+  monumentName:     { color: '#fff', fontSize: 14, fontWeight: '800' },
+  monumentLocation: { color: '#555555', fontSize: 11 },
+  claimBadge:       { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1 },
+  claimBadgeFree:   { backgroundColor: '#57f28720', borderColor: '#57f28740' },
+  claimBadgeHeld:   { backgroundColor: '#ef444420', borderColor: '#ef444440' },
+  claimTxt:         { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  monumentFooter:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 12, marginTop: -4 },
+  monumentCountry:  { fontSize: 18 },
+  oneOfOne:         { color: '#FFB70099', fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  stampsCard:       { backgroundColor: '#0d0d0d', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FFB70018', gap: 8 },
+  stampsTitle:      { color: '#FFB700', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+  stampsRow:        { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  stamp:            { width: 36, height: 36, borderRadius: 10, backgroundColor: '#1a1200', borderWidth: 1, borderColor: '#FFB70025', alignItems: 'center', justifyContent: 'center' },
+  stampFlag:        { fontSize: 20 },
+  stampMore:        { backgroundColor: '#FFB70015' },
+  stampMoreTxt:     { color: '#FFB700', fontSize: 12, fontWeight: '800' },
+  stampsArrow:      { color: '#555555', fontSize: 11 },
+
+  // Go Live Portal
+  livePortal:   { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#ef444430' },
+  liveGrad:     { borderRadius: 16, padding: 18, gap: 16 },
+  liveTopRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444' },
+  liveDotTxt:   { color: '#ef4444', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  liveReach:    { color: '#555555', fontSize: 11 },
+  liveCenter:   { alignItems: 'center', gap: 6, paddingVertical: 10 },
+  liveBigIcon:  { fontSize: 44 },
+  liveTitle:    { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  liveSub:      { color: '#ffffff44', fontSize: 12, textAlign: 'center' },
+  liveBottom:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  liveHint:     { color: '#555555', fontSize: 11 },
+  liveCTA:      { backgroundColor: '#ef444422', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: '#ef444455' },
+  liveCTATxt:   { color: '#ef4444', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+});
+
 // ─── Stat pill ────────────────────────────────────────────────────────────────
 function StatPill({ value, label, color }) {
   return (
@@ -929,9 +1095,7 @@ export default function HomeScreen({ navigation, user }) {
                     )}
                     <TouchableOpacity style={s.notifBtn} onPress={() => navigation.navigate('Notifications')}>
                       <Text style={s.notifIcon}>🔔</Text>
-                      {unreadCount > 0 && (
-                        <View style={s.notifBadge}><Text style={s.notifBadgeTxt}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>
-                      )}
+                      {unreadCount > 0 && <Text style={s.notifCountTxt}>{unreadCount > 9 ? '9+' : unreadCount}</Text>}
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -997,16 +1161,22 @@ export default function HomeScreen({ navigation, user }) {
           </Animated.View>
         )}
 
-        {/* ── Quick actions ── */}
+        {/* ── Quick actions / Pro Footprint ── */}
         <Animated.View style={[s.section, sect(1)]}>
-          <View style={s.quickGrid}>
-            <QuickCard {...tiles[0]} onPress={() => navigation.navigate(tiles[0].nav)} />
-            <QuickCard {...tiles[1]} onPress={() => navigation.navigate(tiles[1].nav)} />
-          </View>
-          <View style={[s.quickGrid, { marginTop: 10 }]}>
-            <QuickCard {...tiles[2]} onPress={() => navigation.navigate(tiles[2].nav)} />
-            <QuickCard {...tiles[3]} onPress={() => navigation.navigate(tiles[3].nav)} />
-          </View>
+          {tier === 'pro' ? (
+            <ProFootprintPanel navigation={navigation} />
+          ) : (
+            <>
+              <View style={s.quickGrid}>
+                <QuickCard {...tiles[0]} onPress={() => navigation.navigate(tiles[0].nav)} />
+                <QuickCard {...tiles[1]} onPress={() => navigation.navigate(tiles[1].nav)} />
+              </View>
+              <View style={[s.quickGrid, { marginTop: 10 }]}>
+                <QuickCard {...tiles[2]} onPress={() => navigation.navigate(tiles[2].nav)} />
+                <QuickCard {...tiles[3]} onPress={() => navigation.navigate(tiles[3].nav)} />
+              </View>
+            </>
+          )}
         </Animated.View>
 
         {/* ── Live Now ── */}
@@ -1208,10 +1378,9 @@ const s = StyleSheet.create({
   tierBadgeTxt:    { fontSize: 11, fontWeight: '800' },
 
   // Notif button
-  notifBtn:        { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  notifBtn:        { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 40, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   notifIcon:       { fontSize: 18 },
-  notifBadge:      { position: 'absolute', top: -4, right: -4, backgroundColor: '#e53935', borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: '#000' },
-  notifBadgeTxt:   { color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 },
+  notifCountTxt:   { color: '#fff', fontSize: 14, fontWeight: '900' },
 
   // Greeting block
   heroGreetBlock:  { gap: 3 },
