@@ -32,84 +32,84 @@ const DEMO_STAGES = [
     id: 'stage_001', title: 'Bollywood Dance Party 🕺',
     type: 'cultural', hostUsername: 'Priya_Mumbai', hostCountry: '🇮🇳',
     viewerCount: 1832,
-    isPro: true, isFeatured: true, isLive: true,
+    isPro: true, isLive: true,
     startedAt: NOW - 35 * 60000, scheduledFor: null, stampCountry: '🇮🇳',
   },
   {
     id: 'stage_002', title: 'Seoul Street Kitchen 🍜',
     type: 'kitchen', hostUsername: 'JiMin_Seoul', hostCountry: '🇰🇷',
     viewerCount: 1247,
-    isPro: true, isFeatured: true, isLive: true,
+    isPro: true, isLive: true,
     startedAt: NOW - 58 * 60000, scheduledFor: null, stampCountry: '🇰🇷',
   },
   {
     id: 'stage_003', title: 'Afrobeats Session 🎶',
     type: 'music', hostUsername: 'Amara_Lagos', hostCountry: '🇳🇬',
     viewerCount: 847,
-    isPro: true, isFeatured: false, isLive: true,
+    isPro: true, isLive: true,
     startedAt: NOW - 22 * 60000, scheduledFor: null, stampCountry: '🇳🇬',
   },
   {
     id: 'stage_004', title: 'Tango Masterclass 💃',
     type: 'cultural', hostUsername: 'Sofia_Buenos', hostCountry: '🇦🇷',
     viewerCount: 709,
-    isPro: true, isFeatured: false, isLive: true,
+    isPro: true, isLive: true,
     startedAt: NOW - 45 * 60000, scheduledFor: null, stampCountry: '🇦🇷',
   },
   {
     id: 'stage_005', title: 'Japanese Calligraphy 🖌️',
     type: 'create', hostUsername: 'Yuki_Tokyo', hostCountry: '🇯🇵',
     viewerCount: 612,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 70 * 60000, scheduledFor: null, stampCountry: '🇯🇵',
   },
   {
     id: 'stage_006', title: 'Istanbul Street Tour 🕌',
     type: 'travel', hostUsername: 'Emre_Istanbul', hostCountry: '🇹🇷',
     viewerCount: 445,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 15 * 60000, scheduledFor: null, stampCountry: '🇹🇷',
   },
   {
     id: 'stage_007', title: 'Tea Ceremony Live 🍵',
     type: 'cultural', hostUsername: 'Wei_Shanghai', hostCountry: '🇨🇳',
     viewerCount: 567,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 90 * 60000, scheduledFor: null, stampCountry: '🇨🇳',
   },
   {
     id: 'stage_008', title: 'Samba Workshop 🥁',
     type: 'music', hostUsername: 'Lucas_Rio', hostCountry: '🇧🇷',
     viewerCount: 389,
-    isPro: true, isFeatured: false, isLive: true,
+    isPro: true, isLive: true,
     startedAt: NOW - 30 * 60000, scheduledFor: null, stampCountry: '🇧🇷',
   },
   {
     id: 'stage_009', title: 'French Cooking Class 🥐',
     type: 'kitchen', hostUsername: 'Amélie_Paris', hostCountry: '🇫🇷',
     viewerCount: 241,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 50 * 60000, scheduledFor: null, stampCountry: '🇫🇷',
   },
   {
     id: 'stage_010', title: 'Spanish Exchange Night 🗣️',
     type: 'language', hostUsername: 'Carlos_CDMX', hostCountry: '🇲🇽',
     viewerCount: 334,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 25 * 60000, scheduledFor: null, stampCountry: '🇲🇽',
   },
   {
     id: 'stage_011', title: 'Kente Weaving Live 🧵',
     type: 'create', hostUsername: 'Ama_Accra', hostCountry: '🇬🇭',
     viewerCount: 223,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 40 * 60000, scheduledFor: null, stampCountry: '🇬🇭',
   },
   {
     id: 'stage_012', title: 'Ubuntu Philosophy Talk 📖',
     type: 'stories', hostUsername: 'Thabo_Joburg', hostCountry: '🇿🇦',
     viewerCount: 198,
-    isPro: false, isFeatured: false, isLive: true,
+    isPro: false, isLive: true,
     startedAt: NOW - 65 * 60000, scheduledFor: null, stampCountry: '🇿🇦',
   },
   // Upcoming
@@ -117,37 +117,47 @@ const DEMO_STAGES = [
     id: 'stage_013', title: 'Cairo Night Market 🌙',
     type: 'travel', hostUsername: 'Ahmed_Cairo', hostCountry: '🇪🇬',
     viewerCount: 0,
-    isPro: false, isFeatured: false, isLive: false,
+    isPro: false, isLive: false,
     startedAt: null, scheduledFor: NOW + 2 * 3600000, stampCountry: '🇪🇬',
   },
   {
     id: 'stage_014', title: 'Nairobi Code Night 💻',
     type: 'tech', hostUsername: 'Wanjiru_Nairobi', hostCountry: '🇰🇪',
     viewerCount: 0,
-    isPro: true, isFeatured: false, isLive: false,
+    isPro: true, isLive: false,
     startedAt: null, scheduledFor: NOW + 4 * 3600000, stampCountry: '🇰🇪',
   },
   {
     id: 'stage_015', title: 'Bali Sunrise Yoga 🧘',
     type: 'mindful', hostUsername: 'Dewi_Bali', hostCountry: '🇮🇩',
     viewerCount: 0,
-    isPro: false, isFeatured: false, isLive: false,
+    isPro: false, isLive: false,
     startedAt: null, scheduledFor: NOW + 8 * 3600000, stampCountry: '🇮🇩',
   },
   {
     id: 'stage_016', title: 'Lisbon Jazz Night 🎷',
     type: 'music', hostUsername: 'Pedro_Lisboa', hostCountry: '🇵🇹',
     viewerCount: 0,
-    isPro: true, isFeatured: false, isLive: false,
+    isPro: true, isLive: false,
     startedAt: null, scheduledFor: NOW + 24 * 3600000, stampCountry: '🇵🇹',
   },
   {
     id: 'stage_017', title: 'Montreal Comedy Night 😂',
     type: 'comedy', hostUsername: 'Marie_Montreal', hostCountry: '🇨🇦',
     viewerCount: 0,
-    isPro: false, isFeatured: false, isLive: false,
+    isPro: false, isLive: false,
     startedAt: null, scheduledFor: NOW + 28 * 3600000, stampCountry: '🇨🇦',
   },
+];
+
+// ── Schedule options (Pro-exclusive) ─────────────────────────────────────────
+const SCHEDULE_OPTIONS = [
+  { label: 'In 1 hour',  mins: 60 },
+  { label: 'In 2 hours', mins: 120 },
+  { label: 'In 4 hours', mins: 240 },
+  { label: 'In 6 hours', mins: 360 },
+  { label: 'Tonight',    mins: 480 },
+  { label: 'Tomorrow',   mins: 1440 },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -174,7 +184,7 @@ function mapServerStage(e) {
     hostCountry:  e.hostCountry || '🌍',
     viewerCount:  e.viewerCount || 0,
     isPro:        e.isPro || false,
-    isFeatured:   e.isPro || false,
+    isReserved:   e.isReserved || false,
     isLive:       e.isLive !== false,
     startedAt:    e.startedAt || Date.now(),
     scheduledFor: e.scheduledFor || null,
@@ -275,7 +285,7 @@ const fc = StyleSheet.create({
 });
 
 // ── StageCard — 2-column grid card ───────────────────────────────────────────
-function StageCard({ stage, onPress }) {
+function StageCard({ stage, onPress, isTopPro }) {
   const meta = STAGE_TYPES[stage.type] || STAGE_TYPES.cultural;
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(stage)} style={sc.wrap}>
@@ -286,10 +296,10 @@ function StageCard({ stage, onPress }) {
         start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
         style={sc.grad}
       >
-        {/* Flag + PRO badge */}
+        {/* Flag + PRO badge (only top 3 Pro stages by viewers earn the badge) */}
         <View style={sc.topRow}>
           <Text style={sc.flag}>{stage.hostCountry}</Text>
-          {stage.isPro && <ProBadge />}
+          {isTopPro && <ProBadge />}
         </View>
 
         {/* Type icon */}
@@ -344,43 +354,63 @@ function UpcomingCard({ stage, onPress }) {
         <View style={uc.topRow}>
           <Text style={uc.flag}>{stage.hostCountry}</Text>
           <Text style={[uc.typeLabel, { color: meta.color }]}>{meta.icon} {meta.label}</Text>
-          {stage.isPro && <ProBadge />}
+          {stage.isReserved && (
+            <View style={uc.reservedBadge}>
+              <Text style={uc.reservedTxt}>📌 RESERVED</Text>
+            </View>
+          )}
         </View>
         <Text style={uc.title} numberOfLines={2}>{stage.title}</Text>
         <Text style={uc.host}>@{stage.hostUsername}</Text>
-        <Text style={uc.time}>⏰ {fmtScheduled(stage.scheduledFor)}</Text>
+        <View style={uc.bottomRow}>
+          <Text style={uc.time}>⏰ {fmtScheduled(stage.scheduledFor)}</Text>
+          {stage.isReserved && (
+            <Text style={uc.reservedHint}>Pro reserved slot</Text>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
 }
 const uc = StyleSheet.create({
-  wrap:     {
+  wrap:         {
     flexDirection: 'row', marginHorizontal: 16, marginBottom: 12,
     borderRadius: 14, overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
-  accent:   { width: 4 },
-  body:     { flex: 1, padding: 16 },
-  topRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  flag:     { fontSize: 18 },
-  typeLabel:{ fontSize: 11, fontWeight: '700' },
-  title:    { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 2 },
-  host:     { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginBottom: 4 },
-  time:     { color: '#42a5f5', fontSize: 11, fontWeight: '600' },
+  accent:       { width: 4 },
+  body:         { flex: 1, padding: 16 },
+  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' },
+  flag:         { fontSize: 18 },
+  typeLabel:    { fontSize: 11, fontWeight: '700' },
+  reservedBadge:{ backgroundColor: '#FFB70018', borderWidth: 1, borderColor: '#FFB70060', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  reservedTxt:  { color: '#FFB700', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  title:        { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  host:         { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginBottom: 6 },
+  bottomRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  time:         { color: '#42a5f5', fontSize: 11, fontWeight: '600' },
+  reservedHint: { color: 'rgba(255,183,0,0.45)', fontSize: 10 },
 });
 
 // ── CreateStageModal ──────────────────────────────────────────────────────────
 function CreateStageModal({ visible, onClose, onSubmit, isPro }) {
-  const [title, setTitle] = useState('');
+  const [title,        setTitle]        = useState('');
   const [selectedType, setSelectedType] = useState('cultural');
+  const [mode,         setMode]         = useState('now');     // 'now' | 'schedule'
+  const [scheduleMins, setScheduleMins] = useState(60);
 
   function handleSubmit() {
     if (!title.trim()) return;
-    onSubmit({ title: title.trim(), type: selectedType });
+    const scheduledFor = mode === 'schedule' ? Date.now() + scheduleMins * 60000 : null;
+    onSubmit({ title: title.trim(), type: selectedType, scheduledFor });
     setTitle('');
     setSelectedType('cultural');
+    setMode('now');
+    setScheduleMins(60);
   }
+
+  const isSchedule = mode === 'schedule';
 
   return (
     <Modal visible={visible} animationType="slide" transparent presentationStyle="overFullScreen">
@@ -389,9 +419,21 @@ function CreateStageModal({ visible, onClose, onSubmit, isPro }) {
           <LinearGradient colors={['#1a1f2e', '#0d1117']} style={cm.grad}>
             <Text style={cm.heading}>Start a World Stage</Text>
 
+            {/* Mode toggle — schedule option is Pro-only */}
             {isPro && (
-              <View style={cm.proBanner}>
-                <Text style={cm.proBannerTxt}>⭐ Your Pro stage gets featured placement at the top</Text>
+              <View style={cm.modeRow}>
+                <TouchableOpacity
+                  style={[cm.modeBtn, !isSchedule && cm.modeBtnActive]}
+                  onPress={() => setMode('now')}
+                >
+                  <Text style={[cm.modeTxt, !isSchedule && cm.modeTxtActive]}>🔴 Go Live Now</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[cm.modeBtn, isSchedule && cm.modeBtnActiveGold]}
+                  onPress={() => setMode('schedule')}
+                >
+                  <Text style={[cm.modeTxt, isSchedule && cm.modeTxtGold]}>📌 Schedule</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -413,24 +455,44 @@ function CreateStageModal({ visible, onClose, onSubmit, isPro }) {
                 return (
                   <TouchableOpacity
                     key={key}
-                    style={[
-                      cm.typeChip,
-                      sel && { backgroundColor: `${meta.color}25`, borderColor: meta.color },
-                    ]}
+                    style={[cm.typeChip, sel && { backgroundColor: `${meta.color}25`, borderColor: meta.color }]}
                     onPress={() => setSelectedType(key)}
                   >
                     <Text style={cm.typeChipIcon}>{meta.icon}</Text>
-                    <Text style={[cm.typeChipLabel, sel && { color: meta.color }]}>
-                      {meta.label}
-                    </Text>
+                    <Text style={[cm.typeChipLabel, sel && { color: meta.color }]}>{meta.label}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Text style={cm.royaltyNote}>
-              🪙 Gifts from your stage flow to you + your country's stamp holder
-            </Text>
+            {/* Schedule time picker — only visible in schedule mode */}
+            {isSchedule && (
+              <>
+                <Text style={cm.label}>Start Time</Text>
+                <View style={cm.scheduleGrid}>
+                  {SCHEDULE_OPTIONS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.mins}
+                      style={[cm.scheduleChip, scheduleMins === opt.mins && cm.scheduleChipActive]}
+                      onPress={() => setScheduleMins(opt.mins)}
+                    >
+                      <Text style={[cm.scheduleTxt, scheduleMins === opt.mins && cm.scheduleTxtActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={cm.scheduleNote}>
+                  Your reserved slot appears in Coming Up so viewers know it's happening.
+                </Text>
+              </>
+            )}
+
+            {!isSchedule && (
+              <Text style={cm.royaltyNote}>
+                🪙 Gifts from your stage flow to you + your country's stamp holder
+              </Text>
+            )}
 
             <View style={cm.actions}>
               <TouchableOpacity style={cm.cancelBtn} onPress={onClose}>
@@ -442,11 +504,11 @@ function CreateStageModal({ visible, onClose, onSubmit, isPro }) {
                 disabled={!title.trim()}
               >
                 <LinearGradient
-                  colors={['#FF0080', '#9B00FF']}
+                  colors={isSchedule ? ['#FFB700', '#FF8C00'] : ['#FF0080', '#9B00FF']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={cm.goBtnGrad}
                 >
-                  <Text style={cm.goTxt}>GO LIVE NOW</Text>
+                  <Text style={cm.goTxt}>{isSchedule ? 'RESERVE SLOT →' : 'GO LIVE NOW'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -457,46 +519,62 @@ function CreateStageModal({ visible, onClose, onSubmit, isPro }) {
   );
 }
 const cm = StyleSheet.create({
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
-  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
-  grad:         { padding: 24, paddingBottom: 44 },
-  heading:      { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 14 },
-  proBanner:    {
-    backgroundColor: '#FFB70015', borderWidth: 1, borderColor: '#FFB70050',
-    borderRadius: 10, padding: 10, marginBottom: 4,
+  overlay:           { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet:             { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
+  grad:              { padding: 24, paddingBottom: 44 },
+  heading:           { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 16 },
+  modeRow:           { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  modeBtn:           {
+    flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  proBannerTxt: { color: '#FFB700', fontSize: 12, fontWeight: '700' },
-  label:        {
+  modeBtnActive:     { backgroundColor: 'rgba(255,0,128,0.12)', borderColor: '#FF0080' },
+  modeBtnActiveGold: { backgroundColor: 'rgba(255,183,0,0.12)', borderColor: '#FFB700' },
+  modeTxt:           { color: 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: '700' },
+  modeTxtActive:     { color: '#FF0080' },
+  modeTxtGold:       { color: '#FFB700' },
+  label:             {
     color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700',
     letterSpacing: 0.5, marginBottom: 8, marginTop: 18,
   },
-  input:        {
+  input:             {
     backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)', borderRadius: 12,
     padding: 14, color: '#fff', fontSize: 14,
   },
-  typeGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeChip:     {
+  typeGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeChip:          {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 7, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  typeChipIcon: { fontSize: 14 },
-  typeChipLabel:{ color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' },
-  royaltyNote:  { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 18, lineHeight: 17 },
-  actions:      { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn:    {
+  typeChipIcon:      { fontSize: 14 },
+  typeChipLabel:     { color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: '600' },
+  scheduleGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  scheduleChip:      {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  },
+  scheduleChipActive:{ backgroundColor: 'rgba(255,183,0,0.15)', borderColor: '#FFB700' },
+  scheduleTxt:       { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '700' },
+  scheduleTxtActive: { color: '#FFB700' },
+  scheduleNote:      { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 12, lineHeight: 17 },
+  royaltyNote:       { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 18, lineHeight: 17 },
+  actions:           { flexDirection: 'row', gap: 12, marginTop: 24 },
+  cancelBtn:         {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 14, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
-  cancelTxt:    { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '700' },
-  goBtn:        { flex: 2, borderRadius: 14, overflow: 'hidden' },
-  goBtnDisabled:{ opacity: 0.4 },
-  goBtnGrad:    { paddingVertical: 14, alignItems: 'center' },
-  goTxt:        { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  cancelTxt:         { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '700' },
+  goBtn:             { flex: 2, borderRadius: 14, overflow: 'hidden' },
+  goBtnDisabled:     { opacity: 0.4 },
+  goBtnGrad:         { paddingVertical: 14, alignItems: 'center' },
+  goTxt:             { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
 });
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
@@ -545,10 +623,23 @@ export default function EventsScreen({ navigation, route }) {
 
   const liveStages     = useMemo(() => filteredStages.filter(st => st.isLive),  [filteredStages]);
   const upcomingStages = useMemo(() => filteredStages.filter(st => !st.isLive), [filteredStages]);
-  const featuredStage  = useMemo(
-    () => liveStages.find(st => st.isPro && st.isFeatured) || liveStages[0],
+
+  // Featured = highest-viewer Pro stage (only 1 slot — earned, not automatic)
+  const featuredStage = useMemo(
+    () => [...liveStages].filter(st => st.isPro).sort((a, b) => b.viewerCount - a.viewerCount)[0]
+      || liveStages[0],
     [liveStages]
   );
+
+  // Only top 3 Pro stages by viewers earn the ⭐ PRO badge in the grid
+  const topProIds = useMemo(() => {
+    const top3 = [...liveStages]
+      .filter(st => st.isPro)
+      .sort((a, b) => b.viewerCount - a.viewerCount)
+      .slice(0, 3);
+    return new Set(top3.map(st => st.id));
+  }, [liveStages]);
+
   const totalViewers = useMemo(
     () => stages.filter(st => st.isLive).reduce((acc, st) => acc + st.viewerCount, 0),
     [stages]
@@ -556,7 +647,25 @@ export default function EventsScreen({ navigation, route }) {
 
   function openStage(stage) {
     if (!stage.isLive) {
-      Alert.alert(stage.title, 'This stage hasn\'t started yet.');
+      const isOwn = stage.isReserved && stage.hostUsername === (user?.username || 'You');
+      const isReady = isOwn && stage.scheduledFor <= Date.now();
+      if (isReady) {
+        Alert.alert(
+          "It's Time! 🎙️",
+          `Your reserved stage "${stage.title}" is ready to go live.`,
+          [
+            { text: 'Not Yet', style: 'cancel' },
+            {
+              text: 'Go Live Now',
+              onPress: () => navigation.navigate('Live', {
+                preTitle: stage.title, preType: stage.type, currentUser: user,
+              }),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(stage.title, 'This stage hasn\'t started yet.');
+      }
       return;
     }
     navigation.navigate('LiveWatch', {
@@ -587,9 +696,27 @@ export default function EventsScreen({ navigation, route }) {
     setCreateVisible(true);
   }
 
-  function handleCreateSubmit({ title, type }) {
+  function handleCreateSubmit({ title, type, scheduledFor }) {
     setCreateVisible(false);
-    navigation.navigate('Live', { preTitle: title, preType: type, currentUser: user });
+    if (scheduledFor) {
+      // Add reserved slot to local Coming Up list
+      const reserved = {
+        id:           `reserved_${Date.now()}`,
+        title, type,
+        hostUsername: user?.username || 'You',
+        hostCountry:  user?.country  || '🌍',
+        viewerCount:  0,
+        isPro:        true,
+        isReserved:   true,
+        isLive:       false,
+        startedAt:    null,
+        scheduledFor,
+        stampCountry: user?.country || '🌍',
+      };
+      setStages(prev => [...prev, reserved]);
+    } else {
+      navigation.navigate('Live', { preTitle: title, preType: type, currentUser: user });
+    }
   }
 
   const typeFilterKeys = ['all', ...Object.keys(STAGE_TYPES)];
@@ -682,7 +809,11 @@ export default function EventsScreen({ navigation, route }) {
                 .filter(st => st.id !== featuredStage?.id)
                 .map(stage => (
                   <View key={stage.id} style={s.stageCol}>
-                    <StageCard stage={stage} onPress={openStage} />
+                    <StageCard
+                      stage={stage}
+                      onPress={openStage}
+                      isTopPro={topProIds.has(stage.id)}
+                    />
                   </View>
                 ))}
             </View>
