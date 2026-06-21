@@ -941,9 +941,7 @@ export default function HomeScreen({ navigation, user }) {
                   <Text style={s.greetLine}>{theme.greetLabel || greeting()}</Text>
                   <Text style={s.heroName}>
                     {firstName} {countryFlag}
-                    {tier === 'plus' ? <Text style={{ color: accentColor }}> +</Text>
-                     : tier === 'pro'  ? <Text style={{ color: accentColor }}> ★</Text>
-                     : null}
+                    {tier === 'plus' ? <Text style={{ color: accentColor }}> +</Text> : null}
                   </Text>
                 </View>
 
@@ -977,10 +975,10 @@ export default function HomeScreen({ navigation, user }) {
         {tier === 'pro' && (
           <Animated.View style={[s.section, sect(0)]}>
             <SectionHead
-              title="⭐ Priority Matches"
+              title="Priority Matches"
               sub="Curated above the queue for you"
               action="View All"
-              onAction={() => navigation.navigate('Bond')}
+              onAction={() => navigation.navigate('Notifications')}
               accentColor="#FFB700"
             />
             <View style={{ gap: 10 }}>
@@ -1107,7 +1105,7 @@ export default function HomeScreen({ navigation, user }) {
         {(tier === 'plus' || tier === 'pro') && (
           <Animated.View style={[s.section, sect(5)]}>
             <SectionHead
-              title={tier === 'pro' ? '⭐ Who Viewed You' : 'Who Viewed You'}
+              title="Who Viewed You"
               sub={`${DEMO_VIEWS.length} people in the last 24 hours`}
               action="See All"
               onAction={() => navigation.navigate('Notifications')}

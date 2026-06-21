@@ -605,7 +605,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [activeVideoId,     setActiveVideoId]     = useState(null);
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
-  const viewabilityConfig = useRef({ itemVisibilityPercentThreshold: 60 }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const socket = getSocket();
 
   // Load saved countries and re-plant flags on server after connect
