@@ -11,6 +11,7 @@ import { useWallet } from '../context/WalletContext';
 import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
 import GiftPicker from '../components/GiftPicker';
+import GiftIcon from '../components/GiftIcon';
 
 const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
@@ -74,9 +75,9 @@ function GiftBurst({ burst, onDone }) {
       <View style={[gb.card, { borderColor: color + '66' }]}>
         <View style={[gb.accentBar, { backgroundColor: color }]} />
 
-        {/* WorldMark in tier color pulsing in the orbit circle */}
+        {/* Gift icon in tier color pulsing in the orbit circle */}
         <Animated.View style={[gb.orbitCircle, { backgroundColor: color + '20', borderColor: color + '55' }, { transform: [{ scale: markScale }] }]}>
-          <WorldMark size={22} color={color} bondColor={color} />
+          <GiftIcon id={burst.gift.id} color={color} size={22} />
         </Animated.View>
 
         <View style={gb.info}>

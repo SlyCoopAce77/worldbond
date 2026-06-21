@@ -10,6 +10,7 @@ import { stringToColor, formatDuration } from '../utils/apiUtils';
 import { useWallet } from '../context/WalletContext';
 import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
+import GiftIcon from '../components/GiftIcon';
 
 const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
@@ -74,9 +75,9 @@ function GiftBurst({ burst, onDone }) {
         {/* Colored accent bar on the left — gift tier indicator */}
         <View style={[gbS.accentBar, { backgroundColor: burst.gift.color }]} />
 
-        {/* Emoji in a glowing orbit circle */}
+        {/* Gift icon in a glowing orbit circle */}
         <Animated.View style={[gbS.orbitCircle, { backgroundColor: burst.gift.color + '20', borderColor: burst.gift.color + '55' }, { transform: [{ scale: emojiScale }] }]}>
-          <WorldMark size={22} color={burst.gift.color} bondColor={burst.gift.color} />
+          <GiftIcon id={burst.gift.id} color={burst.gift.color} size={22} />
         </Animated.View>
 
         <View style={gbS.info}>

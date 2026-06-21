@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { WorldMark } from './BondLogo';
+import GiftIcon from './GiftIcon';
 import { useWallet } from '../context/WalletContext';
 
 const { width } = Dimensions.get('window');
@@ -54,22 +55,15 @@ const TIER_LABEL = {
   starter: 'STARTER', explorer: 'EXPLORER', voyager: 'VOYAGER', elite: 'ELITE', legend: 'LEGEND',
 };
 
-// WorldMark icon scaled and colored to each tier
-const TIER_ICON = {
-  starter:  { color: '#4ade80', bondColor: '#16a34a', size: 34 },
-  explorer: { color: '#60a5fa', bondColor: '#2563eb', size: 36 },
-  voyager:  { color: '#c084fc', bondColor: '#9333ea', size: 38 },
-  elite:    { color: '#FFB700', bondColor: '#c87000', size: 42 },
-  legend:   { color: '#ff6b9d', bondColor: '#FF0080', size: 48 },
-};
+const TIER_ICON_SIZE = { starter: 34, explorer: 36, voyager: 38, elite: 42, legend: 48 };
 
 function GiftSymbol({ gift, locked }) {
-  const ic = TIER_ICON[gift.tier] || TIER_ICON.starter;
+  const sz = TIER_ICON_SIZE[gift.tier] || 36;
   return (
-    <WorldMark
-      size={ic.size}
-      color={locked ? '#333' : ic.color}
-      bondColor={locked ? '#222' : ic.bondColor}
+    <GiftIcon
+      id={gift.id}
+      color={locked ? '#2a2a2a' : gift.color}
+      size={sz}
     />
   );
 }
