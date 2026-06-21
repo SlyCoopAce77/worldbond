@@ -985,6 +985,18 @@ function setupSocket(io) {
       });
     });
 
+    socket.on('live_gift', ({ streamId, gift }) => {
+      const sender = connectedUsers[socket.id];
+      const stream = liveStreams[streamId];
+      if (!sender || !stream) return;
+      io.to(`live:${streamId}`).emit('live_gift_received', {
+        senderId:      socket.id,
+        senderName:    sender.username,
+        senderCountry: sender.country || '',
+        gift,
+      });
+    });
+
     // ── FOLLOWS ──
 
     socket.on('follow_user', ({ targetUserId }) => {

@@ -7,15 +7,120 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
 import { stringToColor, formatDuration } from '../utils/apiUtils';
+import { useWallet } from '../context/WalletContext';
+import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
 
 const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
 
+// ── "Global Drop" gift burst — WorldBond's unique gift animation ──────────────
+// Gifts arrive from above (like they traveled from another country),
+// emoji pops on landing, then launches upward-out when done.
+function GiftBurst({ burst, onDone }) {
+  const dropY      = useRef(new Animated.Value(-90)).current;
+  const cardScale  = useRef(new Animated.Value(0.2)).current;
+  const emojiScale = useRef(new Animated.Value(1)).current;
+  const exitX      = useRef(new Animated.Value(0)).current;
+  const exitY      = useRef(new Animated.Value(0)).current;
+  const exitScale  = useRef(new Animated.Value(1)).current;
+  const fade       = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      // 1. Drop in from above, scale up from tiny (like arriving from orbit)
+      Animated.parallel([
+        Animated.spring(dropY,     { toValue: 0, friction: 7, tension: 65, useNativeDriver: true }),
+        Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 65, useNativeDriver: true }),
+      ]),
+      // 2. Emoji pops — celebration burst on landing
+      Animated.sequence([
+        Animated.timing(emojiScale, { toValue: 1.5, duration: 140, useNativeDriver: true }),
+        Animated.spring(emojiScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+      ]),
+      // 3. Hold so the streamer can read it
+      Animated.delay(2600),
+      // 4. Launch back up + right, shrink to a point — "returns to orbit"
+      Animated.parallel([
+        Animated.timing(exitX,     { toValue: 60,  duration: 480, useNativeDriver: true }),
+        Animated.timing(exitY,     { toValue: -110, duration: 480, useNativeDriver: true }),
+        Animated.timing(exitScale, { toValue: 0.1,  duration: 480, useNativeDriver: true }),
+        Animated.timing(fade,      { toValue: 0,    duration: 400, useNativeDriver: true }),
+      ]),
+    ]).start(() => onDone(burst.id));
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        gbS.wrap,
+        {
+          opacity: fade,
+          transform: [
+            { translateY: dropY },
+            { translateX: exitX },
+            { translateY: exitY },
+            { scale: Animated.multiply(cardScale, exitScale) },
+          ],
+        },
+      ]}
+    >
+      {/* Country flag floats above the card as a "sender origin" marker */}
+      <View style={gbS.flagBadge}>
+        <Text style={gbS.flagEmoji}>{burst.senderCountry || '🌍'}</Text>
+      </View>
+
+      <View style={[gbS.card, { borderColor: burst.gift.color + '66' }]}>
+        {/* Colored accent bar on the left — gift tier indicator */}
+        <View style={[gbS.accentBar, { backgroundColor: burst.gift.color }]} />
+
+        {/* Emoji in a glowing orbit circle */}
+        <Animated.View style={[gbS.orbitCircle, { backgroundColor: burst.gift.color + '20', borderColor: burst.gift.color + '55' }, { transform: [{ scale: emojiScale }] }]}>
+          <Text style={gbS.giftEmoji}>{burst.gift.emoji}</Text>
+        </Animated.View>
+
+        <View style={gbS.info}>
+          <Text style={gbS.senderName} numberOfLines={1}>{burst.senderName}</Text>
+          <Text style={gbS.giftName}>{burst.gift.name}</Text>
+        </View>
+
+        <View style={gbS.coinBadge}>
+          <WorldMark size={11} color="#FFB700" bondColor="#FFB700" />
+          <Text style={gbS.coinsNum}>{burst.gift.coins}</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+const gbS = StyleSheet.create({
+  wrap:        { alignSelf: 'flex-start', marginBottom: 6 },
+  flagBadge:   { alignSelf: 'flex-start', marginLeft: 44, marginBottom: -8,
+                 backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10,
+                 paddingHorizontal: 6, paddingVertical: 2, zIndex: 2 },
+  flagEmoji:   { fontSize: 13 },
+  card:        { flexDirection: 'row', alignItems: 'center', gap: 10,
+                 backgroundColor: 'rgba(8,9,16,0.88)',
+                 borderRadius: 20, borderWidth: 1, overflow: 'hidden',
+                 paddingVertical: 10, paddingRight: 14 },
+  accentBar:   { width: 4, alignSelf: 'stretch', borderRadius: 2, marginLeft: 0 },
+  orbitCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 1,
+                 alignItems: 'center', justifyContent: 'center' },
+  giftEmoji:   { fontSize: 24 },
+  info:        { flex: 1 },
+  senderName:  { color: '#fff', fontSize: 12, fontWeight: '900' },
+  giftName:    { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
+  coinBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3,
+                 backgroundColor: '#FFB70018', borderRadius: 10,
+                 paddingHorizontal: 7, paddingVertical: 4,
+                 borderWidth: 1, borderColor: '#FFB70033' },
+  coinsNum:    { color: '#FFB700', fontSize: 11, fontWeight: '900' },
+});
+
 export default function LiveScreen({ route, navigation }) {
   const { user, currentUser, preTitle } = route.params || {};
   const activeUser = user || currentUser;
   const socket = getSocket();
+  const { earnCoins } = useWallet();
 
   const [phase,        setPhase]        = useState('lobby'); // 'lobby' | 'live'
   const [title,        setTitle]        = useState(preTitle || '');
@@ -24,6 +129,7 @@ export default function LiveScreen({ route, navigation }) {
   const [text,         setText]         = useState('');
   const [viewerCount,  setViewerCount]  = useState(0);
   const [floats,       setFloats]       = useState([]);
+  const [bursts,       setBursts]       = useState([]);
   const [elapsed,      setElapsed]      = useState(0);
   const [viewerJoined, setViewerJoined] = useState(null);
 
@@ -72,6 +178,12 @@ export default function LiveScreen({ route, navigation }) {
       setFloats(prev => [...prev, { emoji, id }]);
     });
 
+    socket.on('live_gift_received', ({ senderName, senderCountry, gift }) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setBursts(prev => [...prev, { id, senderName, senderCountry, gift }]);
+      earnCoins(gift.coins, 'live_gift', { giftId: gift.id, senderName });
+    });
+
     socket.on('live_ended', () => {
       navigation.goBack();
     });
@@ -82,6 +194,7 @@ export default function LiveScreen({ route, navigation }) {
       socket.off('live_viewer_joined');
       socket.off('live_message');
       socket.off('live_reaction');
+      socket.off('live_gift_received');
       socket.off('live_ended');
     };
   }, []);
@@ -112,6 +225,10 @@ export default function LiveScreen({ route, navigation }) {
 
   function removeFloat(id) {
     setFloats(prev => prev.filter(f => f.id !== id));
+  }
+
+  function removeBurst(id) {
+    setBursts(prev => prev.filter(b => b.id !== id));
   }
 
   const avatarColor = stringToColor(activeUser?.username || '');
@@ -234,6 +351,13 @@ export default function LiveScreen({ route, navigation }) {
 
         {/* ── Live chat ── */}
         <View style={styles.chatArea}>
+          {/* Gift burst cards float above chat */}
+          <View style={styles.burstZone} pointerEvents="none">
+            {bursts.map(b => (
+              <GiftBurst key={b.id} burst={b} onDone={removeBurst} />
+            ))}
+          </View>
+
           <FlatList
             ref={flatRef}
             data={messages}
@@ -318,6 +442,7 @@ const styles = StyleSheet.create({
   joinToastText:{ color: '#fff', fontSize: 13 },
 
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
+  burstZone:    { position: 'absolute', top: 0, right: 16, left: 16, zIndex: 10 },
   chatFlatList: { flex: 1 },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
