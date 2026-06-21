@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, SafeAreaView, KeyboardAvoidingView, Platform,
@@ -13,19 +13,19 @@ const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
 
 export default function LiveScreen({ route, navigation }) {
-  const { user } = route.params || {};
+  const { user, currentUser, preTitle } = route.params || {};
+  const activeUser = user || currentUser;
   const socket = getSocket();
 
-  const [phase,         setPhase]         = useState('lobby'); // 'lobby' | 'live'
-  const [title,         setTitle]         = useState('');
-  const [streamId,      setStreamId]      = useState(null);
-  const [messages,      setMessages]      = useState([]);
-  const [text,          setText]          = useState('');
-  const [viewerCount,   setViewerCount]   = useState(0);
-  const [floats,        setFloats]        = useState([]);
-  const [elapsed,       setElapsed]       = useState(0);
-  const [viewerJoined,  setViewerJoined]  = useState(null);
-  const [isEnding,      setIsEnding]      = useState(false);
+  const [phase,        setPhase]        = useState('lobby'); // 'lobby' | 'live'
+  const [title,        setTitle]        = useState(preTitle || '');
+  const [streamId,     setStreamId]     = useState(null);
+  const [messages,     setMessages]     = useState([]);
+  const [text,         setText]         = useState('');
+  const [viewerCount,  setViewerCount]  = useState(0);
+  const [floats,       setFloats]       = useState([]);
+  const [elapsed,      setElapsed]      = useState(0);
+  const [viewerJoined, setViewerJoined] = useState(null);
 
   const flatRef      = useRef(null);
   const timerRef     = useRef(null);
@@ -39,7 +39,7 @@ export default function LiveScreen({ route, navigation }) {
   }, [phase]);
 
   function startLive() {
-    const liveTitle = title.trim() || `${user?.username}'s Live`;
+    const liveTitle = title.trim() || `${activeUser?.username}'s Live`;
     socket.emit('go_live', { title: liveTitle });
   }
 
@@ -52,7 +52,7 @@ export default function LiveScreen({ route, navigation }) {
 
     socket.on('live_viewer_count', ({ count }) => setViewerCount(count));
 
-    socket.on('live_viewer_joined', ({ viewerName, viewerCountry, count }) => {
+    socket.on('live_viewer_joined', ({ viewerName, count }) => {
       setViewerCount(count);
       setViewerJoined(`${viewerName} joined`);
       joinFadeAnim.setValue(1);
@@ -103,7 +103,6 @@ export default function LiveScreen({ route, navigation }) {
       {
         text: 'End Live', style: 'destructive',
         onPress: () => {
-          setIsEnding(true);
           socket.emit('end_live');
           navigation.goBack();
         },
@@ -115,7 +114,7 @@ export default function LiveScreen({ route, navigation }) {
     setFloats(prev => prev.filter(f => f.id !== id));
   }
 
-  const avatarColor = stringToColor(user?.username || '');
+  const avatarColor = stringToColor(activeUser?.username || '');
 
   // ── Lobby (pre-live setup) ──────────────────────────────────────────────────
   if (phase === 'lobby') {
@@ -132,11 +131,11 @@ export default function LiveScreen({ route, navigation }) {
             <View style={styles.lobbyContent}>
               {/* Avatar preview */}
               <View style={styles.lobbyAvatarWrap}>
-                {user?.photo_url ? (
-                  <Image source={{ uri: user.photo_url }} style={styles.lobbyAvatar} />
+                {activeUser?.photo_url ? (
+                  <Image source={{ uri: activeUser.photo_url }} style={styles.lobbyAvatar} />
                 ) : (
                   <LinearGradient colors={[avatarColor, avatarColor + '88']} style={styles.lobbyAvatar}>
-                    <Text style={styles.lobbyInitial}>{(user?.username || '?')[0].toUpperCase()}</Text>
+                    <Text style={styles.lobbyInitial}>{(activeUser?.username || '?')[0].toUpperCase()}</Text>
                   </LinearGradient>
                 )}
                 <View style={styles.lobbyLivePill}>
@@ -151,7 +150,7 @@ export default function LiveScreen({ route, navigation }) {
               <TextInput
                 style={styles.lobbyInput}
                 placeholder="Give your stream a title…"
-                placeholderTextColor="#444"
+                placeholderTextColor="rgba(255,255,255,0.3)"
                 value={title}
                 onChangeText={setTitle}
                 maxLength={60}
@@ -180,11 +179,11 @@ export default function LiveScreen({ route, navigation }) {
 
       {/* Avatar / thumbnail center */}
       <View style={styles.centerAvatar}>
-        {user?.photo_url ? (
-          <Image source={{ uri: user.photo_url }} style={styles.hostPhoto} />
+        {activeUser?.photo_url ? (
+          <Image source={{ uri: activeUser.photo_url }} style={styles.hostPhoto} />
         ) : (
           <LinearGradient colors={[avatarColor, avatarColor + '88']} style={styles.hostAvatarBg}>
-            <Text style={styles.hostInitial}>{(user?.username || '?')[0].toUpperCase()}</Text>
+            <Text style={styles.hostInitial}>{(activeUser?.username || '?')[0].toUpperCase()}</Text>
           </LinearGradient>
         )}
         <LinearGradient
@@ -209,7 +208,7 @@ export default function LiveScreen({ route, navigation }) {
           </View>
 
           <View style={styles.topCenter}>
-            <Text style={styles.hostName}>{user?.username}</Text>
+            <Text style={styles.hostName}>{activeUser?.username}</Text>
             <Text style={styles.timer}>{formatDuration(elapsed)}</Text>
           </View>
 
@@ -224,11 +223,13 @@ export default function LiveScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Viewer joined toast */}
+        {/* Viewer joined toast — floats above content, never shifts layout */}
         {viewerJoined && (
-          <Animated.View style={[styles.joinToast, { opacity: joinFadeAnim }]}>
-            <Text style={styles.joinToastText}>👋 {viewerJoined}</Text>
-          </Animated.View>
+          <View style={styles.joinToastWrap} pointerEvents="none">
+            <Animated.View style={[styles.joinToast, { opacity: joinFadeAnim }]}>
+              <Text style={styles.joinToastText}>👋 {viewerJoined}</Text>
+            </Animated.View>
+          </View>
         )}
 
         {/* ── Live chat ── */}
@@ -237,6 +238,7 @@ export default function LiveScreen({ route, navigation }) {
             ref={flatRef}
             data={messages}
             keyExtractor={m => String(m.id)}
+            style={styles.chatFlatList}
             renderItem={({ item }) => (
               <View style={styles.msgRow}>
                 <Text style={styles.msgName}>{item.senderName}</Text>
@@ -292,7 +294,6 @@ const styles = StyleSheet.create({
   hostAvatarBg: { width: 160, height: 160, borderRadius: 80, alignItems: 'center', justifyContent: 'center' },
   hostInitial:  { color: '#fff', fontSize: 72, fontWeight: '900' },
 
-
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
@@ -312,10 +313,12 @@ const styles = StyleSheet.create({
   endBtn:       { backgroundColor: '#e5393580', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#e53935' },
   endText:      { color: '#fff', fontSize: 13, fontWeight: '800' },
 
-  joinToast:    { alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 4 },
+  joinToastWrap:{ position: 'absolute', top: 72, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+  joinToast:    { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   joinToastText:{ color: '#fff', fontSize: 13 },
 
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
+  chatFlatList: { flex: 1 },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
   msgName:      { color: '#6C47FF', fontWeight: '700', fontSize: 13 },
@@ -333,16 +336,17 @@ const styles = StyleSheet.create({
 
   // Lobby
   lobbyBack:       { padding: 16 },
+  backIcon:        { color: '#fff', fontSize: 24 },
   lobbyContent:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 16 },
   lobbyAvatarWrap: { position: 'relative', marginBottom: 8 },
   lobbyAvatar:     { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#e53935' },
   lobbyInitial:    { color: '#fff', fontSize: 48, fontWeight: '900' },
   lobbyLivePill:   { position: 'absolute', bottom: -8, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   lobbyTitle:      { color: '#fff', fontSize: 24, fontWeight: '900', textAlign: 'center' },
-  lobbySub:        { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  lobbySub:        { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 21 },
   lobbyInput:      { width: '100%', backgroundColor: '#16181C', color: '#fff', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, fontSize: 15, borderWidth: 1, borderColor: '#2F3336', marginTop: 8 },
   goLiveBtn:       { width: '100%', borderRadius: 18, overflow: 'hidden', marginTop: 4 },
   goLiveBtnGrad:   { paddingVertical: 18, alignItems: 'center' },
   goLiveBtnText:   { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: 0.3 },
-  lobbyHint:       { color: '#333', fontSize: 12, textAlign: 'center' },
+  lobbyHint:       { color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center' },
 });
