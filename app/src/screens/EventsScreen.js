@@ -274,47 +274,64 @@ const fc = StyleSheet.create({
   joinTxt:  { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
 });
 
-// ── StageCard — compact 2-column grid card ────────────────────────────────────
+// ── StageCard — 2-column grid card ───────────────────────────────────────────
 function StageCard({ stage, onPress }) {
   const meta = STAGE_TYPES[stage.type] || STAGE_TYPES.cultural;
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(stage)} style={sc.wrap}>
+      {/* Colored left accent bar */}
+      <View style={[sc.accentBar, { backgroundColor: meta.color }]} />
       <LinearGradient
-        colors={[`${meta.color}18`, '#0d111700', '#050507']}
+        colors={[`${meta.color}20`, '#0d1117f0', '#050507']}
         start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
         style={sc.grad}
       >
+        {/* Flag + PRO badge */}
         <View style={sc.topRow}>
           <Text style={sc.flag}>{stage.hostCountry}</Text>
           {stage.isPro && <ProBadge />}
         </View>
+
+        {/* Type icon */}
         <Text style={sc.typeIcon}>{meta.icon}</Text>
+
+        {/* Title */}
         <Text style={sc.title} numberOfLines={2}>{stage.title}</Text>
+
+        {/* Host */}
         <Text style={sc.host} numberOfLines={1}>@{stage.hostUsername}</Text>
-        <View style={sc.bottomRow}>
+
+        {/* Footer: LIVE pulse + viewer count */}
+        <View style={sc.footer}>
           <LivePulse />
-          <Text style={sc.viewers}>👁 {fmtNum(stage.viewerCount)}</Text>
+          <View style={sc.viewerChip}>
+            <Text style={sc.viewerTxt}>👁 {fmtNum(stage.viewerCount)}</Text>
+          </View>
         </View>
       </LinearGradient>
     </TouchableOpacity>
   );
 }
 const sc = StyleSheet.create({
-  wrap:     {
-    flex: 1, margin: 4, borderRadius: 14, overflow: 'hidden',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+  wrap:      {
+    height: 190,
+    borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#0d1117',
   },
-  grad:     { padding: 12, minHeight: 158 },
-  topRow:   {
+  accentBar: { position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, zIndex: 1 },
+  grad:      { flex: 1, padding: 14, paddingLeft: 16 },
+  topRow:    {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', marginBottom: 8,
+    alignItems: 'flex-start', marginBottom: 10,
   },
-  flag:     { fontSize: 24 },
-  typeIcon: { fontSize: 22, marginBottom: 6 },
-  title:    { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 18, marginBottom: 3 },
-  host:     { color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 8 },
-  bottomRow:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  viewers:  { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '600' },
+  flag:      { fontSize: 28 },
+  typeIcon:  { fontSize: 26, marginBottom: 8 },
+  title:     { color: '#fff', fontSize: 14, fontWeight: '700', lineHeight: 20, marginBottom: 4, flex: 1 },
+  host:      { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginBottom: 10 },
+  footer:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' },
+  viewerChip:{ backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 },
+  viewerTxt: { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '700' },
 });
 
 // ── UpcomingCard — scheduled stage row ───────────────────────────────────────
@@ -338,13 +355,13 @@ function UpcomingCard({ stage, onPress }) {
 }
 const uc = StyleSheet.create({
   wrap:     {
-    flexDirection: 'row', marginHorizontal: 16, marginBottom: 10,
-    borderRadius: 12, overflow: 'hidden',
+    flexDirection: 'row', marginHorizontal: 16, marginBottom: 12,
+    borderRadius: 14, overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
   },
   accent:   { width: 4 },
-  body:     { flex: 1, padding: 14 },
+  body:     { flex: 1, padding: 16 },
   topRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   flag:     { fontSize: 18 },
   typeLabel:{ fontSize: 11, fontWeight: '700' },
@@ -664,7 +681,9 @@ export default function EventsScreen({ navigation, route }) {
               {liveStages
                 .filter(st => st.id !== featuredStage?.id)
                 .map(stage => (
-                  <StageCard key={stage.id} stage={stage} onPress={openStage} />
+                  <View key={stage.id} style={s.stageCol}>
+                    <StageCard stage={stage} onPress={openStage} />
+                  </View>
                 ))}
             </View>
           </>
@@ -735,18 +754,19 @@ const s = StyleSheet.create({
   proBannerCTA:   { color: '#FFB700', fontSize: 14, fontWeight: '800' },
   sectionLabel:   {
     color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800',
-    letterSpacing: 1, marginHorizontal: 16, marginBottom: 12, marginTop: 4,
+    letterSpacing: 1, marginHorizontal: 16, marginBottom: 14, marginTop: 8,
   },
-  filterRow:      { marginBottom: 16 },
+  filterRow:      { marginBottom: 18 },
   filterContent:  { paddingHorizontal: 16, gap: 8 },
   filterChip:     {
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
   },
   filterChipActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
   filterChipTxt:  { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '700' },
-  stageGrid:      { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginBottom: 8 },
+  stageGrid:      { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, marginBottom: 4 },
+  stageCol:       { width: '50%', paddingHorizontal: 4, paddingBottom: 10 },
   bottomPad:      { height: 110 },
   fab:            {
     position: 'absolute', bottom: 28, right: 24,
