@@ -299,15 +299,34 @@ export default function WalletScreen({ navigation, route }) {
               <Text style={s.footprintSectionSub}>1-of-1 per country · 195 worldwide · earn 3% royalty on all gifts to your country's streamers</Text>
             </View>
             {Object.entries(stamps).map(([flag, stamp]) => {
-              const isMine = myStamps.includes(flag);
+              const isMine    = myStamps.includes(flag);
+              const unclaimed = !stamp.holder;
               return (
                 <View key={flag} style={[s.fpRow, isMine && s.fpRowMine]}>
                   <Text style={s.fpIcon}>{flag}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.fpHolder}>@{stamp.holder}</Text>
+                    {stamp.holder
+                      ? <Text style={s.fpHolder}>@{stamp.holder}</Text>
+                      : <Text style={[s.fpHolder, { color: '#4ade80' }]}>Unclaimed — tap to claim!</Text>
+                    }
                     <Text style={s.fpEarned}>🪙 {stamp.coinsEarned.toLocaleString()} earned</Text>
                   </View>
-                  {isMine && <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>}
+                  {isMine
+                    ? <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>
+                    : (
+                      <TouchableOpacity
+                        style={unclaimed ? s.claimBtn : s.challengeBtn}
+                        onPress={() => navigation.navigate('CountryStampChallenge', {
+                          stamp: { flag, ...stamp },
+                          currentUser,
+                        })}
+                      >
+                        <Text style={unclaimed ? s.claimBtnTxt : s.challengeBtnTxt}>
+                          {unclaimed ? 'Claim' : 'Challenge'}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  }
                 </View>
               );
             })}

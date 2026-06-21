@@ -36,6 +36,7 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import LegalScreen from '../screens/LegalScreen';
 import WalletScreen from '../screens/WalletScreen';
 import MonumentChallengeScreen from '../screens/MonumentChallengeScreen';
+import CountryStampChallengeScreen from '../screens/CountryStampChallengeScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -173,7 +174,8 @@ export default function AppNavigator({ user, onLogout }) {
 
             {/* Wallet & monetization */}
             <Stack.Screen name="Wallet" component={WalletScreen} />
-            <Stack.Screen name="MonumentChallenge" component={MonumentChallengeScreen} />
+            <Stack.Screen name="MonumentChallenge"     component={MonumentChallengeScreen} />
+            <Stack.Screen name="CountryStampChallenge" component={CountryStampChallengeScreen} />
           </Stack.Navigator>
         </NavigationContainer>
 

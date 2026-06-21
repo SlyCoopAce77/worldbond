@@ -76,3 +76,14 @@ export function getCountryName(countryStr) {
   }
   return str;
 }
+
+// Reverse map: flag emoji → canonical country name
+const FLAG_TO_COUNTRY_NAME = {};
+WORLD_COUNTRIES.forEach(name => {
+  const flag = COUNTRY_FLAG_MAP[name.toLowerCase()];
+  if (flag && !FLAG_TO_COUNTRY_NAME[flag]) FLAG_TO_COUNTRY_NAME[flag] = name;
+});
+
+export function getFlagName(flag) {
+  return FLAG_TO_COUNTRY_NAME[flag] || flag;
+}

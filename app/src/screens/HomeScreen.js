@@ -644,7 +644,7 @@ function ProFootprintPanel({ navigation }) {
       </TouchableOpacity>
 
       {/* ── Country Stamps ── */}
-      <TouchableOpacity onPress={() => navigation.navigate('Wallet')} activeOpacity={0.88} style={fp.stampsCard}>
+      <TouchableOpacity onPress={() => navigation.navigate('CountryStampChallenge', { stamp: { flag: stampFlags[0], ...(DEMO_STAMPS[stampFlags[0]] || {}) } })} activeOpacity={0.88} style={fp.stampsCard}>
         <Text style={fp.stampsTitle}>COUNTRY STAMPS</Text>
         <View style={fp.stampsRow}>
           {stampFlags.map((flag, i) => (

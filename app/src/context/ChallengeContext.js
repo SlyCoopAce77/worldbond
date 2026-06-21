@@ -22,8 +22,10 @@ export const ENTRY_FEE    = 250;  // Bond Coins burned to initiate a challenge
 export const CHALLENGE_MS = 7 * 86400000;   // 7 days in ms
 export const COOLDOWN_MS  = 30 * 86400000;  // 30-day cooldown between challenges
 
-// ── Demo seed: one active challenge on the Eiffel Tower ──────────────────────
+// ── Demo seed challenges ──────────────────────────────────────────────────────
 const NOW = Date.now();
+
+// Active monument challenge: Eiffel Tower
 const SEED_CHALLENGE = {
   id:                  'ch_demo_001',
   monumentId:          'eiffel',
@@ -46,6 +48,29 @@ const SEED_CHALLENGE = {
   ],
 };
 
+// Active stamp challenge: 🇰🇷 South Korea (held by JiMin_Seoul, highest earner)
+const SEED_STAMP_CHALLENGE = {
+  id:                  'ch_stamp_001',
+  monumentId:          'stamp_🇰🇷',
+  challengerUsername:  'K_Fan_Global',
+  holderUsername:      'JiMin_Seoul',
+  startedAt:           NOW - 1 * 86400000,
+  endsAt:              NOW + 6 * 86400000,
+  status:              'active',
+  cooldownUntil:       null,
+  winner:              null,
+  scores: {
+    challenger: { gifts: 1200, bonds: 450, liveHours: 600, votes: 150, total: 2400 },
+    holder:     { gifts: 2800, bonds: 750, liveHours: 900, votes: 375, total: 4825 },
+  },
+  dailyUsage: {},
+  comments: [
+    { id: 'sc1', username: 'Seoul_Stream',  text: 'JiMin has the whole K-pop community voting for her 🇰🇷🔥', ts: NOW - 60 * 60000 },
+    { id: 'sc2', username: 'K_Fan_Global',  text: 'We\'re closing the gap every day — stay tuned 👀',         ts: NOW - 25 * 60000 },
+    { id: 'sc3', username: 'BondWatcher',   text: 'Most competitive stamp challenge I\'ve seen this month',   ts: NOW - 8  * 60000 },
+  ],
+};
+
 const ChallengeContext = createContext(null);
 
 export function ChallengeProvider({ children }) {
@@ -56,7 +81,10 @@ export function ChallengeProvider({ children }) {
 
   useEffect(() => {
     AsyncStorage.getItem(KEY).then(raw => {
-      let base = { [SEED_CHALLENGE.id]: SEED_CHALLENGE };
+      let base = {
+        [SEED_CHALLENGE.id]:       SEED_CHALLENGE,
+        [SEED_STAMP_CHALLENGE.id]: SEED_STAMP_CHALLENGE,
+      };
       if (raw) {
         try { base = { ...base, ...JSON.parse(raw) }; } catch {}
       }
@@ -216,15 +244,52 @@ export function ChallengeProvider({ children }) {
     return { success: true };
   }
 
+  // ── Stamp wrappers (use 'stamp_🇺🇸' prefix to avoid id collision) ──────────
+  const getActiveStampChallenge = (flag) =>
+    Object.values(stateRef.current).find(
+      c => c.monumentId === `stamp_${flag}` && c.status === 'active'
+    ) || null;
+
+  const getStampCooldown = (flag) => getCooldown(`stamp_${flag}`);
+
+  const initiateStampChallenge = (flag, challengerUsername, holderUsername) =>
+    initiateChallenge(`stamp_${flag}`, challengerUsername, holderUsername);
+
+  const addStampComment = (flag, username, text) => {
+    const ch = getActiveStampChallenge(flag);
+    if (!ch) return { error: 'No active challenge.' };
+    return addComment(ch.id, username, text);
+  };
+
+  const contributeStamp = (flag, side, type, amount, username) => {
+    const ch = getActiveStampChallenge(flag);
+    if (!ch) return { error: 'No active challenge.' };
+    return contribute(ch.id, side, type, amount, username);
+  };
+
+  const voteStamp = (flag, side, username) => {
+    const ch = getActiveStampChallenge(flag);
+    if (!ch) return { error: 'No active challenge.' };
+    return vote(ch.id, side, username);
+  };
+
   return (
     <ChallengeContext.Provider value={{
       challenges,
+      // Monument challenge
       getActiveChallenge,
       getCooldown,
       initiateChallenge,
       contribute,
       addComment,
       vote,
+      // Stamp challenge
+      getActiveStampChallenge,
+      getStampCooldown,
+      initiateStampChallenge,
+      contributeStamp,
+      addStampComment,
+      voteStamp,
     }}>
       {children}
     </ChallengeContext.Provider>
