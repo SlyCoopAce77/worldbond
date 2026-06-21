@@ -202,11 +202,11 @@ const DEMO_VIEWS = [
 
 
 const DEMO_TOP_EVENTS = [
-  { id: 'dt1', title: 'K-Drama Watch Party 🍜', type: 'watch_party', attendees: { length: 312 }, hostName: 'JiMin',  hostCountry: 'KR' },
-  { id: 'dt2', title: 'Global English Practice', type: 'language',    attendees: { length: 247 }, hostName: 'Sarah',  hostCountry: 'GB' },
-  { id: 'dt3', title: 'Friday Game Night 🎮',    type: 'game_night',  attendees: { length: 189 }, hostName: 'Carlos', hostCountry: 'MX' },
-  { id: 'dt4', title: 'African Cuisine Cook-Along', type: 'cooking',  attendees: { length: 134 }, hostName: 'Amara',  hostCountry: 'NG' },
-  { id: 'dt5', title: 'Meditation & Mindfulness',   type: 'just_chill',attendees: { length: 98  }, hostName: 'Aiko',   hostCountry: 'JP' },
+  { id: 'dt1', title: 'K-Drama Watch Party', type: 'watch_party', attendees: Array(312).fill(null), hostName: 'JiMin',  hostCountry: 'KR' },
+  { id: 'dt2', title: 'Global English Practice', type: 'language',  attendees: Array(247).fill(null), hostName: 'Sarah',  hostCountry: 'GB' },
+  { id: 'dt3', title: 'Friday Game Night',    type: 'game_night',  attendees: Array(189).fill(null), hostName: 'Carlos', hostCountry: 'MX' },
+  { id: 'dt4', title: 'African Cuisine Cook-Along', type: 'cooking', attendees: Array(134).fill(null), hostName: 'Amara',  hostCountry: 'NG' },
+  { id: 'dt5', title: 'Meditation & Mindfulness',  type: 'just_chill', attendees: Array(98).fill(null),  hostName: 'Aiko',   hostCountry: 'JP' },
 ];
 
 const EV_TYPE = {
@@ -820,11 +820,11 @@ const lb = StyleSheet.create({
   rank:     { fontSize: 20, width: 28, textAlign: 'center' },
   typeIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   title:    { color: '#fff', fontSize: 14, fontWeight: '800', flex: 1 },
-  host:     { color: '#444', fontSize: 11, fontWeight: '600' },
+  host:     { color: '#6b7090', fontSize: 11, fontWeight: '600' },
   countCol: { alignItems: 'flex-end', gap: 1 },
   countNum: { color: '#FF0080', fontSize: 16, fontWeight: '900', lineHeight: 18 },
-  countLbl: { color: '#2a2c34', fontSize: 9, fontWeight: '700' },
-  arrow:    { color: '#2a2c34', fontSize: 22, fontWeight: '300', marginLeft: -4 },
+  countLbl: { color: '#6b7090', fontSize: 9, fontWeight: '700' },
+  arrow:    { color: '#4a4e6a', fontSize: 22, fontWeight: '300', marginLeft: -4 },
   seeAllRow:{ borderTopWidth: 1, borderTopColor: '#1e2028', overflow: 'hidden' },
   seeAllGrd:{ paddingVertical: 14, alignItems: 'center' },
   seeAllTxt:{ color: '#FF0080', fontSize: 13, fontWeight: '800' },
