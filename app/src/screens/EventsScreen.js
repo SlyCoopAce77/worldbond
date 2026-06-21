@@ -2,11 +2,16 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, Modal, ScrollView,
-  KeyboardAvoidingView, Platform, Animated, Dimensions,
+  KeyboardAvoidingView, Platform, Animated, Dimensions, StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
+import GiftPicker, { GIFTS } from '../components/GiftPicker';
+import { useWallet } from '../context/WalletContext';
+import { stringToColor } from '../utils/apiUtils';
+import FloatingReaction from '../components/FloatingReaction';
 
 const { width } = Dimensions.get('window');
 
@@ -22,68 +27,251 @@ const TYPE_META = {
   workout:      { icon: '💪', label: 'Workout Together',  color: '#ff7043', grad: ['#2d0f00', '#180800', '#050507'] },
   art:          { icon: '🎨', label: 'Art & Drawing',     color: '#ab47bc', grad: ['#220030', '#110018', '#050507'] },
   just_chill:   { icon: '😎', label: 'Just Chill',        color: '#57f287', grad: ['#002a14', '#001008', '#050507'] },
+  comedy:       { icon: '😂', label: 'Comedy Night',      color: '#ffd600', grad: ['#2a2000', '#141000', '#050507'] },
+  tech_talk:    { icon: '💻', label: 'Tech Talk',         color: '#00bcd4', grad: ['#001f24', '#000f12', '#050507'] },
+  meditation:   { icon: '🧘', label: 'Mindfulness',       color: '#a5d6a7', grad: ['#0a1f0a', '#050f05', '#050507'] },
 };
 
 const FILTERS = ['All', ...Object.keys(TYPE_META)];
 const TYPES_LIST = Object.entries(TYPE_META).map(([id, m]) => ({ id, ...m }));
 
+// ─── Country → region map ─────────────────────────────────────────────────────
+const COUNTRY_REGIONS = {
+  '🌎 Americas':    ['🇺🇸','🇨🇦','🇲🇽','🇧🇷','🇦🇷','🇨🇴','🇵🇪','🇨🇱','🇻🇪','🇨🇺','🇯🇲','🇵🇷'],
+  '🌍 Europe':      ['🇬🇧','🇩🇰','🇫🇷','🇩🇪','🇮🇹','🇪🇸','🇵🇹','🇳🇱','🇸🇪','🇳🇴','🇵🇱','🇷🇺','🇺🇦','🇹🇷','🇬🇷','🇨🇭','🇧🇪','🇦🇹'],
+  '🌏 Asia':        ['🇯🇵','🇰🇷','🇨🇳','🇮🇳','🇮🇩','🇵🇭','🇻🇳','🇹🇭','🇲🇾','🇸🇬','🇵🇰','🇧🇩','🇱🇰','🇳🇵','🇰🇭','🇲🇲'],
+  '🕌 Middle East': ['🇸🇦','🇦🇪','🇪🇬','🇮🇷','🇮🇶','🇮🇱','🇯🇴','🇱🇧','🇰🇼','🇶🇦','🇴🇲','🇾🇪'],
+  '🌍 Africa':      ['🇳🇬','🇿🇦','🇰🇪','🇬🇭','🇪🇹','🇹🇿','🇲🇦','🇸🇳','🇨🇲','🇺🇬','🇦🇴','🇿🇲'],
+  '🌏 Oceania':     ['🇦🇺','🇳🇿','🇫🇯','🇵🇬'],
+};
+
+function getRegion(flag) {
+  for (const [region, flags] of Object.entries(COUNTRY_REGIONS)) {
+    if (flags.includes(flag)) return region;
+  }
+  return '🌐 Other';
+}
+
 // ─── Demo events ──────────────────────────────────────────────────────────────
 const DEMO_EVENTS = [
+  // ── Live now ──
   {
     id: 'de1', title: 'K-Drama Watch Party 🍜', type: 'watch_party',
     description: 'Watching the latest episode of "When the Stars Fall" together. Bring snacks! 🍿',
-    hostName: 'JiMin_Seoul', hostCountry: '🇰🇷',
+    hostId: 'host_de1', hostName: 'JiMin_Seoul', hostCountry: '🇰🇷',
     attendees: Array.from({ length: 312 }), maxAttendees: 400,
     scheduledFor: null, tags: ['Netflix', 'Korean'],
   },
   {
     id: 'de2', title: 'Global English Practice 🌍', type: 'language',
-    description: 'Casual conversation practice. All levels welcome — from beginners to fluent speakers.',
-    hostName: 'Sarah_London', hostCountry: '🇬🇧',
+    description: 'Casual conversation practice. All levels welcome.',
+    hostId: 'host_de2', hostName: 'Sarah_London', hostCountry: '🇬🇧',
     attendees: Array.from({ length: 247 }), maxAttendees: 300,
-    scheduledFor: Date.now() + 900000, tags: ['English', 'Beginner OK'],
+    scheduledFor: null, tags: ['English', 'Beginner OK'],
   },
+  {
+    id: 'de9', title: 'Hip-Hop Freestyle Cypher 🎤', type: 'music',
+    description: 'Spit bars, drop beats, vibe out. All skill levels welcome — bars only, no hate.',
+    hostId: 'host_de9', hostName: 'DeShawn_ATL', hostCountry: '🇺🇸',
+    attendees: Array.from({ length: 203 }), maxAttendees: 250,
+    scheduledFor: null, tags: ['Hip-hop', 'Freestyle'],
+  },
+  {
+    id: 'de10', title: 'Afrobeats Dance Party 🕺', type: 'just_chill',
+    description: 'Turn up with the hottest Afrobeats, Amapiano, and Afropop. Cameras on, let\'s dance!',
+    hostId: 'host_de10', hostName: 'Kofi_Accra', hostCountry: '🇬🇭',
+    attendees: Array.from({ length: 178 }), maxAttendees: 200,
+    scheduledFor: null, tags: ['Afrobeats', 'Dance'],
+  },
+  {
+    id: 'de8', title: 'Chill & Chat Lounge 😎', type: 'just_chill',
+    description: 'No agenda — just vibes. Come talk about your week, share music, meet new people.',
+    hostId: 'host_de8', hostName: 'Fatoumata_DK', hostCountry: '🇩🇰',
+    attendees: Array.from({ length: 41 }), maxAttendees: 60,
+    scheduledFor: null, tags: ['Casual', 'Open mic'],
+  },
+  // ── Upcoming ──
   {
     id: 'de3', title: 'Friday Night Valorant 🎮', type: 'game_night',
     description: 'Squad up for ranked matches. All ranks welcome, we\'ll make balanced teams.',
     hostName: 'Carlos_MX', hostCountry: '🇲🇽',
     attendees: Array.from({ length: 189 }), maxAttendees: 200,
-    scheduledFor: Date.now() + 3600000, tags: ['Valorant', 'FPS'],
+    scheduledFor: Date.now() + 1800000, tags: ['Valorant', 'FPS'],
   },
   {
     id: 'de4', title: 'African Cuisine Cook-Along 🍛', type: 'cooking',
     description: 'Today: Jollof rice battle — Nigeria vs Ghana. Vote for the best after we cook!',
     hostName: 'Amara_Lagos', hostCountry: '🇳🇬',
     attendees: Array.from({ length: 134 }), maxAttendees: 150,
-    scheduledFor: Date.now() + 7200000, tags: ['Jollof', 'West Africa'],
+    scheduledFor: Date.now() + 3600000, tags: ['Jollof', 'West Africa'],
   },
   {
     id: 'de5', title: 'Lo-fi Study Session 📚', type: 'study',
-    description: 'Focused 2-hour study block with lo-fi beats in the background. Pomodoro timers shared.',
+    description: 'Focused 2-hour study block with lo-fi beats. Pomodoro timers shared.',
     hostName: 'Yuki_Tokyo', hostCountry: '🇯🇵',
     attendees: Array.from({ length: 98 }), maxAttendees: 200,
-    scheduledFor: Date.now() + 1800000, tags: ['Focus', 'Lo-fi'],
+    scheduledFor: Date.now() + 5400000, tags: ['Focus', 'Lo-fi'],
   },
   {
     id: 'de6', title: 'Morning Yoga Flow 💪', type: 'workout',
-    description: '30-min beginner-friendly yoga. All you need is a mat and some water. Rise and stretch!',
+    description: '30-min beginner-friendly yoga. All you need is a mat and water.',
     hostName: 'Priya_Mumbai', hostCountry: '🇮🇳',
     attendees: Array.from({ length: 76 }), maxAttendees: 100,
-    scheduledFor: Date.now() + 10800000, tags: ['Yoga', 'Beginner'],
+    scheduledFor: Date.now() + 7200000, tags: ['Yoga', 'Beginner'],
   },
   {
     id: 'de7', title: 'Digital Art Collab 🎨', type: 'art',
-    description: 'We each draw on the same theme and compare results. This week: cityscapes at night.',
+    description: 'This week: cityscapes at night. Draw your city, share, compare!',
     hostName: 'Lucas_SP', hostCountry: '🇧🇷',
     attendees: Array.from({ length: 54 }), maxAttendees: 80,
-    scheduledFor: Date.now() + 14400000, tags: ['Digital Art', 'Procreate'],
+    scheduledFor: Date.now() + 10800000, tags: ['Digital Art', 'Procreate'],
   },
   {
-    id: 'de8', title: 'Chill & Chat Lounge 😎', type: 'just_chill',
-    description: 'No agenda — just vibes. Come talk about your week, share music, meet new people.',
-    hostName: 'Fatoumata_DK', hostCountry: '🇩🇰',
-    attendees: Array.from({ length: 41 }), maxAttendees: 60,
-    scheduledFor: null, tags: ['Casual', 'Open mic'],
+    id: 'de11', title: 'French Language Café ☕', type: 'language',
+    description: 'Practice French in a relaxed setting. Débutants bienvenus!',
+    hostName: 'Amélie_Paris', hostCountry: '🇫🇷',
+    attendees: Array.from({ length: 67 }), maxAttendees: 80,
+    scheduledFor: Date.now() + 14400000, tags: ['French', 'Débutant OK'],
+  },
+  {
+    id: 'de12', title: 'Anime Watch Night 🌸', type: 'watch_party',
+    description: 'Watching Attack on Titan finale together. Spoiler-free reactions welcome.',
+    hostName: 'Chen_Shanghai', hostCountry: '🇨🇳',
+    attendees: Array.from({ length: 155 }), maxAttendees: 200,
+    scheduledFor: Date.now() + 18000000, tags: ['Anime', 'Attack on Titan'],
+  },
+  {
+    id: 'de13', title: 'K-Pop Stans Unite 🎵', type: 'music',
+    description: 'React to new drops, share fancams, talk comebacks. All fandoms welcome!',
+    hostName: 'Sofia_PH', hostCountry: '🇵🇭',
+    attendees: Array.from({ length: 89 }), maxAttendees: 120,
+    scheduledFor: Date.now() + 21600000, tags: ['K-Pop', 'Fancam'],
+  },
+  {
+    id: 'de14', title: 'Startup Pitch Night 🚀', type: 'just_chill',
+    description: '60-second pitches, open feedback, meet cofounders. No VC gatekeeping.',
+    hostName: 'Amir_Dubai', hostCountry: '🇦🇪',
+    attendees: Array.from({ length: 112 }), maxAttendees: 150,
+    scheduledFor: Date.now() + 25200000, tags: ['Startup', 'Networking'],
+  },
+  {
+    id: 'de15', title: 'Flamenco & Spanish Culture 💃', type: 'music',
+    description: 'Live flamenco performance + Q&A about Spanish culture. ¡Vamos!',
+    hostName: 'Isabella_Madrid', hostCountry: '🇪🇸',
+    attendees: Array.from({ length: 73 }), maxAttendees: 100,
+    scheduledFor: Date.now() + 28800000, tags: ['Flamenco', 'Spanish'],
+  },
+  {
+    id: 'de16', title: 'Toronto Chill Sessions 🍁', type: 'just_chill',
+    description: 'Canada\'s most chill weekly hangout. Bring your coffee, bring good vibes.',
+    hostName: 'Marcus_TO', hostCountry: '🇨🇦',
+    attendees: Array.from({ length: 48 }), maxAttendees: 75,
+    scheduledFor: Date.now() + 32400000, tags: ['Chill', 'Canada'],
+  },
+  {
+    id: 'de17', title: 'Sydney Morning Workout 🏋️', type: 'workout',
+    description: 'HIIT workout to start your day right. 30 mins, all levels welcome.',
+    hostName: 'Jake_Sydney', hostCountry: '🇦🇺',
+    attendees: Array.from({ length: 61 }), maxAttendees: 80,
+    scheduledFor: Date.now() + 36000000, tags: ['HIIT', 'Morning'],
+  },
+  {
+    id: 'de18', title: 'Bollywood Karaoke Night 🎤', type: 'music',
+    description: 'Sing your heart out to Bollywood classics and new hits. Hindi & English OK.',
+    hostName: 'Riya_Delhi', hostCountry: '🇮🇳',
+    attendees: Array.from({ length: 92 }), maxAttendees: 120,
+    scheduledFor: Date.now() + 39600000, tags: ['Bollywood', 'Karaoke'],
+  },
+  {
+    id: 'de19', title: 'Turkish Coffee & Conversation ☕', type: 'just_chill',
+    description: 'Easy conversation over coffee. Turkish, English, or mix — all welcome.',
+    hostName: 'Zeynep_Istanbul', hostCountry: '🇹🇷',
+    attendees: Array.from({ length: 38 }), maxAttendees: 50,
+    scheduledFor: Date.now() + 43200000, tags: ['Coffee', 'Turkish'],
+  },
+  {
+    id: 'de20', title: 'Minecraft World Build 🎮', type: 'game_night',
+    description: 'Building a fantasy city together. Join the server and grab a plot!',
+    hostName: 'Erik_Stockholm', hostCountry: '🇸🇪',
+    attendees: Array.from({ length: 44 }), maxAttendees: 60,
+    scheduledFor: Date.now() + 46800000, tags: ['Minecraft', 'Build'],
+  },
+  {
+    id: 'de21', title: 'Kenyan Cooking Class 🍲', type: 'cooking',
+    description: 'Making Nyama Choma and Ugali from scratch. Ingredients list in description.',
+    hostName: 'Wanjiku_Nairobi', hostCountry: '🇰🇪',
+    attendees: Array.from({ length: 29 }), maxAttendees: 40,
+    scheduledFor: Date.now() + 50400000, tags: ['Kenyan', 'Ugali'],
+  },
+  {
+    id: 'de22', title: 'Buenos Aires Tango Night 💃', type: 'music',
+    description: 'Learn the basics of tango with live music. No partner needed!',
+    hostName: 'Valentina_BA', hostCountry: '🇦🇷',
+    attendees: Array.from({ length: 56 }), maxAttendees: 70,
+    scheduledFor: Date.now() + 54000000, tags: ['Tango', 'Dance'],
+  },
+  {
+    id: 'de23', title: 'German Board Game Night 🎲', type: 'game_night',
+    description: 'Playing Catan, Ticket to Ride, and more. German & English both fine.',
+    hostName: 'Hans_Berlin', hostCountry: '🇩🇪',
+    attendees: Array.from({ length: 33 }), maxAttendees: 48,
+    scheduledFor: Date.now() + 57600000, tags: ['Board Games', 'Catan'],
+  },
+  {
+    id: 'de24', title: 'Saudi Arabian Cultural Night 🌙', type: 'just_chill',
+    description: 'Share traditions, food stories, and culture from across the Gulf region.',
+    hostName: 'Khalid_Riyadh', hostCountry: '🇸🇦',
+    attendees: Array.from({ length: 51 }), maxAttendees: 80,
+    scheduledFor: Date.now() + 61200000, tags: ['Gulf', 'Culture'],
+  },
+  {
+    id: 'de25', title: 'Cape Town Art Share 🎨', type: 'art',
+    description: 'South African artists sharing work and giving feedback. All styles welcome.',
+    hostName: 'Naledi_CT', hostCountry: '🇿🇦',
+    attendees: Array.from({ length: 27 }), maxAttendees: 40,
+    scheduledFor: Date.now() + 64800000, tags: ['Art', 'South Africa'],
+  },
+  {
+    id: 'de26', title: 'Stand-Up Open Mic Night 😂', type: 'comedy',
+    description: 'Got jokes? Come test your material or just enjoy the laughs. All topics welcome.',
+    hostName: 'Tyler_NYC', hostCountry: '🇺🇸',
+    attendees: Array.from({ length: 143 }), maxAttendees: 200,
+    scheduledFor: null, tags: ['Stand-up', 'Open mic'],
+  },
+  {
+    id: 'de27', title: 'Roast Battle 🔥😂', type: 'comedy',
+    description: 'Friendly roast battles — all in good fun. Thick skin required, tears optional.',
+    hostName: 'Jamie_London', hostCountry: '🇬🇧',
+    attendees: Array.from({ length: 88 }), maxAttendees: 120,
+    scheduledFor: Date.now() + 7200000, tags: ['Roast', 'Comedy'],
+  },
+  {
+    id: 'de28', title: 'AI & Future Tech Chat 💻', type: 'tech_talk',
+    description: 'Weekly deep-dive on AI news, tools, and what\'s coming next. No jargon gatekeeping.',
+    hostName: 'Priya_Bangalore', hostCountry: '🇮🇳',
+    attendees: Array.from({ length: 176 }), maxAttendees: 250,
+    scheduledFor: null, tags: ['AI', 'Tech'],
+  },
+  {
+    id: 'de29', title: 'Build in Public Session 💻', type: 'tech_talk',
+    description: 'Share what you\'re building, get feedback, stay accountable. Devs & designers welcome.',
+    hostName: 'Yuto_Osaka', hostCountry: '🇯🇵',
+    attendees: Array.from({ length: 64 }), maxAttendees: 100,
+    scheduledFor: Date.now() + 10800000, tags: ['Dev', 'Build in Public'],
+  },
+  {
+    id: 'de30', title: 'Morning Meditation Circle 🧘', type: 'meditation',
+    description: '20-min guided meditation to start your day with clarity. Silence your notifications.',
+    hostName: 'Aiko_Kyoto', hostCountry: '🇯🇵',
+    attendees: Array.from({ length: 98 }), maxAttendees: 150,
+    scheduledFor: null, tags: ['Meditation', 'Morning'],
+  },
+  {
+    id: 'de31', title: 'Breathwork & Mindfulness 🧘', type: 'meditation',
+    description: 'Guided breathwork session for stress relief and focus. Beginners very welcome.',
+    hostName: 'Lena_Oslo', hostCountry: '🇳🇴',
+    attendees: Array.from({ length: 52 }), maxAttendees: 80,
+    scheduledFor: Date.now() + 14400000, tags: ['Breathwork', 'Mindfulness'],
   },
 ];
 
@@ -102,15 +290,8 @@ function isLive(ev) {
   return !ev.scheduledFor || ev.scheduledFor <= Date.now() + 60000;
 }
 
-function stringToColor(str = '') {
-  const p = ['#e57373', '#ba68c8', '#4fc3f7', '#81c784', '#ffb74d', '#f06292', '#4db6ac', '#7986cb'];
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return p[Math.abs(h) % p.length];
-}
-
 // ─── Featured hero card ───────────────────────────────────────────────────────
-function FeaturedCard({ item, onPress }) {
+function FeaturedCard({ item, onPress, onHostPress }) {
   const meta    = TYPE_META[item.type] || TYPE_META.just_chill;
   const count   = item.attendees?.length || 0;
   const live    = isLive(item);
@@ -164,7 +345,7 @@ function FeaturedCard({ item, onPress }) {
 
           {/* Footer */}
           <View style={fe.footer}>
-            <View style={fe.hostRow}>
+            <TouchableOpacity style={fe.hostRow} onPress={onHostPress} activeOpacity={0.75}>
               <View style={[fe.hostAvatar, { backgroundColor: stringToColor(item.hostName) }]}>
                 <Text style={fe.hostInitial}>{(item.hostName || '?')[0].toUpperCase()}</Text>
               </View>
@@ -172,7 +353,7 @@ function FeaturedCard({ item, onPress }) {
                 <Text style={fe.hostName}>{item.hostName}</Text>
                 <Text style={fe.hostFlag}>{item.hostCountry}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
             <View style={fe.goingBadge}>
               <Text style={[fe.goingNum, { color: meta.color }]}>{count >= 1000 ? `${(count/1000).toFixed(1)}k` : count}</Text>
               <Text style={fe.goingLabel}>going</Text>
@@ -233,7 +414,7 @@ const fe = StyleSheet.create({
 });
 
 // ─── Event list card ──────────────────────────────────────────────────────────
-function EventCard({ item, index, onPress }) {
+function EventCard({ item, index, onPress, onHostPress }) {
   const meta    = TYPE_META[item.type] || TYPE_META.just_chill;
   const count   = item.attendees?.length || 0;
   const max     = item.maxAttendees || 50;
@@ -266,11 +447,11 @@ function EventCard({ item, index, onPress }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={ec.title} numberOfLines={1}>{item.title}</Text>
-              <View style={ec.metaRow}>
+              <TouchableOpacity style={ec.metaRow} onPress={onHostPress} activeOpacity={0.7} hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}>
                 <Text style={ec.hostTxt}>{item.hostName}</Text>
                 {item.hostCountry ? <Text style={ec.hostFlag}>{item.hostCountry}</Text> : null}
                 {isHot ? <Text style={{ fontSize: 11 }}>🔥</Text> : null}
-              </View>
+              </TouchableOpacity>
             </View>
             <View style={ec.rightCol}>
               {live ? (
@@ -377,7 +558,7 @@ function FilterChip({ id, active, onPress }) {
 const fc = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
           backgroundColor: '#0d0f14', borderWidth: 1.5, borderColor: '#1e2028' },
-  text: { color: '#444', fontSize: 12, fontWeight: '800' },
+  text: { color: '#888', fontSize: 12, fontWeight: '800' },
 });
 
 // ─── Create event modal ────────────────────────────────────────────────────────
@@ -496,14 +677,20 @@ const cm = StyleSheet.create({
   submitText:   { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
 
-// ─── Event chat modal ──────────────────────────────────────────────────────────
-function EventChatModal({ visible, event, onClose, user }) {
-  const [messages, setMessages] = useState([]);
-  const [text,     setText]     = useState('');
-  const joinedRef = useRef(false);
-  const flatRef   = useRef(null);
-  const socket    = getSocket();
-  const meta    = event ? (TYPE_META[event.type] || TYPE_META.just_chill) : TYPE_META.just_chill;
+// ─── Floating reaction ────────────────────────────────────────────────────────
+const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯', '🎉', '🌍'];
+
+// ─── Event live modal (full-screen video room + chat) ─────────────────────────
+function EventChatModal({ visible, event, onClose, user, navigation }) {
+  const [messages,   setMessages]   = useState([]);
+  const [text,       setText]       = useState('');
+  const [floats,     setFloats]     = useState([]);
+  const [showGifts,  setShowGifts]  = useState(false);
+  const joinedRef  = useRef(false);
+  const flatRef    = useRef(null);
+  const socket     = getSocket();
+  const meta       = event ? (TYPE_META[event.type] || TYPE_META.just_chill) : TYPE_META.just_chill;
+  const { spendCoins, balance } = useWallet();
 
   useEffect(() => {
     if (!visible || !event) return;
@@ -511,144 +698,475 @@ function EventChatModal({ visible, event, onClose, user }) {
     else socket.once('connect', () => socket.emit('join_event', { eventId: event.id }));
     joinedRef.current = true;
     socket.on('event_history', ({ messages: hist }) => setMessages(hist || []));
-    socket.on('event_message', msg => setMessages(prev => [...prev, msg]));
+    socket.on('event_message', msg => {
+      setMessages(prev => [...prev, msg]);
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    socket.on('event_reaction', ({ emoji }) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setFloats(prev => [...prev, { emoji, id }]);
+    });
     return () => {
       if (joinedRef.current) socket.emit('leave_event', { eventId: event?.id });
       joinedRef.current = false;
       socket.off('event_history');
       socket.off('event_message');
+      socket.off('event_reaction');
     };
   }, [visible, event?.id]);
 
-  useEffect(() => {
-    if (messages.length > 0) flatRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
-
   function send() {
     if (!text.trim()) return;
-    socket.emit('event_message', { eventId: event.id, text: text.trim() });
+    const msg = {
+      id: `local-${Date.now()}`,
+      senderId: 'local',
+      senderName: user?.username || 'You',
+      senderCountry: user?.country || '',
+      text: text.trim(),
+      ts: Date.now(),
+    };
+    setMessages(prev => [...prev, msg]);
+    setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
+    if (socket.connected) {
+      socket.emit('event_message', { eventId: event.id, text: text.trim() });
+    }
     setText('');
   }
 
+  function sendReaction(emoji) {
+    const id = `${Date.now()}-${Math.random()}`;
+    setFloats(prev => [...prev, { emoji, id }]);
+    if (socket.connected) socket.emit('event_reaction', { eventId: event.id, emoji });
+  }
+
+  function sendGift(gift) {
+    if (balance < gift.coins) return;
+    spendCoins(gift.coins, 'live_gift', { eventId: event.id, giftId: gift.id });
+    // Float the gift symbol — no chat message, just the animation
+    const floatId = `gift-${Date.now()}`;
+    setFloats(prev => [...prev, { emoji: gift.symbol, id: floatId }]);
+    if (socket.connected) {
+      socket.emit('event_gift', { eventId: event.id, gift, senderId: socket.id, senderName: user?.username });
+    }
+  }
+
+  function removeFloat(id) { setFloats(prev => prev.filter(f => f.id !== id)); }
+
   if (!event) return null;
-  const count = event.attendees?.length || 0;
+  const count   = event.attendees?.length || 0;
+  const live    = isLive(event);
+  const hostBg  = stringToColor(event.hostName || '');
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#050507' }}>
-        <LinearGradient colors={meta.grad} style={ev.header}>
-          <TouchableOpacity style={ev.backBtn} onPress={onClose}>
-            <Text style={ev.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <View style={[ev.headerIcon, { backgroundColor: meta.color + '30' }]}>
-            <Text style={{ fontSize: 22 }}>{meta.icon}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={ev.eventTitle} numberOfLines={1}>{event.title}</Text>
-            <Text style={ev.eventSub}>{count} attending · {event.hostName}</Text>
-          </View>
-          <View style={[ev.typePill, { backgroundColor: meta.color + '30', borderColor: meta.color + '55' }]}>
-            <Text style={[ev.typeText, { color: meta.color }]}>{meta.label}</Text>
-          </View>
-        </LinearGradient>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <StatusBar hidden />
+      <View style={lv.container}>
 
-        <FlatList
-          ref={flatRef}
-          data={messages}
-          keyExtractor={m => String(m.id)}
-          contentContainerStyle={ev.list}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={ev.emptyWrap}>
-              <Text style={{ fontSize: 44 }}>{meta.icon}</Text>
-              <Text style={ev.emptyTitle}>Be the first to say hello!</Text>
-              <Text style={ev.emptySub}>The chat is open — start the conversation 👋</Text>
-            </View>
-          }
-          renderItem={({ item }) => {
-            const isMine = item.senderId === socket.id;
-            return (
-              <View style={[ev.msgRow, isMine && ev.msgRowMine]}>
-                {!isMine && (
-                  <View style={[ev.avatar, { backgroundColor: stringToColor(item.senderName || '') }]}>
-                    <Text style={ev.avatarText}>{(item.senderName || '?')[0].toUpperCase()}</Text>
-                  </View>
-                )}
-                <View style={[ev.bubble, isMine ? ev.bubbleMine : ev.bubbleOther]}>
-                  {!isMine && (
-                    <Text style={ev.senderName}>
-                      {item.senderName}{item.senderCountry ? ` · ${item.senderCountry}` : ''}
-                    </Text>
-                  )}
-                  <Text style={ev.msgText}>{item.text}</Text>
-                </View>
-              </View>
-            );
-          }}
-          onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
+        {/* ── Full-bleed background ── */}
+        <LinearGradient
+          colors={[meta.color + '55', meta.color + '22', '#000000', '#050507']}
+          style={StyleSheet.absoluteFill}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={ev.inputRow}>
-            <TextInput
-              style={ev.input}
-              placeholder="Say something..."
-              placeholderTextColor="#333"
-              value={text}
-              onChangeText={setText}
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[ev.sendBtn, { backgroundColor: text.trim() ? meta.color : '#1e2028' }]}
-              onPress={send}
-              disabled={!text.trim()}
-            >
-              <Text style={ev.sendIcon}>➤</Text>
-            </TouchableOpacity>
+        {/* ── Host "video" area ── */}
+        <View style={lv.videoArea}>
+          {/* Ambient glow rings */}
+          <View style={[lv.glowRing, lv.glowRing1, { borderColor: meta.color + '30' }]} />
+          <View style={[lv.glowRing, lv.glowRing2, { borderColor: meta.color + '18' }]} />
+          {/* Host avatar — tappable to view profile */}
+          <TouchableOpacity
+            onPress={() => navigation?.navigate('Profile', { profileUser: { userId: event.hostId, username: event.hostName, country: event.hostCountry } })}
+            activeOpacity={0.8}
+            style={{ alignItems: 'center', gap: 4 }}
+          >
+            <View style={[lv.hostAvatar, { backgroundColor: hostBg }]}>
+              <Text style={lv.hostInitial}>{(event.hostName || '?')[0].toUpperCase()}</Text>
+            </View>
+            <Text style={lv.hostName}>{event.hostName}</Text>
+            {event.hostCountry ? <Text style={lv.hostFlag}>{event.hostCountry}</Text> : null}
+          </TouchableOpacity>
+          <View style={[lv.typePill, { backgroundColor: meta.color + '30', borderColor: meta.color + '55' }]}>
+            <Text style={lv.typePillIcon}>{meta.icon}</Text>
+            <Text style={[lv.typePillTxt, { color: meta.color }]}>{meta.label}</Text>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+        </View>
+
+        {/* ── Floating reactions ── */}
+        {floats.map(f => (
+          <FloatingReaction key={f.id} emoji={f.emoji} id={f.id} onDone={removeFloat} rise={260} duration={2000} bottom={200} fontSize={34} />
+        ))}
+
+        <SafeAreaView style={lv.overlay}>
+
+          {/* ── Top bar ── */}
+          <View style={lv.topBar}>
+            <TouchableOpacity style={lv.backBtn} onPress={onClose}>
+              <Text style={lv.backIcon}>←</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={lv.eventTitle} numberOfLines={1}>{event.title}</Text>
+              <Text style={lv.eventSub} numberOfLines={1}>{count} attending</Text>
+            </View>
+            {live ? (
+              <View style={lv.liveBadge}>
+                <View style={lv.liveDot} />
+                <Text style={lv.liveTxt}>LIVE</Text>
+              </View>
+            ) : (
+              <View style={[lv.timeBadge, { backgroundColor: meta.color + '25', borderColor: meta.color + '50' }]}>
+                <Text style={[lv.timeTxt, { color: meta.color }]}>{timeLabel(event.scheduledFor)}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── Bottom section: chat + reactions + input, all shift up with keyboard ── */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+          >
+            {/* Chat messages */}
+            <View style={lv.chatWrap}>
+              <FlatList
+                ref={flatRef}
+                data={messages}
+                keyExtractor={m => String(m.id)}
+                contentContainerStyle={lv.chatList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={lv.chatEmpty}>
+                    <Text style={lv.chatEmptyTxt}>Say hello to everyone 👋</Text>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const isMine = item.senderId === 'local' || item.senderId === socket.id;
+                  const avatarC = stringToColor(item.senderName || '');
+                  const goProfile = () => navigation?.navigate('Profile', {
+                    profileUser: { userId: item.senderId, username: item.senderName, country: item.senderCountry },
+                  });
+                  return (
+                    <View style={[lv.msgRow, isMine && lv.msgRowMine]}>
+                      {!isMine && (
+                        <TouchableOpacity onPress={goProfile} activeOpacity={0.75}>
+                          <View style={[lv.msgAvatar, { backgroundColor: avatarC }]}>
+                            <Text style={lv.msgAvatarTxt}>{(item.senderName || '?')[0].toUpperCase()}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                      <View style={[lv.msgBubble, isMine && lv.msgBubbleMine]}>
+                        {!isMine && (
+                          <TouchableOpacity onPress={goProfile} activeOpacity={0.75}>
+                            <Text style={[lv.msgSender, { color: avatarC }]}>
+                              {item.senderName}
+                              {item.senderCountry ? ` · ${item.senderCountry}` : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <Text style={lv.msgText}>{item.text}</Text>
+                      </View>
+                    </View>
+                  );
+                }}
+                onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
+              />
+            </View>
+
+            {/* Reaction bar */}
+            <View style={lv.reactBar}>
+              {REACTIONS.map(e => (
+                <TouchableOpacity key={e} style={lv.reactBtn} onPress={() => sendReaction(e)} activeOpacity={0.7}>
+                  <Text style={lv.reactEmoji}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Input bar */}
+            <View style={lv.inputBar}>
+              <View style={[lv.inputAvatar, { backgroundColor: stringToColor(user?.username || '') }]}>
+                <Text style={lv.inputAvatarTxt}>{(user?.username || '?')[0].toUpperCase()}</Text>
+              </View>
+              <TextInput
+                style={lv.input}
+                placeholder="Say something..."
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                value={text}
+                onChangeText={setText}
+                onSubmitEditing={send}
+                returnKeyType="send"
+                maxLength={300}
+              />
+              <TouchableOpacity
+                style={lv.giftBtn}
+                onPress={() => setShowGifts(true)}
+              >
+                <Text style={lv.giftBtnIcon}>🎁</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[lv.sendBtn, { backgroundColor: text.trim() ? meta.color : 'rgba(255,255,255,0.12)' }]}
+                onPress={send}
+                disabled={!text.trim()}
+              >
+                <Text style={lv.sendIcon}>➤</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+
+        {/* Gift Picker */}
+        <GiftPicker
+          visible={showGifts}
+          onClose={() => setShowGifts(false)}
+          onSend={sendGift}
+          hostName={event.hostName}
+        />
+      </View>
     </Modal>
   );
 }
-const ev = StyleSheet.create({
-  header:     { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10,
-                borderBottomWidth: 1, borderBottomColor: '#1e2028' },
-  backBtn:    { width: 38, height: 38, borderRadius: 12, backgroundColor: '#00000030',
-                alignItems: 'center', justifyContent: 'center' },
-  backIcon:   { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
-  headerIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  eventTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  eventSub:   { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 },
-  typePill:   { borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1 },
-  typeText:   { fontSize: 11, fontWeight: '700' },
-  list:       { padding: 16, gap: 8, flexGrow: 1 },
-  emptyWrap:  { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  emptySub:   { color: '#444', fontSize: 14, textAlign: 'center' },
-  msgRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  msgRowMine: { justifyContent: 'flex-end' },
-  avatar:     { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  avatarText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  bubble:     { maxWidth: width * 0.72, borderRadius: 18, padding: 12, gap: 4 },
-  bubbleMine: { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
-  bubbleOther:{ backgroundColor: '#111318', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e2028' },
-  senderName: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700' },
-  msgText:    { color: '#fff', fontSize: 14, lineHeight: 20 },
-  inputRow:   { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderTopColor: '#1e2028', gap: 10, alignItems: 'flex-end' },
-  input:      { flex: 1, backgroundColor: '#111318', color: '#fff', borderRadius: 20, paddingHorizontal: 16,
-                paddingVertical: 12, fontSize: 14, borderWidth: 1, borderColor: '#1e2028', maxHeight: 100 },
-  sendBtn:    { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  sendIcon:   { color: '#fff', fontSize: 18 },
+
+const lv = StyleSheet.create({
+  container:    { flex: 1, backgroundColor: '#000' },
+  overlay:      { flex: 1 },
+
+  // Video area
+  videoArea:    { position: 'absolute', top: 0, left: 0, right: 0, height: '52%',
+                  alignItems: 'center', justifyContent: 'center', gap: 10 },
+  glowRing:     { position: 'absolute', borderRadius: 999, borderWidth: 1 },
+  glowRing1:    { width: 220, height: 220 },
+  glowRing2:    { width: 300, height: 300 },
+  hostAvatar:   { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center',
+                  borderWidth: 3, borderColor: 'rgba(255,255,255,0.15)' },
+  hostInitial:  { color: '#fff', fontSize: 48, fontWeight: '900' },
+  hostName:     { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 4 },
+  hostFlag:     { fontSize: 18 },
+  typePill:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20,
+                  borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7, marginTop: 4 },
+  typePillIcon: { fontSize: 14 },
+  typePillTxt:  { fontSize: 13, fontWeight: '800' },
+
+
+  // Top bar
+  topBar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14,
+                  paddingTop: 10, paddingBottom: 12, gap: 12 },
+  backBtn:      { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.5)',
+                  alignItems: 'center', justifyContent: 'center' },
+  backIcon:     { color: '#fff', fontSize: 20 },
+  eventTitle:   { color: '#fff', fontSize: 15, fontWeight: '800' },
+  eventSub:     { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 1 },
+  liveBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#e53935',
+                  borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  liveDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveTxt:      { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
+  timeBadge:    { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1 },
+  timeTxt:      { fontSize: 12, fontWeight: '800' },
+
+  // Chat
+  chatWrap:     { maxHeight: '38%', paddingBottom: 4 },
+  chatList:     { paddingHorizontal: 12, paddingBottom: 6, gap: 6 },
+  chatEmpty:    { paddingHorizontal: 16, paddingVertical: 8 },
+  chatEmptyTxt: { color: 'rgba(255,255,255,0.25)', fontSize: 13, fontStyle: 'italic' },
+  msgRow:       { flexDirection: 'row', alignItems: 'flex-end', gap: 7 },
+  msgRowMine:   { justifyContent: 'flex-end' },
+  msgAvatar:    { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  msgAvatarTxt: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  msgBubble:    { maxWidth: width * 0.74, backgroundColor: 'rgba(0,0,0,0.52)',
+                  borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, gap: 3,
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  msgBubbleMine:{ backgroundColor: 'rgba(108,71,255,0.55)', borderColor: 'rgba(108,71,255,0.3)' },
+  msgSender:    { fontSize: 10, fontWeight: '800' },
+  msgText:      { color: '#fff', fontSize: 13, lineHeight: 19 },
+
+  // Reactions
+  reactBar:     { flexDirection: 'row', justifyContent: 'space-around',
+                  paddingHorizontal: 12, paddingVertical: 10 },
+  reactBtn:     { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.10)',
+                  alignItems: 'center', justifyContent: 'center' },
+  reactEmoji:   { fontSize: 20 },
+
+  // Input
+  inputBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12,
+                  paddingVertical: 10, gap: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  inputAvatar:  { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  inputAvatarTxt:{ color: '#fff', fontSize: 13, fontWeight: '800' },
+  input:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.10)', color: '#fff',
+                  borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11,
+                  fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  giftBtn:      { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.10)',
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  giftBtnIcon:  { fontSize: 20 },
+  sendBtn:      { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  sendIcon:     { color: '#fff', fontSize: 18 },
+  // Coins earned badge on host
+});
+
+// ─── Vibe filter sheet ────────────────────────────────────────────────────────
+function VibeSheet({ visible, value, onSelect, onClose }) {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={fs.overlay} activeOpacity={1} onPress={onClose} />
+      <View style={fs.sheet}>
+        <View style={fs.handle} />
+        <Text style={fs.sheetTitle}>Choose a Vibe</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+          {/* All */}
+          <TouchableOpacity
+            style={[fs.item, !value || value === 'All' ? fs.itemActive : null]}
+            onPress={() => { onSelect('All'); onClose(); }}
+          >
+            <View style={[fs.itemIcon, { backgroundColor: '#1e2028' }]}>
+              <Text style={{ fontSize: 20 }}>✨</Text>
+            </View>
+            <View style={fs.itemInfo}>
+              <Text style={[fs.itemLabel, (!value || value === 'All') && { color: '#fff' }]}>All Vibes</Text>
+              <Text style={fs.itemSub}>Show every type of event</Text>
+            </View>
+            {(!value || value === 'All') && <Text style={fs.check}>✓</Text>}
+          </TouchableOpacity>
+          {TYPES_LIST.map(t => (
+            <TouchableOpacity
+              key={t.id}
+              style={[fs.item, value === t.id && { backgroundColor: t.color + '15', borderColor: t.color + '44' }]}
+              onPress={() => { onSelect(t.id); onClose(); }}
+            >
+              <View style={[fs.itemIcon, { backgroundColor: t.color + '25' }]}>
+                <Text style={{ fontSize: 20 }}>{t.icon}</Text>
+              </View>
+              <View style={fs.itemInfo}>
+                <Text style={[fs.itemLabel, value === t.id && { color: t.color }]}>{t.label}</Text>
+              </View>
+              {value === t.id && <Text style={[fs.check, { color: t.color }]}>✓</Text>}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Country filter sheet ─────────────────────────────────────────────────────
+function CountrySheet({ visible, value, countries, sorted, onSelect, onClose }) {
+  // Group countries by region
+  const grouped = useMemo(() => {
+    const map = {};
+    for (const flag of countries) {
+      const region = getRegion(flag);
+      if (!map[region]) map[region] = [];
+      map[region].push(flag);
+    }
+    return Object.entries(map).sort(([a], [b]) => a.localeCompare(b));
+  }, [countries]);
+
+  const useGrouped = countries.length > 5;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={fs.overlay} activeOpacity={1} onPress={onClose} />
+      <View style={[fs.sheet, { maxHeight: '85%' }]}>
+        <View style={fs.handle} />
+        <Text style={fs.sheetTitle}>Choose a Country</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+          {/* Worldwide */}
+          <TouchableOpacity
+            style={[fs.item, !value && fs.itemActive]}
+            onPress={() => { onSelect(null); onClose(); }}
+          >
+            <View style={[fs.itemIcon, { backgroundColor: '#1e2028' }]}>
+              <Text style={{ fontSize: 22 }}>🌍</Text>
+            </View>
+            <View style={fs.itemInfo}>
+              <Text style={[fs.itemLabel, !value && { color: '#fff' }]}>Worldwide</Text>
+              <Text style={fs.itemSub}>{sorted.length} events total</Text>
+            </View>
+            {!value && <Text style={fs.check}>✓</Text>}
+          </TouchableOpacity>
+
+          {useGrouped ? (
+            // Grouped by region
+            grouped.map(([region, flags]) => (
+              <View key={region}>
+                <Text style={fs.regionHeader}>{region}</Text>
+                {flags.map(flag => {
+                  const count = sorted.filter(e => e.hostCountry === flag).length;
+                  return (
+                    <TouchableOpacity
+                      key={flag}
+                      style={[fs.item, value === flag && { backgroundColor: '#6C47FF18', borderColor: '#6C47FF44' }]}
+                      onPress={() => { onSelect(flag); onClose(); }}
+                    >
+                      <View style={[fs.itemIcon, { backgroundColor: '#1e2028' }]}>
+                        <Text style={{ fontSize: 26 }}>{flag}</Text>
+                      </View>
+                      <View style={fs.itemInfo}>
+                        <Text style={[fs.itemLabel, value === flag && { color: '#6C47FF' }]}>
+                          {count} event{count !== 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                      {value === flag && <Text style={[fs.check, { color: '#6C47FF' }]}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))
+          ) : (
+            // Flat list (5 or fewer)
+            countries.map(flag => {
+              const count = sorted.filter(e => e.hostCountry === flag).length;
+              return (
+                <TouchableOpacity
+                  key={flag}
+                  style={[fs.item, value === flag && { backgroundColor: '#6C47FF18', borderColor: '#6C47FF44' }]}
+                  onPress={() => { onSelect(flag); onClose(); }}
+                >
+                  <View style={[fs.itemIcon, { backgroundColor: '#1e2028' }]}>
+                    <Text style={{ fontSize: 26 }}>{flag}</Text>
+                  </View>
+                  <View style={fs.itemInfo}>
+                    <Text style={[fs.itemLabel, value === flag && { color: '#6C47FF' }]}>
+                      {count} event{count !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  {value === flag && <Text style={[fs.check, { color: '#6C47FF' }]}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const fs = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sheet:      { backgroundColor: '#0d0f14', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+                padding: 24, maxHeight: '75%', borderTopWidth: 1, borderColor: '#1e2028' },
+  handle:     { width: 40, height: 4, backgroundColor: '#2a2c34', borderRadius: 2,
+                alignSelf: 'center', marginBottom: 22 },
+  sheetTitle: { color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 18 },
+  item:       { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14,
+                paddingHorizontal: 4, borderRadius: 16, marginBottom: 4,
+                borderWidth: 1, borderColor: 'transparent' },
+  itemActive: { backgroundColor: '#ffffff0a', borderColor: '#ffffff15' },
+  itemIcon:   { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  itemInfo:   { flex: 1 },
+  itemLabel:  { color: '#888', fontSize: 15, fontWeight: '700' },
+  itemSub:    { color: '#444', fontSize: 12, marginTop: 2 },
+  check:        { color: '#fff', fontSize: 16, fontWeight: '900' },
+  regionHeader: { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase',
+                  letterSpacing: 1, marginTop: 20, marginBottom: 6, paddingHorizontal: 4 },
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function EventsScreen({ navigation, user }) {
   const [events,        setEvents]        = useState([]);
   const [filter,        setFilter]        = useState('All');
-  const [showCreate,    setShowCreate]    = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [search,        setSearch]        = useState('');
+  const [countryFilter, setCountryFilter] = useState(null);
+  const [liveOnly,         setLiveOnly]         = useState(false);
+  const [showVibeFilter,   setShowVibeFilter]   = useState(false);
+  const [showCountryFilter,setShowCountryFilter] = useState(false);
+  const [showCreate,       setShowCreate]       = useState(false);
+  const [selectedEvent,    setSelectedEvent]    = useState(null);
+  const [savedCountries,   setSavedCountries]   = useState([]);
   const { isPro } = usePremium();
   const socket     = getSocket();
 
@@ -662,6 +1180,13 @@ export default function EventsScreen({ navigation, user }) {
     return () => { socket.off('events_list'); socket.off('event_updated'); };
   }, []);
 
+  // Load countries the user follows (pinned in Bond Feed)
+  useEffect(() => {
+    AsyncStorage.getItem('bond_saved_countries').then(raw => {
+      if (raw) setSavedCountries(JSON.parse(raw));
+    });
+  }, []);
+
   // Use real events if any, otherwise demo
   const sourceEvents = events.length > 0 ? events : DEMO_EVENTS;
 
@@ -669,18 +1194,54 @@ export default function EventsScreen({ navigation, user }) {
     [...sourceEvents].sort((a, b) => (b.attendees?.length || 0) - (a.attendees?.length || 0)),
   [sourceEvents]);
 
+  // Countries that actually have events (for the world row)
+  const availableCountries = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const ev of sorted) {
+      if (ev.hostCountry && !seen.has(ev.hostCountry)) {
+        seen.add(ev.hostCountry);
+        result.push(ev.hostCountry);
+      }
+    }
+    return result;
+  }, [sorted]);
+
+  // Live events from countries the user follows
+  const followingLiveEvents = useMemo(() =>
+    savedCountries.length > 0
+      ? sorted.filter(e => isLive(e) && savedCountries.includes(e.hostCountry))
+      : [],
+  [sorted, savedCountries]);
+
+  // Countries that have following live events (for the strip)
+  const followingLiveCountries = useMemo(() =>
+    [...new Set(followingLiveEvents.map(e => e.hostCountry))],
+  [followingLiveEvents]);
+
   const filtered = useMemo(() => {
-    if (filter === 'All') return sorted;
-    return sorted.filter(e => e.type === filter);
-  }, [sorted, filter]);
+    let list = sorted;
+    if (liveOnly)         list = list.filter(e => isLive(e));
+    if (filter !== 'All') list = list.filter(e => e.type === filter);
+    if (countryFilter)    list = list.filter(e => e.hostCountry === countryFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(e =>
+        e.title?.toLowerCase().includes(q) ||
+        e.hostName?.toLowerCase().includes(q) ||
+        e.description?.toLowerCase().includes(q) ||
+        e.tags?.some(t => t.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [sorted, filter, countryFilter, search, liveOnly]);
 
-  const featuredEvent = filtered[0] || null;
-  const listEvents    = filtered.slice(1);
-
-  const liveEvents    = listEvents.filter(e => isLive(e));
-  const upcomingEvents= listEvents.filter(e => !isLive(e));
-
-  const liveCount = sourceEvents.filter(e => isLive(e)).length;
+  const featuredEvent  = filtered[0] || null;
+  const listEvents     = filtered.slice(1);
+  const liveEvents     = listEvents.filter(e => isLive(e));
+  const upcomingEvents = listEvents.filter(e => !isLive(e));
+  const liveCount      = sourceEvents.filter(e => isLive(e)).length;
+  const hasFilters     = filter !== 'All' || countryFilter || search.trim() || liveOnly;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -693,9 +1254,9 @@ export default function EventsScreen({ navigation, user }) {
         <View style={styles.headerCenter}>
           <Text style={styles.title}>Events</Text>
           {liveCount > 0 && (
-            <View style={styles.livePill}>
-              <View style={styles.liveDot} />
-              <Text style={styles.livePillText}>{liveCount} live</Text>
+            <View style={styles.liveHeaderPill}>
+              <View style={styles.liveHeaderDot} />
+              <Text style={styles.liveHeaderTxt}>{liveCount} live</Text>
             </View>
           )}
         </View>
@@ -712,25 +1273,129 @@ export default function EventsScreen({ navigation, user }) {
         )}
       </View>
 
-      {/* ── Filter chips ── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersRow}
-        style={{ flexGrow: 0, marginBottom: 16 }}
+      {/* ── Search bar ── */}
+      <View style={styles.searchWrap}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search events, hosts, topics..."
+          placeholderTextColor="#555"
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.searchClear}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Live Around the World toggle ── */}
+      <TouchableOpacity
+        style={[styles.liveToggle, liveOnly && styles.liveToggleOn]}
+        onPress={() => setLiveOnly(v => !v)}
+        activeOpacity={0.8}
       >
-        {FILTERS.map(f => (
-          <FilterChip key={f} id={f} active={filter === f} onPress={() => setFilter(f)} />
-        ))}
-      </ScrollView>
+        <View style={[styles.livePulseDot, liveOnly && styles.livePulseDotOn]} />
+        <Text style={[styles.liveToggleTxt, liveOnly && styles.liveToggleTxtOn]}>
+          {liveOnly ? `${liveCount} Live Now — tap to clear` : 'Live Around the World'}
+        </Text>
+        <Text style={[styles.liveToggleChev, liveOnly && { color: '#e53935' }]}>
+          {liveOnly ? '✕' : '›'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* ── Countries you follow with live events ── */}
+      {followingLiveCountries.length > 0 && (
+        <View style={styles.followingStrip}>
+          <Text style={styles.followingStripLabel}>🌍 Following Live</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 20 }}>
+            {followingLiveCountries.map(flag => {
+              const count = followingLiveEvents.filter(e => e.hostCountry === flag).length;
+              const isActive = countryFilter === flag;
+              return (
+                <TouchableOpacity
+                  key={flag}
+                  style={[styles.followingPill, isActive && styles.followingPillOn]}
+                  onPress={() => setCountryFilter(isActive ? null : flag)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.followingPillFlag}>{flag}</Text>
+                  <View style={styles.followingPillDot} />
+                  <Text style={[styles.followingPillCount, isActive && { color: '#fff' }]}>{count} live</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Vibe + Country filter buttons ── */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[styles.filterBtn, filter !== 'All' && { borderColor: (TYPE_META[filter]?.color || '#6C47FF') + '88', backgroundColor: (TYPE_META[filter]?.color || '#6C47FF') + '18' }]}
+          onPress={() => setShowVibeFilter(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.filterBtnIcon}>
+            {filter !== 'All' ? TYPE_META[filter]?.icon : '🎭'}
+          </Text>
+          <View style={styles.filterBtnText}>
+            <Text style={styles.filterBtnLabel}>Vibe</Text>
+            <Text style={[styles.filterBtnValue, filter !== 'All' && { color: TYPE_META[filter]?.color }]}>
+              {filter !== 'All' ? TYPE_META[filter]?.label : 'All types'}
+            </Text>
+          </View>
+          <Text style={styles.filterBtnChev}>▾</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterBtn, countryFilter && { borderColor: '#6C47FF88', backgroundColor: '#6C47FF18' }]}
+          onPress={() => setShowCountryFilter(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.filterBtnIcon}>{countryFilter || '🌍'}</Text>
+          <View style={styles.filterBtnText}>
+            <Text style={styles.filterBtnLabel}>Country</Text>
+            <Text style={[styles.filterBtnValue, countryFilter && { color: '#6C47FF' }]}>
+              {countryFilter
+                ? `${sorted.filter(e => e.hostCountry === countryFilter).length} events`
+                : 'Worldwide'}
+            </Text>
+          </View>
+          <Text style={styles.filterBtnChev}>▾</Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+        {/* ── Live in countries you follow ── */}
+        {followingLiveEvents.length > 0 && !countryFilter && (
+          <>
+            <SectionLabel icon="🌍" title="Live in Countries You Follow" count={followingLiveEvents.length} />
+            <View style={styles.listBlock}>
+              {followingLiveEvents.map((item, i) => (
+                <EventCard
+                  key={item.id} item={item} index={i}
+                  onPress={ev => setSelectedEvent(ev)}
+                  onHostPress={() => navigation.navigate('Profile', { profileUser: { userId: item.hostId, username: item.hostName, country: item.hostCountry } })}
+                />
+              ))}
+            </View>
+          </>
+        )}
 
         {/* ── Featured ── */}
         {featuredEvent && (
           <>
             <SectionLabel icon="⭐" title="Featured" count={null} />
-            <FeaturedCard item={featuredEvent} onPress={() => setSelectedEvent(featuredEvent)} />
+            <FeaturedCard
+              item={featuredEvent}
+              onPress={() => setSelectedEvent(featuredEvent)}
+              onHostPress={() => navigation.navigate('Profile', { profileUser: { userId: featuredEvent.hostId, username: featuredEvent.hostName, country: featuredEvent.hostCountry } })}
+            />
           </>
         )}
 
@@ -740,7 +1405,11 @@ export default function EventsScreen({ navigation, user }) {
             <SectionLabel icon="🔴" title="Happening Now" count={liveEvents.length} />
             <View style={styles.listBlock}>
               {liveEvents.map((item, i) => (
-                <EventCard key={item.id} item={item} index={i} onPress={ev => setSelectedEvent(ev)} />
+                <EventCard
+                  key={item.id} item={item} index={i}
+                  onPress={ev => setSelectedEvent(ev)}
+                  onHostPress={() => navigation.navigate('Profile', { profileUser: { userId: item.hostId, username: item.hostName, country: item.hostCountry } })}
+                />
               ))}
             </View>
           </>
@@ -752,7 +1421,11 @@ export default function EventsScreen({ navigation, user }) {
             <SectionLabel icon="📅" title="Upcoming" count={upcomingEvents.length} />
             <View style={styles.listBlock}>
               {upcomingEvents.map((item, i) => (
-                <EventCard key={item.id} item={item} index={i} onPress={ev => setSelectedEvent(ev)} />
+                <EventCard
+                  key={item.id} item={item} index={i}
+                  onPress={ev => setSelectedEvent(ev)}
+                  onHostPress={() => navigation.navigate('Profile', { profileUser: { userId: item.hostId, username: item.hostName, country: item.hostCountry } })}
+                />
               ))}
             </View>
           </>
@@ -761,11 +1434,23 @@ export default function EventsScreen({ navigation, user }) {
         {/* ── Empty ── */}
         {filtered.length === 0 && (
           <View style={styles.empty}>
-            <Text style={{ fontSize: 52 }}>🎉</Text>
-            <Text style={styles.emptyTitle}>No events yet</Text>
+            <Text style={{ fontSize: 52 }}>{hasFilters ? '🔍' : '🎉'}</Text>
+            <Text style={styles.emptyTitle}>{hasFilters ? 'No matches' : 'No events yet'}</Text>
             <Text style={styles.emptySub}>
-              {isPro ? 'Create the first event and bring people together!' : 'Check back soon or upgrade to host your own.'}
+              {hasFilters
+                ? 'Try a different search, type, or country.'
+                : isPro
+                ? 'Create the first event and bring people together!'
+                : 'Check back soon or upgrade to host your own.'}
             </Text>
+            {hasFilters && (
+              <TouchableOpacity
+                style={styles.clearFiltersBtn}
+                onPress={() => { setSearch(''); setFilter('All'); setCountryFilter(null); setLiveOnly(false); }}
+              >
+                <Text style={styles.clearFiltersTxt}>Clear all filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -791,6 +1476,21 @@ export default function EventsScreen({ navigation, user }) {
         event={selectedEvent}
         onClose={() => setSelectedEvent(null)}
         user={user}
+        navigation={navigation}
+      />
+      <VibeSheet
+        visible={showVibeFilter}
+        value={filter}
+        onSelect={v => setFilter(v)}
+        onClose={() => setShowVibeFilter(false)}
+      />
+      <CountrySheet
+        visible={showCountryFilter}
+        value={countryFilter}
+        countries={availableCountries}
+        sorted={sorted}
+        onSelect={v => setCountryFilter(v)}
+        onClose={() => setShowCountryFilter(false)}
       />
     </SafeAreaView>
   );
@@ -799,25 +1499,72 @@ export default function EventsScreen({ navigation, user }) {
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: '#050507' },
 
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                  paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  backBtn:      { width: 40, height: 40, borderRadius: 13, backgroundColor: '#0d0f14',
-                  alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e2028' },
-  backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title:        { color: '#fff', fontSize: 22, fontWeight: '900' },
-  livePill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e5393518',
-                  borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, borderWidth: 1, borderColor: '#e5393540' },
-  liveDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: '#e53935' },
-  livePillText: { color: '#e53935', fontSize: 11, fontWeight: '700' },
+  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
+  headerCenter:   { flex: 1, alignItems: 'center' },
+  liveHeaderPill: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5,
+                    backgroundColor: '#e5393520', borderRadius: 10, paddingHorizontal: 10,
+                    paddingVertical: 4, borderWidth: 1, borderColor: '#e5393540' },
+  liveHeaderDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#e53935' },
+  liveHeaderTxt:  { color: '#e53935', fontSize: 11, fontWeight: '700' },
+  backBtn:        { width: 44, height: 44, borderRadius: 14, backgroundColor: '#0d0f14',
+                    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e2028' },
+  backIcon:       { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
+
+  // Filter row (Vibe + Country buttons)
+  filterRow:      { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 20 },
+  filterBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
+                    backgroundColor: '#0d0f14', borderRadius: 16, paddingHorizontal: 14,
+                    paddingVertical: 13, borderWidth: 1, borderColor: '#1e2028' },
+  filterBtnIcon:  { fontSize: 20 },
+  filterBtnText:  { flex: 1 },
+  filterBtnLabel: { color: '#555', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  filterBtnValue: { color: '#ccc', fontSize: 13, fontWeight: '700', marginTop: 1 },
+  filterBtnChev:  { color: '#444', fontSize: 14 },
+
+  // Search
+  searchWrap:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 14,
+                  backgroundColor: '#0d0f14', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 14,
+                  borderWidth: 1, borderColor: '#1e2028', gap: 10 },
+  searchIcon:   { fontSize: 15 },
+  searchInput:  { flex: 1, color: '#fff', fontSize: 14, fontWeight: '500', padding: 0 },
+  searchClear:  { color: '#444', fontSize: 13, fontWeight: '700', paddingLeft: 4 },
+
+  // Country pills
+  countryRow:   { paddingHorizontal: 16, gap: 8, paddingBottom: 12, paddingTop: 4 },
+  countryPill:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12,
+                  paddingVertical: 8, borderRadius: 20, backgroundColor: '#0d0f14',
+                  borderWidth: 1, borderColor: '#1e2028' },
+  countryPillActive: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF66' },
+  countryPillFlag:   { fontSize: 16 },
+  countryPillTxt:    { color: '#888', fontSize: 12, fontWeight: '700' },
+  countryPillTxtActive: { color: '#6C47FF' },
+
+  // Clear filters
+  clearFiltersBtn: { marginTop: 8, backgroundColor: '#111318', borderRadius: 14,
+                     paddingHorizontal: 22, paddingVertical: 11, borderWidth: 1, borderColor: '#1e2028' },
+  clearFiltersTxt: { color: '#6C47FF', fontSize: 14, fontWeight: '700' },
+  title:        { color: '#fff', fontSize: 26, fontWeight: '900' },
+
+  // Live Around the World toggle
+  liveToggle:      { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16,
+                     marginBottom: 14, backgroundColor: '#0d0f14', borderRadius: 16,
+                     paddingHorizontal: 16, paddingVertical: 15,
+                     borderWidth: 1, borderColor: '#e5393530' },
+  liveToggleOn:    { backgroundColor: '#1a0505', borderColor: '#e5393580' },
+  livePulseDot:    { width: 9, height: 9, borderRadius: 5, backgroundColor: '#e53935' },
+  livePulseDotOn:  { backgroundColor: '#ff1a1a' },
+  liveToggleTxt:   { flex: 1, color: '#888', fontSize: 14, fontWeight: '700' },
+  liveToggleTxtOn: { color: '#e53935' },
+  liveToggleChev:  { color: '#444', fontSize: 18, fontWeight: '300' },
   createBtn:    { borderRadius: 14, overflow: 'hidden' },
   createGrad:   { paddingHorizontal: 16, paddingVertical: 9 },
   createText:   { color: '#fff', fontSize: 14, fontWeight: '800' },
-  proHint:      { backgroundColor: '#f59e0b18', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
-                  borderWidth: 1, borderColor: '#f59e0b33' },
-  proHintTxt:   { color: '#f59e0b', fontSize: 13, fontWeight: '800' },
+  proHint:      { backgroundColor: '#FFB70018', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
+                  borderWidth: 1, borderColor: '#FFB70033' },
+  proHintTxt:   { color: '#FFB700', fontSize: 13, fontWeight: '800' },
 
-  filtersRow:   { paddingHorizontal: 20, gap: 8 },
+  filtersRow:   { paddingHorizontal: 20, gap: 8, paddingVertical: 4 },
 
   scroll:       { paddingBottom: 60 },
   listBlock:    { paddingHorizontal: 20, marginBottom: 8 },
@@ -828,10 +1575,22 @@ const styles = StyleSheet.create({
 
   proCard:      { marginHorizontal: 20, marginTop: 24, borderRadius: 22, overflow: 'hidden' },
   proGrad:      { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18,
-                  borderWidth: 1, borderColor: '#f59e0b22', borderRadius: 22 },
-  proTitle:     { color: '#f59e0b', fontSize: 14, fontWeight: '800' },
-  proSub:       { color: '#f59e0b66', fontSize: 12, marginTop: 3, lineHeight: 17 },
-  proBadge:     { backgroundColor: '#f59e0b22', borderRadius: 10, paddingHorizontal: 10,
-                  paddingVertical: 5, borderWidth: 1, borderColor: '#f59e0b55' },
-  proBadgeTxt:  { color: '#f59e0b', fontSize: 12, fontWeight: '800' },
+                  borderWidth: 1, borderColor: '#FFB70022', borderRadius: 22 },
+  proTitle:     { color: '#FFB700', fontSize: 14, fontWeight: '800' },
+  proSub:       { color: '#FFB70066', fontSize: 12, marginTop: 3, lineHeight: 17 },
+  proBadge:     { backgroundColor: '#FFB70022', borderRadius: 10, paddingHorizontal: 10,
+                  paddingVertical: 5, borderWidth: 1, borderColor: '#FFB70055' },
+  proBadgeTxt:  { color: '#FFB700', fontSize: 12, fontWeight: '800' },
+
+  // Following live strip
+  followingStrip:      { paddingHorizontal: 20, paddingVertical: 10, gap: 8 },
+  followingStripLabel: { color: '#888', fontSize: 11, fontWeight: '700', textTransform: 'uppercase',
+                         letterSpacing: 0.8, marginBottom: 6 },
+  followingPill:       { flexDirection: 'row', alignItems: 'center', gap: 6,
+                         backgroundColor: '#161820', borderRadius: 20, paddingHorizontal: 12,
+                         paddingVertical: 7, borderWidth: 1, borderColor: '#e5393530' },
+  followingPillOn:     { backgroundColor: '#e5393520', borderColor: '#e53935' },
+  followingPillFlag:   { fontSize: 18 },
+  followingPillDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#e53935' },
+  followingPillCount:  { color: '#e53935', fontSize: 12, fontWeight: '700' },
 });

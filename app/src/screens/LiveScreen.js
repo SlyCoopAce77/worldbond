@@ -6,44 +6,11 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
+import { stringToColor, formatDuration } from '../utils/apiUtils';
+import FloatingReaction from '../components/FloatingReaction';
 
 const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
-
-function formatDuration(secs) {
-  const m = Math.floor(secs / 60).toString().padStart(2, '0');
-  const s = (secs % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-function stringToColor(str = '') {
-  const p = ['#e57373','#ba68c8','#4fc3f7','#81c784','#ffb74d','#f06292','#4db6ac','#7986cb'];
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return p[Math.abs(h) % p.length];
-}
-
-// Floating emoji that animates up and fades out
-function FloatingReaction({ emoji, id, onDone }) {
-  const y   = useRef(new Animated.Value(0)).current;
-  const op  = useRef(new Animated.Value(1)).current;
-  const x   = useRef(Math.random() * width * 0.5 + width * 0.1).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(y,  { toValue: -220, duration: 1800, useNativeDriver: true }),
-      Animated.timing(op, { toValue: 0,    duration: 1800, useNativeDriver: true }),
-    ]).start(() => onDone(id));
-  }, []);
-
-  return (
-    <Animated.Text
-      style={[styles.floatEmoji, { left: x, bottom: 160, transform: [{ translateY: y }], opacity: op }]}
-    >
-      {emoji}
-    </Animated.Text>
-  );
-}
 
 export default function LiveScreen({ route, navigation }) {
   const { user } = route.params || {};
@@ -325,7 +292,6 @@ const styles = StyleSheet.create({
   hostAvatarBg: { width: 160, height: 160, borderRadius: 80, alignItems: 'center', justifyContent: 'center' },
   hostInitial:  { color: '#fff', fontSize: 72, fontWeight: '900' },
 
-  floatEmoji:   { position: 'absolute', fontSize: 36, zIndex: 99 },
 
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { getAccessToken } from '../services/authApi';
+import { authHeader } from '../utils/apiUtils';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import GiftPicker from '../components/GiftPicker';
@@ -94,11 +94,6 @@ const TODAY_PULSES = getDailyPulses();
 
 function todayLabel() {
   return new Date().toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-async function authHeader() {
-  const token = await getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function timeStr(ts) {

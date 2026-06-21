@@ -8,45 +8,32 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getAccessToken } from '../services/authApi';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
 import { getCountryFlag, getCountryName } from '../utils/countryUtils';
+import { WorldMark } from '../components/BondLogo';
 
 const { width } = Dimensions.get('window');
 const TABS = [
   { id: 'icebreaker', icon: '💡', label: 'Icebreaker' },
   { id: 'random',     icon: '🌀', label: 'Random'     },
-  { id: 'language',   icon: '🗣️', label: 'Language'   },
   { id: 'people',     icon: '👥', label: 'People'     },
 ];
 const TAB_W = width / TABS.length;
 
-const LANG_FLAGS = { en:'🇺🇸', ja:'🇯🇵', es:'🇪🇸', fr:'🇫🇷', de:'🇩🇪', pt:'🇧🇷', zh:'🇨🇳', ko:'🇰🇷', ar:'🇸🇦', hi:'🇮🇳', th:'🇹🇭', ru:'🇷🇺' };
-const LANG_NAMES = { en:'English', ja:'Japanese', es:'Spanish', fr:'French', de:'German', pt:'Portuguese', zh:'Chinese', ko:'Korean', ar:'Arabic', hi:'Hindi', th:'Thai', ru:'Russian' };
 
+
+import { stringToColor } from '../utils/apiUtils';
 
 const CT_META = {
-  dating:           { emoji:'❤️',  label:'Dating',    color:'#e91e63' },
-  friendship:       { emoji:'🤝',  label:'Friends',   color:'#2196f3' },
-  travel:           { emoji:'✈️',  label:'Travel',    color:'#ff9800' },
-  language:         { emoji:'🗣️', label:'Language',  color:'#26c6da' },
-  mentorship:       { emoji:'🎓',  label:'Mentorship',color:'#57f287' },
+  dating:     { emoji:'❤️',  label:'Dating',           color:'#e91e63' },
+  friendship: { emoji:'🤝',  label:'Friends',          color:'#2196f3' },
+  travel:     { emoji:'✈️',  label:'Travel',           color:'#ff9800' },
+  language:   { emoji:'💬',  label:'Language Exchange', color:'#9c27b0' },
+  mentorship: { emoji:'🎓',  label:'Mentorship',       color:'#57f287' },
 };
-
-async function authHeader() {
-  const token = await getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-function stringToColor(str = '') {
-  const p = ['#e57373','#ba68c8','#4fc3f7','#81c784','#ffb74d','#f06292','#4db6ac','#7986cb'];
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return p[Math.abs(h) % p.length];
-}
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ photo_url, name, size = 44 }) {
@@ -71,6 +58,7 @@ function IcebreakerTab({ user, navigation }) {
   const [expandedComments, setExpandedComments] = useState(new Set());
   const [commentTexts,     setCommentTexts]     = useState({});
   const [likedCommentIds,  setLikedCommentIds]  = useState(new Set());
+  const [myResponseId,     setMyResponseId]     = useState(null);
   const scrollRef = useRef(null);
   const socket = getSocket();
 
@@ -99,10 +87,12 @@ function IcebreakerTab({ user, navigation }) {
         if (mine) {
           setSubmitted(true);
           setMyAnswerText(mine.text);
+          setMyResponseId(mine.id);
         } else {
           setSubmitted(false);
           setMyAnswerText('');
           setMyAnswer('');
+          setMyResponseId(null);
         }
       }
     });
@@ -116,6 +106,28 @@ function IcebreakerTab({ user, navigation }) {
     socket.emit('submit_icebreaker', { text: myAnswer.trim() });
     setMyAnswerText(myAnswer.trim());
     setSubmitted(true);
+  }
+
+  function handleDeleteResponse() {
+    if (!myResponseId) return;
+    Alert.alert(
+      'Delete your answer?',
+      'This will remove your response and all reactions to it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            socket.emit('delete_icebreaker_response', { responseId: myResponseId });
+            setSubmitted(false);
+            setMyAnswerText('');
+            setMyAnswer('');
+            setMyResponseId(null);
+          },
+        },
+      ],
+    );
   }
 
   function handleLike(responseId) {
@@ -173,15 +185,18 @@ function IcebreakerTab({ user, navigation }) {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90} style={{ flex: 1 }}>
     <ScrollView ref={scrollRef} contentContainerStyle={tab.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       {/* Question card */}
-      <LinearGradient colors={['#200010', '#120008', '#000000']} style={tab.questionCard}>
+      <LinearGradient colors={['#0d0014', '#1a0033', '#000000']} style={tab.questionCard}>
         <View style={tab.questionTop}>
           <View style={tab.questionBadge}>
             <View style={tab.questionDot} />
-            <Text style={tab.questionBadgeText}>Today's Question</Text>
+            <Text style={tab.questionBadgeText}>🔥 Daily Question</Text>
           </View>
           <Text style={tab.responseCount}>{responses.length} answered 🌍</Text>
         </View>
         <Text style={tab.questionText}>"{question || 'Loading today\'s question…'}"</Text>
+        <View style={tab.questionFooter}>
+          <Text style={tab.questionFooterTxt}>🕛 New question drops at midnight UTC</Text>
+        </View>
       </LinearGradient>
 
       {/* Answer box — shows input before submit, stays as card after */}
@@ -227,6 +242,9 @@ function IcebreakerTab({ user, navigation }) {
                 {getCountryFlag(user?.country)}  {getCountryName(user?.country)}
               </Text>
             </View>
+            <TouchableOpacity onPress={handleDeleteResponse} activeOpacity={0.7} style={tab.myAnswerDeleteBtn}>
+              <Text style={tab.myAnswerDeleteIcon}>✕</Text>
+            </TouchableOpacity>
           </View>
           <Text style={tab.myAnswerText}>{myAnswerText}</Text>
         </View>
@@ -281,7 +299,7 @@ function IcebreakerTab({ user, navigation }) {
                     disabled={!submitted}
                   >
                     <Text style={[tab.likeIcon, isLiked && tab.likeIconActive]}>
-                      {isLiked ? '♥' : '♡'}
+                      👣
                     </Text>
                     <Text style={[tab.footerCount, isLiked && tab.likeCountActive]}>
                       {likeCount}
@@ -310,45 +328,54 @@ function IcebreakerTab({ user, navigation }) {
                     {comments.length === 0 && (
                       <Text style={tab.noComments}>No replies yet — be the first!</Text>
                     )}
-                    {comments.map(c => {
-                      const cKey   = `${r.id}:${c.id}`;
-                      const cLiked = likedCommentIds.has(cKey);
-                      const cFlag  = getCountryFlag(c.country);
+                    {comments.map((c, cIdx) => {
+                      const cKey      = `${r.id}:${c.id}`;
+                      const cLiked    = likedCommentIds.has(cKey);
+                      const cFlag     = getCountryFlag(c.country);
+                      const isLastC   = cIdx === comments.length - 1;
                       return (
                         <View key={c.id} style={tab.commentItem}>
-                          <Avatar photo_url={c.photo_url} name={c.username} size={32} />
+                          {/* Thread rail: logo node + vertical line */}
+                          <View style={tab.threadRail}>
+                            <View style={tab.threadNode}>
+                              <WorldMark size={8} color="#6C47FF" bondColor="#9B72FF" />
+                            </View>
+                            {!isLastC && <View style={tab.threadLine} />}
+                          </View>
+                          {/* Comment content */}
                           <View style={tab.commentBody}>
                             <View style={tab.commentMeta}>
+                              <Avatar photo_url={c.photo_url} name={c.username} size={26} />
                               <Text style={tab.commentName}>{c.username}</Text>
                               <Text style={tab.commentFlag}>{cFlag}</Text>
                             </View>
                             <Text style={tab.commentText}>{c.text}</Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <TouchableOpacity
-                              style={tab.commentLikeBtn}
-                              onPress={() => handleLikeComment(r.id, c.id)}
-                              activeOpacity={submitted ? 0.7 : 1}
-                              disabled={!submitted}
-                            >
-                              <Text style={[tab.commentLikeIcon, cLiked && tab.likeIconActive]}>
-                                {cLiked ? '♥' : '♡'}
-                              </Text>
-                              {(c.likes > 0) && (
-                                <Text style={[tab.commentLikeCount, cLiked && tab.likeCountActive]}>
-                                  {c.likes}
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                            {c.userId === user?.userId && (
+                            <View style={tab.commentActions}>
                               <TouchableOpacity
-                                style={tab.commentDeleteBtn}
-                                onPress={() => handleDeleteComment(r.id, c.id)}
-                                activeOpacity={0.7}
+                                style={tab.commentLikeBtn}
+                                onPress={() => handleLikeComment(r.id, c.id)}
+                                activeOpacity={submitted ? 0.7 : 1}
+                                disabled={!submitted}
                               >
-                                <Text style={tab.commentDeleteIcon}>✕</Text>
+                                <Text style={[tab.commentLikeIcon, cLiked && tab.likeIconActive]}>
+                                  👣
+                                </Text>
+                                {(c.likes > 0) && (
+                                  <Text style={[tab.commentLikeCount, cLiked && tab.likeCountActive]}>
+                                    {c.likes}
+                                  </Text>
+                                )}
                               </TouchableOpacity>
-                            )}
+                              {c.userId === user?.userId && (
+                                <TouchableOpacity
+                                  style={tab.commentDeleteBtn}
+                                  onPress={() => handleDeleteComment(r.id, c.id)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={tab.commentDeleteIcon}>✕</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
                           </View>
                         </View>
                       );
@@ -408,6 +435,8 @@ const tab = StyleSheet.create({
   questionBadgeText: { color: '#6C47FF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   responseCount:     { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '600' },
   questionText:      { color: '#ffffff', fontSize: 19, lineHeight: 30, fontStyle: 'italic', fontWeight: '600', letterSpacing: 0.1 },
+  questionFooter:    { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
+  questionFooterTxt: { color: 'rgba(255,255,255,0.28)', fontSize: 11, fontWeight: '600' },
 
   answerWrap:        { gap: 12 },
   answerInput:       { backgroundColor: '#1e1e2e', color: '#ffffff', borderRadius: 18, padding: 16, fontSize: 15, minHeight: 95, textAlignVertical: 'top', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.22)', lineHeight: 23 },
@@ -417,11 +446,13 @@ const tab = StyleSheet.create({
   submitGrad:        { paddingHorizontal: 22, paddingVertical: 13 },
   submitText:        { color: '#fff', fontSize: 14, fontWeight: '800' },
 
-  myAnswerCard:      { backgroundColor: 'rgba(232,0,61,0.1)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(232,0,61,0.3)', gap: 12 },
-  myAnswerHeader:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  myAnswerName:      { color: '#ffffff', fontSize: 14, fontWeight: '800' },
-  myAnswerMeta:      { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 2 },
-  myAnswerText:      { color: '#ffffff', fontSize: 15, lineHeight: 24 },
+  myAnswerCard:       { backgroundColor: 'rgba(232,0,61,0.1)', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: 'rgba(232,0,61,0.3)', gap: 12 },
+  myAnswerHeader:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  myAnswerName:       { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+  myAnswerMeta:       { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginTop: 2 },
+  myAnswerText:       { color: '#ffffff', fontSize: 15, lineHeight: 24 },
+  myAnswerDeleteBtn:  { padding: 6, marginLeft: 4 },
+  myAnswerDeleteIcon: { color: 'rgba(255,255,255,0.3)', fontSize: 16, fontWeight: '700' },
   liveBadge:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#6C47FF', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   liveDot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: '#fff' },
   liveBadgeText:     { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
@@ -442,8 +473,8 @@ const tab = StyleSheet.create({
 
   responseFooter:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 10 },
   footerBtn:         { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  likeIcon:          { fontSize: 22, color: 'rgba(255,255,255,0.3)' },
-  likeIconActive:    { color: '#6C47FF' },
+  likeIcon:          { fontSize: 20, opacity: 0.3 },
+  likeIconActive:    { opacity: 1 },
   footerCount:       { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
   likeCountActive:   { color: '#6C47FF' },
   commentIcon:       { fontSize: 20 },
@@ -455,17 +486,21 @@ const tab = StyleSheet.create({
   noComments:        { color: 'rgba(255,255,255,0.25)', fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 4 },
   replyHint:         { color: 'rgba(255,255,255,0.2)', fontSize: 11, fontStyle: 'italic', textAlign: 'center' },
 
-  commentItem:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  commentBody:       { flex: 1, gap: 3 },
+  commentItem:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, minHeight: 52 },
+  threadRail:        { width: 20, alignItems: 'center', paddingTop: 2 },
+  threadNode:        { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(108,71,255,0.15)', borderWidth: 1.5, borderColor: 'rgba(108,71,255,0.5)', alignItems: 'center', justifyContent: 'center' },
+  threadLine:        { width: 2, flex: 1, marginTop: 3, backgroundColor: 'rgba(108,71,255,0.25)', borderRadius: 1, minHeight: 20 },
+  commentBody:       { flex: 1, gap: 5, paddingBottom: 8 },
   commentMeta:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentName:       { color: '#ffffff', fontSize: 13, fontWeight: '700' },
-  commentFlag:       { fontSize: 15 },
+  commentFlag:       { fontSize: 14 },
   commentText:       { color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20 },
-  commentLikeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 3, paddingTop: 4, paddingLeft: 4 },
-  commentLikeIcon:   { fontSize: 17, color: 'rgba(255,255,255,0.3)' },
+  commentActions:    { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 2 },
+  commentLikeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  commentLikeIcon:   { fontSize: 14, opacity: 0.3 },
   commentLikeCount:  { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.35)' },
-  commentDeleteBtn:  { paddingTop: 4, paddingLeft: 2 },
-  commentDeleteIcon: { fontSize: 13, color: 'rgba(255,255,255,0.22)' },
+  commentDeleteBtn:  { paddingHorizontal: 2 },
+  commentDeleteIcon: { fontSize: 12, color: 'rgba(255,255,255,0.22)' },
 
   commentInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   commentInput:      { flex: 1, color: '#ffffff', fontSize: 13, paddingVertical: 6 },
@@ -1136,8 +1171,6 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     useRef(new Animated.Value(0.10)).current,
     useRef(new Animated.Value(0.07)).current,
   ];
-  const [ring1, ring2, ring3] = rings;
-  const [op1, op2, op3] = ringOps;
 
   const sig = cardPool[cardIndex % cardPool.length];
 
@@ -1240,7 +1273,6 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     return () => anims.forEach(a => a.stop());
   }, [state, tier]);
 
-  function buildPayload() { return { reach: reachFilter, gender: genderFilter, ageMin, ageMax }; }
   function doNext()    { setCardIndex(i => i + 1); }
   function doConnect() {
     if (outOfBonds) { setShowUpgrade(true); return; }
@@ -1703,8 +1735,8 @@ const fp = StyleSheet.create({
   sheetTitle:     { color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 18 },
   sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
-  lockBadge:      { color: '#f59e0b', fontSize: 10, fontWeight: '800', backgroundColor: '#f59e0b18',
-                    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#f59e0b33' },
+  lockBadge:      { color: '#FFB700', fontSize: 10, fontWeight: '800', backgroundColor: '#FFB70018',
+                    borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FFB70033' },
   lockedSection:  { opacity: 0.35 },
 
   // Reach — 3 wide tiles
@@ -2103,133 +2135,6 @@ const st = StyleSheet.create({
   signalUpgradeBtn:{ marginBottom: 12, backgroundColor: '#6C47FF18', borderRadius: 16, borderWidth: 1, borderColor: '#6C47FF33',
                      paddingHorizontal: 18, paddingVertical: 10 },
   signalUpgradeTxt:{ color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-});
-
-// ─── Language exchange tab ────────────────────────────────────────────────────
-function LanguageTab({ user, navigation }) {
-  const { isPremium } = usePremium();
-  const [partners, setPartners] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [online,   setOnline]   = useState({});
-  const socket = getSocket();
-
-  const fetchPartners = useCallback(async () => {
-    setLoading(true);
-    try {
-      const headers = await authHeader();
-      const { data } = await axios.get(`${SERVER_URL}/api/profiles`, { headers, params: { limit: 30 }, timeout: 8000 });
-      const profiles = (data.profiles || data || []).filter(
-        p => p.language && p.language !== (user.language || user.lang)
-      );
-      setPartners(profiles);
-    } catch {
-      socket.emit('get_users');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchPartners();
-    socket.on('user_list', users => {
-      const map = {};
-      users.forEach(u => { if (u.userId) map[u.userId] = true; });
-      setOnline(map);
-    });
-    if (socket.connected) socket.emit('get_users');
-    else socket.once('connect', () => socket.emit('get_users'));
-    return () => socket.off('user_list');
-  }, []);
-
-  const myLang = user.language || user.lang || 'en';
-  const myFlag = LANG_FLAGS[myLang] || '🌐';
-  const myName = LANG_NAMES[myLang] || myLang.toUpperCase();
-
-  return (
-    <ScrollView contentContainerStyle={lx.scroll} showsVerticalScrollIndicator={false}>
-      {/* Your language */}
-      <LinearGradient colors={['#16181C', '#000000']} style={lx.myBadge}>
-        <Text style={{ fontSize: 36 }}>{myFlag}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={lx.myTitle}>You speak {myName}</Text>
-          <Text style={lx.mySub}>Find partners who can teach you a new language 🌍</Text>
-        </View>
-      </LinearGradient>
-
-      {!isPremium && (
-        <View style={lx.proGate}>
-          <Text style={{ fontSize: 20 }}>🌟</Text>
-          <Text style={lx.proText}>Upgrade to Bond Plus for unlimited language matching</Text>
-        </View>
-      )}
-
-      <Text style={lx.sectionLabel}>Available Partners</Text>
-
-      {loading ? (
-        <View style={lx.loading}>
-          <ActivityIndicator color="#6C47FF" />
-          <Text style={lx.loadingText}>Finding language partners…</Text>
-        </View>
-      ) : partners.length === 0 ? (
-        <View style={lx.loading}>
-          <Text style={{ fontSize: 36 }}>🗣️</Text>
-          <Text style={lx.emptyTitle}>No partners online right now</Text>
-          <Text style={lx.emptyText}>Check back soon — people join from all over the world</Text>
-        </View>
-      ) : (
-        partners.map(p => {
-          const theirLang = p.language || 'en';
-          const theirFlag = LANG_FLAGS[theirLang] || '🌐';
-          const theirName = LANG_NAMES[theirLang] || theirLang.toUpperCase();
-          const isOnline  = online[p.user_id];
-          return (
-            <TouchableOpacity
-              key={p.user_id}
-              style={lx.card}
-              onPress={() => navigation.navigate('Profile', {
-                profileUser: { userId: p.user_id, username: p.display_name, photo_url: p.photo_url, country: p.country, language: p.language },
-                bondUserId: p.user_id,
-              })}
-              activeOpacity={0.85}
-            >
-              <View style={{ position: 'relative' }}>
-                <Avatar photo_url={p.photo_url} name={p.display_name} size={50} />
-                {isOnline && <View style={lx.onlineDot} />}
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={lx.name}>{p.display_name}{p.age ? `, ${p.age}` : ''}</Text>
-                <Text style={lx.country}>{p.country}</Text>
-              </View>
-              <View style={lx.exchangeBadge}>
-                <Text style={lx.exchangeFlags}>{myFlag} ↔ {theirFlag}</Text>
-                <Text style={lx.exchangeNames}>{myName} / {theirName}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })
-      )}
-    </ScrollView>
-  );
-}
-const lx = StyleSheet.create({
-  scroll:        { padding: 20, gap: 12, paddingBottom: 50 },
-  myBadge:       { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#6C47FF30' },
-  myTitle:       { color: '#fff', fontSize: 16, fontWeight: '800' },
-  mySub:         { color: '#ffffff66', fontSize: 12, marginTop: 3, lineHeight: 18 },
-  proGate:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f59e0b15', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#f59e0b30' },
-  proText:       { color: '#f59e0b', fontSize: 13, fontWeight: '600', flex: 1 },
-  sectionLabel:  { color: '#444', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  loading:       { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  loadingText:   { color: '#555', fontSize: 14 },
-  emptyTitle:    { color: '#fff', fontSize: 17, fontWeight: '700' },
-  emptyText:     { color: '#555', fontSize: 13, textAlign: 'center' },
-  card:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#2F3336', gap: 14 },
-  onlineDot:     { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000000' },
-  name:          { color: '#fff', fontSize: 15, fontWeight: '700' },
-  country:       { color: '#555', fontSize: 12 },
-  exchangeBadge: { backgroundColor: '#6C47FF18', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8, alignItems: 'center', gap: 3, borderWidth: 1, borderColor: '#6C47FF35' },
-  exchangeFlags: { color: '#6C47FF', fontSize: 15, fontWeight: '800' },
-  exchangeNames: { color: '#6C47FF88', fontSize: 9, fontWeight: '700' },
 });
 
 // ─── People tab ───────────────────────────────────────────────────────────────
@@ -2643,7 +2548,7 @@ const pe = StyleSheet.create({
   swipeAction:        { alignItems: 'center', justifyContent: 'center', width: 68,
                         borderRadius: 16, marginLeft: 6, paddingVertical: 10, gap: 3 },
   swipeDelete:        { backgroundColor: '#e5393520', borderWidth: 1, borderColor: '#e5393540' },
-  swipeFlag:          { backgroundColor: '#f59e0b20', borderWidth: 1, borderColor: '#f59e0b40' },
+  swipeFlag:          { backgroundColor: '#FFB70020', borderWidth: 1, borderColor: '#FFB70040' },
   swipeReport:        { backgroundColor: '#55555520', borderWidth: 1, borderColor: '#55555540' },
   swipeActionIcon:    { fontSize: 18 },
   swipeActionTxt:     { color: '#888', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
@@ -2715,7 +2620,6 @@ export default function DiscoverScreen({ navigation, user }) {
       {/* ── Content ── */}
       {activeTab === 'icebreaker' && <IcebreakerTab user={user} navigation={navigation} />}
       {activeTab === 'random'     && <RandomTab user={user} navigation={navigation} onMatch={addBondMatch} switchTab={switchTab} />}
-      {activeTab === 'language'   && <LanguageTab user={user} navigation={navigation} />}
       {activeTab === 'people'     && <PeopleTab user={user} navigation={navigation} bondMatches={bondMatches} setBondMatches={setBondMatches} />}
     </SafeAreaView>
   );

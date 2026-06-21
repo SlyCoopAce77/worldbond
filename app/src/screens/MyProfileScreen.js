@@ -9,7 +9,6 @@ import LinearGradient from 'react-native-linear-gradient';
 import Sound from 'react-native-sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-Sound.setCategory('Playback');
 import { launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 import { getSocket } from '../services/socket';
@@ -18,16 +17,9 @@ import { SERVER_URL } from '../services/socket';
 import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
 import { getCountryFlag } from '../utils/countryUtils';
+import { CONNECTION_TYPES } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
-
-const CONNECTION_TYPES = [
-  { key: 'dating',     emoji: '❤️',  label: 'Dating',           color: '#e91e63' },
-  { key: 'friendship', emoji: '🤝',  label: 'Friendship',       color: '#2196f3' },
-  { key: 'travel',     emoji: '✈️',  label: 'Travel Buddy',     color: '#ff9800' },
-  { key: 'language',   emoji: '💬',  label: 'Language Exchange', color: '#9c27b0' },
-  { key: 'mentorship', emoji: '🎓',  label: 'Mentorship',       color: '#4caf50' },
-];
 
 const LANGUAGES = [
   { code: 'en', flag: '🇺🇸', label: 'English' },
@@ -74,6 +66,7 @@ function VoiceNotePlayer({ url }) {
 
   useEffect(() => {
     if (!url) { setLoading(false); setLoadErr(true); return; }
+    Sound.setCategory('Playback');
     const snd = new Sound(url, '', err => {
       if (err) { setLoadErr(true); setLoading(false); return; }
       setDuration(snd.getDuration());
@@ -334,6 +327,23 @@ const impEdit = StyleSheet.create({
   saveTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
 
+// ─── Bond Mark — milestone tier badge ──────────────────────────────────────────
+function BondCrest({ tier }) {
+  if (!tier || tier === 'free') return null;
+  const isPro = tier === 'pro';
+  const bg = isPro ? '#B8860B' : '#5B21B6';
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: isPro ? 2 : 0,
+      paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5,
+      backgroundColor: bg,
+    }}>
+      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>
+      {isPro && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>}
+    </View>
+  );
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { tier, tierInfo, isPremium } = usePremium();
@@ -349,6 +359,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const [tab, setTab]                 = useState('profile');
   const [galleryUploading, setGalleryUploading] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState(null);
 
   const [culturePosts, setCulturePosts] = useState([]);
   const [cultureText, setCultureText]   = useState('');
@@ -428,6 +439,33 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       });
       setProfile(p => ({ ...p, photo_url: data.imageUrl }));
     } catch { Alert.alert('Error', 'Could not upload photo. Try again.'); }
+  }
+
+  async function pickCoverPhoto() {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.85 });
+    if (!result.assets?.[0]) return;
+    const asset = result.assets[0];
+    try {
+      const token = await getAccessToken();
+      const form  = new FormData();
+      form.append('photo',    { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'cover.jpg' });
+      form.append('userId',   user?.userId || '');
+      form.append('username', profile?.display_name || user?.username || '');
+      form.append('country',  profile?.country || user?.country || '');
+      form.append('language', profile?.language || 'en');
+      const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+      });
+      if (!uploadRes.ok) throw new Error('upload failed');
+      const data = await uploadRes.json();
+      await fetch(`${SERVER_URL}/api/profiles/me`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_photo_url: data.imageUrl }),
+      });
+      setCoverPhotoUrl(data.imageUrl);
+      setProfile(p => ({ ...p, cover_photo_url: data.imageUrl }));
+    } catch { Alert.alert('Error', 'Could not upload background. Try again.'); }
   }
 
   async function saveProfile(updates) {
@@ -545,13 +583,32 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           showsVerticalScrollIndicator={false}
           style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
-          {/* ── Hero ── */}
-          <View style={s.hero}>
-            <LinearGradient colors={[tierColor + '70', tierColor + '25', 'transparent']} style={s.heroGrad} />
-            <View style={[s.avatarGlow, { backgroundColor: tierColor }]} />
+          {/* ── Banner ── */}
+          <View style={s.banner}>
+            {(coverPhotoUrl || profile?.cover_photo_url) ? (
+              <Image
+                source={{ uri: coverPhotoUrl || profile.cover_photo_url }}
+                style={s.bannerBg}
+                resizeMode="cover"
+              />
+            ) : (
+              <LinearGradient
+                colors={[tierColor + 'cc', tierColor + '55', tierColor + '22']}
+                style={s.bannerBg}
+              />
+            )}
+            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={s.bannerFade} />
 
+            {/* 3-dot edit cover */}
+            <TouchableOpacity style={s.editBgBtn} onPress={pickCoverPhoto} activeOpacity={0.75}>
+              <Text style={s.editBgDots}>•••</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Avatar action row — overlaps banner seam ── */}
+          <View style={s.avatarActionRow}>
             <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85} style={s.avatarWrap}>
-              <View style={[s.avatarRing, { borderColor: tierColor }]}>
+              <View style={s.avatarRing}>
                 {profile?.photo_url ? (
                   <Image source={{ uri: profile.photo_url }} style={s.avatar} />
                 ) : (
@@ -562,28 +619,41 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
               </View>
               <View style={s.cameraBtn}><Text style={{ fontSize: 13 }}>📷</Text></View>
             </TouchableOpacity>
+          </View>
 
-            <Text style={s.heroName}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
+          {/* ── Profile info ── */}
+          <View style={s.profileInfo}>
+            <View style={s.heroNameRow}>
+              <Text style={s.heroName} numberOfLines={1}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
+              <BondCrest tier={tier} />
+            </View>
             {countryCity ? <Text style={s.heroLoc}>{countryCity} {countryFlag}</Text> : null}
             {profile?.gender ? <Text style={s.heroGender}>{profile.gender}</Text> : null}
+          </View>
 
-            <View style={[s.tierPill, { borderColor: tierColor + '60', backgroundColor: tierColor + '18' }]}>
-              <Text style={[s.tierPillTxt, { color: tierColor }]}>
-                {tier === 'free' ? '🆓 Bond Free' : tier === 'plus' ? '💜 Bond Plus' : '⭐ Bond Pro'}
-              </Text>
+          {/* ── Bio — blended, no label ── */}
+          <TouchableOpacity style={s.headerStory} onPress={() => setShowEdit(true)} activeOpacity={0.7}>
+            {profile?.bio
+              ? <Text style={s.headerBioText}>{profile.bio}</Text>
+              : <Text style={s.headerBioPlaceholder}>Add a bio</Text>}
+          </TouchableOpacity>
+
+          {/* ── Stats — Twitter-style inline text ── */}
+          <View style={s.twitterStats}>
+            <View style={s.twitterStat}>
+              <Text style={s.twitterStatNum}>{matchCount ?? '—'}</Text>
+              <Text style={s.twitterStatLabel}> Bonds</Text>
             </View>
-
-            {/* Footprint strip — pinned countries */}
-            {flagsPlanted.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.fpStrip} contentContainerStyle={s.fpStripContent}>
-                <Text style={s.fpLabel}>👣</Text>
-                {flagsPlanted.map((c, i) => (
-                  <View key={i} style={s.fpFlag}>
-                    <Text style={s.fpFlagEmoji}>{getCountryFlag(c)}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
+            <Text style={s.twitterDot}>·</Text>
+            <View style={s.twitterStat}>
+              <Text style={s.twitterStatNum}>{flagsPlanted.length ?? '—'}</Text>
+              <Text style={s.twitterStatLabel}> Bonding</Text>
+            </View>
+            <Text style={s.twitterDot}>·</Text>
+            <View style={s.twitterStat}>
+              <Text style={s.twitterStatNum}>{myExps.length ?? '—'}</Text>
+              <Text style={s.twitterStatLabel}> Footprints</Text>
+            </View>
           </View>
 
           {/* ── Profile completion ── */}
@@ -601,19 +671,32 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </TouchableOpacity>
           )}
 
-          {/* ── Stats ── */}
-          <View style={s.statsRow}>
-            {[
-              { value: matchCount,         label: 'Bonds',       icon: '🤝' },
-              { value: flagsPlanted.length, label: 'Footprints',  icon: '👣' },
-              { value: myExps.length,      label: 'Experiences', icon: '✨' },
-            ].map(st => (
-              <View key={st.label} style={s.statCard}>
-                <Text style={s.statIcon}>{st.icon}</Text>
-                <Text style={s.statValue}>{st.value ?? '—'}</Text>
-                <Text style={s.statLabel}>{st.label}</Text>
-              </View>
-            ))}
+          {/* ── Moments (photo strip) ── */}
+          <View style={s.section}>
+            <View style={s.sectionRow}>
+              <Text style={s.sectionLabel}>📸 Moments</Text>
+              <Text style={s.galleryCount}>{(profile?.gallery_photos || []).length}/6</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.polaroidRow}>
+              <TouchableOpacity style={s.polaroidAdd} onPress={addGalleryPhoto} disabled={galleryUploading} activeOpacity={0.8}>
+                {galleryUploading ? <ActivityIndicator color="#6C47FF" size="small" /> : <Text style={s.polaroidAddIcon}>+</Text>}
+              </TouchableOpacity>
+              {(profile?.gallery_photos || []).map((url, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={s.polaroid}
+                  onPress={() => setViewingPhoto(url)}
+                  onLongPress={() => removeGalleryPhoto(i)}
+                  activeOpacity={0.9}
+                >
+                  <Image source={{ uri: url }} style={s.polaroidImg} />
+                  <TouchableOpacity style={s.polaroidRemove} onPress={() => removeGalleryPhoto(i)}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '900' }}>✕</Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={s.galleryHint}>Hold a photo to remove it</Text>
           </View>
 
           {/* ── Voice Signature ── */}
@@ -639,23 +722,6 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             )}
           </View>
 
-          {/* ── My Story (bio) ── */}
-          <View style={s.section}>
-            <View style={s.sectionRow}>
-              <Text style={s.sectionLabel}>📖 My Story</Text>
-              <TouchableOpacity onPress={() => setShowEdit(true)}><Text style={s.editLink}>Edit</Text></TouchableOpacity>
-            </View>
-            {profile?.bio ? (
-              <LinearGradient colors={['rgba(108,71,255,0.08)', 'rgba(108,71,255,0.03)']} style={s.storyCard}>
-                <Text style={s.storyQuote}>"</Text>
-                <Text style={s.storyText}>{profile.bio}</Text>
-              </LinearGradient>
-            ) : (
-              <TouchableOpacity style={s.dashedCard} onPress={() => setShowEdit(true)}>
-                <Text style={s.dashedTxt}>+ Tell your story</Text>
-              </TouchableOpacity>
-            )}
-          </View>
 
           {/* ── World Impressions (1 of 1 footprint feature) ── */}
           <View style={s.section}>
@@ -672,35 +738,6 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             ))}
           </View>
 
-          {/* ── Mission Stamps (Here For) ── */}
-          {(profile?.connection_types || []).length > 0 && (
-            <View style={s.section}>
-              <View style={s.sectionRow}>
-                <Text style={s.sectionLabel}>🎯 Mission</Text>
-                <TouchableOpacity onPress={() => setShowEdit(true)}><Text style={s.editLink}>Edit</Text></TouchableOpacity>
-              </View>
-              <View style={s.stampsGrid}>
-                {profile.connection_types.map(key => {
-                  const ct = CONNECTION_TYPES.find(c => c.key === key);
-                  if (!ct) return null;
-                  return (
-                    <View key={key} style={[s.stamp, { borderColor: ct.color + '60', backgroundColor: ct.color + '12' }]}>
-                      <Text style={s.stampEmoji}>{ct.emoji}</Text>
-                      <Text style={[s.stampLabel, { color: ct.color }]}>{ct.label}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-          {(profile?.connection_types || []).length === 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>🎯 Mission</Text>
-              <TouchableOpacity style={s.dashedCard} onPress={() => setShowEdit(true)}>
-                <Text style={s.dashedTxt}>+ What are you here for?</Text>
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* ── Go Live ── */}
           <View style={s.section}>
@@ -719,33 +756,16 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </TouchableOpacity>
           </View>
 
-          {/* ── Photo Strip (horizontal polaroids) ── */}
+          {/* ── Bond Wallet ── */}
           <View style={s.section}>
-            <View style={s.sectionRow}>
-              <Text style={s.sectionLabel}>📸 Moments</Text>
-              <Text style={s.galleryCount}>{(profile?.gallery_photos || []).length}/6</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.polaroidRow}>
-              {/* Add button */}
-              <TouchableOpacity style={s.polaroidAdd} onPress={addGalleryPhoto} disabled={galleryUploading} activeOpacity={0.8}>
-                {galleryUploading ? <ActivityIndicator color="#6C47FF" size="small" /> : <Text style={s.polaroidAddIcon}>+</Text>}
-              </TouchableOpacity>
-              {(profile?.gallery_photos || []).map((url, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={s.polaroid}
-                  onPress={() => setViewingPhoto(url)}
-                  onLongPress={() => removeGalleryPhoto(i)}
-                  activeOpacity={0.9}
-                >
-                  <Image source={{ uri: url }} style={s.polaroidImg} />
-                  <TouchableOpacity style={s.polaroidRemove} onPress={() => removeGalleryPhoto(i)}>
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '900' }}>✕</Text>
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <Text style={s.galleryHint}>Hold a photo to remove it</Text>
+            <Text style={s.sectionLabel}>🪙 Bond Wallet</Text>
+            <TouchableOpacity style={s.walletCard} onPress={() => navigation.navigate('Wallet')} activeOpacity={0.85}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={s.walletTitle}>Bond Coins & Earnings</Text>
+                <Text style={s.walletSub}>View gifts, stamps, and cash out</Text>
+              </View>
+              <Text style={s.walletArrow}>🪙→</Text>
+            </TouchableOpacity>
           </View>
 
           {/* ── Subscription ── */}
@@ -886,28 +906,40 @@ const s = StyleSheet.create({
 
   scroll:          { paddingBottom: 90, gap: 26 },
 
-  // Hero
-  hero:            { alignItems: 'center', paddingTop: 32, paddingBottom: 28, paddingHorizontal: 20 },
-  heroGrad:        { position: 'absolute', top: 0, left: 0, right: 0, height: 260 },
-  avatarGlow:      { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: 0, opacity: 0.12 },
-  avatarWrap:      { marginBottom: 16, position: 'relative' },
-  avatarRing:      { width: 128, height: 128, borderRadius: 64, borderWidth: 3, padding: 3, backgroundColor: 'rgba(0,0,0,0.5)' },
-  avatar:          { width: '100%', height: '100%', borderRadius: 56 },
-  avatarFallback:  { width: '100%', height: '100%', borderRadius: 56, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial:   { color: '#fff', fontSize: 46, fontWeight: '900' },
-  cameraBtn:       { position: 'absolute', bottom: 2, right: 2, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  heroName:        { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.6 },
-  heroLoc:         { color: 'rgba(255,255,255,0.38)', fontSize: 13, marginTop: 4 },
-  heroGender:      { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 2 },
-  tierPill:        { marginTop: 12, borderWidth: 1, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 7 },
-  tierPillTxt:     { fontSize: 13, fontWeight: '800' },
+  // Banner
+  banner:          { height: 185, overflow: 'hidden', backgroundColor: '#05000a' },
+  bannerBg:        { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bannerFade:      { position: 'absolute', bottom: 0, left: 0, right: 0, height: 85 },
+  editBgBtn:       { position: 'absolute', top: 12, right: 14, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', zIndex: 10 },
+  editBgDots:      { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 1.5 },
 
-  // Footprint strip
-  fpStrip:         { marginTop: 16, maxHeight: 44 },
-  fpStripContent:  { alignItems: 'center', gap: 8, paddingHorizontal: 4 },
-  fpLabel:         { fontSize: 16, marginRight: 4 },
-  fpFlag:          { width: 34, height: 34, borderRadius: 17, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  fpFlagEmoji:     { fontSize: 18 },
+  // Avatar action row — overlaps banner seam
+  avatarActionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: -42, paddingBottom: 8 },
+  avatarWrap:      { position: 'relative' },
+  avatarRing:      { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: '#000', backgroundColor: '#000', overflow: 'hidden' },
+  avatar:          { width: '100%', height: '100%' },
+  avatarFallback:  { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  avatarInitial:   { color: '#fff', fontSize: 32, fontWeight: '900' },
+  cameraBtn:       { position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+
+  // Profile info
+  profileInfo:     { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 3 },
+  heroNameRow:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 2 },
+  heroName:        { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  heroLoc:         { color: 'rgba(255,255,255,0.42)', fontSize: 13 },
+  heroGender:      { color: 'rgba(255,255,255,0.28)', fontSize: 12 },
+
+  // Bio — blended inline (no label, no card)
+  headerStory:          { marginHorizontal: 16, marginTop: 8, marginBottom: 2 },
+  headerBioText:        { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21 },
+  headerBioPlaceholder: { color: 'rgba(255,255,255,0.22)', fontSize: 14, lineHeight: 21 },
+
+  // Twitter-style stats
+  twitterStats:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  twitterStat:      { flexDirection: 'row', alignItems: 'baseline' },
+  twitterStatNum:   { color: '#fff', fontSize: 15, fontWeight: '800' },
+  twitterStatLabel: { color: 'rgba(255,255,255,0.42)', fontSize: 14, fontWeight: '400' },
+  twitterDot:       { color: 'rgba(255,255,255,0.2)', fontSize: 16, fontWeight: '300' },
 
   // Completion
   completionBar:   { marginHorizontal: 20, backgroundColor: 'rgba(108,71,255,0.08)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(108,71,255,0.2)' },
@@ -918,11 +950,6 @@ const s = StyleSheet.create({
   completionFill:  { height: '100%', backgroundColor: '#6C47FF', borderRadius: 2 },
 
   // Stats
-  statsRow:        { flexDirection: 'row', gap: 10, paddingHorizontal: 20 },
-  statCard:        { flex: 1, backgroundColor: GLASS, borderRadius: 20, padding: 16, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: BORDER },
-  statIcon:        { fontSize: 18 },
-  statValue:       { color: '#fff', fontSize: 18, fontWeight: '900' },
-  statLabel:       { color: 'rgba(255,255,255,0.32)', fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, textAlign: 'center' },
 
   // Sections
   section:         { paddingHorizontal: 20, gap: 12 },
@@ -976,6 +1003,11 @@ const s = StyleSheet.create({
   subPrice:        { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 4 },
   manageBtn:       { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1 },
   manageTxt:       { fontSize: 13, fontWeight: '700' },
+  walletCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f1116',
+                     borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FFB70033' },
+  walletTitle:     { color: '#fff', fontSize: 15, fontWeight: '800' },
+  walletSub:       { color: '#555', fontSize: 12 },
+  walletArrow:     { color: '#FFB700', fontSize: 18, fontWeight: '800' },
   upgradeCard:     { borderRadius: 20, overflow: 'hidden' },
   upgradeInner:    { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 12 },
   upgradeTitle:    { color: '#fff', fontSize: 15, fontWeight: '900' },

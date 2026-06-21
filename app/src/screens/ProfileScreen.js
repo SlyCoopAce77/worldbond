@@ -2,28 +2,21 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Image, Alert, ActivityIndicator,
-  Animated, Linking, Dimensions, Modal,
+  Animated, Linking, Dimensions, Modal, TextInput,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Sound from 'react-native-sound';
+import { launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { getCountryFlag } from '../utils/countryUtils';
-
-Sound.setCategory('Playback');
+import { usePremium } from '../context/PremiumContext';
+import { stringToColor } from '../utils/apiUtils';
+import { CONNECTION_TYPES } from '../utils/constants';
 
 const { width, height } = Dimensions.get('window');
-const COVER_HEIGHT = 340;
-
-const CONNECTION_TYPES = [
-  { key: 'dating',     emoji: '❤️',  label: 'Dating',           color: '#e91e63' },
-  { key: 'friendship', emoji: '🤝',  label: 'Friendship',       color: '#2196f3' },
-  { key: 'travel',     emoji: '✈️',  label: 'Travel Buddy',     color: '#ff9800' },
-  { key: 'language',   emoji: '💬',  label: 'Language Exchange', color: '#9c27b0' },
-  { key: 'mentorship', emoji: '🎓',  label: 'Mentorship',       color: '#4caf50' },
-];
 
 const SOCIAL_PLATFORMS = [
   { key: 'instagram', label: 'Instagram', icon: '📸', baseUrl: 'https://instagram.com/' },
@@ -32,13 +25,6 @@ const SOCIAL_PLATFORMS = [
   { key: 'snapchat',  label: 'Snapchat',  icon: '👻', baseUrl: 'https://snapchat.com/add/' },
   { key: 'youtube',   label: 'YouTube',   icon: '▶️',  baseUrl: 'https://youtube.com/' },
 ];
-
-function stringToColor(str = '') {
-  const palette = ['#e57373', '#ba68c8', '#4fc3f7', '#81c784', '#ffb74d', '#f06292', '#4db6ac', '#7986cb'];
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return palette[Math.abs(h) % palette.length];
-}
 
 function getReliability(score) {
   if (!score) return { label: 'New',       color: '#888', emoji: '🌱' };
@@ -63,6 +49,7 @@ function VoiceNotePlayer({ url }) {
 
   useEffect(() => {
     if (!url) { setLoading(false); setLoadErr(true); return; }
+    Sound.setCategory('Playback');
     const snd = new Sound(url, '', err => {
       if (err) { setLoadErr(true); setLoading(false); return; }
       setDuration(snd.getDuration());
@@ -216,6 +203,25 @@ const cStyles = StyleSheet.create({
   pct:       { color: '#6C47FF', fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
 });
 
+// ─── Bond Mark — milestone tier badge ──────────────────────────────────────
+// One check = Plus, two checks = Pro. Pill shape (not a circle) so it reads
+// as a progression milestone rather than a generic verify icon.
+function BondCrest({ tier }) {
+  if (!tier || tier === 'free') return null;
+  const isPro = tier === 'pro';
+  const bg = isPro ? '#B8860B' : '#5B21B6';
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: isPro ? 2 : 0,
+      paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5,
+      backgroundColor: bg,
+    }}>
+      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>
+      {isPro && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>}
+    </View>
+  );
+}
+
 // ─── Main screen ───────────────────────────────────────────────────────────
 export default function ProfileScreen({ route, navigation }) {
   const { profileUser, bondUserId, compatibilityScore, scoreBreakdown } = route.params || {};
@@ -230,8 +236,14 @@ export default function ProfileScreen({ route, navigation }) {
   const [followCounts,     setFollowCounts]     = useState({ followers: 0, following: 0 });
   const [countryFlagCount, setCountryFlagCount] = useState(null);
   const [connecting,       setConnecting]       = useState(false);
-  const [connected,   setConnected]   = useState(false);
-  const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [connected,        setConnected]        = useState(false);
+  const [viewingPhoto,     setViewingPhoto]     = useState(null);
+  const [showBondSheet,    setShowBondSheet]    = useState(false);
+  const [bondNote,         setBondNote]         = useState('');
+  const [isLive,           setIsLive]           = useState(false);
+  const [coverPhotoUrl,    setCoverPhotoUrl]    = useState(null);
+
+  const { tierInfo, tier } = usePremium();
 
   const slideAnim = useRef(new Animated.Value(60)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -289,6 +301,20 @@ export default function ProfileScreen({ route, navigation }) {
     return () => socket.off('follow_status', onFollowStatus);
   }, [bondUserId, profileUser?.userId]);
 
+  // Check if this user is currently live
+  useEffect(() => {
+    const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
+    function onStreams(streams) {
+      setIsLive((streams || []).some(s =>
+        s.hostId === targetId || s.hostUserId === targetId || s.userId === targetId
+      ));
+    }
+    socket.on('live_streams', onStreams);
+    if (socket.connected) socket.emit('get_live_streams');
+    else socket.once('connect', () => socket.emit('get_live_streams'));
+    return () => socket.off('live_streams', onStreams);
+  }, [bondUserId, profileUser?.userId]);
+
   // Fetch flag count for this user's country
   useEffect(() => {
     const country = bondProfile?.country || profileUser?.country;
@@ -306,7 +332,12 @@ export default function ProfileScreen({ route, navigation }) {
   function toggleFollow() {
     const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
     if (!targetId) return;
-    socket.emit(following ? 'unfollow_user' : 'follow_user', { targetUserId: targetId });
+    socket.emit(following ? 'unfollow_user' : 'follow_user', {
+      targetUserId: targetId,
+      senderTier:  tierInfo.id,
+      senderBadge: tierInfo.followBadge,
+      priority:    tierInfo.bondPriority,
+    });
     setFollowing(f => !f);
     setFollowCounts(c => ({
       ...c,
@@ -314,17 +345,27 @@ export default function ProfileScreen({ route, navigation }) {
     }));
   }
 
-  async function handleConnect() {
+  async function handleConnect(note = '') {
     if (!bondUserId) return Alert.alert('Unavailable', 'Full Bond profile not loaded yet.');
     setConnecting(true);
+    setShowBondSheet(false);
     try {
       const token = await getAccessToken();
       const ct = (bondProfile?.connection_types || [])[0] || 'friendship';
       await axios.post(`${SERVER_URL}/api/matches`, {
-        targetUserId: bondUserId, connectionType: ct,
+        targetUserId: bondUserId,
+        connectionType: ct,
+        note: note.trim() || undefined,
+        priority: tierInfo.bondPriority,
+        senderTier: tierInfo.id,
+        senderBadge: tierInfo.followBadge,
       }, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 });
       setConnected(true);
-      Alert.alert('Connected! 🎉', `You're now bonded with ${displayName}.`);
+      setBondNote('');
+      Alert.alert(
+        `${tierInfo.bondIcon} Bonded!`,
+        `Your ${tierInfo.bondLabel} request was sent to ${displayName}.`,
+      );
     } catch (err) {
       const msg = err.response?.data?.error || 'Could not connect. Try again.';
       if (msg.includes('already')) setConnected(true);
@@ -333,16 +374,54 @@ export default function ProfileScreen({ route, navigation }) {
   }
 
   function openChat() {
-    if (!bondUserId) return;
+    if (!tierInfo.canMessageAnyone && tierInfo.id === 'free') {
+      Alert.alert(
+        '💬 Chat Requires Plus or Pro',
+        'Upgrade to WorldBond Plus or Pro to message other bonders and start real conversations.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: '🌟 Upgrade', onPress: () => navigation.navigate('Subscription') },
+        ],
+      );
+      return;
+    }
+    const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
+    if (!targetId) return;
     navigation.navigate('Chat', {
       otherUser: {
-        userId:       bondUserId,
+        userId:       targetId,
         display_name: displayName,
-        photo_url:    bondProfile?.photo_url || null,
-        socketId:     profileUser?.socketId,
+        photo_url:    bondProfile?.photo_url || profileUser?.photo_url || null,
+        socketId:     profileUser?.socketId || null,
       },
       currentUser: { socketId: socket.id },
     });
+  }
+
+  async function pickCoverPhoto() {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.85 });
+    if (!result.assets?.[0]) return;
+    const asset = result.assets[0];
+    try {
+      const token = await getAccessToken();
+      const form  = new FormData();
+      form.append('photo',    { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'cover.jpg' });
+      form.append('userId',   profileUser?.userId || '');
+      form.append('username', displayName);
+      form.append('country',  bondProfile?.country || profileUser?.country || '');
+      form.append('language', 'en');
+      const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+      });
+      if (!uploadRes.ok) throw new Error('upload failed');
+      const data = await uploadRes.json();
+      await fetch(`${SERVER_URL}/api/profiles/me`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_photo_url: data.imageUrl }),
+      });
+      setCoverPhotoUrl(data.imageUrl);
+    } catch { Alert.alert('Error', 'Could not upload cover. Try again.'); }
   }
 
   const displayName        = bondProfile?.display_name || profileUser?.username || 'Unknown';
@@ -360,93 +439,121 @@ export default function ProfileScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         bounces
       >
-        {/* ── Full-bleed cover photo ─────────────────────── */}
-        <View style={styles.cover}>
-          {hasPhoto ? (
-            <Image source={{ uri: bondProfile.photo_url }} style={styles.coverImg} />
+        {/* ── Banner ── */}
+        <View style={styles.banner}>
+          {(coverPhotoUrl || bondProfile?.cover_photo_url) ? (
+            <Image source={{ uri: coverPhotoUrl || bondProfile.cover_photo_url }} style={styles.bannerBg} resizeMode="cover" />
           ) : (
-            <LinearGradient colors={[avatarColor + 'cc', avatarColor + '33', '#000000']} style={styles.coverImg}>
-              <Text style={styles.coverInitial}>{displayName[0]?.toUpperCase()}</Text>
-            </LinearGradient>
+            <LinearGradient colors={['#160020', '#0c0016', '#06000e', '#020006']} style={styles.bannerBg} />
           )}
+          {/* Bottom fade into dark content */}
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.bannerFade} />
 
-          {/* Gradient overlay */}
-          <LinearGradient
-            colors={['transparent', 'transparent', '#000000cc', '#000000']}
-            style={styles.coverOverlay}
-          />
-
-          {/* Back button */}
-          <SafeAreaView style={styles.backRow}>
+          {/* Back + live — top nav */}
+          <SafeAreaView style={styles.bannerNav}>
             <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
-          </SafeAreaView>
-
-          {/* Identity block pinned to bottom of cover */}
-          <View style={styles.coverBottom}>
-            {/* Flag + Name on same line */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {(() => {
-                const country = bondProfile?.country || profileUser?.country;
-                const flag = getCountryFlag(country);
-                return flag ? <Text style={{ fontSize: 22 }}>{flag}</Text> : null;
-              })()}
-              <Text style={styles.coverName}>
-                {displayName}{bondProfile?.age ? `, ${bondProfile.age}` : ''}
-              </Text>
+            <View style={styles.bannerNavRight}>
+              {isLive && (
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveBadgeTxt}>LIVE</Text>
+                </View>
+              )}
+              {isOwnProfile && (
+                <TouchableOpacity style={styles.editCoverBtn} onPress={pickCoverPhoto} activeOpacity={0.8}>
+                  <Text style={styles.editCoverDots}>•••</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            {bondProfile?.gender ? <Text style={styles.coverGender}>{bondProfile.gender}</Text> : null}
-            <Text style={styles.coverLocation}>
-              {(() => {
-                const country = bondProfile?.country || profileUser?.country;
-                const parts = [bondProfile?.city, country].filter(Boolean);
-                return parts.length ? parts.join(', ') : '';
-              })()}
-            </Text>
+          </SafeAreaView>
+        </View>
 
-            {bondProfile?.ghost_score ? (
-              <View style={[styles.relBadge, { backgroundColor: reliability.color + '22', borderColor: reliability.color + '55' }]}>
-                <Text style={{ fontSize: 12 }}>{reliability.emoji}</Text>
-                <Text style={[styles.relBadgeText, { color: reliability.color }]}>{reliability.label} responder</Text>
-              </View>
-            ) : null}
+        {/* ── Avatar row — overlaps banner seam ── */}
+        <View style={styles.avatarActionRow}>
+          <View style={styles.avatarRing}>
+            {bondProfile?.photo_url ? (
+              <Image source={{ uri: bondProfile.photo_url }} style={styles.avatar} />
+            ) : (
+              <LinearGradient colors={['#FF0080', '#CC0060']} style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>{displayName[0]?.toUpperCase()}</Text>
+              </LinearGradient>
+            )}
           </View>
+          {!isOwnProfile && (
+            <TouchableOpacity
+              style={[styles.followBtn, { borderColor: tierInfo.color }, following && { backgroundColor: tierInfo.color + '22' }]}
+              onPress={toggleFollow}
+            >
+              <Text style={[styles.followBtnText, { color: tierInfo.color }]}>
+                {following ? '✓ Bonded' : '+ Bond'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Profile info ── */}
+        <View style={styles.profileInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.heroName} numberOfLines={1}>
+              {displayName}{bondProfile?.age ? `, ${bondProfile.age}` : ''}
+            </Text>
+            {(bondProfile?.is_verified || bondProfile?.verified) && (
+              <View style={styles.verifyBadge}>
+                <Text style={styles.verifyTxt}>✓</Text>
+              </View>
+            )}
+            <BondCrest tier={bondProfile?.tier || bondProfile?.subscription_tier} />
+          </View>
+
+          {(() => {
+            const country = bondProfile?.country || profileUser?.country;
+            const flag    = getCountryFlag(country);
+            const parts   = [bondProfile?.city, country].filter(Boolean);
+            if (!flag && !parts.length) return null;
+            return <Text style={styles.heroLoc}>{parts.join(', ')} {flag}</Text>;
+          })()}
+
+          {bondProfile?.gender ? <Text style={styles.heroGender}>{bondProfile.gender}</Text> : null}
+
+          {bondProfile?.ghost_score ? (
+            <View style={[styles.relBadge, { backgroundColor: reliability.color + '22', borderColor: reliability.color + '55', marginTop: 4 }]}>
+              <Text style={{ fontSize: 12 }}>{reliability.emoji}</Text>
+              <Text style={[styles.relBadgeText, { color: reliability.color }]}>{reliability.label} responder</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* ── Twitter-style stats — sits just below profile info ── */}
+        <View style={styles.twitterStats}>
+          <View style={styles.twitterStat}>
+            <Text style={styles.twitterStatNum}>{followCounts.followers}</Text>
+            <Text style={styles.twitterStatLabel}> Bonds</Text>
+          </View>
+          <Text style={styles.twitterDot}>·</Text>
+          <View style={styles.twitterStat}>
+            <Text style={styles.twitterStatNum}>{followCounts.following}</Text>
+            <Text style={styles.twitterStatLabel}> Bonding</Text>
+          </View>
+          <Text style={styles.twitterDot}>·</Text>
+          <View style={styles.twitterStat}>
+            <Text style={styles.twitterStatNum}>{countryFlagCount ?? '—'}</Text>
+            <Text style={styles.twitterStatLabel}> Footprints</Text>
+          </View>
+          {tier === 'pro' && bondProfile?.rank != null && (
+            <>
+              <Text style={styles.twitterDot}>·</Text>
+              <View style={styles.twitterStat}>
+                <Text style={[styles.twitterStatNum, { color: '#FFB700' }]}>#{bondProfile.rank}</Text>
+                <Text style={styles.twitterStatLabel}> Rank</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* ── Body content ──────────────────────────────────── */}
         <Animated.View style={[styles.body, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-
-          {/* Stats row — Bond-branded */}
-          <View style={styles.followRow}>
-            <View style={styles.followStat}>
-              <Text style={styles.followNum}>{followCounts.followers}</Text>
-              <Text style={styles.followLabel}>🤝 Bonds</Text>
-            </View>
-            <View style={styles.followDivider} />
-            <View style={styles.followStat}>
-              <Text style={styles.followNum}>{followCounts.following}</Text>
-              <Text style={styles.followLabel}>🤝 Bonding</Text>
-            </View>
-            <View style={styles.followDivider} />
-            <View style={styles.followStat}>
-              <Text style={styles.followNum}>{countryFlagCount ?? '—'}</Text>
-              <Text style={styles.followLabel}>📍 Pins</Text>
-            </View>
-            {!isOwnProfile && (
-              <>
-                <View style={styles.followDivider} />
-                <TouchableOpacity
-                  style={[styles.followBtn, following && styles.followBtnActive]}
-                  onPress={toggleFollow}
-                >
-                  <Text style={[styles.followBtnText, following && styles.followBtnTextActive]}>
-                    {following ? '✓ Bonded' : '+ Bond'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
 
           {loadingBond && (
             <View style={styles.loadingRow}>
@@ -617,29 +724,35 @@ export default function ProfileScreen({ route, navigation }) {
       {/* ── Floating action bar ──────────────────────────────── */}
       {!isOwnProfile && (
         <View style={styles.actionBar}>
-          <TouchableOpacity style={styles.messageBtn} onPress={openChat}>
-            <Text style={styles.messageBtnText}>💬  Message</Text>
+
+          {/* Message button — tier color */}
+          <TouchableOpacity
+            style={[styles.messageBtn, { borderColor: tierInfo.color, paddingVertical: 14, backgroundColor: tierInfo.color + '15' }]}
+            onPress={openChat}
+          >
+            <Text style={[styles.messageBtnText, { color: tierInfo.color }]}>💬  Chat</Text>
           </TouchableOpacity>
 
+          {/* Bond button — styled by tier */}
           {bondUserId && (
             connected ? (
-              <View style={styles.bondedBtn}>
-                <Text style={styles.bondedBtnText}>✓ Bonded</Text>
+              <View style={[styles.bondedBtn, { borderColor: tierInfo.color, backgroundColor: tierInfo.color + '20' }]}>
+                <Text style={[styles.bondedBtnText, { color: tierInfo.color }]}>✓ 🌍 Bonded</Text>
               </View>
             ) : (
               <LinearGradient
-                colors={['#6C47FF', '#5533DD']}
+                colors={tierInfo.bondGradColors}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.bondBtn}
               >
                 <TouchableOpacity
-                  onPress={handleConnect}
+                  onPress={() => tierInfo.canSendBondNote ? setShowBondSheet(true) : handleConnect()}
                   disabled={connecting}
                   style={styles.bondBtnInner}
                 >
                   {connecting
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.bondBtnText}>Bond with them 🌍</Text>
+                    : <Text style={styles.bondBtnText}>🌍  {tierInfo.bondLabel}</Text>
                   }
                 </TouchableOpacity>
               </LinearGradient>
@@ -647,6 +760,80 @@ export default function ProfileScreen({ route, navigation }) {
           )}
         </View>
       )}
+
+      {/* ── Bond Request Sheet (Plus / Pro) ─────────────────────────── */}
+      <Modal
+        visible={showBondSheet}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowBondSheet(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowBondSheet(false)}
+        />
+        <View style={styles.bondSheet}>
+          {/* Sheet handle */}
+          <View style={styles.sheetHandle} />
+
+          {/* Tier badge header */}
+          <View style={[styles.sheetTierBadge, { backgroundColor: tierInfo.bondBorderColor + '22', borderColor: tierInfo.bondBorderColor + '55' }]}>
+            <Text style={styles.sheetTierIcon}>{tierInfo.bondIcon}</Text>
+            <Text style={[styles.sheetTierLabel, { color: tierInfo.bondBorderColor }]}>{tierInfo.label}</Text>
+            {tierInfo.bondPriority && (
+              <View style={styles.priorityTag}>
+                <Text style={styles.priorityTagTxt}>PRIORITY</Text>
+              </View>
+            )}
+          </View>
+
+          <Text style={styles.sheetTitle}>Send a Bond Request</Text>
+          <Text style={styles.sheetSub}>
+            Introduce yourself to <Text style={{ color: '#fff', fontWeight: '700' }}>{displayName}</Text>
+            {tierInfo.bondPriority ? ' — your request will appear at the top of their inbox ⭐' : ''}
+          </Text>
+
+          {/* Note input */}
+          <View style={[styles.sheetInputWrap, { borderColor: tierInfo.bondBorderColor + '55' }]}>
+            <TextInput
+              style={styles.sheetInput}
+              placeholder={`Write a personal note… (${tierInfo.bondNoteLimit} chars)`}
+              placeholderTextColor="#444"
+              value={bondNote}
+              onChangeText={t => setBondNote(t.slice(0, tierInfo.bondNoteLimit))}
+              multiline
+              maxLength={tierInfo.bondNoteLimit}
+            />
+            <Text style={styles.sheetCharCount}>
+              {bondNote.length}/{tierInfo.bondNoteLimit}
+            </Text>
+          </View>
+
+          {/* Send button */}
+          <LinearGradient
+            colors={tierInfo.bondGradColors}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.sheetSendBtn}
+          >
+            <TouchableOpacity
+              style={styles.sheetSendInner}
+              onPress={() => handleConnect(bondNote)}
+              disabled={connecting}
+            >
+              {connecting
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.sheetSendTxt}>🌍  Send {tierInfo.bondLabel}</Text>
+              }
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* Skip note option */}
+          <TouchableOpacity style={styles.sheetSkip} onPress={() => handleConnect('')}>
+            <Text style={styles.sheetSkipTxt}>Send without a note</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -655,22 +842,39 @@ const styles = StyleSheet.create({
   container:       { flex: 1, backgroundColor: '#000000' },
   scroll:          { paddingBottom: 0 },
 
-  cover:           { width, height: COVER_HEIGHT, position: 'relative', justifyContent: 'flex-end' },
-  coverImg:        { position: 'absolute', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  coverInitial:    { color: '#fff', fontSize: 100, fontWeight: '800', opacity: 0.6 },
-  coverOverlay:    { position: 'absolute', width: '100%', height: '100%' },
-  backRow:         { position: 'absolute', top: 0, left: 0, right: 0 },
-  backBtn:         { margin: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: '#00000066', alignItems: 'center', justifyContent: 'center' },
-  backIcon:        { color: '#fff', fontSize: 22, fontWeight: '300' },
+  // ── Banner ──
+  banner:          { height: 190, overflow: 'hidden', backgroundColor: '#05000a' },
+  bannerBg:        { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bannerFade:      { position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 },
+  bannerNav:       { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 },
+  bannerNavRight:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 14 },
+  backBtn:         { margin: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  backIcon:        { color: '#fff', fontSize: 20, fontWeight: '300' },
+  liveBadge:       { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#e53935', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  liveDot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveBadgeTxt:    { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  editCoverBtn:    { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  editCoverDots:   { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 1.5 },
 
-  coverBottom:     { paddingHorizontal: 20, paddingBottom: 20, gap: 4 },
-  coverName:       { color: '#fff', fontSize: 30, fontWeight: '800', letterSpacing: -0.5 },
-  coverGender:     { color: '#ffffff88', fontSize: 14 },
-  coverLocation:   { color: '#ffffff66', fontSize: 14 },
-  relBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginTop: 6 },
+  // ── Avatar action row — overlaps banner seam ──
+  avatarActionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: -42, paddingBottom: 10 },
+  avatarRing:      { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: '#000', backgroundColor: '#000', overflow: 'hidden' },
+  avatar:          { width: '100%', height: '100%' },
+  avatarFallback:  { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  avatarInitial:   { color: '#fff', fontSize: 32, fontWeight: '900' },
+
+  // ── Profile info ──
+  profileInfo:     { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 4 },
+  nameRow:         { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
+  heroName:        { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  heroLoc:         { color: 'rgba(255,255,255,0.45)', fontSize: 13 },
+  heroGender:      { color: 'rgba(255,255,255,0.3)', fontSize: 12 },
+  verifyBadge:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#1d9bf0', alignItems: 'center', justifyContent: 'center' },
+  verifyTxt:       { color: '#fff', fontSize: 10, fontWeight: '900' },
+  relBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginTop: 4 },
   relBadgeText:    { fontSize: 12, fontWeight: '700' },
 
-  body:            { paddingTop: 24, gap: 24, paddingHorizontal: 20 },
+  body:            { paddingTop: 0, gap: 24, paddingHorizontal: 16 },
 
   galleryGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gallerySlot:      { width: (width - 40 - 16) / 3, aspectRatio: 1, borderRadius: 16, overflow: 'hidden' },
@@ -682,15 +886,15 @@ const styles = StyleSheet.create({
   photoModalClose:     { position: 'absolute', top: 60, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: '#ffffff18', borderWidth: 1, borderColor: '#ffffff30', alignItems: 'center', justifyContent: 'center' },
   photoModalCloseText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 
-  followRow:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111316', borderRadius: 16, padding: 16, gap: 16, borderWidth: 1, borderColor: '#222527' },
-  followStat:      { alignItems: 'center', gap: 2 },
-  followNum:       { color: '#fff', fontSize: 20, fontWeight: '800' },
-  followLabel:     { color: '#555', fontSize: 11 },
-  followDivider:   { width: 1, height: 32, backgroundColor: '#2F3336' },
-  followBtn:       { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1.5, borderColor: '#6C47FF' },
-  followBtnActive: { backgroundColor: '#6C47FF20' },
-  followBtnText:   { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
-  followBtnTextActive: { color: '#6C47FF' },
+  // Twitter-style inline stats
+  twitterStats:    { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingVertical: 10, marginBottom: 2 },
+  twitterStat:     { flexDirection: 'row', alignItems: 'baseline' },
+  twitterStatNum:  { color: '#fff', fontSize: 15, fontWeight: '800' },
+  twitterStatLabel:{ color: 'rgba(255,255,255,0.42)', fontSize: 14, fontWeight: '400' },
+  twitterDot:      { color: 'rgba(255,255,255,0.2)', fontSize: 16, fontWeight: '300' },
+
+  followBtn:       { paddingVertical: 9, paddingHorizontal: 22, borderRadius: 20, alignItems: 'center', borderWidth: 1.5 },
+  followBtnText:   { fontSize: 13, fontWeight: '800' },
 
   loadingRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'center' },
   loadingText:     { color: '#555', fontSize: 13 },
@@ -727,11 +931,35 @@ const styles = StyleSheet.create({
   socialArrow:     { color: '#6C47FF', fontSize: 20, fontWeight: '700' },
 
   actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 34, backgroundColor: '#000000f2', borderTopWidth: 1, borderTopColor: '#1C1F23' },
-  messageBtn:      { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#6C47FF' },
-  messageBtnText:  { color: '#6C47FF', fontSize: 14, fontWeight: '700' },
+  messageBtn:      { flex: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
+  messageBtnInner: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  messageBtnText:  { fontSize: 14, fontWeight: '700' },
   bondBtn:         { flex: 2, borderRadius: 18, overflow: 'hidden' },
   bondBtnInner:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-  bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700' },
+  bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
   bondedBtn:       { flex: 2, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#57f28720', borderWidth: 1, borderColor: '#57f287' },
   bondedBtnText:   { color: '#57f287', fontSize: 15, fontWeight: '700' },
+
+  // Bond Request Sheet
+  sheetOverlay:    { flex: 1, backgroundColor: '#000000aa' },
+  bondSheet:       { backgroundColor: '#0d0f14', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+                     paddingHorizontal: 24, paddingBottom: 48, paddingTop: 12, gap: 16,
+                     borderTopWidth: 1, borderColor: '#1e2028' },
+  sheetHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#333', alignSelf: 'center', marginBottom: 8 },
+  sheetTierBadge:  { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
+                     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  sheetTierIcon:   { fontSize: 16 },
+  sheetTierLabel:  { fontSize: 13, fontWeight: '800' },
+  priorityTag:     { backgroundColor: '#FFB70033', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  priorityTagTxt:  { color: '#FFB700', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  sheetTitle:      { color: '#fff', fontSize: 20, fontWeight: '900' },
+  sheetSub:        { color: '#666', fontSize: 14, lineHeight: 20 },
+  sheetInputWrap:  { backgroundColor: '#111318', borderRadius: 16, borderWidth: 1, padding: 14, gap: 8 },
+  sheetInput:      { color: '#fff', fontSize: 15, lineHeight: 22, minHeight: 80, textAlignVertical: 'top' },
+  sheetCharCount:  { color: '#333', fontSize: 11, textAlign: 'right' },
+  sheetSendBtn:    { borderRadius: 18, overflow: 'hidden' },
+  sheetSendInner:  { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  sheetSendTxt:    { color: '#fff', fontSize: 16, fontWeight: '800' },
+  sheetSkip:       { alignItems: 'center', paddingVertical: 8 },
+  sheetSkipTxt:    { color: '#444', fontSize: 13 },
 });

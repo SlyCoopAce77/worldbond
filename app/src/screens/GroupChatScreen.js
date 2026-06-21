@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { getAccessToken } from '../services/authApi';
+import { authHeader } from '../utils/apiUtils';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 
@@ -42,11 +42,6 @@ function dateLabel(ts) {
   if (y.toDateString() === d.toDateString()) return 'Yesterday';
   return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
 }
-async function authHeader() {
-  const t = await getAccessToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
-}
-
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
 function Avatar({ name = '?', photo_url, size = 32 }) {

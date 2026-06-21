@@ -7,14 +7,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../services/socket';
-
-const SAVED_KEY = 'wb_saved_spots';
+import { stringToColor } from '../utils/apiUtils';
+import { SAVED_SPOTS_KEY as SAVED_KEY } from '../utils/constants';
 
 const EVENT_TYPES = [
   { key: 'concert',  icon: '🎵', label: 'Concert',      color: '#8b5cf6' },
   { key: 'party',    icon: '🎉', label: 'Party',         color: '#ec4899' },
   { key: 'sports',   icon: '⚽', label: 'Sports Night',  color: '#f97316' },
-  { key: 'comedy',   icon: '😂', label: 'Comedy',        color: '#f59e0b' },
+  { key: 'comedy',   icon: '😂', label: 'Comedy',        color: '#FFB700' },
   { key: 'open mic', icon: '🎙️', label: 'Open Mic',      color: '#22c55e' },
   { key: 'festival', icon: '🎪', label: 'Festival',      color: '#06b6d4' },
   { key: 'special',  icon: '✨', label: 'Special',       color: '#6366f1' },
@@ -457,8 +457,8 @@ export default function PlaceDetailScreen({ route, navigation }) {
                         <Text style={[styles.eventTypeTxt, { color: et.color }]}>{et.label}</Text>
                       </View>
                       {evt.price && (
-                        <View style={[styles.eventPriceBadge, evt.price === 'Free' ? { backgroundColor: '#22c55e18', borderColor: '#22c55e40' } : { backgroundColor: '#f59e0b18', borderColor: '#f59e0b40' }]}>
-                          <Text style={{ color: evt.price === 'Free' ? '#22c55e' : '#f59e0b', fontSize: 12, fontWeight: '800' }}>{evt.price}</Text>
+                        <View style={[styles.eventPriceBadge, evt.price === 'Free' ? { backgroundColor: '#22c55e18', borderColor: '#22c55e40' } : { backgroundColor: '#FFB70018', borderColor: '#FFB70040' }]}>
+                          <Text style={{ color: evt.price === 'Free' ? '#22c55e' : '#FFB700', fontSize: 12, fontWeight: '800' }}>{evt.price}</Text>
                         </View>
                       )}
                     </View>
@@ -538,13 +538,6 @@ export default function PlaceDetailScreen({ route, navigation }) {
 
     </SafeAreaView>
   );
-}
-
-function stringToColor(str = '') {
-  const colors = ['#e57373', '#ba68c8', '#4fc3f7', '#81c784', '#ffb74d', '#f06292', '#4db6ac', '#7986cb'];
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
 }
 
 const styles = StyleSheet.create({
@@ -668,8 +661,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16,
     paddingVertical: 8, backgroundColor: '#1a1a0e',
   },
-  ratingStars: { color: '#f59e0b', fontSize: 16 },
-  ratingValue: { color: '#f59e0b', fontWeight: '700', fontSize: 14 },
+  ratingStars: { color: '#FFB700', fontSize: 16 },
+  ratingValue: { color: '#FFB700', fontWeight: '700', fontSize: 14 },
   ratingCount: { color: '#888', fontSize: 12 },
 
   // Reviews tab
@@ -682,7 +675,7 @@ const styles = StyleSheet.create({
   starsRow: { flexDirection: 'row', gap: 8 },
   starBtn: { padding: 4 },
   starIcon: { fontSize: 32, color: '#444' },
-  starIconFilled: { color: '#f59e0b' },
+  starIconFilled: { color: '#FFB700' },
   reviewInput: {
     backgroundColor: '#000000', color: '#fff', borderRadius: 10,
     padding: 12, fontSize: 14, minHeight: 80, textAlignVertical: 'top',
@@ -707,7 +700,7 @@ const styles = StyleSheet.create({
   reviewUsername: { color: '#fff', fontWeight: '600', fontSize: 14 },
   reviewCountry: { color: '#888', fontSize: 11, marginTop: 1 },
   reviewStars: { alignItems: 'flex-end' },
-  reviewStarsText: { color: '#f59e0b', fontSize: 16 },
+  reviewStarsText: { color: '#FFB700', fontSize: 16 },
   reviewText: { color: '#ccc', fontSize: 14, lineHeight: 20 },
   reviewDate: { color: '#555', fontSize: 11 },
 

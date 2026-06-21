@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
+import { formatDuration } from '../utils/apiUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -13,12 +14,6 @@ function stringToColor(str = '') {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
   return palette[Math.abs(h) % palette.length];
-}
-
-function formatDuration(secs) {
-  const m = Math.floor(secs / 60).toString().padStart(2, '0');
-  const s = (secs % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
 }
 
 // ─── Pulsing rings ─────────────────────────────────────────────────────────

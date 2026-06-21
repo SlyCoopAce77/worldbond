@@ -1,5 +1,3 @@
-import { Appearance } from 'react-native';
-
 export const LIGHT = {
   bg:          '#FFFFFF',
   bgSecondary: '#F7F9FA',
@@ -42,7 +40,3 @@ export const DARK = {
   shadow:      '#00000060',
 };
 
-// follows system setting by default
-const sys = Appearance.getColorScheme();
-export const colors = sys === 'light' ? LIGHT : DARK;
-export const isDark  = sys !== 'light';

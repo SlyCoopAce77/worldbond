@@ -1,46 +1,38 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, FlatList, ScrollView,
   TouchableOpacity, TextInput, Modal, KeyboardAvoidingView,
-  Platform, Animated, Alert, ActivityIndicator, Dimensions,
+  Platform, Animated, Alert, ActivityIndicator, Dimensions, RefreshControl,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Video from 'react-native-video';
+import Geolocation from '@react-native-community/geolocation';
 import { getSocket, SERVER_URL } from '../services/socket';
-import { WORLD_COUNTRIES } from '../utils/countryUtils';
+import { WORLD_COUNTRIES, getCountryFlag } from '../utils/countryUtils';
 import { getAccessToken } from '../services/authApi';
+import { stringToColor, timeAgo } from '../utils/apiUtils';
 import FilteredImage from '../components/FilteredImage';
 import FilterPicker from '../components/FilterPicker';
 import StoryViewer from '../components/StoryViewer';
+import { WorldMark } from '../components/BondLogo';
 
 const { width } = Dimensions.get('window');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function stringToColor(str = '') {
-  const palette = ['#e57373','#ba68c8','#4fc3f7','#81c784','#ffb74d','#f06292','#4db6ac','#7986cb'];
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return palette[Math.abs(h) % palette.length];
-}
-
-function timeAgo(ts) {
-  const d = Date.now() - ts, m = Math.floor(d / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
-function countryFlag(str = '') {
-  const m = str.match(/\p{Regional_Indicator}{2}/u);
-  return m ? m[0] : '🌍';
-}
+function countryFlag(str = '') { return getCountryFlag(str) || '🌍'; }
 
 function countryName(str = '') {
   return str.replace(/\p{Regional_Indicator}{2}/u, '').trim() || str;
+}
+
+function scorePost(p) {
+  const ageHours = (Date.now() - (p.createdAt || 0)) / 3600000;
+  const decay = Math.exp(-ageHours / 36); // half-life ~25h
+  const engagement = (p.likes?.length || 0) * 3 + (p.echos?.length || 0) * 5 + (p.comments?.length || 0) * 2;
+  return decay * (1 + engagement * 0.15);
 }
 
 // ─── Heart burst ──────────────────────────────────────────────────────────────
@@ -60,394 +52,210 @@ function HeartBurst({ visible }) {
     ]).start();
   }, [visible]);
   if (!visible) return null;
-  return <Animated.Text style={[s.heartBurst, { transform: [{ scale }], opacity }]}>❤️</Animated.Text>;
+  return <Animated.Text style={[s.heartBurst, { transform: [{ scale }], opacity }]}>👣</Animated.Text>;
 }
 
-// ─── Bond Footprint Card ──────────────────────────────────────────────────────
 
-function BondFootprintCard({ bondPhotos, followingCount, isDemoMode, onPress }) {
-  const countryData = useMemo(() => {
-    const map = {};
-    bondPhotos.forEach(p => {
-      if (!p.country) return;
-      if (!map[p.country]) map[p.country] = { count: 0, users: new Set() };
-      map[p.country].count++;
-      map[p.country].users.add(p.username);
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([country, data]) => ({ country, count: data.count, users: [...data.users] }));
-  }, [bondPhotos]);
+// ─── World Entry Card ─────────────────────────────────────────────────────────
 
-  const pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 2800, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 2800, useNativeDriver: true }),
-    ])).start();
-  }, []);
-  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.75] });
-
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={fp.wrap}>
-      <LinearGradient colors={['#0e0920', '#13103a', '#0a0a18']} style={fp.card}>
-
-        {/* Animated glow orb */}
-        <Animated.View style={[fp.glowOrb, { opacity: glowOpacity }]} />
-
-        {/* Title row */}
-        <View style={fp.topRow}>
-          <View style={fp.titleGroup}>
-            <Text style={fp.globe}>🌐</Text>
-            <View>
-              <Text style={fp.cardTitle}>Bond Footprint</Text>
-              <Text style={fp.cardSub}>{isDemoMode ? '✦ Preview — bond with people to build yours' : 'Your reach across the world'}</Text>
-            </View>
-          </View>
-          <View style={fp.explorePill}>
-            <Text style={fp.exploreTxt}>Explore →</Text>
-          </View>
-        </View>
-
-        {/* Stats */}
-        <View style={fp.statsRow}>
-          <View style={fp.stat}>
-            <Text style={fp.statNum}>{followingCount}</Text>
-            <Text style={fp.statLabel}>bonds</Text>
-          </View>
-          <View style={fp.statDiv} />
-          <View style={fp.stat}>
-            <Text style={fp.statNum}>{countryData.length}</Text>
-            <Text style={fp.statLabel}>countries</Text>
-          </View>
-          <View style={fp.statDiv} />
-          <View style={fp.stat}>
-            <Text style={fp.statNum}>{bondPhotos.length}</Text>
-            <Text style={fp.statLabel}>moments</Text>
-          </View>
-        </View>
-
-        {/* Flag grid */}
-        {countryData.length > 0 ? (
-          <View style={fp.flagGrid}>
-            {countryData.slice(0, 12).map(({ country }) => (
-              <Text key={country} style={fp.flagItem}>{countryFlag(country)}</Text>
-            ))}
-            {countryData.length > 12 && (
-              <View style={fp.flagMore}>
-                <Text style={fp.flagMoreTxt}>+{countryData.length - 12}</Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <Text style={fp.emptyHint}>Bond with people to grow your world reach</Text>
-        )}
-
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Moment Ring (replaces story circle) ─────────────────────────────────────
-
-function MomentRing({ group, isSelf, onPress }) {
-  const hasNew = !isSelf && group?.stories?.some(s => !s.viewed);
-  const pulse = useRef(new Animated.Value(1)).current;
-  const color = stringToColor(group?.username || 'x');
-
-  useEffect(() => {
-    if (!hasNew) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.12, duration: 950, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 950, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [hasNew]);
-
-  const flag = countryFlag(group?.country || '');
-  const cname = countryName(group?.country || '') || group?.username || '';
-
-  return (
-    <TouchableOpacity style={mr.item} onPress={onPress} activeOpacity={0.82}>
-      {isSelf ? (
-        <View style={mr.addRing}>
-          <LinearGradient colors={['#6C47FF22', '#6C47FF0a']} style={mr.addInner}>
-            <Text style={mr.addPlus}>+</Text>
-          </LinearGradient>
-        </View>
-      ) : (
-        <View style={mr.ringWrap}>
-          {hasNew && (
-            <Animated.View
-              style={[mr.outerGlow, { borderColor: color, transform: [{ scale: pulse }] }]}
-            />
-          )}
-          <LinearGradient
-            colors={hasNew ? [color + '55', color + '22'] : ['#1a1a1a', '#111']}
-            style={[mr.ring, hasNew && { borderColor: color + '99' }]}
-          >
-            <Text style={mr.flagBig}>{flag}</Text>
-            <View style={[mr.initBadge, { backgroundColor: color }]}>
-              <Text style={mr.initTxt}>{(group?.username?.[0] ?? '?').toUpperCase()}</Text>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-      <Text style={mr.label} numberOfLines={1}>{isSelf ? 'Add' : cname}</Text>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Bond Footprint Sheet ─────────────────────────────────────────────────────
-
-function BondFootprintSheet({ visible, bondPhotos, onClose, onSelectCountry, activeFilter }) {
-  const countryData = useMemo(() => {
-    const map = {};
-    bondPhotos.forEach(p => {
-      if (!p.country) return;
-      if (!map[p.country]) map[p.country] = { count: 0, users: [] };
-      map[p.country].count++;
-      if (!map[p.country].users.find(u => u.id === p.userId)) {
-        map[p.country].users.push({ id: p.userId, username: p.username });
-      }
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([country, data]) => ({ country, count: data.count, users: data.users }));
-  }, [bondPhotos]);
-
-  const totalBonds = useMemo(() => {
-    const seen = new Set();
-    bondPhotos.forEach(p => seen.add(p.userId));
-    return seen.size;
-  }, [bondPhotos]);
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={bfs.overlay} activeOpacity={1} onPress={onClose}>
-        <View style={bfs.sheet}>
-          <View style={bfs.handle} />
-
-          {/* Header */}
-          <View style={bfs.header}>
-            <Text style={bfs.title}>🌐 Bond Footprint</Text>
-            <Text style={bfs.sub}>
-              {countryData.length} {countryData.length === 1 ? 'country' : 'countries'} · {totalBonds} {totalBonds === 1 ? 'bond' : 'bonds'} · tap to filter
-            </Text>
-          </View>
-
-          {/* Active filter chip */}
-          {activeFilter && (
-            <TouchableOpacity style={bfs.activeChip} onPress={() => { onSelectCountry(null); onClose(); }}>
-              <Text style={bfs.activeChipFlag}>{countryFlag(activeFilter)}</Text>
-              <Text style={bfs.activeChipTxt}>Showing {countryName(activeFilter)}</Text>
-              <Text style={bfs.activeChipX}>✕ Clear</Text>
-            </TouchableOpacity>
-          )}
-
-          <ScrollView
-            style={{ maxHeight: 480 }}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
-            {countryData.length === 0 ? (
-              <View style={bfs.empty}>
-                <Text style={bfs.emptyIcon}>🌍</Text>
-                <Text style={bfs.emptyTxt}>Bond with people from around the world to grow your footprint</Text>
-              </View>
-            ) : (
-              countryData.map(({ country, count, users }) => {
-                const isActive = activeFilter === country;
-                return (
-                  <TouchableOpacity
-                    key={country}
-                    style={[bfs.row, isActive && bfs.rowActive]}
-                    onPress={() => { onSelectCountry(isActive ? null : country); onClose(); }}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={bfs.rowFlag}>{countryFlag(country)}</Text>
-                    <View style={bfs.rowInfo}>
-                      <Text style={[bfs.rowName, isActive && bfs.rowNameActive]}>
-                        {countryName(country) || country}
-                      </Text>
-                      {/* Bond user initials */}
-                      <View style={bfs.avatarRow}>
-                        {users.slice(0, 6).map(u => (
-                          <View key={u.id} style={[bfs.avatar, { backgroundColor: stringToColor(u.username) }]}>
-                            <Text style={bfs.avatarTxt}>{u.username[0].toUpperCase()}</Text>
-                          </View>
-                        ))}
-                        {users.length > 6 && (
-                          <Text style={bfs.avatarMore}>+{users.length - 6}</Text>
-                        )}
-                      </View>
-                    </View>
-                    <View style={bfs.rowRight}>
-                      <Text style={[bfs.rowCount, isActive && bfs.rowCountActive]}>{count}</Text>
-                      <Text style={bfs.rowCountLabel}>moments</Text>
-                    </View>
-                    <Text style={[bfs.rowChevron, isActive && { color: '#6C47FF' }]}>›</Text>
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </ScrollView>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
-
-// ─── Bond Trail Card ──────────────────────────────────────────────────────────
-
-function BondTrailCard({ photo, user, onComment, onProfile, onFollow, followingIds }) {
+function WorldEntryCard({ photo, user, onComment, onProfile, onFollow, followingIds, isActiveVideo }) {
   const socket = getSocket();
   const myUid = user?.userId || socket.id;
-  const [liked,     setLiked]    = useState(photo.likes?.some(l => l.userId === socket.id));
-  const [likeCount, setLikeCount] = useState(photo.likes?.length || 0);
-  const [echoed,    setEchoed]   = useState(photo.echos?.some(e => e.userId === myUid));
-  const [echoCount, setEchoCount] = useState(photo.echos?.length || 0);
-  const [showHeart, setShowHeart] = useState(false);
+  const [marked,     setMarked]    = useState(photo.likes?.some(l => l.userId === myUid));
+  const [markCount,  setMarkCount] = useState(photo.likes?.length || 0);
+  const [echoed,     setEchoed]    = useState(photo.echos?.some(e => e.userId === myUid));
+  const [echoCount,  setEchoCount] = useState(photo.echos?.length || 0);
+  const [showStamp,  setShowStamp] = useState(false);
   const lastTap = useRef(0);
-  const threadColor = stringToColor(photo.username);
+  const authorColor = stringToColor(photo.username);
+  const cardInnerW = width - 14 - 14 - 28 - 10; // marginH:14×2 + stampContainer:28 + gap:10
+  const photoH = (cardInnerW * 3) / 4;
 
   useEffect(() => {
-    setLiked(photo.likes?.some(l => l.userId === socket.id));
-    setLikeCount(photo.likes?.length || 0);
+    setMarked(photo.likes?.some(l => l.userId === myUid));
+    setMarkCount(photo.likes?.length || 0);
     setEchoed(photo.echos?.some(e => e.userId === myUid));
     setEchoCount(photo.echos?.length || 0);
   }, [photo.likes, photo.echos]);
 
-  function toggleLike() {
+  function toggleMark() {
     socket.emit('like_photo', { photoId: photo.id });
-    setLiked(l => !l); setLikeCount(c => liked ? c - 1 : c + 1);
+    setMarked(m => !m);
+    setMarkCount(c => marked ? c - 1 : c + 1);
   }
 
   function handleDoubleTap() {
     const now = Date.now();
     if (now - lastTap.current < 300) {
-      if (!liked) { toggleLike(); setShowHeart(true); setTimeout(() => setShowHeart(false), 900); }
+      if (!marked) { toggleMark(); setShowStamp(true); setTimeout(() => setShowStamp(false), 900); }
     }
     lastTap.current = now;
   }
 
-  const isOwn = photo.userId === socket.id;
-  const isFollowed = followingIds.includes(photo.userId);
-  const cardW = width - 32;
+  const isOwn      = photo.userId === myUid;
+  const lastComment = photo.comments?.length > 0
+    ? photo.comments[photo.comments.length - 1]
+    : null;
 
   return (
-    <View style={bt.card}>
-      {/* Colored thread line running full height */}
-      <View style={[bt.thread, { backgroundColor: threadColor }]} />
+    <View style={we.card}>
 
-      <View style={bt.inner}>
-        {/* Header */}
-        <TouchableOpacity style={bt.header} onPress={() => onProfile(photo)} activeOpacity={0.8}>
-          <View style={[bt.av, { backgroundColor: threadColor }]}>
-            <Text style={bt.avTxt}>{(photo.username?.[0] ?? '?').toUpperCase()}</Text>
-            {photo.mood && <Text style={bt.mood}>{photo.mood}</Text>}
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Text style={bt.uname}>{photo.username}</Text>
-              <Text>{countryFlag(photo.country)}</Text>
-            </View>
-            <Text style={bt.meta}>{countryName(photo.country)} · {timeAgo(photo.createdAt)}</Text>
-          </View>
-          {!isOwn && (
-            <TouchableOpacity
-              style={[bt.bondBtn, isFollowed && { backgroundColor: threadColor + '33', borderColor: threadColor }]}
-              onPress={() => onFollow(photo.userId, isFollowed)}
-            >
-              <Text style={[bt.bondBtnTxt, isFollowed && { color: threadColor }]}>
-                {isFollowed ? '✓ Bonded' : '+ Bond'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
+      {/* Echo attribution — "[name] echoed" above the thread */}
+      {!!photo._echoAttrib && (
+        <View style={we.echoAttrib}>
+          <Text style={we.echoAttribIcon}>🔊</Text>
+          <Text style={we.echoAttribTxt}>{photo._echoAttrib} echoed</Text>
+        </View>
+      )}
 
-        {/* Photo + side actions */}
-        <View style={bt.photoRow}>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={handleDoubleTap}
-            style={[bt.photoWrap, { width: cardW - 56 }]}
-          >
+      {/* Stamp thread */}
+      <View style={we.threadRow}>
+        <View style={we.threadContainer}>
+          <View style={[we.threadLine, { backgroundColor: authorColor + '88' }]} />
+          <View style={[we.stampCircle, { borderColor: authorColor, backgroundColor: authorColor + '18' }]}>
+            <WorldMark size={12} color={authorColor} bondColor={authorColor} />
+          </View>
+          <View style={[we.threadLine, { backgroundColor: authorColor }]} />
+        </View>
+
+        <View style={we.inner}>
+
+          {/* Photo/Video — 4:3 editorial ratio */}
+          <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap} style={we.photoWrap}>
             {photo.imageUrl ? (
-              <FilteredImage
-                uri={photo.imageUrl}
-                filterId={photo.filter || 'normal'}
-                style={[bt.photo, { width: cardW - 56, height: (cardW - 56) * 1.1 }]}
-                resizeMode="cover"
-              />
+              photo.mediaType === 'video' ? (
+                <Video
+                  source={{ uri: photo.imageUrl }}
+                  style={{ width: cardInnerW, height: photoH }}
+                  muted
+                  repeat
+                  paused={!isActiveVideo}
+                  resizeMode="cover"
+                  playInBackground={false}
+                  playWhenInactive={false}
+                />
+              ) : (
+                <FilteredImage
+                  uri={photo.imageUrl}
+                  filterId={photo.filter || 'normal'}
+                  style={{ width: cardInnerW, height: photoH }}
+                  resizeMode="cover"
+                />
+              )
             ) : (
-              <View style={[bt.photo, { width: cardW - 56, height: (cardW - 56) * 1.1, backgroundColor: stringToColor(photo.username) + '33', alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={{ fontSize: 42 }}>{countryFlag(photo.country)}</Text>
+              <View style={[we.photoEmpty, { width: cardInnerW, height: photoH }]}>
+                <Text style={we.photoEmptyFlag}>{countryFlag(photo.country)}</Text>
               </View>
             )}
-            {showHeart && (
-              <Animated.Text style={bt.heartBurst}>❤️</Animated.Text>
+
+            {photo.mediaType === 'video' && !isActiveVideo && (
+              <View style={we.videoBadge}>
+                <Text style={we.videoBadgeTxt}>▶</Text>
+              </View>
             )}
-            {/* Country stamp overlay */}
+
+            <HeartBurst visible={showStamp} />
+
+            {/* Passport-style location stamp */}
+            <View style={we.locationStamp}>
+              <Text style={we.locationFlag}>{countryFlag(photo.country)}</Text>
+              <View>
+                <Text style={we.locationCountry}>{countryName(photo.country).toUpperCase()}</Text>
+                <Text style={we.locationTime}>{timeAgo(photo.createdAt)}</Text>
+              </View>
+            </View>
+
+            {/* Pin — where photo was actually taken (if different from home) */}
+            {photo.postCountry && photo.postCountry !== photo.country && (
+              <View style={we.pinStamp}>
+                <Text style={we.pinIcon}>📍</Text>
+                <Text style={we.pinTxt}>{countryName(photo.postCountry)}</Text>
+              </View>
+            )}
+
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.72)']}
-              style={bt.photoGrad}
-            >
-              <Text style={bt.photoFlag}>{countryFlag(photo.country)}</Text>
-              <Text style={bt.photoCountry}>{countryName(photo.country)}</Text>
-            </LinearGradient>
+              colors={['transparent', 'rgba(0,0,0,0.82)']}
+              style={we.photoGrad}
+            />
           </TouchableOpacity>
 
-          {/* Vertical actions rail */}
-          <View style={bt.actionsRail}>
-            <TouchableOpacity style={bt.railBtn} onPress={toggleLike}>
-              <Text style={bt.railIcon}>{liked ? '❤️' : '🤍'}</Text>
-              {likeCount > 0 && <Text style={[bt.railCount, liked && { color: '#e91e63' }]}>{likeCount}</Text>}
+          {/* Entry body */}
+          <View style={we.body}>
+
+            {/* Author row */}
+            <TouchableOpacity style={we.authorRow} onPress={() => onProfile(photo)} activeOpacity={0.8}>
+              <View style={[we.avatar, { backgroundColor: authorColor }]}>
+                <Text style={we.avatarTxt}>{(photo.username?.[0] ?? '?').toUpperCase()}</Text>
+                {photo.mood && <Text style={we.mood}>{photo.mood}</Text>}
+              </View>
+              <Text style={we.username}>{photo.username}</Text>
+              <View style={{ flex: 1 }} />
+              {isOwn && (
+                <TouchableOpacity onPress={() =>
+                  Alert.alert('Delete Entry', 'Remove this world entry?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: () => socket.emit('delete_photo', { photoId: photo.id }) },
+                  ])
+                }>
+                  <Text style={we.dots}>⋯</Text>
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={bt.railBtn} onPress={() => onComment(photo)}>
-              <Text style={bt.railIcon}>💬</Text>
-              {photo.comments?.length > 0 && <Text style={bt.railCount}>{photo.comments.length}</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={bt.railBtn}
-              onPress={() => {
-                socket.emit('echo_photo', { photoId: photo.id });
-                setEchoed(e => !e); setEchoCount(c => echoed ? c - 1 : c + 1);
-              }}
-            >
-              <Text style={[bt.railIcon, echoed && { color: '#6C47FF' }]}>🔊</Text>
-              {echoCount > 0 && <Text style={[bt.railCount, echoed && { color: '#6C47FF' }]}>{echoCount}</Text>}
-            </TouchableOpacity>
-            {isOwn && (
+
+            {/* Blog-style entry caption */}
+            {!!photo.caption && (
+              <Text style={we.entryText}>{photo.caption}</Text>
+            )}
+
+            {/* Action bar: Mark · Notes · Echo */}
+            <View style={we.actionsBar}>
+              <TouchableOpacity style={we.actionBtn} onPress={toggleMark}>
+                <Text style={we.actionIcon}>👣</Text>
+                <Text style={[we.actionLbl, marked && we.markedLbl]}>
+                  {markCount > 0 ? `${markCount} ` : ''}Mark
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={we.actionBtn} onPress={() => onComment(photo)}>
+                <Text style={we.actionIcon}>💬</Text>
+                <Text style={we.actionLbl}>
+                  {photo.comments?.length > 0 ? `${photo.comments.length} ` : ''}Notes
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
-                style={bt.railBtn}
-                onPress={() => Alert.alert('Delete Photo', 'Remove this photo?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => socket.emit('delete_photo', { photoId: photo.id }) },
-                ])}
+                style={we.actionBtn}
+                onPress={() => {
+                  socket.emit('echo_photo', { photoId: photo.id });
+                  setEchoed(e => !e);
+                  setEchoCount(c => echoed ? c - 1 : c + 1);
+                }}
               >
-                <Text style={[bt.railIcon, { fontSize: 18, color: '#555' }]}>⋯</Text>
+                <Text style={we.actionIcon}>🔊</Text>
+                <Text style={[we.actionLbl, echoed && we.echoedLbl]}>
+                  {echoCount > 0 ? `${echoCount} ` : ''}Echo
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Latest note preview */}
+            {lastComment && (
+              <TouchableOpacity onPress={() => onComment(photo)} style={we.notesPrev}>
+                {photo.comments.length > 1 && (
+                  <Text style={we.notesAll}>Read all {photo.comments.length} notes</Text>
+                )}
+                <View style={we.noteRow}>
+                  <Text style={we.noteUser}>{lastComment.username}</Text>
+                  <Text style={we.noteTxt} numberOfLines={2}> {lastComment.text}</Text>
+                </View>
               </TouchableOpacity>
             )}
           </View>
-        </View>
 
-        {/* Caption */}
-        {!!photo.caption && (
-          <View style={bt.captionWrap}>
-            <Text style={bt.captionUser}>{photo.username} </Text>
-            <Text style={bt.captionTxt}>{photo.caption}</Text>
-          </View>
-        )}
-        {photo.comments?.length > 0 && (
-          <TouchableOpacity onPress={() => onComment(photo)} style={bt.commentHint}>
-            <Text style={bt.commentHintTxt}>View {photo.comments.length} {photo.comments.length === 1 ? 'comment' : 'comments'}</Text>
-          </TouchableOpacity>
-        )}
+        </View>
       </View>
+
+      <View style={we.divider} />
     </View>
   );
 }
@@ -469,12 +277,12 @@ function CommentsModal({ visible, photo, user, onClose }) {
         <TouchableOpacity style={cm.backdrop} activeOpacity={1} onPress={onClose} />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={cm.sheet}>
           <View style={cm.handle} />
-          <Text style={cm.title}>Comments</Text>
+          <Text style={cm.title}>Notes</Text>
           <FlatList
             data={photo.comments || []}
             keyExtractor={c => String(c.id)}
             style={{ maxHeight: 340 }}
-            ListEmptyComponent={<Text style={cm.empty}>No comments yet — be first!</Text>}
+            ListEmptyComponent={<Text style={cm.empty}>No notes yet — be first!</Text>}
             renderItem={({ item }) => (
               <View style={cm.row}>
                 <View style={[cm.av, { backgroundColor: stringToColor(item.username) }]}>
@@ -497,7 +305,7 @@ function CommentsModal({ visible, photo, user, onClose }) {
             </View>
             <TextInput
               style={cm.input}
-              placeholder="Add a comment…"
+              placeholder="Leave a note…"
               placeholderTextColor="#444"
               value={text}
               onChangeText={setText}
@@ -520,23 +328,58 @@ function CommentsModal({ visible, photo, user, onClose }) {
 // ─── Upload modal ─────────────────────────────────────────────────────────────
 
 function UploadModal({ visible, onClose, user, mode = 'photo' }) {
-  const [imageUri,   setImageUri]   = useState(null);
-  const [caption,    setCaption]    = useState('');
-  const [filter,     setFilter]     = useState('normal');
-  const [uploading,  setUploading]  = useState(false);
-  const [audience,   setAudience]   = useState('world'); // 'world' | 'bonds'
+  const [imageUri,     setImageUri]     = useState(null);
+  const [caption,      setCaption]      = useState('');
+  const [filter,       setFilter]       = useState('normal');
+  const [uploading,    setUploading]    = useState(false);
+  const [audience,     setAudience]     = useState('world'); // 'world' | 'bonds'
+  const [isVideo,      setIsVideo]      = useState(false);
+  const [postCountry,  setPostCountry]  = useState(null);
+  const [locDetecting, setLocDetecting] = useState(false);
   const isStory = mode === 'story';
 
   function reset() {
     setImageUri(null); setCaption(''); setFilter('normal');
-    setUploading(false); setAudience('world');
+    setUploading(false); setAudience('world'); setIsVideo(false);
+    setPostCountry(null);
   }
 
-  function pick(cam) {
+  useEffect(() => {
+    if (!visible) return;
+    setPostCountry(null);
+    setLocDetecting(true);
+    Geolocation.getCurrentPosition(
+      ({ coords: { latitude, longitude } }) => {
+        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.countryCode) {
+              const flag = countryFlag(data.countryCode);
+              setPostCountry(`${flag} ${data.countryName}`);
+            }
+          })
+          .catch(() => {})
+          .finally(() => setLocDetecting(false));
+      },
+      () => setLocDetecting(false),
+      { timeout: 6000, enableHighAccuracy: false }
+    );
+  }, [visible]);
+
+  function pick(cam, video = false) {
     const fn = cam ? launchCamera : launchImageLibrary;
-    fn({ mediaType: 'photo', quality: 0.7, maxWidth: 1080, maxHeight: 1080 }, r => {
-      if (!r.didCancel && r.assets?.[0]) setImageUri(r.assets[0].uri);
-    });
+    fn(
+      video
+        ? { mediaType: 'video', videoQuality: 'high', durationLimit: 60 }
+        : { mediaType: 'mixed', quality: 0.7, maxWidth: 1080, maxHeight: 1080 },
+      r => {
+        if (!r.didCancel && r.assets?.[0]) {
+          const asset = r.assets[0];
+          setImageUri(asset.uri);
+          setIsVideo(video || asset.type?.startsWith('video') || false);
+        }
+      }
+    );
   }
 
   async function upload() {
@@ -545,7 +388,12 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
     try {
       const token = await getAccessToken();
       const fd = new FormData();
-      fd.append('photo', { uri: imageUri, type: 'image/jpeg', name: 'photo.jpg' });
+      fd.append('photo', isVideo
+        ? { uri: imageUri, type: 'video/mp4', name: 'media.mp4' }
+        : { uri: imageUri, type: 'image/jpeg', name: 'photo.jpg' }
+      );
+      fd.append('mediaType', isVideo ? 'video' : 'image');
+      if (postCountry) fd.append('postCountry', postCountry);
       fd.append('username', user.username);
       fd.append('userId', user.userId || user.id || '');
       fd.append('country', user.country);
@@ -575,7 +423,18 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
         <TouchableOpacity style={up.backdrop} activeOpacity={1} onPress={() => { reset(); onClose(); }} />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={up.sheet}>
           <View style={up.handle} />
-          <Text style={up.title}>{isStory ? 'New Story ✨' : 'Share with the World 🌍'}</Text>
+          <Text style={up.title}>{isStory ? 'New Story ✨' : 'New World Entry ✦'}</Text>
+          <View style={up.locRow}>
+            {locDetecting ? (
+              <ActivityIndicator size="small" color="#6C47FF" />
+            ) : (
+              <Text style={up.locTxt}>
+                {postCountry
+                  ? `📍 Posting from ${countryName(postCountry)}`
+                  : `📍 ${countryName(user?.country || '')} (home)`}
+              </Text>
+            )}
+          </View>
 
           {/* Story audience selector */}
           {isStory && (
@@ -605,7 +464,7 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
             </View>
           )}
 
-          {/* Photo picker */}
+          {/* Media picker */}
           {!imageUri ? (
             <View style={up.picks}>
               <TouchableOpacity style={up.pick} onPress={() => pick(false)}>
@@ -615,6 +474,18 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
               <TouchableOpacity style={up.pick} onPress={() => pick(true)}>
                 <Text style={up.pickIcon}>📷</Text>
                 <Text style={up.pickTxt}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={up.pick} onPress={() => pick(true, true)}>
+                <Text style={up.pickIcon}>🎬</Text>
+                <Text style={up.pickTxt}>Record</Text>
+              </TouchableOpacity>
+            </View>
+          ) : isVideo ? (
+            <View style={[up.preview, up.videoPrev]}>
+              <Text style={up.videoIcon}>🎬</Text>
+              <Text style={up.videoReady}>Video ready</Text>
+              <TouchableOpacity onPress={() => pick(true, true)} style={{ marginTop: 6 }}>
+                <Text style={up.reRecordTxt}>Re-record</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -626,29 +497,30 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
             </View>
           )}
 
-          {imageUri && <FilterPicker imageUri={imageUri} selectedFilter={filter} onSelect={setFilter} />}
+          {imageUri && !isVideo && <FilterPicker imageUri={imageUri} selectedFilter={filter} onSelect={setFilter} />}
 
           <TextInput
             style={up.caption}
-            placeholder={isStory ? 'Add a caption…' : 'Write a caption… 🌍'}
+            placeholder={isStory ? 'Add a caption…' : 'Write your entry…'}
             placeholderTextColor="#444"
             value={caption}
             onChangeText={setCaption}
             multiline
-            maxLength={200}
+            maxLength={500}
           />
 
           <TouchableOpacity
             style={[up.btn, (!imageUri || uploading) && up.btnOff]}
             onPress={upload}
             disabled={!imageUri || uploading}
+            activeOpacity={0.85}
           >
             {uploading
               ? <ActivityIndicator color="#fff" />
               : <Text style={up.btnTxt}>
                   {isStory
                     ? (audience === 'bonds' ? 'Share to Bonds 🫂' : 'Share to World 🌍')
-                    : 'Post to the World 🌍'}
+                    : 'Post Entry ✦'}
                 </Text>
             }
           </TouchableOpacity>
@@ -658,147 +530,48 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
   );
 }
 
-// ─── Photo card (IG-style full-width) ─────────────────────────────────────────
 
-function PhotoCard({ photo, user, onComment, onProfile, onFollow, followingIds, showCountryBadge }) {
-  const socket = getSocket();
-  const myUid = user?.userId || socket.id;
-  const [liked,      setLiked]     = useState(photo.likes?.some(l => l.userId === socket.id));
-  const [likeCount,  setLikeCount] = useState(photo.likes?.length || 0);
-  const [echoed,     setEchoed]    = useState(photo.echos?.some(e => e.userId === myUid));
-  const [echoCount,  setEchoCount] = useState(photo.echos?.length || 0);
-  const [showHeart,  setShowHeart] = useState(false);
-  const lastTap = useRef(0);
+// ─── Moment Ring (story bubble) ───────────────────────────────────────────────
 
-  useEffect(() => {
-    setLiked(photo.likes?.some(l => l.userId === socket.id));
-    setLikeCount(photo.likes?.length || 0);
-    setEchoed(photo.echos?.some(e => e.userId === myUid));
-    setEchoCount(photo.echos?.length || 0);
-  }, [photo.likes, photo.echos]);
+function MomentRing({ isSelf, group, viewCount = 0, onPress }) {
+  const color   = stringToColor(group?.username || '?');
+  const flag    = countryFlag(group?.country || '');
+  const initial = (group?.username?.[0] ?? '?').toUpperCase();
 
-  function toggleLike() {
-    socket.emit('like_photo', { photoId: photo.id });
-    setLiked(l => !l);
-    setLikeCount(c => liked ? c - 1 : c + 1);
+  if (isSelf) {
+    return (
+      <TouchableOpacity style={mr.item} onPress={onPress} activeOpacity={0.8}>
+        <View style={[mr.addRing, { backgroundColor: color + '11' }]}>
+          <View style={mr.addInner}>
+            <Text style={mr.addPlus}>+</Text>
+          </View>
+        </View>
+        <Text style={mr.label} numberOfLines={1}>Your Story</Text>
+        {viewCount > 0 && (
+          <View style={mr.viewRow}>
+            <Text style={mr.viewCount}>{viewCount} 👁</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
   }
-
-  function handleDoubleTap() {
-    const now = Date.now();
-    if (now - lastTap.current < 300) {
-      if (!liked) { toggleLike(); setShowHeart(true); setTimeout(() => setShowHeart(false), 900); }
-    }
-    lastTap.current = now;
-  }
-
-  const isOwn      = photo.userId === socket.id;
-  const isFollowed = followingIds.includes(photo.userId);
 
   return (
-    <View style={pc.card}>
-      {/* Header */}
-      <TouchableOpacity style={pc.header} onPress={() => onProfile(photo)}>
-        <View style={[pc.av, { backgroundColor: stringToColor(photo.username) }]}>
-          <Text style={pc.avTxt}>{(photo.username?.[0] ?? '?').toUpperCase()}</Text>
-          {photo.mood && <Text style={pc.mood}>{photo.mood}</Text>}
+    <TouchableOpacity style={mr.item} onPress={onPress} activeOpacity={0.8}>
+      <View style={mr.ringWrap}>
+        <View style={[mr.outerGlow, { borderColor: color }]} />
+        <View style={mr.ring}>
+          <Text style={mr.flagBig}>{flag}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          {/* Flag right next to name */}
-          <View style={pc.nameRow}>
-            <Text style={pc.flag}>{countryFlag(photo.country)}</Text>
-            <Text style={pc.username}>{photo.username}</Text>
-          </View>
-          <View style={pc.sub}>
-            <Text style={pc.country}>{countryName(photo.country)}</Text>
-            <Text style={pc.sep}>·</Text>
-            <Text style={pc.time}>{timeAgo(photo.createdAt)}</Text>
-          </View>
+        <View style={[mr.initBadge, { backgroundColor: color }]}>
+          <Text style={mr.initTxt}>{initial}</Text>
         </View>
-        {!isOwn && (
-          <TouchableOpacity
-            style={[pc.followBtn, isFollowed && pc.followBtnOn]}
-            onPress={() => onFollow(photo.userId, isFollowed)}
-          >
-            <Text style={[pc.followTxt, isFollowed && pc.followTxtOn]}>
-              {isFollowed ? '✓ Bonded' : '+ Bond'}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {isOwn && (
-          <TouchableOpacity onPress={() =>
-            Alert.alert('Delete Photo', 'Remove this photo?', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: () => socket.emit('delete_photo', { photoId: photo.id }) },
-            ])
-          }>
-            <Text style={{ fontSize: 18, color: '#444' }}>⋯</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-
-      {/* Photo */}
-      <TouchableOpacity activeOpacity={1} onPress={handleDoubleTap} style={{ position: 'relative' }}>
-        <FilteredImage uri={photo.imageUrl} filterId={photo.filter || 'normal'} style={pc.img} resizeMode="cover" />
-        <HeartBurst visible={showHeart} />
-        {/* World tab country badge on image */}
-        {showCountryBadge && (
-          <View style={pc.countryBadge}>
-            <Text style={pc.countryBadgeFlag}>{countryFlag(photo.country)}</Text>
-            <Text style={pc.countryBadgeName}>{countryName(photo.country)}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-
-      {/* Actions */}
-      <View style={pc.actions}>
-        <TouchableOpacity style={pc.actionBtn} onPress={toggleLike}>
-          <Text style={[pc.actionIcon, liked && pc.liked]}>{liked ? '❤️' : '🤍'}</Text>
-          {likeCount > 0 && <Text style={[pc.actionCount, liked && pc.likedCount]}>{likeCount}</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={pc.actionBtn} onPress={() => onComment(photo)}>
-          <Text style={pc.actionIcon}>💬</Text>
-          {photo.comments?.length > 0 && <Text style={pc.actionCount}>{photo.comments.length}</Text>}
-        </TouchableOpacity>
-        {/* Echo — Bond's unique repost */}
-        <TouchableOpacity
-          style={pc.actionBtn}
-          onPress={() => {
-            socket.emit('echo_photo', { photoId: photo.id });
-            setEchoed(e => !e);
-            setEchoCount(c => echoed ? c - 1 : c + 1);
-          }}
-        >
-          <Text style={[pc.actionIcon, echoed && pc.echoed]}>🔊</Text>
-          {echoCount > 0 && <Text style={[pc.actionCount, echoed && pc.echoedCount]}>{echoCount}</Text>}
-        </TouchableOpacity>
       </View>
-
-      {likeCount > 0 && (
-        <Text style={pc.likes}>❤️ {likeCount} {likeCount === 1 ? 'like' : 'likes'}</Text>
-      )}
-      {echoCount > 0 && (
-        <Text style={pc.echos}>🔊 {echoCount} {echoCount === 1 ? 'echo' : 'echos'}</Text>
-      )}
-      {!!photo.caption && (
-        <View style={pc.captionRow}>
-          <Text style={pc.captionUser}>{photo.username}</Text>
-          <Text style={pc.caption}>{photo.caption}</Text>
-        </View>
-      )}
-      {photo.comments?.length > 0 && (
-        <TouchableOpacity onPress={() => onComment(photo)} style={pc.commentPrev}>
-          {photo.comments.length > 1 && (
-            <Text style={pc.viewAll}>View all {photo.comments.length} comments</Text>
-          )}
-          <View style={{ flexDirection: 'row', gap: 5 }}>
-            <Text style={pc.prevUser}>{photo.comments[photo.comments.length - 1].username}</Text>
-            <Text style={pc.prevTxt} numberOfLines={1}>{photo.comments[photo.comments.length - 1].text}</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-    </View>
+      <Text style={mr.label} numberOfLines={1}>{group?.username || ''}</Text>
+    </TouchableOpacity>
   );
 }
+
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
@@ -814,12 +587,10 @@ export default function PhotoFeedScreen({ navigation, user }) {
     { id: 'd8', userId: 'demo8', username: 'ines_pt',     country: '🇵🇹 Portugal',    city: 'Lisbon',     imageUrl: '', caption: 'Sunset fado 🎵', likes: [], echos: [], comments: [], createdAt: Date.now() - 28800000 },
     { id: 'd9', userId: 'demo9', username: 'carlos_mx',   country: '🇲🇽 Mexico',      city: 'Mexico City',imageUrl: '', caption: 'Tacos at 2am 🌮', likes: [], echos: [], comments: [], createdAt: Date.now() - 32400000 },
   ], []);
-  const DEMO_FOLLOWING = useMemo(() => DEMO_PHOTOS.map(p => p.userId), [DEMO_PHOTOS]);
 
   const [photos,            setPhotos]           = useState([]);
   const [stories,           setStories]          = useState([]);
   const [tab,               setTab]              = useState('world');
-  const [countryFilter,     setCountryFilter]    = useState(null);
   const [showFootprints,    setShowFootprints]    = useState(false);
   const [showUpload,        setShowUpload]        = useState(false);
   const [uploadMode,        setUploadMode]        = useState('photo');
@@ -827,23 +598,25 @@ export default function PhotoFeedScreen({ navigation, user }) {
   const [viewingStoryGroup, setViewingStoryGroup] = useState(null);
   const [followingIds,      setFollowingIds]      = useState([]);
   const [savedCountries,    setSavedCountries]    = useState([]);
-  const [currentCountry,    setCurrentCountry]    = useState(null); // null = globe prompt
+  const [currentCountry,    setCurrentCountry]    = useState(null);
   const [countryFlagCounts, setCountryFlagCounts] = useState({});   // country -> planted count
-  const [showBondFootprint,  setShowBondFootprint]  = useState(true); // open on first load to demo
   const [bondCountryFilter, setBondCountryFilter] = useState(null);
+  const [refreshing,        setRefreshing]        = useState(false);
+  const [activeVideoId,     setActiveVideoId]     = useState(null);
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
+  const viewabilityConfig = useRef({ itemVisibilityPercentThreshold: 60 }).current;
   const socket = getSocket();
 
   // Load saved countries and re-plant flags on server after connect
   useEffect(() => {
     AsyncStorage.getItem('bond_saved_countries').then(raw => {
-      const countries = raw ? JSON.parse(raw) : [];
-      if (countries.length) {
-        setSavedCountries(countries);
-        const plant = () => countries.forEach(c => socket.emit('plant_flag', { country: c }));
-        if (socket.connected) plant(); else socket.once('connect', plant);
-      }
+      // Pre-seed demo countries on first run so the Events "Following Live" feature is visible
+      const countries = raw ? JSON.parse(raw) : ['🇺🇸', '🇬🇧', '🇰🇷'];
+      setSavedCountries(countries);
+      const plant = () => countries.forEach(c => socket.emit('plant_flag', { country: c }));
+      if (socket.connected) plant(); else socket.once('connect', plant);
+      if (!raw) AsyncStorage.setItem('bond_saved_countries', JSON.stringify(countries));
     });
   }, []);
 
@@ -866,7 +639,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
     }
     if (socket.connected) init(); else socket.once('connect', init);
 
-    socket.on('photos_feed',   setPhotos);
+    socket.on('photos_feed', data => { setPhotos(data); setRefreshing(false); });
     socket.on('new_photo',     p  => setPhotos(prev => [p, ...prev]));
     socket.on('photo_updated', up => {
       setPhotos(prev => prev.map(p => p.id === up.id ? up : p));
@@ -874,11 +647,12 @@ export default function PhotoFeedScreen({ navigation, user }) {
     });
     socket.on('stories_updated', setStories);
     socket.on('following_list',  ({ following }) => setFollowingIds(following));
-    socket.on('follow_status',   ({ targetUserId, following }) =>
+    socket.on('follow_status', ({ targetUserId, following }) => {
       setFollowingIds(prev =>
         following ? [...new Set([...prev, targetUserId])] : prev.filter(id => id !== targetUserId)
-      )
-    );
+      );
+      if (following) socket.emit('get_photos'); // pull new bond's posts into feed
+    });
     socket.on('country_flag_count', ({ country, count }) =>
       setCountryFlagCounts(prev => ({ ...prev, [country]: count }))
     );
@@ -894,28 +668,45 @@ export default function PhotoFeedScreen({ navigation, user }) {
     return list;
   }, [photos]);
 
-  const worldPhotos = useMemo(() =>
-    currentCountry ? photos.filter(p => p.country === currentCountry) : photos
-  , [photos, currentCountry]);
+  const worldPhotos = useMemo(() => {
+    const filtered = currentCountry
+      ? photos.filter(p => p.country === currentCountry || p.postCountry === currentCountry)
+      : photos;
+    return [...filtered].sort((a, b) => scorePost(b) - scorePost(a));
+  }, [photos, currentCountry]);
 
   const myUserId = user?.userId || socket.id;
+
+  const myStoryViewCount = useMemo(() => {
+    const myGroup = stories.find(g => g.userId === myUserId);
+    if (!myGroup?.stories?.length) return 0;
+    const viewers = new Set();
+    myGroup.stories.forEach(s => {
+      (s.viewers || []).forEach(v => viewers.add(typeof v === 'string' ? v : v.userId));
+      if (s.viewedBy) viewers.add(s.viewedBy);
+    });
+    return viewers.size;
+  }, [stories]);
+
   const realBondPhotos = useMemo(() =>
-    photos.filter(p =>
-      followingIds.includes(p.userId) ||
-      p.userId === myUserId ||
-      p.echos?.some(e => followingIds.includes(e.userId))
-    )
+    photos
+      .filter(p =>
+        followingIds.includes(p.userId) ||
+        p.userId === myUserId ||
+        p.echos?.some(e => followingIds.includes(e.userId))
+      )
+      .map(p => {
+        const isDirectFollow = followingIds.includes(p.userId) || p.userId === myUserId;
+        if (isDirectFollow) return p;
+        const echoer = p.echos?.find(e => followingIds.includes(e.userId));
+        return { ...p, _echoAttrib: echoer?.username || 'A bond' };
+      })
   , [photos, followingIds, myUserId]);
 
   // Show demo data when no real bonds exist yet so the footprint is visible
   const isDemoMode = realBondPhotos.length === 0 && followingIds.length === 0;
   const allBondPhotos = isDemoMode ? DEMO_PHOTOS : realBondPhotos;
-  const effectiveFollowingIds = isDemoMode ? DEMO_FOLLOWING : followingIds;
 
-  // Force-open the sheet in demo mode so the user can see it immediately
-  useEffect(() => {
-    if (isDemoMode && tab === 'bonds') setShowBondFootprint(true);
-  }, [isDemoMode, tab]);
 
   const bondPhotos = useMemo(() =>
     bondCountryFilter
@@ -926,12 +717,25 @@ export default function PhotoFeedScreen({ navigation, user }) {
   // Stories filtered by audience for bonds tab
   const bondsStories = useMemo(() =>
     stories.filter(g => {
-      // show world stories + stories from bonds
-      const isOwn = g.userId === socket.id;
+      const isOwn = g.userId === myUserId;
       const isBonded = followingIds.includes(g.userId);
-      return isOwn || isBonded || g.audience !== 'bonds';
+      return isOwn || isBonded;
     })
-  , [stories, followingIds]);
+  , [stories, followingIds, myUserId]);
+
+  function teleport() {
+    Animated.sequence([
+      Animated.timing(globeAnim, { toValue: 1.4, duration: 120, useNativeDriver: true }),
+      Animated.timing(globeAnim, { toValue: 0.85, duration: 100, useNativeDriver: true }),
+      Animated.spring(globeAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
+    ]).start();
+    const options = WORLD_COUNTRIES.filter(c => c !== currentCountry);
+    const pick = options[Math.floor(Math.random() * options.length)];
+    landAnim.setValue(0);
+    setCurrentCountry(pick);
+    socket.emit('get_country_flag_count', { country: pick });
+    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
+  }
 
   function openProfile(photo) {
     navigation.navigate('Profile', {
@@ -946,30 +750,41 @@ export default function PhotoFeedScreen({ navigation, user }) {
     socket.emit(isFollowed ? 'unfollow_user' : 'follow_user', { targetUserId });
   }
 
-  function teleport() {
-    // Bounce the globe, then land somewhere new
-    Animated.sequence([
-      Animated.timing(globeAnim, { toValue: 1.4, duration: 120, useNativeDriver: true }),
-      Animated.timing(globeAnim, { toValue: 0.85, duration: 100, useNativeDriver: true }),
-      Animated.spring(globeAnim, { toValue: 1, useNativeDriver: true, friction: 4 }),
-    ]).start();
-
-    // Pick a random country from all world countries, excluding the current one
-    const options = WORLD_COUNTRIES.filter(c => c !== currentCountry);
-    const pick = options[Math.floor(Math.random() * options.length)];
-
-    landAnim.setValue(0);
-    setCurrentCountry(pick);
-    socket.emit('get_country_flag_count', { country: pick });
-    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
+  function onRefresh() {
+    setRefreshing(true);
+    socket.emit('get_photos');
+    socket.emit('get_stories');
   }
+
+  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+    const first = viewableItems.find(v => v.item?.mediaType === 'video');
+    setActiveVideoId(first?.item?.id ?? null);
+  }, []);
 
   const countryFilterHeader = (
     <View>
 
-      {/* ── Footprints trigger (replaces scrolling pill strip) ── */}
-      {savedCountries.length > 0 && (
-        <View style={s.footprintRow}>
+      {/* ── Quick-access row: Mine + Footprints ── */}
+      <View style={s.footprintRow}>
+        {user?.country && (
+          <TouchableOpacity
+            style={[s.mineBtn, currentCountry === user.country && s.mineBtnOn]}
+            onPress={() => {
+              const next = currentCountry === user.country ? null : user.country;
+              setCurrentCountry(next);
+              if (next) {
+                landAnim.setValue(0);
+                Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
+                socket.emit('get_country_flag_count', { country: next });
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={s.mineFlag}>{countryFlag(user.country)}</Text>
+            <Text style={[s.mineTxt, currentCountry === user.country && s.mineTxtOn]}>Mine</Text>
+          </TouchableOpacity>
+        )}
+        {savedCountries.length > 0 && (
           <TouchableOpacity style={s.footprintBtn} onPress={() => setShowFootprints(true)} activeOpacity={0.8}>
             <Text style={s.footprintEmoji}>👣</Text>
             <Text style={s.footprintLabel}>Footprints</Text>
@@ -977,36 +792,46 @@ export default function PhotoFeedScreen({ navigation, user }) {
               <Text style={s.footprintBadgeTxt}>{savedCountries.length}</Text>
             </View>
           </TouchableOpacity>
-          {currentCountry && savedCountries.includes(currentCountry) && (
-            <TouchableOpacity style={s.footprintActiveChip} onPress={() => setCurrentCountry(null)} activeOpacity={0.8}>
-              <Text style={s.footprintActiveFlag}>{countryFlag(currentCountry)}</Text>
-              <Text style={s.footprintActiveName} numberOfLines={1}>{countryName(currentCountry) || currentCountry}</Text>
-              <Text style={s.footprintActiveClear}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+        )}
+        {currentCountry && currentCountry !== user?.country && savedCountries.includes(currentCountry) && (
+          <TouchableOpacity style={s.footprintActiveChip} onPress={() => setCurrentCountry(null)} activeOpacity={0.8}>
+            <Text style={s.footprintActiveFlag}>{countryFlag(currentCountry)}</Text>
+            <Text style={s.footprintActiveName} numberOfLines={1}>{countryName(currentCountry) || currentCountry}</Text>
+            <Text style={s.footprintActiveClear}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* ── Globe teleport button ── */}
+      {/* ── Globe teleport OR landing banner ── */}
       {!currentCountry ? (
         <View style={s.globePrompt}>
-          <Animated.Text
-            style={[s.globeEmoji, { transform: [{ scale: globeAnim }] }]}
-          >
-            🌍
-          </Animated.Text>
+          <Animated.Text style={[s.globeEmoji, { transform: [{ scale: globeAnim }] }]}>🌍</Animated.Text>
           <Text style={s.globeTitle}>Explore the world</Text>
           <Text style={s.globeSub}>
             {countries.length > 0
               ? `${countries.length} countries posting right now`
               : 'Be the first to post from your country!'}
           </Text>
+          {user?.country && (
+            <TouchableOpacity
+              style={s.minePromptBtn}
+              onPress={() => {
+                setCurrentCountry(user.country);
+                landAnim.setValue(0);
+                Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
+                socket.emit('get_country_flag_count', { country: user.country });
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={s.minePromptFlag}>{countryFlag(user.country)}</Text>
+              <Text style={s.minePromptTxt}>See my country</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={s.teleportBtn} onPress={teleport} activeOpacity={0.85}>
             <Text style={s.teleportBtnTxt}>🌍  Take me somewhere</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        /* ── Landed on a country ── */
         <Animated.View style={[s.landingBanner, {
           opacity: landAnim,
           transform: [{ translateY: landAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
@@ -1014,9 +839,10 @@ export default function PhotoFeedScreen({ navigation, user }) {
           <View style={s.landingTop}>
             <Text style={s.landingFlag}>{countryFlag(currentCountry)}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={s.landingLabel}>You landed in</Text>
+              <Text style={s.landingLabel}>
+                {currentCountry === user?.country ? 'Your country' : 'You landed in'}
+              </Text>
               <Text style={s.landingCountry}>{countryName(currentCountry) || currentCountry}</Text>
-              {/* 📍 planted count */}
               <View style={s.plantedRow}>
                 <Text style={s.plantedIcon}>📍</Text>
                 <Text style={s.plantedCount}>
@@ -1024,11 +850,12 @@ export default function PhotoFeedScreen({ navigation, user }) {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={s.nextBtn} onPress={teleport} activeOpacity={0.8}>
-              <Text style={s.nextBtnTxt}>Next 🌍</Text>
-            </TouchableOpacity>
+            {currentCountry !== user?.country && (
+              <TouchableOpacity style={s.nextBtn} onPress={teleport} activeOpacity={0.8}>
+                <Text style={s.nextBtnTxt}>Next 🌍</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          {/* Pin / Unpin country */}
           <TouchableOpacity
             style={[s.followCountryBtn, savedCountries.includes(currentCountry) && s.followCountryBtnOn]}
             onPress={() => toggleSaveCountry(currentCountry)}
@@ -1049,15 +876,29 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
   const bondsHeader = (
     <View>
-      {/* Bond Footprint Card */}
-      <BondFootprintCard
-        bondPhotos={allBondPhotos}
-        followingCount={effectiveFollowingIds.length}
-        isDemoMode={isDemoMode}
-        onPress={() => setShowBondFootprint(true)}
-      />
+      {/* Snap-style story rings */}
+      <View style={s.snapRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.snapContent}
+        >
+          <MomentRing
+            isSelf
+            group={{ username: user?.username, country: user?.country }}
+            viewCount={myStoryViewCount}
+            onPress={() => { setUploadMode('story'); setShowUpload(true); }}
+          />
+          {bondsStories.map(g => (
+            <MomentRing
+              key={g.userId}
+              group={g}
+              onPress={() => setViewingStoryGroup(g)}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
-      {/* Active country filter chip */}
       {bondCountryFilter && (
         <TouchableOpacity
           style={s.bondFilterChip}
@@ -1069,31 +910,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
           <Text style={s.bondFilterX}>✕</Text>
         </TouchableOpacity>
       )}
-
-
-      {/* Moment Rings row */}
-      <View style={s.momentSection}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.momentRow}
-        >
-          {/* Add your moment */}
-          <MomentRing
-            isSelf
-            group={{ username: user?.username, country: user?.country }}
-            onPress={() => { setUploadMode('story'); setShowUpload(true); }}
-          />
-          {/* Bond story rings */}
-          {bondsStories.map(g => (
-            <MomentRing
-              key={g.userId}
-              group={g}
-              onPress={() => setViewingStoryGroup(g)}
-            />
-          ))}
-        </ScrollView>
-      </View>
 
       <View style={s.divider} />
     </View>
@@ -1125,7 +941,14 @@ export default function PhotoFeedScreen({ navigation, user }) {
           style={[s.tab, tab === 'bonds' && s.tabActive]}
           onPress={() => setTab('bonds')}
         >
-          <Text style={[s.tabTxt, tab === 'bonds' && s.tabTxtActive]}>🫂  Bonds</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <WorldMark
+                size={15}
+                color={tab === 'bonds' ? '#fff' : '#555'}
+                bondColor={tab === 'bonds' ? '#6C47FF' : '#444'}
+              />
+              <Text style={[s.tabTxt, tab === 'bonds' && s.tabTxtActive]}>Bonds</Text>
+            </View>
         </TouchableOpacity>
       </View>
 
@@ -1136,18 +959,31 @@ export default function PhotoFeedScreen({ navigation, user }) {
         keyExtractor={p => String(p.id)}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6C47FF"
+            colors={['#6C47FF']}
+          />
+        }
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         ListHeaderComponent={
           tab === 'world' ? countryFilterHeader : bondsHeader
         }
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyIcon}>{tab === 'world' ? '🌍' : '🫂'}</Text>
+            {tab === 'world'
+              ? <Text style={s.emptyIcon}>🌍</Text>
+              : <WorldMark size={48} color="#555" bondColor="#6C47FF" />
+            }
             <Text style={s.emptyTitle}>
-              {tab === 'world' ? 'No photos yet' : 'No bond photos yet'}
+              {tab === 'world' ? 'No entries yet' : 'No bond entries yet'}
             </Text>
             <Text style={s.emptySub}>
               {tab === 'world'
-                ? 'Be the first to share a moment from your world!'
+                ? 'Be the first to post a world entry from your corner of the globe!'
                 : 'Bond with people to see their photos here'}
             </Text>
             {tab === 'world' && (
@@ -1155,33 +991,22 @@ export default function PhotoFeedScreen({ navigation, user }) {
                 style={s.emptyBtn}
                 onPress={() => { setUploadMode('photo'); setShowUpload(true); }}
               >
-                <Text style={s.emptyBtnTxt}>Post a Photo</Text>
+                <Text style={s.emptyBtnTxt}>Post a World Entry</Text>
               </TouchableOpacity>
             )}
           </View>
         }
-        renderItem={({ item }) =>
-          tab === 'bonds' ? (
-            <BondTrailCard
-              photo={item}
-              user={user}
-              onComment={setCommentPhoto}
-              onProfile={openProfile}
-              onFollow={handleFollow}
-              followingIds={followingIds}
-            />
-          ) : (
-            <PhotoCard
-              photo={item}
-              user={user}
-              onComment={setCommentPhoto}
-              onProfile={openProfile}
-              onFollow={handleFollow}
-              followingIds={followingIds}
-              showCountryBadge
-            />
-          )
-        }
+        renderItem={({ item }) => (
+          <WorldEntryCard
+            photo={item}
+            user={user}
+            onComment={setCommentPhoto}
+            onProfile={openProfile}
+            onFollow={handleFollow}
+            followingIds={followingIds}
+            isActiveVideo={activeVideoId === item.id}
+          />
+        )}
       />
 
       {/* ── Modals ── */}
@@ -1204,14 +1029,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
         onDelete={id => socket.emit('delete_story', { storyId: id })}
         onViewStory={id => socket.emit('view_story', { storyId: id })}
         currentUserId={socket.id}
-      />
-
-      <BondFootprintSheet
-        visible={showBondFootprint}
-        bondPhotos={allBondPhotos}
-        onClose={() => setShowBondFootprint(false)}
-        onSelectCountry={setBondCountryFilter}
-        activeFilter={bondCountryFilter}
       />
 
       {/* ── Footprints bottom sheet ── */}
@@ -1284,8 +1101,8 @@ const s = StyleSheet.create({
   bondFilterTxt:   { color: '#a78bfa', fontSize: 13, fontWeight: '800' },
   bondFilterX:     { color: '#6C47FF', fontSize: 14, fontWeight: '900', marginLeft: 4 },
 
-  // Footprints trigger row
-  footprintRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 8 },
+  // Footprints row
+  footprintRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 6, paddingBottom: 10, gap: 8 },
   footprintBtn:        { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
   footprintEmoji:      { fontSize: 16 },
   footprintLabel:      { color: '#fff', fontSize: 13, fontWeight: '800' },
@@ -1295,6 +1112,40 @@ const s = StyleSheet.create({
   footprintActiveFlag: { fontSize: 16 },
   footprintActiveName: { color: '#fff', fontSize: 13, fontWeight: '700', flex: 1 },
   footprintActiveClear:{ color: '#6C47FF', fontSize: 14, fontWeight: '700' },
+
+  // Mine button
+  mineBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
+  mineBtnOn:     { backgroundColor: 'rgba(108,71,255,0.15)', borderColor: '#6C47FF66' },
+  mineFlag:      { fontSize: 16 },
+  mineTxt:       { color: '#777', fontSize: 13, fontWeight: '700' },
+  mineTxtOn:     { color: '#6C47FF' },
+
+  // Globe teleport prompt
+  globePrompt:    { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24, gap: 8 },
+  globeEmoji:     { fontSize: 52 },
+  globeTitle:     { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 4 },
+  globeSub:       { color: '#555', fontSize: 13, textAlign: 'center' },
+  minePromptBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1, borderColor: '#2a2a2a', marginTop: 6 },
+  minePromptFlag: { fontSize: 18 },
+  minePromptTxt:  { color: '#aaa', fontSize: 14, fontWeight: '700' },
+  teleportBtn:    { backgroundColor: '#6C47FF', borderRadius: 26, paddingHorizontal: 28, paddingVertical: 14, marginTop: 4 },
+  teleportBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '900' },
+
+  // Landing banner
+  landingBanner:      { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#111', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#222', gap: 12 },
+  landingTop:         { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  landingFlag:        { fontSize: 44 },
+  landingLabel:       { color: '#555', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  landingCountry:     { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 2 },
+  nextBtn:            { backgroundColor: '#1a1a1a', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
+  nextBtnTxt:         { color: '#fff', fontSize: 13, fontWeight: '800' },
+  followCountryBtn:   { backgroundColor: '#1a1a1a', borderRadius: 14, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#2a2a2a' },
+  followCountryBtnOn: { backgroundColor: 'rgba(108,71,255,0.15)', borderColor: '#6C47FF66' },
+  followCountryTxt:   { color: '#666', fontSize: 14, fontWeight: '700' },
+  followCountryTxtOn: { color: '#6C47FF' },
+  plantedRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  plantedIcon:        { fontSize: 12 },
+  plantedCount:       { color: '#555', fontSize: 11, fontWeight: '700' },
 
   // Footprints bottom sheet
   fpOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
@@ -1309,34 +1160,12 @@ const s = StyleSheet.create({
   fpCellRemove:   { position: 'absolute', top: 5, right: 6 },
   fpCellRemoveTxt:{ color: '#444', fontSize: 11, fontWeight: '800' },
 
-  // Globe teleport
-  globePrompt:    { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24, gap: 10 },
-  globeEmoji:     { fontSize: 72 },
-  globeTitle:     { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  globeSub:       { color: '#555', fontSize: 13, textAlign: 'center' },
-  teleportBtn:    { marginTop: 8, backgroundColor: '#6C47FF', borderRadius: 24, paddingHorizontal: 28, paddingVertical: 16, shadowColor: '#6C47FF', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 6 } },
-  teleportBtnTxt: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
-
-  // Country landing banner
-  landingBanner:  { marginHorizontal: 16, marginTop: 12, marginBottom: 4, backgroundColor: '#111', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#222', gap: 12 },
-  landingTop:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  landingFlag:    { fontSize: 40 },
-  landingLabel:   { color: '#555', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  landingCountry: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5, marginTop: 2 },
-  nextBtn:        { backgroundColor: '#1e1e1e', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#2a2a2a' },
-  nextBtnTxt:     { color: '#fff', fontSize: 13, fontWeight: '700' },
-  followCountryBtn:    { backgroundColor: '#6C47FF18', borderRadius: 14, paddingVertical: 13, alignItems: 'center', borderWidth: 1.5, borderColor: '#6C47FF44' },
-  followCountryBtnOn:  { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
-  followCountryTxt:    { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
-  followCountryTxtOn:  { color: '#fff' },
-  plantedRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  plantedIcon: { fontSize: 12 },
-  plantedCount:{ color: '#888', fontSize: 11, fontWeight: '700' },
-
   divider: { height: 1, backgroundColor: '#111' },
 
   momentSection: { paddingVertical: 14 },
   momentRow:     { paddingHorizontal: 14, gap: 12 },
+  snapRow:       { paddingVertical: 12, borderBottomWidth: 0 },
+  snapContent:   { paddingHorizontal: 14, gap: 14 },
 
   heartBurst: { position: 'absolute', alignSelf: 'center', top: '35%', fontSize: 90 },
 
@@ -1348,50 +1177,73 @@ const s = StyleSheet.create({
   emptyBtnTxt:{ color: '#fff', fontWeight: '700' },
 });
 
-// PhotoCard styles
-const pc = StyleSheet.create({
-  card:     { marginBottom: 24, borderBottomWidth: 1, borderBottomColor: '#111' },
-  header:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  av:       { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avTxt:    { color: '#fff', fontWeight: 'bold', fontSize: 17 },
-  mood:     { position: 'absolute', bottom: -2, right: -2, fontSize: 13 },
-  nameRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  flag:     { fontSize: 15 },
-  username: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  sub:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  country:  { color: '#666', fontSize: 11 },
-  sep:      { color: '#444', fontSize: 11 },
-  time:     { color: '#444', fontSize: 11 },
-  followBtn:  { borderWidth: 1, borderColor: '#6C47FF', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 },
-  followBtnOn:{ backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
-  followTxt:  { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
-  followTxtOn:{ color: '#fff' },
-  img:      { width, aspectRatio: 1, backgroundColor: '#111' },
-  countryBadge: {
-    position: 'absolute', bottom: 12, left: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  countryBadgeFlag: { fontSize: 16 },
-  countryBadgeName: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  actions:    { flexDirection: 'row', paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, gap: 18 },
-  actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionIcon: { fontSize: 24 },
-  actionCount:{ color: '#888', fontSize: 13, fontWeight: '600' },
-  liked:       { color: '#e91e63' },
-  likedCount:  { color: '#e91e63' },
-  echoed:      { },
-  echoedCount: { color: '#6C47FF' },
-  likes:    { color: '#fff', fontSize: 13, fontWeight: '700', paddingHorizontal: 14, marginBottom: 2 },
-  echos:    { color: '#6C47FF', fontSize: 13, fontWeight: '700', paddingHorizontal: 14, marginBottom: 4 },
-  captionRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 14, marginBottom: 4, flexWrap: 'wrap' },
-  captionUser:{ color: '#fff', fontWeight: '700', fontSize: 13 },
-  caption:  { color: '#ccc', fontSize: 13, flex: 1, flexWrap: 'wrap' },
-  commentPrev: { paddingHorizontal: 14, paddingBottom: 10, gap: 2 },
-  viewAll:  { color: '#555', fontSize: 12, marginBottom: 2 },
-  prevUser: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  prevTxt:  { color: '#666', fontSize: 12, flex: 1 },
+// ─── World Entry Card styles ──────────────────────────────────────────────────
+const we = StyleSheet.create({
+  card:             { marginBottom: 8 },
+
+  // Thread row (Reddit-style with logo in gap)
+  threadRow:        { flexDirection: 'row', alignItems: 'stretch', marginHorizontal: 14, marginBottom: 4 },
+  threadContainer:  { width: 28, alignItems: 'center', marginRight: 10 },
+  threadLine:       { flex: 1, width: 2, borderRadius: 2, minHeight: 16, alignSelf: 'center' },
+  stampCircle:      { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  inner:            { flex: 1, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#1a1a1a', backgroundColor: '#0d0d0d' },
+
+  // Photo
+  photoWrap:        { position: 'relative', overflow: 'hidden' },
+  photoEmpty:       { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' },
+  photoEmptyFlag:   { fontSize: 72 },
+  photoGrad:        { position: 'absolute', bottom: 0, left: 0, right: 0, height: 90 },
+  videoBadge:       { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.72)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  videoBadgeTxt:    { fontSize: 13 },
+
+  // Passport stamp overlay
+  locationStamp:    { position: 'absolute', top: 14, left: 14, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.68)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  locationFlag:     { fontSize: 20 },
+  locationCountry:  { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
+  locationTime:     { color: 'rgba(255,255,255,0.42)', fontSize: 9, fontWeight: '600', marginTop: 1 },
+  pinStamp:         { position: 'absolute', bottom: 96, left: 14, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  pinIcon:          { fontSize: 11 },
+  pinTxt:           { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+
+  // Body
+  body:             { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6, gap: 10 },
+
+  // Author
+  authorRow:        { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar:           { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  avatarTxt:        { color: '#fff', fontWeight: '900', fontSize: 15 },
+  mood:             { position: 'absolute', bottom: -2, right: -2, fontSize: 12 },
+  username:         { color: '#fff', fontWeight: '800', fontSize: 14 },
+  dots:             { color: '#444', fontSize: 18 },
+  bondBtn:          { borderWidth: 1, borderColor: '#333', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  bondBtnOn:        { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  bondBtnTxt:       { color: '#777', fontSize: 12, fontWeight: '700' },
+  bondBtnTxtOn:     { color: '#fff' },
+
+  // Blog-style entry caption
+  entryText:        { color: 'rgba(255,255,255,0.85)', fontSize: 15, lineHeight: 24, fontWeight: '400', letterSpacing: 0.1 },
+
+  // Action bar
+  actionsBar:       { flexDirection: 'row', alignItems: 'center', gap: 26, paddingTop: 2 },
+  actionBtn:        { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionIcon:       { fontSize: 19 },
+  actionLbl:        { color: '#555', fontSize: 13, fontWeight: '600' },
+  markedLbl:        { color: '#FF0080' },
+  echoedLbl:        { color: '#6C47FF' },
+
+  // Notes preview
+  notesPrev:        { paddingTop: 2, gap: 3 },
+  notesAll:         { color: '#444', fontSize: 12, marginBottom: 2 },
+  noteRow:          { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap' },
+  noteUser:         { color: '#fff', fontWeight: '700', fontSize: 13 },
+  noteTxt:          { color: '#555', fontSize: 13, flex: 1 },
+
+  divider:          { height: 1, backgroundColor: '#111', marginTop: 10 },
+
+  // Echo attribution (Twitter-style "X reposted")
+  echoAttrib:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 30, paddingRight: 16, paddingTop: 8, paddingBottom: 4 },
+  echoAttribIcon: { fontSize: 13 },
+  echoAttribTxt:  { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 });
 
 // Comments modal
@@ -1421,7 +1273,9 @@ const up = StyleSheet.create({
   backdrop:{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
   sheet:   { backgroundColor: '#111', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
   handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  title:   { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 14 },
+  title:   { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 6 },
+  locRow:  { flexDirection: 'row', alignItems: 'center', minHeight: 20, marginBottom: 14 },
+  locTxt:  { color: '#555', fontSize: 12, fontWeight: '600' },
 
   audienceRow:  { marginBottom: 16, gap: 8 },
   audienceLabel:{ color: '#888', fontSize: 13, fontWeight: '600' },
@@ -1437,36 +1291,17 @@ const up = StyleSheet.create({
   pick:    { flex: 1, backgroundColor: '#000', borderRadius: 16, padding: 20, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#1e1e1e' },
   pickIcon:{ fontSize: 32 },
   pickTxt: { color: '#888', fontSize: 13 },
-  preview: { width: '100%', height: 220, borderRadius: 16 },
+  preview:      { width: '100%', height: 220, borderRadius: 16 },
+  videoPrev:    { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111', marginBottom: 10 },
+  videoIcon:    { fontSize: 52 },
+  videoReady:   { color: '#aaa', fontSize: 14, fontWeight: '700', marginTop: 8 },
+  reRecordTxt:  { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
   caption: { backgroundColor: '#000', color: '#fff', borderRadius: 12, padding: 14, fontSize: 14, minHeight: 60, borderWidth: 1, borderColor: '#1e1e1e', marginBottom: 14, marginTop: 12 },
   btn:     { backgroundColor: '#6C47FF', borderRadius: 14, padding: 16, alignItems: 'center' },
   btnOff:  { backgroundColor: '#222' },
   btnTxt:  { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
 
-// ─── Bond Footprint Banner styles ─────────────────────────────────────────────
-const fp = StyleSheet.create({
-  wrap:        { marginHorizontal: 14, marginTop: 14, marginBottom: 6 },
-  card:        { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#6C47FF44', overflow: 'hidden' },
-  glowOrb:     { position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: '#6C47FF', },
-  topRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  titleGroup:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  globe:       { fontSize: 28 },
-  cardTitle:   { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: -0.3 },
-  cardSub:     { color: 'rgba(108,71,255,0.8)', fontSize: 11, fontWeight: '600', marginTop: 2 },
-  explorePill: { backgroundColor: 'rgba(108,71,255,0.2)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(108,71,255,0.4)' },
-  exploreTxt:  { color: '#a78bfa', fontSize: 12, fontWeight: '800' },
-  statsRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 6, marginBottom: 16, gap: 4 },
-  stat:        { flex: 1, alignItems: 'center', gap: 2 },
-  statNum:     { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  statLabel:   { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  statDiv:     { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.08)' },
-  flagGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  flagItem:    { fontSize: 26, lineHeight: 32 },
-  flagMore:    { backgroundColor: 'rgba(108,71,255,0.25)', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, justifyContent: 'center', alignItems: 'center' },
-  flagMoreTxt: { color: '#a78bfa', fontSize: 11, fontWeight: '800' },
-  emptyHint:   { color: 'rgba(255,255,255,0.25)', fontSize: 13, textAlign: 'center', paddingVertical: 10 },
-});
 
 // ─── Moment Ring styles ────────────────────────────────────────────────────────
 const mr = StyleSheet.create({
@@ -1478,70 +1313,11 @@ const mr = StyleSheet.create({
   outerGlow: { position: 'absolute', width: 62, height: 62, borderRadius: 31, borderWidth: 2 },
   ring:      { width: 58, height: 58, borderRadius: 29, backgroundColor: '#1a1a1a', borderWidth: 1.5, borderColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   flagBig:   { fontSize: 28 },
-  initBadge: { position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
-  initTxt:   { color: '#fff', fontSize: 9, fontWeight: '900' },
-  label:     { color: '#666', fontSize: 10, fontWeight: '600', textAlign: 'center', maxWidth: 64 },
+  initBadge:    { position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
+  initTxt:      { color: '#fff', fontSize: 9, fontWeight: '900' },
+  label:        { color: '#666', fontSize: 10, fontWeight: '600', textAlign: 'center', maxWidth: 64 },
+  viewRow:      { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  viewCount:    { color: '#6C47FF', fontSize: 9, fontWeight: '800' },
 });
 
-// ─── Bond Footprint Sheet styles ──────────────────────────────────────────────
-const bfs = StyleSheet.create({
-  overlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
-  sheet:          { backgroundColor: '#0c0c1e', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: 44 },
-  handle:         { width: 44, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 14, marginBottom: 4 },
-  header:         { paddingHorizontal: 22, paddingTop: 16, paddingBottom: 14 },
-  title:          { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
-  sub:            { color: 'rgba(108,71,255,0.8)', fontSize: 12, fontWeight: '600', marginTop: 4 },
-  activeChip:     { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 10, backgroundColor: '#6C47FF22', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF55' },
-  activeChipFlag: { fontSize: 18 },
-  activeChipTxt:  { color: '#a78bfa', fontSize: 13, fontWeight: '700', flex: 1 },
-  activeChipX:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
-  row:            { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 14, borderBottomWidth: 1, borderBottomColor: '#111' },
-  rowActive:      { backgroundColor: '#6C47FF12' },
-  rowFlag:        { fontSize: 34, width: 42, textAlign: 'center' },
-  rowInfo:        { flex: 1, gap: 6 },
-  rowName:        { color: '#fff', fontSize: 15, fontWeight: '800' },
-  rowNameActive:  { color: '#a78bfa' },
-  avatarRow:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  avatar:         { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
-  avatarTxt:      { color: '#fff', fontSize: 9, fontWeight: '900' },
-  avatarMore:     { color: '#555', fontSize: 10, fontWeight: '700', marginLeft: 2 },
-  rowRight:       { alignItems: 'center', gap: 2, minWidth: 40 },
-  rowCount:       { color: '#fff', fontSize: 18, fontWeight: '900' },
-  rowCountActive: { color: '#a78bfa' },
-  rowCountLabel:  { color: '#555', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' },
-  rowChevron:     { color: '#333', fontSize: 22, fontWeight: '300' },
-  empty:          { alignItems: 'center', paddingVertical: 50, gap: 14 },
-  emptyIcon:      { fontSize: 54 },
-  emptyTxt:       { color: '#444', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
-});
 
-// ─── Bond Trail Card styles ────────────────────────────────────────────────────
-const bt = StyleSheet.create({
-  card:        { flexDirection: 'row', marginHorizontal: 14, marginBottom: 20 },
-  thread:      { width: 3, borderRadius: 3, marginRight: 12, minHeight: '100%' },
-  inner:       { flex: 1, backgroundColor: '#0d0d0d', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#1a1a1a' },
-  header:      { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
-  av:          { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  avTxt:       { color: '#fff', fontWeight: '900', fontSize: 16 },
-  mood:        { position: 'absolute', bottom: -2, right: -2, fontSize: 12 },
-  uname:       { color: '#fff', fontWeight: '800', fontSize: 13 },
-  meta:        { color: '#555', fontSize: 11, marginTop: 2 },
-  bondBtn:     { borderWidth: 1, borderColor: '#333', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  bondBtnTxt:  { color: '#555', fontSize: 11, fontWeight: '700' },
-  photoRow:    { flexDirection: 'row' },
-  photoWrap:   { position: 'relative', overflow: 'hidden' },
-  photo:       { backgroundColor: '#111' },
-  photoGrad:   { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60, paddingHorizontal: 10, paddingBottom: 10, flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  photoFlag:   { fontSize: 18 },
-  photoCountry:{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' },
-  actionsRail: { width: 52, alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 16 },
-  railBtn:     { alignItems: 'center', gap: 3 },
-  railIcon:    { fontSize: 20 },
-  railCount:   { color: '#666', fontSize: 11, fontWeight: '700' },
-  heartBurst:  { position: 'absolute', alignSelf: 'center', top: '30%', fontSize: 72 },
-  captionWrap: { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6, flexWrap: 'wrap' },
-  captionUser: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  captionTxt:  { color: '#888', fontSize: 12, flex: 1, flexWrap: 'wrap' },
-  commentHint: { paddingHorizontal: 12, paddingBottom: 10 },
-  commentHintTxt: { color: '#555', fontSize: 11 },
-});

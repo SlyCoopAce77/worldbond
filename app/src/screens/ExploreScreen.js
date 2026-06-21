@@ -7,15 +7,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../services/socket';
-
-const SAVED_KEY = 'wb_saved_spots';
+import { SAVED_SPOTS_KEY as SAVED_KEY } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const TYPE_META = {
-  bar:        { icon: '🍺', label: 'Bars',       color: '#f59e0b', grad: ['#2a1a00', '#0d0800'] },
+  bar:        { icon: '🍺', label: 'Bars',       color: '#FFB700', grad: ['#2a1a00', '#0d0800'] },
   club:       { icon: '🎉', label: 'Clubs',       color: '#8b5cf6', grad: ['#1a0a2e', '#080412'] },
   karaoke:    { icon: '🎤', label: 'Karaoke',     color: '#ec4899', grad: ['#2a0a1a', '#0d0408'] },
   gaming:     { icon: '🎮', label: 'Gaming',      color: '#3b82f6', grad: ['#0a1a2e', '#030810'] },
@@ -28,7 +27,7 @@ const TYPE_META = {
 };
 
 const VIBES = [
-  { key: 'bar',        icon: '🍺', label: 'Bars',       color: '#f59e0b' },
+  { key: 'bar',        icon: '🍺', label: 'Bars',       color: '#FFB700' },
   { key: 'club',       icon: '🎉', label: 'Clubs',       color: '#8b5cf6' },
   { key: 'restaurant', icon: '🍜', label: 'Food',        color: '#ef4444' },
   { key: 'beach',      icon: '🏖️', label: 'Beach',       color: '#06b6d4' },
@@ -54,7 +53,7 @@ const EVENT_TYPES = [
   { key: 'concert',  icon: '🎵', label: 'Concert',     color: '#8b5cf6' },
   { key: 'party',    icon: '🎉', label: 'Party',        color: '#ec4899' },
   { key: 'sports',   icon: '⚽', label: 'Sports Night', color: '#f97316' },
-  { key: 'comedy',   icon: '😂', label: 'Comedy',       color: '#f59e0b' },
+  { key: 'comedy',   icon: '😂', label: 'Comedy',       color: '#FFB700' },
   { key: 'open mic', icon: '🎙️', label: 'Open Mic',     color: '#22c55e' },
   { key: 'festival', icon: '🎪', label: 'Festival',     color: '#06b6d4' },
   { key: 'special',  icon: '✨', label: 'Special',      color: '#6366f1' },
@@ -166,7 +165,7 @@ const cc = StyleSheet.create({
   flag:     { fontSize: 36 },
   name:     { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   liveDot:  { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff5252' },
-  eventDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#f59e0b' },
+  eventDot: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFB700' },
 });
 
 // ─── Compact spot card (used in horizontal group rows) ───────────────────────
@@ -279,8 +278,8 @@ const sc = StyleSheet.create({
   liveBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ff525222', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#ff525244' },
   liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
   liveTxt:    { color: '#ff5252', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
-  eventBadge: { backgroundColor: '#f59e0b22', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#f59e0b44' },
-  eventTxt:   { color: '#f59e0b', fontSize: 11, fontWeight: '700' },
+  eventBadge: { backgroundColor: '#FFB70022', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#FFB70044' },
+  eventTxt:   { color: '#FFB700', fontSize: 11, fontWeight: '700' },
   hereBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e18', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#22c55e33' },
   hereDot:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22c55e' },
   hereTxt:    { color: '#22c55e', fontSize: 10, fontWeight: '700' },

@@ -2,11 +2,12 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Text, View, StyleSheet, Platform } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
 import { navigationRef } from '../services/navigationRef';
 import NotificationToast from '../components/NotificationToast';
+import { WorldMark } from '../components/BondLogo';
 
 // Tab screens
 import HomeScreen from '../screens/HomeScreen';
@@ -32,18 +33,10 @@ import LiveScreen from '../screens/LiveScreen';
 import LiveWatchScreen from '../screens/LiveWatchScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import LegalScreen from '../screens/LegalScreen';
+import WalletScreen from '../screens/WalletScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
-
-const TABS = [
-  { name: 'Home',     icon: '🌍', label: 'Home' },
-  { name: 'Discover', icon: '🔍', label: 'Discover' },
-  { name: 'Groups',   icon: '💬', label: 'Chats' },
-  { name: 'Photos',   icon: '📸', label: 'Photos' },
-  { name: 'Explore',  icon: '✈️', label: 'Explore' },
-  { name: 'Me',       icon: '👤', label: 'Me' },
-];
 
 function TabIcon({ icon, color, focused }) {
   return (
@@ -53,9 +46,21 @@ function TabIcon({ icon, color, focused }) {
   );
 }
 
+function HomeTabIcon({ color, focused }) {
+  const bondC  = focused ? '#FF0080' : color;
+  const globeC = focused ? '#fff'    : color;
+  return (
+    <View style={[tabStyles.homeWrap, focused && tabStyles.homeWrapActive]}>
+      <WorldMark size={26} color={globeC} bondColor={bondC} />
+    </View>
+  );
+}
+
 const tabStyles = StyleSheet.create({
   iconWrap:       { width: 44, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   iconWrapActive: { backgroundColor: '#6C47FF18' },
+  homeWrap:       { alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  homeWrapActive: { backgroundColor: '#FF008018' },
 });
 
 function HomeTabs({ user, onLogout }) {
@@ -79,7 +84,7 @@ function HomeTabs({ user, onLogout }) {
     >
       <Tab.Screen
         name="Home"
-        options={{ tabBarLabel: 'Home', tabBarIcon: ({ color, focused }) => <TabIcon icon="🌍" color={color} focused={focused} /> }}
+        options={{ tabBarLabel: 'Home', tabBarIcon: ({ color, focused }) => <HomeTabIcon color={color} focused={focused} /> }}
       >
         {props => <HomeScreen {...props} user={user} />}
       </Tab.Screen>
@@ -162,6 +167,9 @@ export default function AppNavigator({ user, onLogout }) {
             {/* Settings sub-screens */}
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
             <Stack.Screen name="Legal"          component={LegalScreen} />
+
+            {/* Wallet & monetization */}
+            <Stack.Screen name="Wallet" component={WalletScreen} />
           </Stack.Navigator>
         </NavigationContainer>
 

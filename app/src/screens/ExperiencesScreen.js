@@ -7,18 +7,10 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { SERVER_URL } from '../services/socket';
-import { getAccessToken } from '../services/authApi';
+import { authHeader } from '../utils/apiUtils';
+import { CONNECTION_TYPES } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
-const CONNECTION_TYPES = [
-  { key: 'dating',      label: 'Dating',           emoji: '❤️',  color: '#e91e63', grad: ['#4a0a1a', '#1a0008'] },
-  { key: 'friendship',  label: 'Friendship',       emoji: '🤝',  color: '#2196f3', grad: ['#0a1f3d', '#050e1a'] },
-  { key: 'travel',      label: 'Travel Buddy',     emoji: '✈️',  color: '#ff9800', grad: ['#3d2200', '#1a0e00'] },
-  { key: 'language',    label: 'Language Exchange',emoji: '💬',  color: '#26c6da', grad: ['#002f38', '#001218'] },
-  { key: 'mentorship',  label: 'Mentorship',       emoji: '🎓',  color: '#57f287', grad: ['#0a2d14', '#041008'] },
-];
 
 const CATEGORIES = [
   { key: 'food',      label: 'Food',      emoji: '🍜' },
@@ -37,11 +29,6 @@ function ctMeta(key) {
 }
 function catMeta(key) {
   return CATEGORIES.find(c => c.key === key) || { emoji: '🌍', label: 'Other' };
-}
-
-async function authHeader() {
-  const token = await getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 // ─── Filter chip ──────────────────────────────────────────────────────────────

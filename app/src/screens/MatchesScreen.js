@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
-import { getAccessToken } from '../services/authApi';
+import { authHeader, stringToColor } from '../utils/apiUtils';
 import { SERVER_URL, getSocket } from '../services/socket';
 
 const { width } = Dimensions.get('window');
@@ -27,23 +27,12 @@ const BREAKDOWN_LABELS = {
   ghost_score:      'Reliability',
 };
 
-function stringToColor(str = '') {
-  const p = ['#e57373','#ba68c8','#4fc3f7','#81c784','#ffb74d','#f06292','#4db6ac','#7986cb'];
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
-  return p[Math.abs(h) % p.length];
-}
-
 function compatColor(score) {
   if (score >= 75) return '#57f287';
   if (score >= 50) return '#fee75c';
   return '#f04747';
 }
 
-async function authHeaders() {
-  const token = await getAccessToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
 
 // ─── Voice note mini-player ────────────────────────────────────────────────
 function VoiceNote() {
@@ -356,7 +345,7 @@ export default function MatchesScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      const headers = await authHeaders();
+      const headers = await authHeader();
       const [dailyRes, confRes] = await Promise.allSettled([
         axios.get(`${SERVER_URL}/api/matches/daily`, { headers, timeout: 8000 }),
         axios.get(`${SERVER_URL}/api/matches`,       { headers, timeout: 8000 }),
@@ -387,7 +376,7 @@ export default function MatchesScreen({ navigation }) {
 
   async function handleConnect(item) {
     try {
-      const headers = await authHeaders();
+      const headers = await authHeader();
       const targetId = item.matched_user_id || item.user_id;
       const ct = (item.connection_types || [])[0] || 'friendship';
       await axios.post(`${SERVER_URL}/api/matches`, { targetUserId: targetId, connectionType: ct }, { headers, timeout: 10000 });
