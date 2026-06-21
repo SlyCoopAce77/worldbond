@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Image, FlatList, RefreshControl,
@@ -200,11 +200,6 @@ const DEMO_VIEWS = [
   { id: 'v4', username: 'Priya_IN',    country: '🇮🇳', time: '3 hrs ago',  interest: '💬' },
 ];
 
-const DEMO_PRIORITY_MATCHES = [
-  { id: 'pm1', name: 'JiMin',  country: '🇰🇷', score: 94, interest: '❤️' },
-  { id: 'pm2', name: 'Amara',  country: '🇳🇬', score: 89, interest: '🤝' },
-  { id: 'pm3', name: 'Sophie', country: '🇫🇷', score: 86, interest: '✈️' },
-];
 
 const DEMO_TOP_EVENTS = [
   { id: 'dt1', title: 'K-Drama Watch Party 🍜', type: 'watch_party', attendees: { length: 312 }, hostName: 'JiMin',  hostCountry: 'KR' },
@@ -489,19 +484,40 @@ const vw = StyleSheet.create({
 });
 
 // ─── Pro: Priority match row ──────────────────────────────────────────────────
-function PriorityMatchRow({ item, onPress }) {
-  const ac = stringToColor(item.name);
+function PriorityMatchRow({ match, onPress }) {
+  const name = match.display_name || 'Someone';
+  const ac   = stringToColor(name);
+  const flag = match.country ? getCountryFlag(match.country) : '🌍';
+  // Show up to 2 shared connection types as "in common" pills
+  const shared = (match.connection_types || []).slice(0, 2).map(t => CONNECTION_TYPES[t]).filter(Boolean);
+
   return (
     <TouchableOpacity style={pm.row} onPress={onPress} activeOpacity={0.8}>
       <LinearGradient colors={['#FFB70022', '#FFB70008']} style={pm.grad}>
         <View style={pm.left}>
-          {item.photo_url
-            ? <Image source={{ uri: item.photo_url }} style={pm.avatar} />
+          {match.photo_url
+            ? <Image source={{ uri: match.photo_url }} style={pm.avatar} />
             : <View style={[pm.avatarFallback, { backgroundColor: ac }]}>
-                <Text style={pm.avatarInitial}>{item.name[0]?.toUpperCase()}</Text>
+                <Text style={pm.avatarInitial}>{name[0]?.toUpperCase()}</Text>
               </View>}
-          <Text style={pm.country}>{item.country}</Text>
-          <Text style={pm.name}>{item.name}</Text>
+          <View>
+            <View style={pm.nameRow}>
+              <Text style={pm.flag}>{flag}</Text>
+              <Text style={pm.name}>{name}</Text>
+            </View>
+            {shared.length > 0 && (
+              <View style={pm.sharedRow}>
+                {shared.map((ct, i) => (
+                  <View key={i} style={[pm.sharedPill, { backgroundColor: ct.color + '22', borderColor: ct.color + '55' }]}>
+                    <Text style={pm.sharedEmoji}>{ct.emoji}</Text>
+                    <Text style={[pm.sharedLabel, { color: ct.color }]}>
+                      {Object.keys(CONNECTION_TYPES).find(k => CONNECTION_TYPES[k] === ct)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         </View>
         <View style={pm.right}>
           <WorldMark size={28} color="#FFB700" bondColor="#FF0080" />
@@ -518,8 +534,14 @@ const pm = StyleSheet.create({
   avatar:        { width: 44, height: 44, borderRadius: 22 },
   avatarFallback:{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  country:       { fontSize: 20 },
+  nameRow:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  flag:          { fontSize: 18 },
   name:          { color: '#fff', fontSize: 15, fontWeight: '800' },
+  sharedRow:     { flexDirection: 'row', gap: 6, marginTop: 6 },
+  sharedPill:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10,
+                   paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  sharedEmoji:   { fontSize: 11 },
+  sharedLabel:   { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
   right:         { alignItems: 'flex-end', gap: 6 },
   priorityLabel: { color: '#FFB700', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
 });
@@ -992,6 +1014,21 @@ export default function HomeScreen({ navigation, user }) {
     });
   }
 
+  // Top 2 daily matches become Priority Matches for Pro users
+  const priorityMatches = useMemo(() => {
+    if (tier !== 'pro') return [];
+    return [...dailyMatches]
+      .sort((a, b) => (b.compatibility_score || 0) - (a.compatibility_score || 0))
+      .slice(0, 2);
+  }, [dailyMatches, tier]);
+
+  // Regular matches exclude whoever is already in priority (no duplicates)
+  const regularMatches = useMemo(() => {
+    if (priorityMatches.length === 0) return dailyMatches;
+    const priorityIds = new Set(priorityMatches.map(m => m.matched_user_id));
+    return dailyMatches.filter(m => !priorityIds.has(m.matched_user_id));
+  }, [dailyMatches, priorityMatches]);
+
   const firstName = (user?.display_name || user?.username || 'Bond').split(' ')[0];
   const countryFlag = user?.country ? getCountryFlag(user.country) : '🌍';
   const totalOnline = onlineUsers.length;
@@ -1136,25 +1173,21 @@ export default function HomeScreen({ navigation, user }) {
         </Animated.View>
 
         {/* ── Pro: Priority Matches ── */}
-        {tier === 'pro' && (
+        {tier === 'pro' && priorityMatches.length > 0 && (
           <Animated.View style={[s.section, sect(0)]}>
             <SectionHead
               title="Priority Matches"
-              sub="Curated above the queue for you"
-              action="View All"
-              onAction={() => navigation.navigate('Notifications')}
+              sub="Your strongest bonds today"
+              action="See All"
+              onAction={() => navigation.navigate('Bond')}
               accentColor="#FFB700"
             />
             <View style={{ gap: 10 }}>
-              {DEMO_PRIORITY_MATCHES.map(m => (
+              {priorityMatches.map(m => (
                 <PriorityMatchRow
-                  key={m.id}
-                  item={m}
-                  onPress={() => navigation.navigate('Profile', {
-                    profileUser: { username: m.name, country: m.country, socials: {} },
-                    bondUserId: m.id,
-                    compatibilityScore: m.score,
-                  })}
+                  key={m.matched_user_id}
+                  match={m}
+                  onPress={() => openMatchProfile(m)}
                 />
               ))}
             </View>
@@ -1227,14 +1260,25 @@ export default function HomeScreen({ navigation, user }) {
               <ActivityIndicator color={accentColor} />
               <Text style={s.loadTxt}>Finding your matches…</Text>
             </View>
-          ) : dailyMatches.length > 0 ? (
+          ) : regularMatches.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
-              {dailyMatches.map((m, i) => <MatchCard key={m.id} match={m} index={i} onPress={() => openMatchProfile(m)} />)}
+              {regularMatches.map((m, i) => <MatchCard key={m.id} match={m} index={i} onPress={() => openMatchProfile(m)} />)}
               <TouchableOpacity style={s.moreCard} onPress={() => navigation.navigate('Bond')}>
                 <Text style={[s.moreArrow, { color: accentColor }]}>→</Text>
                 <Text style={s.moreLbl}>See{'\n'}All</Text>
               </TouchableOpacity>
             </ScrollView>
+          ) : dailyMatches.length > 0 ? (
+            // Pro user — all matches promoted to Priority above
+            <LinearGradient colors={['#1a1400', '#0d0900']} style={s.emptyCard}>
+              <View style={s.emptyRow}>
+                <Text style={{ fontSize: 32 }}>⭐</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.emptyTitle}>All promoted to Priority</Text>
+                  <Text style={s.emptySub}>Your best matches are featured above. New ones arrive tomorrow.</Text>
+                </View>
+              </View>
+            </LinearGradient>
           ) : (
             <LinearGradient colors={['#130d24', '#0d0820']} style={s.emptyCard}>
               <View style={s.emptyRow}>
