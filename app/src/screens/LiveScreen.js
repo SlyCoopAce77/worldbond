@@ -8,113 +8,11 @@ import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
 import { stringToColor, formatDuration } from '../utils/apiUtils';
 import { useWallet } from '../context/WalletContext';
-import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
-import GiftIcon from '../components/GiftIcon';
+import GiftBurst from '../components/GiftBurst';
 
 const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
-
-// ── "Global Drop" gift burst — WorldBond's unique gift animation ──────────────
-// Gifts arrive from above (like they traveled from another country),
-// emoji pops on landing, then launches upward-out when done.
-function GiftBurst({ burst, onDone }) {
-  const dropY      = useRef(new Animated.Value(-90)).current;
-  const cardScale  = useRef(new Animated.Value(0.2)).current;
-  const emojiScale = useRef(new Animated.Value(1)).current;
-  const exitX      = useRef(new Animated.Value(0)).current;
-  const exitY      = useRef(new Animated.Value(0)).current;
-  const exitScale  = useRef(new Animated.Value(1)).current;
-  const fade       = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      // 1. Drop in from above, scale up from tiny (like arriving from orbit)
-      Animated.parallel([
-        Animated.spring(dropY,     { toValue: 0, friction: 7, tension: 65, useNativeDriver: true }),
-        Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 65, useNativeDriver: true }),
-      ]),
-      // 2. Emoji pops — celebration burst on landing
-      Animated.sequence([
-        Animated.timing(emojiScale, { toValue: 1.5, duration: 140, useNativeDriver: true }),
-        Animated.spring(emojiScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
-      ]),
-      // 3. Hold so the streamer can read it
-      Animated.delay(2600),
-      // 4. Launch back up + right, shrink to a point — "returns to orbit"
-      Animated.parallel([
-        Animated.timing(exitX,     { toValue: 60,  duration: 480, useNativeDriver: true }),
-        Animated.timing(exitY,     { toValue: -110, duration: 480, useNativeDriver: true }),
-        Animated.timing(exitScale, { toValue: 0.1,  duration: 480, useNativeDriver: true }),
-        Animated.timing(fade,      { toValue: 0,    duration: 400, useNativeDriver: true }),
-      ]),
-    ]).start(() => onDone(burst.id));
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        gbS.wrap,
-        {
-          opacity: fade,
-          transform: [
-            { translateY: dropY },
-            { translateX: exitX },
-            { translateY: exitY },
-            { scale: Animated.multiply(cardScale, exitScale) },
-          ],
-        },
-      ]}
-    >
-      {/* Country flag floats above the card as a "sender origin" marker */}
-      <View style={gbS.flagBadge}>
-        <Text style={gbS.flagEmoji}>{burst.senderCountry || '🌍'}</Text>
-      </View>
-
-      <View style={[gbS.card, { borderColor: burst.gift.color + '66' }]}>
-        {/* Colored accent bar on the left — gift tier indicator */}
-        <View style={[gbS.accentBar, { backgroundColor: burst.gift.color }]} />
-
-        {/* Gift icon in a glowing orbit circle */}
-        <Animated.View style={[gbS.orbitCircle, { backgroundColor: burst.gift.color + '20', borderColor: burst.gift.color + '55' }, { transform: [{ scale: emojiScale }] }]}>
-          <GiftIcon id={burst.gift.id} color={burst.gift.color} size={22} />
-        </Animated.View>
-
-        <View style={gbS.info}>
-          <Text style={gbS.senderName} numberOfLines={1}>{burst.senderName}</Text>
-          <Text style={gbS.giftName}>{burst.gift.name}</Text>
-        </View>
-
-        <View style={gbS.coinBadge}>
-          <WorldMark size={11} color="#FFB700" bondColor="#FFB700" />
-          <Text style={gbS.coinsNum}>{burst.gift.coins}</Text>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-const gbS = StyleSheet.create({
-  wrap:        { alignSelf: 'flex-start', marginBottom: 6 },
-  flagBadge:   { alignSelf: 'flex-start', marginLeft: 44, marginBottom: -8,
-                 backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10,
-                 paddingHorizontal: 6, paddingVertical: 2, zIndex: 2 },
-  flagEmoji:   { fontSize: 13 },
-  card:        { flexDirection: 'row', alignItems: 'center', gap: 10,
-                 backgroundColor: 'rgba(8,9,16,0.88)',
-                 borderRadius: 20, borderWidth: 1, overflow: 'hidden',
-                 paddingVertical: 10, paddingRight: 14 },
-  accentBar:   { width: 4, alignSelf: 'stretch', borderRadius: 2, marginLeft: 0 },
-  orbitCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 1,
-                 alignItems: 'center', justifyContent: 'center' },
-  info:        { flex: 1 },
-  senderName:  { color: '#fff', fontSize: 12, fontWeight: '900' },
-  giftName:    { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
-  coinBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3,
-                 backgroundColor: '#FFB70018', borderRadius: 10,
-                 paddingHorizontal: 7, paddingVertical: 4,
-                 borderWidth: 1, borderColor: '#FFB70033' },
-  coinsNum:    { color: '#FFB700', fontSize: 11, fontWeight: '900' },
-});
 
 export default function LiveScreen({ route, navigation }) {
   const { user, currentUser, preTitle } = route.params || {};
@@ -122,7 +20,7 @@ export default function LiveScreen({ route, navigation }) {
   const socket = getSocket();
   const { earnCoins } = useWallet();
 
-  const [phase,        setPhase]        = useState('lobby'); // 'lobby' | 'live'
+  const [phase,        setPhase]        = useState('lobby');
   const [title,        setTitle]        = useState(preTitle || '');
   const [streamId,     setStreamId]     = useState(null);
   const [messages,     setMessages]     = useState([]);
@@ -137,7 +35,6 @@ export default function LiveScreen({ route, navigation }) {
   const timerRef     = useRef(null);
   const joinFadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Duration timer — only runs while live
   useEffect(() => {
     if (phase !== 'live') return;
     timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -149,7 +46,6 @@ export default function LiveScreen({ route, navigation }) {
     socket.emit('go_live', { title: liveTitle });
   }
 
-  // Socket listeners
   useEffect(() => {
     socket.on('live_started', ({ streamId: sid }) => {
       setStreamId(sid);
@@ -223,17 +119,12 @@ export default function LiveScreen({ route, navigation }) {
     ]);
   }
 
-  function removeFloat(id) {
-    setFloats(prev => prev.filter(f => f.id !== id));
-  }
-
-  function removeBurst(id) {
-    setBursts(prev => prev.filter(b => b.id !== id));
-  }
+  function removeFloat(id) { setFloats(prev => prev.filter(f => f.id !== id)); }
+  function removeBurst(id) { setBursts(prev => prev.filter(b => b.id !== id)); }
 
   const avatarColor = stringToColor(activeUser?.username || '');
 
-  // ── Lobby (pre-live setup) ──────────────────────────────────────────────────
+  // ── Lobby ──────────────────────────────────────────────────────────────────
   if (phase === 'lobby') {
     return (
       <View style={styles.container}>
@@ -246,7 +137,6 @@ export default function LiveScreen({ route, navigation }) {
             </TouchableOpacity>
 
             <View style={styles.lobbyContent}>
-              {/* Avatar preview */}
               <View style={styles.lobbyAvatarWrap}>
                 {activeUser?.photo_url ? (
                   <Image source={{ uri: activeUser.photo_url }} style={styles.lobbyAvatar} />
@@ -287,14 +177,13 @@ export default function LiveScreen({ route, navigation }) {
     );
   }
 
+  // ── Live ───────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <StatusBar hidden />
 
-      {/* Background — gradient with avatar overlay */}
       <LinearGradient colors={['#1a0a2e', '#000000', '#001a0a']} style={StyleSheet.absoluteFill} />
 
-      {/* Avatar / thumbnail center */}
       <View style={styles.centerAvatar}>
         {activeUser?.photo_url ? (
           <Image source={{ uri: activeUser.photo_url }} style={styles.hostPhoto} />
@@ -303,14 +192,9 @@ export default function LiveScreen({ route, navigation }) {
             <Text style={styles.hostInitial}>{(activeUser?.username || '?')[0].toUpperCase()}</Text>
           </LinearGradient>
         )}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.7)']}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        />
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
       </View>
 
-      {/* Floating reactions */}
       {floats.map(f => (
         <FloatingReaction key={f.id} emoji={f.emoji} id={f.id} onDone={removeFloat} />
       ))}
@@ -340,7 +224,6 @@ export default function LiveScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* Viewer joined toast — floats above content, never shifts layout */}
         {viewerJoined && (
           <View style={styles.joinToastWrap} pointerEvents="none">
             <Animated.View style={[styles.joinToast, { opacity: joinFadeAnim }]}>
@@ -351,7 +234,7 @@ export default function LiveScreen({ route, navigation }) {
 
         {/* ── Live chat ── */}
         <View style={styles.chatArea}>
-          {/* Gift burst cards float above chat */}
+          {/* Global Drop burst zone — floats above chat, centered */}
           <View style={styles.burstZone} pointerEvents="none">
             {bursts.map(b => (
               <GiftBurst key={b.id} burst={b} onDone={removeBurst} />
@@ -414,22 +297,17 @@ const styles = StyleSheet.create({
   overlay:      { flex: 1 },
 
   centerAvatar: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  hostPhoto:    { width: width, height: height, resizeMode: 'cover' },
+  hostPhoto:    { width, height, resizeMode: 'cover' },
   hostAvatarBg: { width: 160, height: 160, borderRadius: 80, alignItems: 'center', justifyContent: 'center' },
   hostInitial:  { color: '#fff', fontSize: 72, fontWeight: '900' },
 
-  topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
-  },
+  topBar:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
   liveBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#e53935', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   liveDot:      { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
   liveText:     { color: '#fff', fontWeight: '900', fontSize: 13, letterSpacing: 1 },
-
   topCenter:    { alignItems: 'center', flex: 1 },
   hostName:     { color: '#fff', fontWeight: '700', fontSize: 14 },
   timer:        { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 2 },
-
   topRight:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   viewerPill:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   viewerIcon:   { fontSize: 12 },
@@ -437,12 +315,12 @@ const styles = StyleSheet.create({
   endBtn:       { backgroundColor: '#e5393580', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#e53935' },
   endText:      { color: '#fff', fontSize: 13, fontWeight: '800' },
 
-  joinToastWrap:{ position: 'absolute', top: 72, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
-  joinToast:    { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
-  joinToastText:{ color: '#fff', fontSize: 13 },
+  joinToastWrap: { position: 'absolute', top: 72, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+  joinToast:     { backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  joinToastText: { color: '#fff', fontSize: 13 },
 
   chatArea:     { flex: 1, justifyContent: 'flex-end' },
-  burstZone:    { position: 'absolute', top: 0, right: 16, left: 16, zIndex: 10 },
+  burstZone:    { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10 },
   chatFlatList: { flex: 1 },
   chatList:     { padding: 12, gap: 6 },
   msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
@@ -459,7 +337,6 @@ const styles = StyleSheet.create({
   sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
-  // Lobby
   lobbyBack:       { padding: 16 },
   backIcon:        { color: '#fff', fontSize: 24 },
   lobbyContent:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 16 },

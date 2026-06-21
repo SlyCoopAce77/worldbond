@@ -11,112 +11,11 @@ import { useWallet } from '../context/WalletContext';
 import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
 import GiftPicker from '../components/GiftPicker';
-import GiftIcon from '../components/GiftIcon';
+import GiftBurst from '../components/GiftBurst';
 
 const { width, height } = Dimensions.get('window');
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
 
-// ── "Global Drop" gift burst — WorldBond's unique gift animation ──────────────
-// Drops from above at orbit scale, WorldMark pulses on landing in the gift's
-// tier color, then launches back upward-right like returning to orbit.
-function GiftBurst({ burst, onDone }) {
-  const dropY      = useRef(new Animated.Value(-90)).current;
-  const cardScale  = useRef(new Animated.Value(0.2)).current;
-  const markScale  = useRef(new Animated.Value(1)).current;
-  const exitX      = useRef(new Animated.Value(0)).current;
-  const exitY      = useRef(new Animated.Value(0)).current;
-  const exitScale  = useRef(new Animated.Value(1)).current;
-  const fade       = useRef(new Animated.Value(1)).current;
-
-  const color = burst.gift.color || '#6C47FF';
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.spring(dropY,     { toValue: 0, friction: 7, tension: 65, useNativeDriver: true }),
-        Animated.spring(cardScale, { toValue: 1, friction: 7, tension: 65, useNativeDriver: true }),
-      ]),
-      // WorldMark pulses on landing
-      Animated.sequence([
-        Animated.timing(markScale, { toValue: 1.5, duration: 140, useNativeDriver: true }),
-        Animated.spring(markScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
-      ]),
-      Animated.delay(2600),
-      // Returns to orbit — launches upward-right, shrinks to a point
-      Animated.parallel([
-        Animated.timing(exitX,     { toValue: 60,   duration: 480, useNativeDriver: true }),
-        Animated.timing(exitY,     { toValue: -110, duration: 480, useNativeDriver: true }),
-        Animated.timing(exitScale, { toValue: 0.1,  duration: 480, useNativeDriver: true }),
-        Animated.timing(fade,      { toValue: 0,    duration: 400, useNativeDriver: true }),
-      ]),
-    ]).start(() => onDone(burst.id));
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        gb.wrap,
-        {
-          opacity: fade,
-          transform: [
-            { translateY: dropY },
-            { translateX: exitX },
-            { translateY: exitY },
-            { scale: Animated.multiply(cardScale, exitScale) },
-          ],
-        },
-      ]}
-    >
-      {/* Sender's country flag — "gift arrived from here" */}
-      <View style={gb.flagBadge}>
-        <Text style={gb.flagText}>{burst.senderCountry || '🌍'}</Text>
-      </View>
-
-      <View style={[gb.card, { borderColor: color + '66' }]}>
-        <View style={[gb.accentBar, { backgroundColor: color }]} />
-
-        {/* Gift icon in tier color pulsing in the orbit circle */}
-        <Animated.View style={[gb.orbitCircle, { backgroundColor: color + '20', borderColor: color + '55' }, { transform: [{ scale: markScale }] }]}>
-          <GiftIcon id={burst.gift.id} color={color} size={22} />
-        </Animated.View>
-
-        <View style={gb.info}>
-          <Text style={gb.senderName} numberOfLines={1}>{burst.senderName}</Text>
-          <Text style={gb.giftName}>{burst.gift.name}</Text>
-        </View>
-
-        <View style={gb.coinBadge}>
-          <WorldMark size={11} color="#FFB700" bondColor="#FFB700" />
-          <Text style={gb.coinsNum}>{burst.gift.coins}</Text>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-const gb = StyleSheet.create({
-  wrap:       { alignSelf: 'flex-start', marginBottom: 6 },
-  flagBadge:  { alignSelf: 'flex-start', marginLeft: 44, marginBottom: -8,
-                backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10,
-                paddingHorizontal: 6, paddingVertical: 2, zIndex: 2 },
-  flagText:   { fontSize: 13 },
-  card:       { flexDirection: 'row', alignItems: 'center', gap: 10,
-                backgroundColor: 'rgba(8,9,16,0.88)',
-                borderRadius: 20, borderWidth: 1, overflow: 'hidden',
-                paddingVertical: 10, paddingRight: 14 },
-  accentBar:  { width: 4, alignSelf: 'stretch', borderRadius: 2 },
-  orbitCircle:{ width: 42, height: 42, borderRadius: 21, borderWidth: 1,
-                alignItems: 'center', justifyContent: 'center' },
-  info:       { flex: 1 },
-  senderName: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  giftName:   { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
-  coinBadge:  { flexDirection: 'row', alignItems: 'center', gap: 3,
-                backgroundColor: '#FFB70018', borderRadius: 10,
-                paddingHorizontal: 7, paddingVertical: 4,
-                borderWidth: 1, borderColor: '#FFB70033' },
-  coinsNum:   { color: '#FFB700', fontSize: 11, fontWeight: '900' },
-});
-
-// ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveWatchScreen({ route, navigation }) {
   const { stream, currentUser } = route.params || {};
   const socket = getSocket();
@@ -194,7 +93,7 @@ export default function LiveWatchScreen({ route, navigation }) {
     spendCoins(gift.coins, 'live_gift', { giftId: gift.id, streamId: stream?.streamId });
     socket.emit('live_gift', {
       streamId: stream?.streamId,
-      gift: { id: gift.id, name: gift.name, coins: gift.coins, color: gift.color, tier: gift.tier },
+      gift: { id: gift.id, name: gift.name, coins: gift.coins, color: gift.color, tier: gift.tier, tagline: gift.tagline },
     });
   }
 
@@ -286,7 +185,7 @@ export default function LiveWatchScreen({ route, navigation }) {
             onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
           />
 
-          {/* Gift bursts — drop from top, return to orbit */}
+          {/* Global Drop burst zone — floats above chat, centered */}
           <View style={styles.burstZone} pointerEvents="none">
             {bursts.map(b => (
               <GiftBurst key={b.id} burst={b} onDone={removeBurst} />
@@ -328,7 +227,6 @@ export default function LiveWatchScreen({ route, navigation }) {
 
       </SafeAreaView>
 
-      {/* GiftPicker — full WorldBond catalog with tier filters */}
       <GiftPicker
         visible={giftOpen}
         onClose={() => setGiftOpen(false)}
@@ -370,7 +268,7 @@ const styles = StyleSheet.create({
   msgName:      { color: '#6C47FF', fontWeight: '700', fontSize: 13 },
   msgText:      { color: '#fff', fontSize: 13 },
   translated:   { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
-  burstZone:    { position: 'absolute', top: 0, right: 16, left: 16, zIndex: 10 },
+  burstZone:    { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10 },
 
   reactBar:     { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 8 },
   reactBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },

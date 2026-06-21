@@ -13,14 +13,14 @@ function GiftIcon({ id, color, size = 38 }) {
     // ── Starter ──────────────────────────────────────────────────────────────
 
     case 'world_hello': {
-      // Two overlapping circles = two worlds meeting for the first time
+      // Two overlapping ring-circles = two worlds meeting for the first time
       const r = s * 0.36;
       return (
         <View style={{ width: s, height: s }}>
-          <View style={[circle(r, c, 0.18), { position: 'absolute', left: 0, top: s * 0.12 }]} />
-          <View style={[circle(r, c, 0.18), { position: 'absolute', right: 0, top: s * 0.12 }]} />
+          <View style={{ position: 'absolute', left: 0, top: s * 0.12, width: r * 2, height: r * 2, borderRadius: r, borderWidth: 2.5, borderColor: c, backgroundColor: c + '18' }} />
+          <View style={{ position: 'absolute', right: 0, top: s * 0.12, width: r * 2, height: r * 2, borderRadius: r, borderWidth: 2.5, borderColor: c, backgroundColor: c + '18' }} />
           {/* Connection dot at the overlap center */}
-          <View style={[circle(s * 0.1, c, 1), { position: 'absolute', left: s * 0.5 - s * 0.05, top: s * 0.26 }]} />
+          <View style={[circle(s * 0.1, c, 1), { position: 'absolute', left: s * 0.5 - s * 0.05, top: s * 0.28 }]} />
         </View>
       );
     }
