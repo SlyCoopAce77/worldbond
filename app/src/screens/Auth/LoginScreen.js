@@ -6,6 +6,10 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { login } from '../../services/authApi';
+import { WorldWordmark } from '../../components/BondLogo';
+
+const AMBER   = '#FF0080';   // Frequency Blue
+const AMBER_D = '#CC0060';
 
 export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotPassword }) {
   const [email, setEmail]       = useState('');
@@ -16,12 +20,12 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
   const passwordRef             = useRef(null);
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 480, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 55, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -42,163 +46,200 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
     }
   }
 
+  const canSubmit = email.length > 0 && password.length > 0 && !loading;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
-          {/* Back */}
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <View style={styles.backBtnInner}>
-              <Text style={styles.backIcon}>‹</Text>
-            </View>
-          </TouchableOpacity>
-
-          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Welcome back</Text>
-              <Text style={styles.subtitle}>Sign in to your Bond account</Text>
-            </View>
-
-            {/* Error */}
-            {!!error && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorIcon}>⚠️</Text>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-
-            {/* Form */}
-            <View style={styles.form}>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Email</Text>
-                <View style={[styles.inputWrap, email.length > 0 && styles.inputWrapFocused]}>
-                  <Text style={styles.inputIcon}>✉️</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="you@example.com"
-                    placeholderTextColor="#536471"
-                    value={email}
-                    onChangeText={t => { setEmail(t); setError(''); }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    onSubmitEditing={() => passwordRef.current?.focus()}
-                  />
+    <LinearGradient colors={['#000000', '#010100', '#000000']} style={s.root}>
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* ── Nav ── */}
+            <View style={s.nav}>
+              <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <View style={s.backBtn}>
+                  <Text style={s.backArrow}>‹</Text>
                 </View>
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.label}>Password</Text>
-                  <TouchableOpacity onPress={onForgotPassword}>
-                    <Text style={styles.forgotLink}>Forgot?</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={[styles.inputWrap, password.length > 0 && styles.inputWrapFocused]}>
-                  <Text style={styles.inputIcon}>🔒</Text>
-                  <TextInput
-                    ref={passwordRef}
-                    style={styles.input}
-                    placeholder="Your password"
-                    placeholderTextColor="#536471"
-                    value={password}
-                    onChangeText={t => { setPassword(t); setError(''); }}
-                    secureTextEntry={!showPass}
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                  />
-                  <TouchableOpacity onPress={() => setShowPass(v => !v)} style={styles.showHide}>
-                    <Text style={styles.showHideText}>{showPass ? 'Hide' : 'Show'}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {/* Submit */}
-            <TouchableOpacity
-              style={[styles.submitBtn, (loading || !email || !password) && styles.submitBtnOff]}
-              onPress={handleLogin}
-              disabled={loading || !email || !password}
-              activeOpacity={0.87}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <LinearGradient
-                  colors={['#6C47FF', '#6C47FF', '#5533DD']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={styles.submitGrad}
-                >
-                  <Text style={styles.submitText}>Sign In</Text>
-                </LinearGradient>
-              )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Footer */}
-            <View style={styles.footerRow}>
-              <Text style={styles.footerText}>New to Bond?</Text>
-              <TouchableOpacity onPress={onGoRegister}>
-                <Text style={styles.footerLink}> Create an account →</Text>
               </TouchableOpacity>
+              <WorldWordmark size={18} color="#fff" bondColor={AMBER} bondTextColor={AMBER} />
+              <View style={{ width: 40 }} />
             </View>
 
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+
+              {/* ── Header ── */}
+              <View style={s.header}>
+                <Text style={s.title}>Welcome back</Text>
+                <Text style={s.subtitle}>Your worlds are waiting.</Text>
+              </View>
+
+              {/* ── Error ── */}
+              {!!error && (
+                <View style={s.errorRow}>
+                  <View style={s.errorIcon}>
+                    <Text style={s.errorIconText}>!</Text>
+                  </View>
+                  <Text style={s.errorMsg}>{error}</Text>
+                </View>
+              )}
+
+              {/* ── Form ── */}
+              <View style={s.form}>
+                <View style={s.field}>
+                  <Text style={s.label}>EMAIL</Text>
+                  <View style={[s.inputBox, email.length > 0 && s.inputBoxActive]}>
+                    <TextInput
+                      style={s.input}
+                      placeholder="you@example.com"
+                      placeholderTextColor="#2e2e2e"
+                      value={email}
+                      onChangeText={t => { setEmail(t); setError(''); }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordRef.current?.focus()}
+                    />
+                  </View>
+                </View>
+
+                <View style={s.field}>
+                  <View style={s.labelRow}>
+                    <Text style={s.label}>PASSWORD</Text>
+                    <TouchableOpacity onPress={onForgotPassword} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <Text style={s.forgotLink}>Forgot?</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={[s.inputBox, password.length > 0 && s.inputBoxActive]}>
+                    <TextInput
+                      ref={passwordRef}
+                      style={s.input}
+                      placeholder="Your password"
+                      placeholderTextColor="#2e2e2e"
+                      value={password}
+                      onChangeText={t => { setPassword(t); setError(''); }}
+                      secureTextEntry={!showPass}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                    />
+                    <TouchableOpacity onPress={() => setShowPass(v => !v)} style={s.eyeBtn}>
+                      <Text style={s.eyeText}>{showPass ? 'Hide' : 'Show'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* ── Sign In ── */}
+              <TouchableOpacity
+                style={[s.submitWrap, !canSubmit && s.submitOff]}
+                onPress={handleLogin}
+                disabled={!canSubmit}
+                activeOpacity={0.85}
+              >
+                {loading ? (
+                  <View style={s.submitGrad}>
+                    <ActivityIndicator color="#fff" />
+                  </View>
+                ) : (
+                  <LinearGradient
+                    colors={[AMBER, AMBER_D]}
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                    style={s.submitGrad}
+                  >
+                    <Text style={s.submitText}>Sign In</Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+
+              {/* ── Divider ── */}
+              <View style={s.dividerRow}>
+                <View style={s.dividerLine} />
+                <Text style={s.dividerLabel}>or</Text>
+                <View style={s.dividerLine} />
+              </View>
+
+              {/* ── Footer ── */}
+              <View style={s.footerRow}>
+                <Text style={s.footerText}>New to WorldBond?</Text>
+                <TouchableOpacity onPress={onGoRegister}>
+                  <Text style={s.footerLink}> Create account</Text>
+                </TouchableOpacity>
+              </View>
+
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#000000' },
-  scroll:          { flexGrow: 1, padding: 24, paddingTop: 16 },
+const s = StyleSheet.create({
+  root:   { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 26, paddingTop: 8, paddingBottom: 48 },
 
-  backBtn:         { marginBottom: 28, alignSelf: 'flex-start' },
-  backBtnInner:    { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
-  backIcon:        { color: '#fff', fontSize: 26, lineHeight: 30 },
+  // Nav
+  nav: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 40,
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 13,
+    backgroundColor: '#ffffff09', borderWidth: 1, borderColor: '#ffffff10',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  backArrow: { color: '#fff', fontSize: 24, lineHeight: 28, marginTop: -1 },
 
-  header:          { marginBottom: 32 },
-  title:           { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
-  subtitle:        { fontSize: 15, color: '#536471', marginTop: 6 },
+  // Header
+  header:   { marginBottom: 36 },
+  title:    { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: -0.8, marginBottom: 6 },
+  subtitle: { color: '#ffffff', opacity: 0.45, fontSize: 15, fontWeight: '400' },
 
-  errorBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
-  errorIcon:       { fontSize: 16 },
-  errorText:       { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
+  // Error
+  errorRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#f0474710', borderWidth: 1, borderColor: '#f0474730',
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 24,
+  },
+  errorIcon:     { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f04747', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  errorIconText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  errorMsg:      { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
-  form:            { gap: 20 },
-  fieldGroup:      { gap: 8 },
-  labelRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label:           { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  forgotLink:      { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
+  // Form
+  form:  { gap: 22 },
+  field: { gap: 7 },
 
-  inputWrap:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputWrapFocused:{ borderColor: '#6C47FF40' },
-  inputIcon:       { fontSize: 16, marginRight: 10 },
-  input:           { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
-  showHide:        { paddingLeft: 8 },
-  showHideText:    { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  labelRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label:      { color: '#ffffff', opacity: 0.30, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  forgotLink: { color: AMBER, fontSize: 13, fontWeight: '600' },
 
-  submitBtn:       { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
-  submitBtnOff:    { opacity: 0.45 },
-  submitGrad:      { paddingVertical: 19, alignItems: 'center', borderRadius: 18 },
-  submitText:      { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
+  inputBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d0d0d',
+    borderRadius: 16, borderWidth: 1, borderColor: '#1e1e1e',
+    paddingHorizontal: 18,
+  },
+  inputBoxActive: { borderColor: '#FF008050' },
+  input:   { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 18 },
+  eyeBtn:  { paddingLeft: 10 },
+  eyeText: { color: AMBER, fontSize: 13, fontWeight: '600' },
 
-  divider:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
-  dividerLine:     { flex: 1, height: 1, backgroundColor: '#2F3336' },
-  dividerText:     { color: '#2F3336', fontSize: 13, fontWeight: '600' },
+  // Submit
+  submitWrap: { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
+  submitOff:  { opacity: 0.4 },
+  submitGrad: { paddingVertical: 20, alignItems: 'center', borderRadius: 18, backgroundColor: AMBER },
+  submitText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
 
-  footerRow:       { flexDirection: 'row', justifyContent: 'center', paddingVertical: 8 },
-  footerText:      { color: '#555', fontSize: 15 },
-  footerLink:      { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
+  // Divider
+  dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 28 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#1a1a1a' },
+  dividerLabel:{ color: '#ffffff', opacity: 0.25, fontSize: 13, fontWeight: '600' },
+
+  // Footer
+  footerRow:  { flexDirection: 'row', justifyContent: 'center', paddingBottom: 8 },
+  footerText: { color: '#ffffff', opacity: 0.40, fontSize: 15 },
+  footerLink: { color: AMBER, fontSize: 15, fontWeight: '700' },
 });

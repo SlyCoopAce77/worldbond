@@ -5,14 +5,20 @@ import { useNotifications } from '../context/NotificationsContext';
 import { navigate } from '../services/navigationRef';
 
 const TYPE_META = {
-  follower: { icon: '👤', color: '#57f287' },
-  gift:     { icon: '🎁', color: '#f06292' },
-  random:   { icon: '🌀', color: '#6C47FF' },
-  live:     { icon: '🔴', color: '#e53935' },
-  match:    { icon: '🌍', color: '#6C47FF' },
-  message:  { icon: '💬', color: '#26c6da' },
-  bond:     { icon: '🤝', color: '#57f287' },
-  system:   { icon: '🔔', color: '#f59e0b' },
+  follower:  { icon: '👤', color: '#57f287' },
+  gift:      { icon: '🎁', color: '#f06292' },
+  random:    { icon: '🌀', color: '#6C47FF' },
+  live:      { icon: '🔴', color: '#e53935' },
+  match:     { icon: '🌍', color: '#6C47FF' },
+  message:   { icon: '💬', color: '#26c6da' },
+  comment:   { icon: '💬', color: '#26c6da' },
+  bond:      { icon: '🤝', color: '#57f287' },
+  system:    { icon: '🔔', color: '#FFB700' },
+  call:      { icon: '📞', color: '#66bb6a' },
+  missed:    { icon: '📵', color: '#e53935' },
+  like:      { icon: '👣', color: '#f06292' },
+  echo:      { icon: '🔁', color: '#6C47FF' },
+  milestone: { icon: '🏆', color: '#ffd700' },
 };
 
 export default function NotificationToast() {
@@ -52,7 +58,9 @@ export default function NotificationToast() {
     markRead(t.id);
     clearToast(); // kills the banner immediately
 
-    if (t.fromId) {
+    if (t.type === 'call' || t.type === 'missed') {
+      navigate('Notifications');
+    } else if (t.fromId) {
       navigate('Profile', { bondUserId: t.fromId });
     } else {
       navigate('Notifications');

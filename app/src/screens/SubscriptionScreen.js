@@ -13,41 +13,46 @@ const IS_BETA = true;
 
 const FEATURES = {
   free: [
-    { label: 'Direct messaging + translation', has: true },
+    { label: '🤝 Bond — basic request, 5/day', has: true },
+    { label: '➕ Follow anyone', has: true },
+    { label: '💬 Message bonded users', has: true },
     { label: 'Group chats (8 categories)', has: true },
     { label: 'Explore spots worldwide', has: true },
     { label: '3 gifts per day', has: true },
     { label: '1 Random Connect per day', has: true },
     { label: 'Join up to 3 events', has: true },
-    { label: 'Read 5 icebreaker responses', has: true },
+    { label: '💜 Bond+ with personal intro note', has: false },
+    { label: '💜 Message anyone (not just bonded)', has: false },
     { label: 'Premium badge on profile', has: false },
-    { label: 'See who viewed you', has: false },
-    { label: 'Create & host events', has: false },
-    { label: 'Verified badge', has: false },
+    { label: '⚡ Priority Bond — top of inbox', has: false },
   ],
   plus: [
     { label: 'Everything in Free', has: true },
+    { label: '💜 Bond+ — personal intro note (150 chars)', has: true },
+    { label: '💜 Follow+ — badge shown on notification', has: true },
+    { label: '💜 Message+ anyone, bonded or not', has: true },
     { label: 'Unlimited gifts', has: true },
     { label: '5 Random Connects per day', has: true },
     { label: 'Join unlimited events', has: true },
-    { label: 'All icebreaker responses', has: true },
     { label: '💜 Premium badge on profile', has: true },
     { label: 'Priority in People list', has: true },
     { label: 'See who viewed your profile', has: true },
+    { label: '⚡ Priority Bond — top of inbox', has: false },
     { label: 'Create & host events', has: false },
-    { label: 'Verified badge', has: false },
   ],
   pro: [
     { label: 'Everything in Plus', has: true },
+    { label: '⚡ Priority Bond — pinned top of inbox', has: true },
+    { label: '⚡ Priority Follow — shown first in notifications', has: true },
+    { label: '⚡ Priority Message — shown at top of inbox', has: true },
+    { label: 'Intro note up to 300 chars with bond request', has: true },
     { label: 'Unlimited Random Connects', has: true },
     { label: 'Create & host virtual events', has: true },
     { label: 'Language Exchange matching', has: true },
     { label: '🌟 Verified badge', has: true },
-    { label: 'Custom profile themes', has: true },
     { label: 'Voice translation in calls', has: true },
     { label: 'Pin 5 favorite spots', has: true },
-    { label: 'Priority support', has: true },
-    { label: 'Early access to features', has: true },
+    { label: 'Priority support + early access', has: true },
   ],
 };
 
@@ -58,8 +63,9 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
   const features = FEATURES[tierId];
   const isActive = currentTier === tierId;
   const isLoading = loading === tierId;
-  const isFree = tierId === 'free';
-  const isPro = tierId === 'pro';
+  const isFree  = tierId === 'free';
+  const isPlus  = tierId === 'plus';
+  const isPro   = tierId === 'pro';
 
   const monthlyPrice = isFree ? 0 : parseFloat(t.price.replace('$', '').replace('/mo', ''));
   const displayPrice = isFree
@@ -97,13 +103,22 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
         activeOpacity={0.85}
         disabled={isActive}
       >
-        {isPro && (
+        {isPlus && (
           <LinearGradient
-            colors={['#f59e0b', '#e07b00']}
+            colors={['#FF0080', '#CC0060']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.popularBadge}
           >
-            <Text style={styles.popularBadgeText}>⭐  MOST POPULAR</Text>
+            <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
+          </LinearGradient>
+        )}
+        {isPro && (
+          <LinearGradient
+            colors={['#FFB700', '#D99500']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={styles.popularBadge}
+          >
+            <Text style={styles.popularBadgeText}>⚡  ELITE</Text>
           </LinearGradient>
         )}
 
@@ -151,7 +166,7 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
           </View>
         ) : isPro ? (
           <LinearGradient
-            colors={['#f59e0b', '#e07b00']}
+            colors={['#FFB700', '#D99500']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.btn}
           >
@@ -167,7 +182,7 @@ function TierCard({ tierId, currentTier, billing, onPress, loading, animValue })
           </TouchableOpacity>
         ) : (
           <LinearGradient
-            colors={['#6C47FF', '#5533DD']}
+            colors={['#FF0080', '#CC0060']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.btn}
           >
@@ -251,7 +266,7 @@ export default function SubscriptionScreen({ navigation }) {
         {/* Hero */}
         <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
           <LinearGradient
-            colors={['#6C47FF22', '#f59e0b11', '#000000']}
+            colors={['#FF008022', '#FFB70011', '#000000']}
             style={styles.heroBg}
           >
             <Text style={styles.heroGlobe}>🌍</Text>

@@ -6,6 +6,8 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { getSocket, disconnectSocket } from './src/services/socket';
 import { isAuthenticated, getSavedProfile, logout } from './src/services/authApi';
 import { PremiumProvider } from './src/context/PremiumContext';
+import { WalletProvider } from './src/context/WalletContext';
+import { StreakProvider } from './src/context/StreakContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 function Inner() {
@@ -72,7 +74,11 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <PremiumProvider>
-          <Inner />
+          <WalletProvider>
+            <StreakProvider>
+              <Inner />
+            </StreakProvider>
+          </WalletProvider>
         </PremiumProvider>
       </ThemeProvider>
     </SafeAreaProvider>

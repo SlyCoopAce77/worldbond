@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { register } from '../../services/authApi';
+import { WorldWordmark } from '../../components/BondLogo';
 
 const SCREEN_W = Dimensions.get('window').width;
 const ITEM_H   = 48;
@@ -71,8 +72,8 @@ const wh = StyleSheet.create({
   selBar: {
     position: 'absolute',
     top: ITEM_H * 2, left: 8, right: 8, height: ITEM_H,
-    borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#6C47FF55',
-    borderRadius: 8, backgroundColor: '#6C47FF12',
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#FF008055',
+    borderRadius: 8, backgroundColor: '#FF008012',
   },
 });
 
@@ -213,26 +214,34 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
     : 'Select your date of birth';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <>
+    <LinearGradient colors={['#000000', '#010101', '#000000']} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-          <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-            <View style={styles.backBtnInner}>
-              <Text style={styles.backIcon}>‹</Text>
-            </View>
-          </TouchableOpacity>
+          <View style={styles.nav}>
+            <TouchableOpacity style={styles.backBtn} onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={styles.backBtnInner}>
+                <Text style={styles.backIcon}>‹</Text>
+              </View>
+            </TouchableOpacity>
+            <WorldWordmark size={20} color="#fff" bondColor="#FF0080" bondTextColor="#FF0080" />
+            <View style={{ width: 40 }} />
+          </View>
 
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
             <View style={styles.header}>
               <Text style={styles.title}>Create account</Text>
-              <Text style={styles.subtitle}>Join Bond — takes less than a minute</Text>
+              <Text style={styles.subtitle}>Join WorldBond — takes less than a minute</Text>
             </View>
 
             {!!error && (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorIcon}>⚠️</Text>
+                <View style={styles.errorDot}>
+                  <Text style={styles.errorDotText}>!</Text>
+                </View>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -243,11 +252,10 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Email</Text>
                 <View style={[styles.inputWrap, email.length > 0 && styles.inputWrapFocused]}>
-                  <Text style={styles.inputIcon}>✉️</Text>
                   <TextInput
                     style={styles.input}
                     placeholder="you@example.com"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="#2e2e2e"
                     value={email}
                     onChangeText={t => { setEmail(t); setError(''); }}
                     keyboardType="email-address"
@@ -263,12 +271,11 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Password</Text>
                 <View style={[styles.inputWrap, password.length > 0 && styles.inputWrapFocused]}>
-                  <Text style={styles.inputIcon}>🔒</Text>
                   <TextInput
                     ref={passwordRef}
                     style={styles.input}
                     placeholder="Create a strong password"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="#2e2e2e"
                     value={password}
                     onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPass}
@@ -291,14 +298,22 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                   confirmState === 'mismatch' && styles.inputWrapErr,
                   confirmState === 'idle' && confirm.length === 0 && password.length > 0 && styles.inputWrapFocused,
                 ]}>
-                  <Text style={styles.inputIcon}>
-                    {confirmState === 'match' ? '✅' : confirmState === 'mismatch' ? '❌' : '🔑'}
-                  </Text>
+                  {confirmState !== 'idle' && (
+                    <View style={[
+                      styles.confirmDot,
+                      confirmState === 'match'    && styles.confirmDotOk,
+                      confirmState === 'mismatch' && styles.confirmDotErr,
+                    ]}>
+                      <Text style={styles.confirmDotText}>
+                        {confirmState === 'match' ? '✓' : '×'}
+                      </Text>
+                    </View>
+                  )}
                   <TextInput
                     ref={confirmRef}
                     style={styles.input}
                     placeholder="Repeat your password"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="#2e2e2e"
                     value={confirm}
                     onChangeText={t => { setConfirm(t); setError(''); }}
                     secureTextEntry={!showConfirm}
@@ -322,12 +337,11 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                   onPress={openPicker}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.inputIcon}>🎂</Text>
                   <Text style={[styles.dobText, dobSet && styles.dobTextSet]}>{dobLabel}</Text>
                   {dobSet && <Text style={styles.dobCheck}>✓</Text>}
                 </TouchableOpacity>
                 <Text style={styles.dobHint}>
-                  Bond is strictly 18+. Your date of birth is permanently stored and verified.
+                  18+ only. DOB is permanently stored — false information results in a permanent ban.
                 </Text>
               </View>
 
@@ -346,7 +360,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                 </View>
               ) : (
                 <LinearGradient
-                  colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                  colors={['#FF0080', '#FF0080', '#CC0060']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={styles.submitGrad}
                 >
@@ -378,6 +392,8 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
 
       {/* ── DOB Picker Modal ── */}
       <Modal
@@ -411,7 +427,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
               </View>
 
               <TouchableOpacity style={dob.actionBtn} onPress={advanceToConfirm} activeOpacity={0.87}>
-                <LinearGradient colors={['#6C47FF', '#5533DD']} style={dob.actionGrad}>
+                <LinearGradient colors={['#FF0080', '#CC0060']} style={dob.actionGrad}>
                   <Text style={dob.actionText}>Continue →</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -424,19 +440,20 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
 
               {/* Age summary card */}
               <View style={dob.ageCard}>
-                <Text style={dob.ageEmoji}>🎂</Text>
                 <Text style={dob.ageDate}>{formatDOB(dobMonth, dobDay, YEARS[dobYear])}</Text>
                 <Text style={dob.ageNum}>{age} years old</Text>
               </View>
 
               {/* Warning */}
               <View style={dob.warningBox}>
-                <Text style={dob.warningTitle}>⚠️  Age Verification</Text>
+                <Text style={dob.warningTitle}>⚠️  Age Verification Required</Text>
                 <Text style={dob.warningText}>
-                  Bond is strictly for adults 18 and older. Your date of birth is{' '}
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>permanently stored</Text>
-                  {' '}and cannot be changed. Providing false information is a violation of our Terms of Service and will result in a{' '}
-                  <Text style={{ color: '#f04747', fontWeight: '700' }}>permanent ban</Text>.
+                  WorldBond is strictly 18+. Your date of birth is{' '}
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>permanently stored and cannot be changed</Text>
+                  {' '}after account creation.{'\n\n'}
+                  Lying about your age is a violation of our Terms of Service and will result in an{' '}
+                  <Text style={{ color: '#f04747', fontWeight: '800' }}>immediate permanent ban</Text>
+                  {' '}with no appeal.
                 </Text>
               </View>
 
@@ -460,7 +477,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                 disabled={!confirmed}
                 activeOpacity={0.87}
               >
-                <LinearGradient colors={['#6C47FF', '#5533DD']} style={dob.actionGrad}>
+                <LinearGradient colors={['#FF0080', '#CC0060']} style={dob.actionGrad}>
                   <Text style={dob.actionText}>I Confirm My Age</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -472,64 +489,68 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
           )}
         </View>
       </Modal>
-
-    </SafeAreaView>
+    </>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#000000' },
-  scroll:          { flexGrow: 1, padding: 24, paddingTop: 16 },
+  scroll:          { flexGrow: 1, padding: 24, paddingTop: 12, paddingBottom: 48 },
 
-  backBtn:         { marginBottom: 28, alignSelf: 'flex-start' },
-  backBtnInner:    { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
+  nav:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 36 },
+  backBtn:         {},
+  backBtnInner:    { width: 40, height: 40, borderRadius: 12, backgroundColor: '#ffffff0d', borderWidth: 1, borderColor: '#ffffff14', alignItems: 'center', justifyContent: 'center' },
   backIcon:        { color: '#fff', fontSize: 26, lineHeight: 30 },
 
   header:          { marginBottom: 32 },
-  title:           { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
-  subtitle:        { fontSize: 15, color: '#536471', marginTop: 6 },
+  title:           { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+  subtitle:        { fontSize: 15, color: '#ffffff', opacity: 0.45, marginTop: 6 },
 
-  errorBanner:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
-  errorIcon:       { fontSize: 16 },
+  errorBanner:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f0474710', borderWidth: 1, borderColor: '#f0474728', borderRadius: 14, padding: 14, marginBottom: 22 },
+  errorDot:        { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f04747', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  errorDotText:    { color: '#fff', fontSize: 12, fontWeight: '900' },
   errorText:       { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
   form:            { gap: 20 },
   fieldGroup:      { gap: 8 },
-  label:           { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  labelBadge:      { color: '#6C47FF', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  label:           { color: '#ffffff', opacity: 0.30, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  labelBadge:      { color: '#FF0080', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
 
-  inputWrap:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputWrapFocused:{ borderColor: '#6C47FF40' },
+  inputWrap:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0d0d0d', borderRadius: 16, borderWidth: 1, borderColor: '#1e1e1e', paddingHorizontal: 18 },
+  inputWrapFocused:{ borderColor: '#FF008055' },
   inputWrapOk:     { borderColor: '#57f28755' },
   inputWrapErr:    { borderColor: '#f0474755' },
-  inputIcon:       { fontSize: 16, marginRight: 10 },
-  input:           { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
+  input:           { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 18 },
   showHide:        { paddingLeft: 8 },
-  showHideText:    { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  showHideText:    { color: '#FF0080', fontSize: 13, fontWeight: '700' },
 
-  dobWrap:         { paddingVertical: 17 },
-  dobText:         { flex: 1, color: '#536471', fontSize: 15 },
+  confirmDot:      { width: 20, height: 20, borderRadius: 10, backgroundColor: '#1e1608', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 },
+  confirmDotOk:    { backgroundColor: '#57f28730', borderWidth: 1, borderColor: '#57f287' },
+  confirmDotErr:   { backgroundColor: '#f0474720', borderWidth: 1, borderColor: '#f04747' },
+  confirmDotText:  { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 16 },
+
+  dobWrap:         { paddingVertical: 18 },
+  dobText:         { flex: 1, color: '#555', fontSize: 15 },
   dobTextSet:      { color: '#fff', fontWeight: '600' },
-  dobCheck:        { color: '#57f287', fontSize: 16, fontWeight: '700' },
-  dobHint:         { color: '#333', fontSize: 11, lineHeight: 16 },
+  dobCheck:        { color: '#57f287', fontSize: 15, fontWeight: '700' },
+  dobHint:         { color: '#ffffff', opacity: 0.30, fontSize: 11, lineHeight: 16 },
 
   submitBtn:       { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
-  submitBtnOff:    { opacity: 0.45 },
-  submitGrad:      { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: '#6C47FF' },
+  submitBtnOff:    { opacity: 0.4 },
+  submitGrad:      { paddingVertical: 20, alignItems: 'center', borderRadius: 18, backgroundColor: '#FF0080' },
   submitText:      { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
 
-  terms:           { color: '#2F3336', fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
-  termsLink:       { color: '#6C47FF50' },
+  terms:           { color: '#ffffff', opacity: 0.30, fontSize: 12, textAlign: 'center', marginTop: 20, lineHeight: 18 },
+  termsLink:       { color: '#FF008099' },
 
   divider:         { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 },
-  dividerLine:     { flex: 1, height: 1, backgroundColor: '#2F3336' },
-  dividerText:     { color: '#2F3336', fontSize: 13, fontWeight: '600' },
+  dividerLine:     { flex: 1, height: 1, backgroundColor: '#1a1a1a' },
+  dividerText:     { color: '#ffffff', opacity: 0.25, fontSize: 13, fontWeight: '600' },
 
   footerRow:       { flexDirection: 'row', justifyContent: 'center', paddingBottom: 24 },
-  footerText:      { color: '#555', fontSize: 15 },
-  footerLink:      { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
+  footerText:      { color: '#ffffff', opacity: 0.40, fontSize: 15 },
+  footerLink:      { color: '#FF0080', fontSize: 15, fontWeight: '700' },
 });
 
 const dob = StyleSheet.create({
@@ -555,19 +576,18 @@ const dob = StyleSheet.create({
   actionText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
   // Confirm step
-  ageCard:    { backgroundColor: '#16162a', borderRadius: 20, padding: 20, alignItems: 'center', gap: 6, marginBottom: 16, borderWidth: 1, borderColor: '#6C47FF33' },
-  ageEmoji:   { fontSize: 36 },
+  ageCard:    { backgroundColor: '#16162a', borderRadius: 20, padding: 20, alignItems: 'center', gap: 6, marginBottom: 16, borderWidth: 1, borderColor: '#FF008033' },
   ageDate:    { color: '#fff', fontSize: 18, fontWeight: '700' },
-  ageNum:     { color: '#6C47FF', fontSize: 14, fontWeight: '600' },
+  ageNum:     { color: '#FF0080', fontSize: 14, fontWeight: '600' },
 
-  warningBox:   { backgroundColor: '#1a1020', borderRadius: 14, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: '#f0474730' },
-  warningTitle: { color: '#f04747', fontSize: 13, fontWeight: '800', marginBottom: 6 },
-  warningText:  { color: '#888', fontSize: 12, lineHeight: 18 },
+  warningBox:   { backgroundColor: '#1a0808', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#f0474755' },
+  warningTitle: { color: '#f04747', fontSize: 13, fontWeight: '900', marginBottom: 8, letterSpacing: 0.2 },
+  warningText:  { color: '#aaa', fontSize: 12, lineHeight: 19 },
 
   confirmCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, backgroundColor: '#16162a', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#2F3336' },
-  confirmCardOn: { borderColor: '#6C47FF', backgroundColor: '#1a1535' },
+  confirmCardOn: { borderColor: '#FF0080', backgroundColor: '#1a1535' },
   checkbox:    { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#2F3336', backgroundColor: '#16181C', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  checkboxOn:  { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  checkboxOn:  { backgroundColor: '#FF0080', borderColor: '#FF0080' },
   checkmark:   { color: '#fff', fontSize: 13, fontWeight: '800' },
   checkLabel:  { flex: 1, color: '#aaa', fontSize: 13, lineHeight: 20 },
 

@@ -10,11 +10,11 @@ const {
   postVenueEvent, getVenueEvents, getAllUpcomingEvents,
   setVenueLive, getVenueLiveStatus, getAllLiveVenues,
 } = require('./places');
-const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment } = require('./icebreaker');
+const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment, deleteResponse: deleteIcebreakerResponse } = require('./icebreaker');
 const { createEvent, getEvents, getEventById, joinEvent, leaveEvent, addEventMessage, getEventMessages } = require('./events');
 const { createCulturalPost, likePost, getCulturalPosts } = require('./culturalPosts');
-const { toggleLike, addComment, deletePhoto, getPhotos, toggleEcho } = require('./photos');
-const { getStoriesGrouped, viewStory, deleteStory } = require('./stories');
+const { toggleLike, addComment, deletePhoto, getPhotos, getPhotoById, toggleEcho } = require('./photos');
+const { getStoriesGrouped, viewStory, deleteStory, getStoryById } = require('./stories');
 const { followUser, unfollowUser, getFollowing, getFollowers, isFollowing } = require('./follows');
 
 // Bond ghost score — only loaded when DB is available
@@ -24,6 +24,13 @@ if (process.env.DATABASE_URL) {
 }
 
 const connectedUsers  = {};
+
+// Find a connected socket by userId (returns socketId string or undefined)
+function findSocketId(userId) {
+  if (!userId) return undefined;
+  return Object.keys(connectedUsers).find(sid => connectedUsers[sid].userId === userId);
+}
+
 const countryFlags    = {};   // country -> Set of socketIds who planted flag
 const socketCountries = {};   // socketId -> Set of countries (for cleanup on disconnect)
 const directMessageHistory = {};
@@ -199,6 +206,12 @@ function setupSocket(io) {
 
       // Send to recipient (translated) and back to sender (original)
       io.to(toSocketId).emit('direct_message', message);
+      io.to(toSocketId).emit('new_message_notif', {
+        fromId: socket.id,
+        fromName: sender.username,
+        fromCountry: sender.country,
+        preview: (imageUrl ? '📷 Photo' : text).slice(0, 60),
+      });
       socket.emit('direct_message', { ...message, text });
     });
 
@@ -492,6 +505,18 @@ function setupSocket(io) {
       likeResponse(index, responseId, user.userId || socket.id);
       const responses = getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
+      // Notify response owner
+      const resp = responses.find(r => r.id === responseId);
+      if (resp?.userId && resp.userId !== (user.userId || socket.id)) {
+        const ownerSid = findSocketId(resp.userId);
+        if (ownerSid) {
+          io.to(ownerSid).emit('icebreaker_response_liked', {
+            fromId: user.userId || socket.id,
+            fromName: user.username,
+            fromCountry: user.country,
+          });
+        }
+      }
     });
 
     socket.on('add_icebreaker_comment', ({ responseId, text }) => {
@@ -508,6 +533,19 @@ function setupSocket(io) {
       });
       const responses = getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
+      // Notify response owner
+      const resp = responses.find(r => r.id === responseId);
+      if (resp?.userId && resp.userId !== (user.userId || socket.id)) {
+        const ownerSid = findSocketId(resp.userId);
+        if (ownerSid) {
+          io.to(ownerSid).emit('icebreaker_response_commented', {
+            fromId: user.userId || socket.id,
+            fromName: user.username,
+            fromCountry: user.country,
+            preview: text.trim().slice(0, 60),
+          });
+        }
+      }
     });
 
     socket.on('like_icebreaker_comment', ({ responseId, commentId }) => {
@@ -524,6 +562,17 @@ function setupSocket(io) {
       if (!user || !responseId || !commentId) return;
       const { index } = getTodaysQuestion();
       const deleted = deleteIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
+      if (deleted) {
+        const responses = getResponses(index);
+        io.emit('icebreaker_responses', { index, responses });
+      }
+    });
+
+    socket.on('delete_icebreaker_response', ({ responseId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !responseId) return;
+      const { index } = getTodaysQuestion();
+      const deleted = deleteIcebreakerResponse(index, responseId, user.userId || socket.id);
       if (deleted) {
         const responses = getResponses(index);
         io.emit('icebreaker_responses', { index, responses });
@@ -714,22 +763,48 @@ function setupSocket(io) {
       const user = connectedUsers[socket.id];
       if (!user) return;
       const photo = toggleLike(photoId, socket.id, user.username);
-      if (photo) io.emit('photo_updated', photo);
+      if (photo) {
+        io.emit('photo_updated', photo);
+        // Notify owner (skip self-likes)
+        if (photo.userId && photo.userId !== (user.userId || socket.id)) {
+          const ownerSid = findSocketId(photo.userId);
+          if (ownerSid) {
+            io.to(ownerSid).emit('photo_liked', {
+              fromId: user.userId || socket.id,
+              fromName: user.username,
+              fromCountry: user.country,
+              photoId,
+            });
+          }
+        }
+      }
     });
 
     socket.on('comment_photo', async ({ photoId, text }) => {
       const user = connectedUsers[socket.id];
       if (!user || !text?.trim()) return;
-
-      let displayText = text.trim();
-      // Translate comment for... we keep original; clients display as-is
       const photo = addComment(photoId, {
         userId: socket.id,
         username: user.username,
         country: user.country,
-        text: displayText,
+        text: text.trim(),
       });
-      if (photo) io.emit('photo_updated', photo);
+      if (photo) {
+        io.emit('photo_updated', photo);
+        // Notify owner (skip self-comments)
+        if (photo.userId && photo.userId !== (user.userId || socket.id)) {
+          const ownerSid = findSocketId(photo.userId);
+          if (ownerSid) {
+            io.to(ownerSid).emit('photo_commented', {
+              fromId: user.userId || socket.id,
+              fromName: user.username,
+              fromCountry: user.country,
+              photoId,
+              preview: text.trim().slice(0, 60),
+            });
+          }
+        }
+      }
     });
 
     socket.on('delete_photo', ({ photoId }) => {
@@ -742,7 +817,21 @@ function setupSocket(io) {
       if (!user) return;
       const uid = user.userId || socket.id;
       const photo = toggleEcho(photoId, uid, user.username, user.country);
-      if (photo) io.emit('photo_updated', photo);
+      if (photo) {
+        io.emit('photo_updated', photo);
+        // Notify owner (skip self-echos)
+        if (photo.userId && photo.userId !== uid) {
+          const ownerSid = findSocketId(photo.userId);
+          if (ownerSid) {
+            io.to(ownerSid).emit('photo_echoed', {
+              fromId: uid,
+              fromName: user.username,
+              fromCountry: user.country,
+              photoId,
+            });
+          }
+        }
+      }
     });
 
     // ── STORIES ──
