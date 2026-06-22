@@ -999,8 +999,10 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
         {/* Stats row */}
         <View style={pv.statsRow}>
           <View style={pv.statItem}>
-            <Text style={pv.statVal}>{sig.strength ?? '—'}%</Text>
-            <Text style={pv.statLabel}>Bond Match</Text>
+            <Text style={pv.statVal}>
+              {(sig.interests || []).slice(0, 3).map(t => t.split(' ')[0]).join(' ') || '✨'}
+            </Text>
+            <Text style={pv.statLabel}>In Common</Text>
           </View>
           <View style={pv.statDiv} />
           <View style={pv.statItem}>
@@ -1918,7 +1920,7 @@ const pv = StyleSheet.create({
                  borderRadius: 18, paddingVertical: 16, borderWidth: 1, borderColor: '#1e2028' },
   statItem:    { flex: 1, alignItems: 'center', gap: 4 },
   statVal:     { color: '#fff', fontSize: 20, fontWeight: '900' },
-  statLabel:   { color: '#333', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  statLabel:   { color: '#666', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   statDiv:     { width: 1, backgroundColor: '#1e2028' },
 
   // Sections
