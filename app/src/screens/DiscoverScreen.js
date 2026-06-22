@@ -1565,7 +1565,6 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
                   onPress={() => locked ? setShowUpgrade(true) : setReachFilter(r.id)}
                   activeOpacity={0.8}
                 >
-                  <Text style={fp.reachIcon}>{r.icon}</Text>
                   <Text style={[fp.reachLabel, active && { color: r.color }]}>{r.label}</Text>
                   <Text style={fp.reachDesc} numberOfLines={1}>{r.desc}</Text>
                   {locked && <View style={fp.reachLock}><Text style={{ fontSize: 9 }}>🔒</Text></View>}
@@ -1589,7 +1588,6 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
                   onPress={() => tierInfo?.canFilterGender ? setGenderFilter(g.id) : setShowUpgrade(true)}
                   activeOpacity={0.8}
                 >
-                  <Text style={fp.genderPillIcon}>{g.icon}</Text>
                   <Text style={[fp.genderPillTxt, active && { color: '#fff' }]}>{g.label}</Text>
                 </TouchableOpacity>
               );
@@ -1636,7 +1634,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
               <TextInput
                 style={fp.countrySearchInput}
                 placeholder="Search country..."
-                placeholderTextColor="#333"
+                placeholderTextColor="#555"
                 value={countrySearch}
                 onChangeText={setCountrySearch}
               />
@@ -1668,7 +1666,6 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
                 onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(null) : setShowUpgrade(true)}
                 activeOpacity={0.8}
               >
-                <Text style={fp.anywhereFlag}>🌍</Text>
                 <Text style={[fp.anywhereTxt, countryFilter === null && tierInfo?.canFilterCountry && { color: '#6C47FF' }]}>Anywhere</Text>
                 {countryFilter === null && tierInfo?.canFilterCountry && <Text style={fp.anywhereCheck}>✓</Text>}
               </TouchableOpacity>
@@ -1716,7 +1713,7 @@ const fp = StyleSheet.create({
   handle:         { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2a2c34', alignSelf: 'center', marginBottom: 18 },
   sheetTitle:     { color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 18 },
   sectionRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  sectionLabel:   { color: '#777', fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
   lockBadge:      { color: '#FFB700', fontSize: 10, fontWeight: '800', backgroundColor: '#FFB70018',
                     borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: '#FFB70033' },
   lockedSection:  { opacity: 0.35 },
@@ -1728,7 +1725,7 @@ const fp = StyleSheet.create({
                     position: 'relative' },
   reachIcon:      { fontSize: 22 },
   reachLabel:     { color: '#bbb', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  reachDesc:      { color: '#333', fontSize: 9, fontWeight: '600', textAlign: 'center' },
+  reachDesc:      { color: '#666', fontSize: 9, fontWeight: '600', textAlign: 'center' },
   reachDot:       { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5 },
   reachLock:      { position: 'absolute', top: 6, right: 6 },
 
@@ -1738,7 +1735,7 @@ const fp = StyleSheet.create({
                     paddingVertical: 14, borderRadius: 18, backgroundColor: '#111318',
                     borderWidth: 1.5, borderColor: '#1e2028' },
   genderPillIcon: { fontSize: 20 },
-  genderPillTxt:  { color: '#555', fontSize: 13, fontWeight: '800' },
+  genderPillTxt:  { color: '#aaa', fontSize: 13, fontWeight: '800' },
 
   // Age range steppers
   ageRangeVal:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
@@ -1750,7 +1747,7 @@ const fp = StyleSheet.create({
                     alignItems: 'center', justifyContent: 'center' },
   ageBtnTxt:      { color: '#fff', fontSize: 20, fontWeight: '300', lineHeight: 24 },
   ageVal:         { color: '#fff', fontSize: 18, fontWeight: '900', minWidth: 34, textAlign: 'center' },
-  ageTo:          { color: '#333', fontSize: 13, fontWeight: '700' },
+  ageTo:          { color: '#666', fontSize: 13, fontWeight: '700' },
 
   // Country search bar
   countrySearchBar:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111318',
@@ -1766,7 +1763,7 @@ const fp = StyleSheet.create({
   regionTab:       { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
                      backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028' },
   regionTabActive: { backgroundColor: '#6C47FF20', borderColor: '#6C47FF' },
-  regionTabTxt:    { color: '#444', fontSize: 12, fontWeight: '800' },
+  regionTabTxt:    { color: '#777', fontSize: 12, fontWeight: '800' },
   regionTabTxtActive: { color: '#6C47FF' },
 
   // Anywhere pill
@@ -1786,7 +1783,7 @@ const fp = StyleSheet.create({
                     position: 'relative' },
   flagTileActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
   flagEmoji:      { fontSize: 22 },
-  flagName:       { color: '#444', fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  flagName:       { color: '#888', fontSize: 9, fontWeight: '700', textAlign: 'center' },
   flagNameActive: { color: '#6C47FF' },
   flagCheck:      { position: 'absolute', top: 4, right: 4, width: 13, height: 13,
                     borderRadius: 6.5, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
