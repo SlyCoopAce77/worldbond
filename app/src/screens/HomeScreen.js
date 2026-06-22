@@ -250,12 +250,6 @@ function BondStreakBadge({ tier, primary, milestones, longest, onPress }) {
 
   if (!tier) return null;
 
-  const nextTierDays = (() => {
-    const tiers = [1, 7, 30, 90, 180, 365];
-    const next = tiers.find(d => d > (primary.value * (primary.unit.includes('YR') ? 365 : primary.unit.includes('MO') ? 30 : primary.unit.includes('WK') ? 7 : 1)));
-    return next;
-  })();
-
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={sk.wrap}>
       <LinearGradient colors={['#0d0f1a', '#080a12']} style={sk.card}>
@@ -301,7 +295,7 @@ function BondStreakBadge({ tier, primary, milestones, longest, onPress }) {
                 )}
                 <View style={sk.msText}>
                   <Text style={[sk.msVal, { color: m.done ? tier.color : '#2a2c3a' }]}>{m.display}</Text>
-                  <Text style={[sk.msLbl, { color: m.done ? '#555' : '#1e2030' }]}>{m.label}</Text>
+                  <Text style={[sk.msLbl, { color: m.done ? '#8890b0' : '#2a2c3a' }]}>{m.label}</Text>
                 </View>
               </View>
             ))}
@@ -340,7 +334,7 @@ const sk = StyleSheet.create({
   countBlock: { flex: 1, gap: 2 },
   countNum:   { fontSize: 56, fontWeight: '900', letterSpacing: -2, lineHeight: 58 },
   countUnit:  { fontSize: 16, fontWeight: '800', letterSpacing: 1, marginTop: -4 },
-  countLabel: { color: '#333', fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginTop: 6 },
+  countLabel: { color: '#4a4e6a', fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginTop: 6 },
 
   // Right: milestones
   milestonesBlock: { flex: 1, gap: 0, paddingTop: 2 },
@@ -352,7 +346,7 @@ const sk = StyleSheet.create({
   msLbl:           { fontSize: 8, fontWeight: '700', letterSpacing: 1.2, marginTop: 1 },
 
   footer:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1 },
-  footerBest:{ color: '#333', fontSize: 11, fontWeight: '600' },
+  footerBest:{ color: '#6b7090', fontSize: 11, fontWeight: '600' },
   stamp:     { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderStyle: 'dashed' },
   stampTxt:  { fontSize: 8, fontWeight: '900', letterSpacing: 1.5 },
 });
@@ -1241,7 +1235,7 @@ export default function HomeScreen({ navigation, user }) {
             <FlatList
               horizontal data={onlineUsers.slice(0, 15)} keyExtractor={u => u.socketId}
               showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}
-              renderItem={({ item }) => <StoryRing user={item} onPress={() => navigation.navigate('Chat', { otherUser: item, currentUser: user })} />}
+              renderItem={({ item }) => <StoryRing user={item} onPress={() => {}} />}
             />
           </Animated.View>
         )}

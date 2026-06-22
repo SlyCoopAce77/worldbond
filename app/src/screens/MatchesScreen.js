@@ -267,7 +267,7 @@ const dc = StyleSheet.create({
 });
 
 // ─── Connection row ────────────────────────────────────────────────────────
-function ConnectionRow({ item, onChat, onProfile, index }) {
+function ConnectionRow({ item, onProfile, index }) {
   const ct     = CT[item.connection_type] || CT.friendship;
   const name   = item.display_name || 'Someone';
   const avatarC= stringToColor(name);
@@ -306,11 +306,6 @@ function ConnectionRow({ item, onChat, onProfile, index }) {
           </View>
         </View>
 
-        <TouchableOpacity style={cr.chatBtn} onPress={onChat}>
-          <LinearGradient colors={['#6C47FF', '#5533DD']} style={cr.chatGrad}>
-            <Text style={cr.chatIcon}>💬</Text>
-          </LinearGradient>
-        </TouchableOpacity>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -326,9 +321,6 @@ const cr = StyleSheet.create({
   meta:          { color: '#555', fontSize: 12 },
   badge:         { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1, marginTop: 2 },
   badgeText:     { fontSize: 10, fontWeight: '700' },
-  chatBtn:       { borderRadius: 14, overflow: 'hidden' },
-  chatGrad:      { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
-  chatIcon:      { fontSize: 18 },
 });
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -399,20 +391,6 @@ export default function MatchesScreen({ navigation }) {
     });
   }
 
-  function openChat(item) {
-    if (!navigation) return;
-    const targetUserId = item.matched_user_id || item.user_id;
-    const online = onlineUsers.find(u => u.userId === targetUserId);
-    navigation.navigate('Chat', {
-      otherUser: {
-        userId:       targetUserId,
-        display_name: item.display_name,
-        photo_url:    item.photo_url,
-        socketId:     online?.socketId,
-      },
-      currentUser: {},
-    });
-  }
 
   const indicatorX = tabAnim.interpolate({ inputRange: [0, 1], outputRange: [0, (width - 40) / 2] });
 
@@ -479,7 +457,6 @@ export default function MatchesScreen({ navigation }) {
               <ConnectionRow
                 item={item}
                 index={index}
-                onChat={() => openChat(item)}
                 onProfile={() => openProfile(item)}
               />
             )

@@ -13,14 +13,11 @@ import { WorldMark } from '../components/BondLogo';
 // Tab screens
 import HomeScreen from '../screens/HomeScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
-import GroupsScreen from '../screens/GroupsScreen';
 import PhotoFeedScreen from '../screens/PhotoFeedScreen';
 import ExploreScreen from '../screens/ExploreScreen';
 import MyProfileScreen from '../screens/MyProfileScreen';
 
 // Stack screens (pushed on top)
-import ChatScreen from '../screens/ChatScreen';
-import GroupChatScreen from '../screens/GroupChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MatchesScreen from '../screens/MatchesScreen';
 import EventsScreen from '../screens/EventsScreen';
@@ -100,13 +97,6 @@ function HomeTabs({ user, onLogout }) {
       </Tab.Screen>
 
       <Tab.Screen
-        name="Groups"
-        options={{ tabBarLabel: 'Chats', tabBarIcon: ({ color, focused }) => <TabIcon icon="💬" color={color} focused={focused} /> }}
-      >
-        {props => <GroupsScreen {...props} user={user} />}
-      </Tab.Screen>
-
-      <Tab.Screen
         name="Photos"
         options={{ tabBarLabel: 'Photos', tabBarIcon: ({ color, focused }) => <TabIcon icon="📸" color={color} focused={focused} /> }}
       >
@@ -141,9 +131,6 @@ export default function AppNavigator({ user, onLogout }) {
               {props => <HomeTabs {...props} user={user} onLogout={onLogout} />}
             </Stack.Screen>
 
-            {/* Chats */}
-            <Stack.Screen name="Chat" component={ChatScreen} />
-            <Stack.Screen name="GroupChat" component={GroupChatScreen} />
             <Stack.Screen name="Call" component={CallScreen} options={{ presentation: 'modal' }} />
 
             {/* People */}

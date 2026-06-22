@@ -124,7 +124,6 @@ export function StreakProvider({ children }) {
   const [longest,  setLongest]  = useState(0);
   const [lastDate, setLastDate] = useState(null); // 'YYYY-MM-DD'
   const [loading,  setLoading]  = useState(true);
-  const [newMilestone, setNewMilestone] = useState(null); // tier unlocked today
 
   function todayStr() {
     return new Date().toISOString().split('T')[0];
@@ -168,13 +167,6 @@ export function StreakProvider({ children }) {
         }
       }
 
-      // Check if a new tier milestone was just unlocked
-      const prevTier = getStreakTier(data.streak || 0);
-      const currTier = getStreakTier(newStreak);
-      if (currTier && (!prevTier || currTier.id !== prevTier.id)) {
-        setNewMilestone(currTier);
-      }
-
       const updated = { streak: newStreak, longest: newLongest, lastDate: newDate };
       save(updated);
       setStreak(newStreak);
@@ -184,8 +176,6 @@ export function StreakProvider({ children }) {
     });
   }, []);
 
-  function clearMilestone() { setNewMilestone(null); }
-
   const tier       = getStreakTier(streak);
   const milestones = getStreakMilestones(streak);
   const primary    = formatStreakPrimary(streak);
@@ -194,7 +184,6 @@ export function StreakProvider({ children }) {
     <StreakContext.Provider value={{
       streak, longest, lastDate, tier,
       milestones, primary, loading,
-      newMilestone, clearMilestone,
     }}>
       {children}
     </StreakContext.Provider>

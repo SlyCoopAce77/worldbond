@@ -373,30 +373,6 @@ export default function ProfileScreen({ route, navigation }) {
     } finally { setConnecting(false); }
   }
 
-  function openChat() {
-    if (!tierInfo.canMessageAnyone && tierInfo.id === 'free') {
-      Alert.alert(
-        '💬 Chat Requires Plus or Pro',
-        'Upgrade to WorldBond Plus or Pro to message other bonders and start real conversations.',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: '🌟 Upgrade', onPress: () => navigation.navigate('Subscription') },
-        ],
-      );
-      return;
-    }
-    const targetId = bondUserId || profileUser?.userId || profileUser?.user_id;
-    if (!targetId) return;
-    navigation.navigate('Chat', {
-      otherUser: {
-        userId:       targetId,
-        display_name: displayName,
-        photo_url:    bondProfile?.photo_url || profileUser?.photo_url || null,
-        socketId:     profileUser?.socketId || null,
-      },
-      currentUser: { socketId: socket.id },
-    });
-  }
 
   async function pickCoverPhoto() {
     const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.85 });
@@ -725,14 +701,6 @@ export default function ProfileScreen({ route, navigation }) {
       {!isOwnProfile && (
         <View style={styles.actionBar}>
 
-          {/* Message button — tier color */}
-          <TouchableOpacity
-            style={[styles.messageBtn, { borderColor: tierInfo.color, paddingVertical: 14, backgroundColor: tierInfo.color + '15' }]}
-            onPress={openChat}
-          >
-            <Text style={[styles.messageBtnText, { color: tierInfo.color }]}>💬  Chat</Text>
-          </TouchableOpacity>
-
           {/* Bond button — styled by tier */}
           {bondUserId && (
             connected ? (
@@ -931,9 +899,6 @@ const styles = StyleSheet.create({
   socialArrow:     { color: '#6C47FF', fontSize: 20, fontWeight: '700' },
 
   actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 34, backgroundColor: '#000000f2', borderTopWidth: 1, borderTopColor: '#1C1F23' },
-  messageBtn:      { flex: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, overflow: 'hidden' },
-  messageBtnInner: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  messageBtnText:  { fontSize: 14, fontWeight: '700' },
   bondBtn:         { flex: 2, borderRadius: 18, overflow: 'hidden' },
   bondBtnInner:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
