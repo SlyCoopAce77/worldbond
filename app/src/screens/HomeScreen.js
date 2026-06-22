@@ -170,27 +170,13 @@ function HomeLogoMark() {
   );
 }
 
-// ─── Tier quick-tile configs ──────────────────────────────────────────────────
-const QUICK_TILES = {
-  free: [
-    { icon: '✨', label: 'Matches',  sub: 'Daily picks for you',  grad: ['#031418','#041c22'], accent: '#FF0080', nav: 'Bond'     },
-    { icon: '📸', label: 'Photos',   sub: 'Share your world',     grad: ['#041226','#020b1a'], accent: '#4fc3f7', nav: 'Photos'   },
-    { icon: '🎉', label: 'Events',   sub: 'Go live or join',      grad: ['#1a0c04','#100804'], accent: '#ff9800', nav: 'Events'   },
-    { icon: '🌍', label: 'Explore',  sub: 'Discover the world',   grad: ['#031a10','#011008'], accent: '#57f287', nav: 'Discover' },
-  ],
-  plus: [
-    { icon: '💎', label: 'Bond+',       sub: 'Priority matches',    grad: ['#031418','#041c22'], accent: '#FF0080', nav: 'Bond'     },
-    { icon: '📸', label: 'Photos',      sub: 'Share your story',    grad: ['#031418','#041c22'], accent: '#F0A420', nav: 'Photos'   },
-    { icon: '🎉', label: 'Events',      sub: 'Unlimited joins',     grad: ['#1a0c04','#100804'], accent: '#ff9800', nav: 'Events'   },
-    { icon: '👁',  label: 'Who Viewed', sub: 'See who looked',      grad: ['#031418','#041c22'], accent: '#67e8f9', nav: 'Me'       },
-  ],
-  pro: [
-    { icon: '⭐', label: 'Priority Bond', sub: 'Top of every list',   grad: ['#1a0e00','#120900'], accent: '#FFB700', nav: 'Bond'     },
-    { icon: '💬', label: 'Chats',         sub: 'Priority inbox',      grad: ['#1a1100','#100b00'], accent: '#fbbf24', nav: 'Groups'   },
-    { icon: '📡', label: 'Go Live',       sub: 'Create your stream',  grad: ['#1a0000','#100000'], accent: '#ef4444', nav: 'Events'   },
-    { icon: '🌐', label: 'Explore',       sub: 'Full world access',   grad: ['#031a10','#011008'], accent: '#57f287', nav: 'Discover' },
-  ],
-};
+// ─── Quick-tile config (free tier only — plus/pro use panels) ────────────────
+const FREE_TILES = [
+  { icon: '✨', label: 'Matches',  sub: 'Daily picks for you',  grad: ['#031418','#041c22'], accent: '#FF0080', nav: 'Bond'     },
+  { icon: '📸', label: 'Photos',   sub: 'Share your world',     grad: ['#041226','#020b1a'], accent: '#4fc3f7', nav: 'Photos'   },
+  { icon: '🎉', label: 'Events',   sub: 'Go live or join',      grad: ['#1a0c04','#100804'], accent: '#ff9800', nav: 'Events'   },
+  { icon: '🌍', label: 'Explore',  sub: 'Discover the world',   grad: ['#031a10','#011008'], accent: '#57f287', nav: 'Discover' },
+];
 
 // ─── Demo data for tier-locked sections ──────────────────────────────────────
 const DEMO_VIEWS = [
@@ -602,6 +588,153 @@ const qc = StyleSheet.create({
   arrow:      { fontSize: 22, fontWeight: '300', marginLeft: -4, flexShrink: 0 },
 });
 
+// ─── Plus: Bond Profile Panel — replaces 4-tile quick grid ──────────────────
+function PlusBondPanel({ navigation }) {
+  const glow  = useRef(new Animated.Value(0.04)).current;
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(glow,  { toValue: 0.12, duration: 2800, useNativeDriver: true }),
+      Animated.timing(glow,  { toValue: 0.04, duration: 2800, useNativeDriver: true }),
+    ])).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true }),
+    ])).start();
+  }, []);
+
+  return (
+    <View style={pp.wrap}>
+
+      {/* ── Header ── */}
+      <View style={pp.head}>
+        <View>
+          <Text style={pp.headLabel}>BOND PROFILE</Text>
+          <Text style={pp.headSub}>1-of-1 connection · Priority access</Text>
+        </View>
+        <View style={pp.pinkTag}><Text style={pp.pinkTagTxt}>PLUS</Text></View>
+      </View>
+
+      {/* ── Who Viewed You — featured card ── */}
+      <TouchableOpacity onPress={() => navigation.navigate('Notifications')} activeOpacity={0.88} style={pp.viewersCard}>
+        <LinearGradient colors={['#1a0010', '#100008', '#08000a']} style={pp.viewersGrad}>
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FF0080', opacity: glow, borderRadius: 16 }]} />
+          <LinearGradient colors={['#FF0080', '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pp.pinkBar} />
+          <View style={pp.viewersBody}>
+            <View style={pp.viewersLeft}>
+              <View style={pp.avatarStack}>
+                {DEMO_VIEWS.slice(0, 3).map((v, i) => (
+                  <View key={v.id} style={[pp.stackAvatar, { left: i * 22, zIndex: 3 - i, backgroundColor: stringToColor(v.username) }]}>
+                    <Text style={pp.stackInitial}>{v.username[0].toUpperCase()}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={pp.viewersMeta}>
+                <Text style={pp.viewersCount}>{DEMO_VIEWS.length} people</Text>
+                <Text style={pp.viewersSubtxt}>viewed your profile</Text>
+              </View>
+            </View>
+            <View style={pp.seeBadge}>
+              <Text style={pp.seeBadgeTxt}>SEE ALL</Text>
+            </View>
+          </View>
+          <View style={pp.viewersFooter}>
+            <Text style={pp.lastViewed}>Last: {DEMO_VIEWS[0]?.time}</Text>
+            <Text style={pp.oneOfOne}>1 OF 1</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* ── Priority Matches — collection card ── */}
+      <TouchableOpacity onPress={() => navigation.navigate('Bond')} activeOpacity={0.88} style={pp.matchesCard}>
+        <Text style={pp.matchesTitle}>PRIORITY MATCHES</Text>
+        <View style={pp.matchesRow}>
+          {DEMO_VIEWS.map((v, i) => (
+            <View key={v.id} style={pp.matchChip}>
+              <Text style={pp.matchFlag}>{v.country}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={pp.matchesArrow}>View your daily Bond picks →</Text>
+      </TouchableOpacity>
+
+      {/* ── World Connect Portal ── */}
+      <TouchableOpacity onPress={() => navigation.navigate('Discover')} activeOpacity={0.88} style={pp.connectPortal}>
+        <LinearGradient colors={['#06021a', '#040112', '#020009']} style={pp.connectGrad}>
+          <Animated.View style={[StyleSheet.absoluteFill, {
+            backgroundColor: '#6C47FF', borderRadius: 16,
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.03, 0.10] }),
+          }]} />
+          <View style={pp.connectTopRow}>
+            <Animated.View style={[pp.connectDot, {
+              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
+            }]} />
+            <Text style={pp.connectDotTxt}>BOND+</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={pp.connectReach}>195 countries</Text>
+          </View>
+          <View style={pp.connectCenter}>
+            <Text style={pp.connectTitle}>WORLD CONNECT</Text>
+            <Text style={pp.connectSub}>Find your next bond anywhere on earth</Text>
+          </View>
+          <View style={pp.connectBottom}>
+            <Text style={pp.connectHint}>Plus members get priority matching</Text>
+            <View style={pp.connectCTA}>
+              <Text style={pp.connectCTATxt}>CONNECT →</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+}
+const pp = StyleSheet.create({
+  wrap:         { gap: 10 },
+  head:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2 },
+  headLabel:    { color: '#FF0080', fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  headSub:      { color: '#555555', fontSize: 10, marginTop: 2 },
+  pinkTag:      { backgroundColor: '#FF008020', borderRadius: 8, borderWidth: 1, borderColor: '#FF008050', paddingHorizontal: 8, paddingVertical: 4 },
+  pinkTagTxt:   { color: '#FF0080', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+
+  viewersCard:  { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#FF008025' },
+  viewersGrad:  { borderRadius: 16 },
+  pinkBar:      { height: 3 },
+  viewersBody:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  viewersLeft:  { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatarStack:  { width: 76, height: 40, position: 'relative' },
+  stackAvatar:  { position: 'absolute', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#08000a' },
+  stackInitial: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  viewersMeta:  { gap: 2 },
+  viewersCount: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  viewersSubtxt:{ color: '#FF008099', fontSize: 11 },
+  seeBadge:     { backgroundColor: '#FF008020', borderRadius: 8, borderWidth: 1, borderColor: '#FF008045', paddingHorizontal: 10, paddingVertical: 6 },
+  seeBadgeTxt:  { color: '#FF0080', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  viewersFooter:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 12, marginTop: -4 },
+  lastViewed:   { color: '#555555', fontSize: 11 },
+  oneOfOne:     { color: '#FF008099', fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+
+  matchesCard:  { backgroundColor: '#0d0d0d', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FF008018', gap: 8 },
+  matchesTitle: { color: '#FF0080', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+  matchesRow:   { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  matchChip:    { width: 36, height: 36, borderRadius: 10, backgroundColor: '#1a0010', borderWidth: 1, borderColor: '#FF008025', alignItems: 'center', justifyContent: 'center' },
+  matchFlag:    { fontSize: 20 },
+  matchesArrow: { color: '#555555', fontSize: 11 },
+
+  connectPortal: { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#6C47FF30' },
+  connectGrad:   { borderRadius: 16, padding: 18, gap: 16 },
+  connectTopRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  connectDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6C47FF' },
+  connectDotTxt: { color: '#6C47FF', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  connectReach:  { color: '#555555', fontSize: 11 },
+  connectCenter: { alignItems: 'center', gap: 6, paddingVertical: 10 },
+  connectTitle:  { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  connectSub:    { color: '#ffffff44', fontSize: 12, textAlign: 'center' },
+  connectBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  connectHint:   { color: '#555555', fontSize: 11 },
+  connectCTA:    { backgroundColor: '#6C47FF22', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF55' },
+  connectCTATxt: { color: '#6C47FF', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+});
+
 // ─── Pro: World Footprint Panel — replaces 4-tile quick grid ─────────────────
 function ProFootprintPanel({ navigation }) {
   const glow      = useRef(new Animated.Value(0.04)).current;
@@ -925,7 +1058,7 @@ export default function HomeScreen({ navigation, user }) {
   const sectAnim   = useRef([...Array(7)].map(() => new Animated.Value(0))).current;
 
   const theme = HERO_THEMES[tier] || HERO_THEMES.free;
-  const tiles = QUICK_TILES[tier]  || QUICK_TILES.free;
+  const tiles = FREE_TILES;
   const accentColor = tier === 'pro' ? '#FFB700' : tier === 'plus' ? '#FF0080' : '#FF0080';
 
   const fetchBondData = useCallback(async () => {
@@ -1136,7 +1269,6 @@ export default function HomeScreen({ navigation, user }) {
                   <Text style={s.greetLine}>{theme.greetLabel || greeting()}</Text>
                   <Text style={s.heroName}>
                     {firstName} {countryFlag}
-                    {tier === 'plus' ? <Text style={{ color: accentColor }}> +</Text> : null}
                   </Text>
                 </View>
 
@@ -1192,6 +1324,8 @@ export default function HomeScreen({ navigation, user }) {
         <Animated.View style={[s.section, sect(1)]}>
           {tier === 'pro' ? (
             <ProFootprintPanel navigation={navigation} />
+          ) : tier === 'plus' ? (
+            <PlusBondPanel navigation={navigation} />
           ) : (
             <>
               <View style={s.quickGrid}>
