@@ -174,13 +174,13 @@ function HomeLogoMark() {
 const QUICK_TILES = {
   free: [
     { icon: '✨', label: 'Matches',  sub: 'Daily picks for you',  grad: ['#031418','#041c22'], accent: '#FF0080', nav: 'Bond'     },
-    { icon: '💬', label: 'Chats',    sub: 'Your conversations',   grad: ['#041226','#020b1a'], accent: '#4fc3f7', nav: 'Groups'   },
+    { icon: '📸', label: 'Photos',   sub: 'Share your world',     grad: ['#041226','#020b1a'], accent: '#4fc3f7', nav: 'Photos'   },
     { icon: '🎉', label: 'Events',   sub: 'Go live or join',      grad: ['#1a0c04','#100804'], accent: '#ff9800', nav: 'Events'   },
     { icon: '🌍', label: 'Explore',  sub: 'Discover the world',   grad: ['#031a10','#011008'], accent: '#57f287', nav: 'Discover' },
   ],
   plus: [
     { icon: '💎', label: 'Bond+',       sub: 'Priority matches',    grad: ['#031418','#041c22'], accent: '#FF0080', nav: 'Bond'     },
-    { icon: '💬', label: 'Chats',       sub: 'Message anyone',      grad: ['#031418','#041c22'], accent: '#F0A420', nav: 'Groups'   },
+    { icon: '📸', label: 'Photos',      sub: 'Share your story',    grad: ['#031418','#041c22'], accent: '#F0A420', nav: 'Photos'   },
     { icon: '🎉', label: 'Events',      sub: 'Unlimited joins',     grad: ['#1a0c04','#100804'], accent: '#ff9800', nav: 'Events'   },
     { icon: '👁',  label: 'Who Viewed', sub: 'See who looked',      grad: ['#031418','#041c22'], accent: '#67e8f9', nav: 'Me'       },
   ],

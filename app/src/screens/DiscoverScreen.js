@@ -17,9 +17,9 @@ import { WorldMark } from '../components/BondLogo';
 
 const { width } = Dimensions.get('window');
 const TABS = [
-  { id: 'icebreaker', icon: '💡', label: 'Icebreaker' },
-  { id: 'random',     icon: '🌀', label: 'Random'     },
-  { id: 'people',     icon: '👥', label: 'People'     },
+  { id: 'icebreaker', label: 'Icebreaker', icon: '💡' },
+  { id: 'random',     label: 'Connect',    icon: '🌀' },
+  { id: 'people',     label: 'People',     icon: '👥' },
 ];
 const TAB_W = width / TABS.length;
 
@@ -516,20 +516,18 @@ const tab = StyleSheet.create({
 
 function buildSignalCfg(tierInfo) {
   if (!tierInfo) return {
-    label: 'Basic Signal', color: '#555', ringColor: '#33333388', ringCount: 1, bars: 1,
-    emoji: '📶', upgradeHint: 'Upgrade to boost your signal',
-    lockTitle: 'Searching…', lockSub: 'Basic Signal · 5 bonds per day',
+    color: '#555', ringColor: '#33333388', ringCount: 1, bars: 1,
+    upgradeHint: 'Upgrade to boost your signal',
+    lockTitle: 'Searching…', lockSub: '5 bonds per day',
   };
   const lockSubs = { free: '5 bonds/day', plus: '30 bonds/day', pro: 'Unlimited bonds' };
   return {
-    label:      tierInfo.signalName,
     color:      tierInfo.signalColor,
     ringColor:  tierInfo.signalColor + '55',
     ringCount:  tierInfo.signalRings,
     bars:       tierInfo.signalRings,
-    emoji:      tierInfo.signalEmoji,
     upgradeHint: tierInfo.id === 'free' ? 'Upgrade to boost your signal' : null,
-    lockTitle:  tierInfo.id === 'pro' ? 'Priority Match…' : 'Searching…',
+    lockTitle:  tierInfo.id === 'pro' ? 'Finding your match…' : 'Searching…',
     lockSub:    lockSubs[tierInfo.id] ?? '5 bonds/day',
   };
 }
@@ -1302,15 +1300,15 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             ]} />
           ))}
           <LinearGradient colors={orbColors} style={st.lockOrb}>
-            <Text style={{ fontSize: 52 }}>{state === 'timeout' ? '😶' : sc.emoji}</Text>
+            {state === 'timeout'
+              ? <Text style={{ fontSize: 52 }}>😶</Text>
+              : <WorldMark size={52} color={sc.color} />}
           </LinearGradient>
         </View>
 
-        {/* Signal tier badge — only for free/plus */}
-        {state === 'locking' && sc.label && (
+        {state === 'locking' && (
           <View style={[st.signalBadge, { borderColor: sc.color + '44', backgroundColor: sc.color + '12' }]}>
             <SignalBars count={5} activeCount={sc.bars} color={sc.color} size={4} />
-            <Text style={[st.signalBadgeTxt, { color: sc.color }]}>{sc.label}</Text>
           </View>
         )}
 
@@ -1355,7 +1353,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
         <Animated.View style={[st.matchContent, { transform: [{ scale: matchScaleA }], opacity: matchOpA }]}>
           <Text style={st.matchEmoji}>🌐</Text>
           <Text style={st.matchTitle}>It's a Match!</Text>
-          <Text style={st.matchSub}>You both bonded each other — chat is now unlocked</Text>
+          <Text style={st.matchSub}>You both bonded each other — your connection is live</Text>
           <View style={st.matchAvatarRow}>
             <View style={st.matchAvatarWrap}>
               <View style={[st.matchAvatar, { backgroundColor: myColor }]}><Text style={st.matchAvatarInitial}>{myInit}</Text></View>
@@ -1372,7 +1370,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             clearMatch();
             if (switchTab) switchTab('people');
           }} activeOpacity={0.85}>
-            <Text style={st.matchMsgTxt}>💬  Start Chatting</Text>
+            <Text style={st.matchMsgTxt}>View Bond</Text>
           </TouchableOpacity>
           <TouchableOpacity style={st.matchSkipBtn} onPress={() => {
             if (onMatch) onMatch(matchedUser, roomKey);
