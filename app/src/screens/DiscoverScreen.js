@@ -17,9 +17,9 @@ import { WorldMark } from '../components/BondLogo';
 
 const { width } = Dimensions.get('window');
 const TABS = [
-  { id: 'icebreaker', label: 'Icebreaker', icon: '💡' },
-  { id: 'random',     label: 'Connect',    icon: '🌀' },
-  { id: 'people',     label: 'People',     icon: '👥' },
+  { id: 'icebreaker', label: 'Icebreaker' },
+  { id: 'random',     label: 'Connect'    },
+  { id: 'people',     label: 'People'     },
 ];
 const TAB_W = width / TABS.length;
 
@@ -1412,34 +1412,18 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   return (
     <View style={{ flex: 1 }}>
 
-      {/* ── Signal badge + bonds counter ─────────────────────────────────── */}
-      <View style={fp2.signalHeader}>
-        <View style={[fp2.signalBadge, { backgroundColor: signalCfg.color + '15', borderColor: signalCfg.color + '40' }]}>
-          <Text style={fp2.signalEmoji}>{signalCfg.emoji}</Text>
-          <Text style={[fp2.signalName, { color: signalCfg.color }]}>{signalCfg.label}</Text>
-        </View>
-        <View style={fp2.bondsLeft}>
-          <Text style={[fp2.bondsLeftNum, outOfBonds && { color: '#e91936' }]}>
-            {isUnlimited ? '∞' : bondsLeft}
-          </Text>
-          <Text style={fp2.bondsLeftLabel}>
-            {isUnlimited ? 'bonds' : `bond${bondsLeft !== 1 ? 's' : ''} left`}
-          </Text>
-        </View>
-      </View>
-
       {/* ── Filter chip + shuffle ─────────────────────────────────────────── */}
       <View style={fp2.topRow}>
         <TouchableOpacity
           style={[fp2.vibeChip, hasFilter && { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' }]}
           onPress={() => setShowFilterSheet(true)} activeOpacity={0.8}
         >
-          <Text style={fp2.vibeIcon}>{hasFilter ? (genderFilter !== 'everyone' ? genderMeta.icon : reachMeta.icon) : '🎛️'}</Text>
+          <Text style={[fp2.vibeIcon, hasFilter && { color: '#6C47FF' }]}>⋮</Text>
           <Text style={[fp2.vibeTxt, hasFilter && { color: '#6C47FF' }]}>{filterLabel}</Text>
           <Text style={fp2.caret}>▾</Text>
         </TouchableOpacity>
         <TouchableOpacity style={fp2.shuffleBtn} onPress={doNext} activeOpacity={0.8}>
-          <Text style={fp2.shuffleIcon}>🌀</Text>
+          <Text style={fp2.shuffleIcon}>↻</Text>
         </TouchableOpacity>
       </View>
 
@@ -1827,12 +1811,12 @@ const fp2 = StyleSheet.create({
   bondsLeftNum:  { color: '#fff', fontSize: 16, fontWeight: '900', lineHeight: 18 },
   bondsLeftLabel:{ color: '#333', fontSize: 10, fontWeight: '700' },
   topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6 },
-  vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#1e2028' },
-  vibeIcon:     { fontSize: 16 },
-  vibeTxt:      { color: '#555', fontSize: 13, fontWeight: '800', flex: 1 },
-  caret:        { color: '#2a2c34', fontSize: 9 },
-  shuffleBtn:   { width: 46, height: 46, borderRadius: 23, backgroundColor: '#0e1016', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1e2028' },
-  shuffleIcon:  { fontSize: 22 },
+  vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#252730' },
+  vibeIcon:     { fontSize: 18, color: '#666', fontWeight: '700' },
+  vibeTxt:      { color: '#888', fontSize: 13, fontWeight: '700', flex: 1 },
+  caret:        { color: '#555', fontSize: 10 },
+  shuffleBtn:   { width: 46, height: 46, borderRadius: 23, backgroundColor: '#0e1016', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#252730' },
+  shuffleIcon:  { fontSize: 20, color: '#888', fontWeight: '700' },
 
   card:         { flex: 1, marginHorizontal: 14, marginBottom: 6, borderRadius: 30, overflow: 'hidden',
                   shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 28, shadowOffset: { width: 0, height: 10 } },
@@ -1850,7 +1834,7 @@ const fp2 = StyleSheet.create({
 
   // World Footprint Trail — the hero unique element
   trailWrap:    { alignSelf: 'stretch', marginTop: 18, marginBottom: 4 },
-  trailLabel:   { color: '#2a2c34', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 },
+  trailLabel:   { color: '#555', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 },
   trail:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   trailNode:    { width: 52, height: 52, borderRadius: 26, backgroundColor: '#111318', borderWidth: 1, borderColor: '#1e2028', alignItems: 'center', justifyContent: 'center' },
   trailFlag:    { fontSize: 26 },
@@ -1858,13 +1842,13 @@ const fp2 = StyleSheet.create({
   trailDot:     { width: 3, height: 3, borderRadius: 2, backgroundColor: '#2a2c34' },
   trailLine:    { width: 16, height: 1, backgroundColor: '#1e2028' },
 
-  tagline:      { color: '#444', fontSize: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 22, marginTop: 8, paddingHorizontal: 20 },
-  profileHint:  { marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#1e2028' },
-  profileHintTxt:{ color: '#333', fontSize: 12, fontWeight: '700' },
+  tagline:      { color: '#777', fontSize: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 22, marginTop: 8, paddingHorizontal: 20 },
+  profileHint:  { marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#2a2c3a' },
+  profileHintTxt:{ color: '#666', fontSize: 12, fontWeight: '700' },
   swipeHintRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
-  swipeHintPass: { color: '#2a2c34', fontSize: 11, fontWeight: '800' },
-  swipeHintDot:  { color: '#1e2028', fontSize: 11 },
-  swipeHintBond: { color: '#2a2c34', fontSize: 11, fontWeight: '800' },
+  swipeHintPass: { color: '#555', fontSize: 11, fontWeight: '800' },
+  swipeHintDot:  { color: '#333', fontSize: 11 },
+  swipeHintBond: { color: '#555', fontSize: 11, fontWeight: '800' },
 
   actions:      { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 },
   nextBtn:      { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#161820', borderWidth: 1, borderColor: '#353744' },
@@ -2607,7 +2591,6 @@ export default function DiscoverScreen({ navigation, user }) {
               onPress={() => switchTab(t.id)}
               activeOpacity={0.75}
             >
-              <Text style={styles.tabIcon}>{t.icon}</Text>
               <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
             </TouchableOpacity>
           );
@@ -2630,10 +2613,9 @@ const styles = StyleSheet.create({
   title:         { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   subtitle:      { color: '#444', fontSize: 13, marginTop: 3 },
 
-  tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2F3336', position: 'relative' },
-  tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 3 },
-  tabIcon:       { fontSize: 18 },
-  tabLabel:      { color: '#444', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  tabLabelActive:{ color: '#6C47FF' },
+  tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1e2028', position: 'relative' },
+  tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 14 },
+  tabLabel:      { color: '#666', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  tabLabelActive:{ color: '#fff', fontWeight: '900' },
   tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#6C47FF', borderRadius: 2 },
 });
