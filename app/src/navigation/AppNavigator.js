@@ -13,13 +13,12 @@ import { WorldMark } from '../components/BondLogo';
 // Tab screens
 import HomeScreen from '../screens/HomeScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
-import PhotoFeedScreen from '../screens/PhotoFeedScreen';
-import ExploreScreen from '../screens/ExploreScreen';
+import LiveHubScreen from '../screens/LiveHubScreen';
 import MyProfileScreen from '../screens/MyProfileScreen';
 
 // Stack screens (pushed on top)
 import ProfileScreen from '../screens/ProfileScreen';
-import MatchesScreen from '../screens/MatchesScreen';
+import ChatScreen from '../screens/ChatScreen';
 import EventsScreen from '../screens/EventsScreen';
 import ExperiencesScreen from '../screens/ExperiencesScreen';
 import PlaceDetailScreen from '../screens/PlaceDetailScreen';
@@ -38,9 +37,9 @@ import CountryStampChallengeScreen from '../screens/CountryStampChallengeScreen'
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-function TabIcon({ icon, color, focused }) {
+function TabIcon({ icon, color, focused, activeBg }) {
   return (
-    <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
+    <View style={[tabStyles.iconWrap, focused && { backgroundColor: activeBg || '#FF008018' }]}>
       <Text style={{ fontSize: 20 }}>{icon}</Text>
     </View>
   );
@@ -58,7 +57,6 @@ function HomeTabIcon({ color, focused }) {
 
 const tabStyles = StyleSheet.create({
   iconWrap:       { width: 44, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  iconWrapActive: { backgroundColor: '#6C47FF18' },
   homeWrap:       { alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   homeWrapActive: { backgroundColor: '#FF008018' },
 });
@@ -84,35 +82,40 @@ function HomeTabs({ user, onLogout }) {
     >
       <Tab.Screen
         name="Home"
-        options={{ tabBarLabel: 'Home', tabBarIcon: ({ color, focused }) => <HomeTabIcon color={color} focused={focused} /> }}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, focused }) => <HomeTabIcon color={color} focused={focused} />,
+        }}
       >
         {props => <HomeScreen {...props} user={user} />}
       </Tab.Screen>
 
       <Tab.Screen
         name="Discover"
-        options={{ tabBarLabel: 'Discover', tabBarIcon: ({ color, focused }) => <TabIcon icon="🔍" color={color} focused={focused} /> }}
+        options={{
+          tabBarLabel: 'Connect',
+          tabBarIcon: ({ color, focused }) => <TabIcon icon="🌐" color={color} focused={focused} activeBg="#FF008018" />,
+        }}
       >
         {props => <DiscoverScreen {...props} user={user} />}
       </Tab.Screen>
 
       <Tab.Screen
-        name="Photos"
-        options={{ tabBarLabel: 'Photos', tabBarIcon: ({ color, focused }) => <TabIcon icon="📸" color={color} focused={focused} /> }}
+        name="LiveHub"
+        options={{
+          tabBarLabel: 'Live',
+          tabBarIcon: ({ color, focused }) => <TabIcon icon="📡" color={color} focused={focused} activeBg="#e5393518" />,
+        }}
       >
-        {props => <PhotoFeedScreen {...props} user={user} />}
-      </Tab.Screen>
-
-      <Tab.Screen
-        name="Explore"
-        options={{ tabBarLabel: 'Explore', tabBarIcon: ({ color, focused }) => <TabIcon icon="✈️" color={color} focused={focused} /> }}
-      >
-        {props => <ExploreScreen {...props} user={user} />}
+        {props => <LiveHubScreen {...props} user={user} />}
       </Tab.Screen>
 
       <Tab.Screen
         name="Me"
-        options={{ tabBarLabel: 'Me', tabBarIcon: ({ color, focused }) => <TabIcon icon="👤" color={color} focused={focused} /> }}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, focused }) => <TabIcon icon="👤" color={color} focused={focused} activeBg="#FF008018" />,
+        }}
       >
         {props => <MyProfileScreen {...props} user={user} onLogout={onLogout} />}
       </Tab.Screen>
@@ -135,7 +138,7 @@ export default function AppNavigator({ user, onLogout }) {
 
             {/* People */}
             <Stack.Screen name="Profile" component={ProfileScreen} />
-            <Stack.Screen name="Bond" component={MatchesScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
 
             {/* Explore */}
             <Stack.Screen name="PlaceDetail" component={PlaceDetailScreen} />
