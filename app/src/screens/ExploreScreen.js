@@ -2,14 +2,16 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   SafeAreaView, TextInput, ScrollView, Animated,
-  Dimensions,
+  Dimensions, Alert, ActivityIndicator, Platform, PermissionsAndroid, Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Geolocation from '@react-native-community/geolocation';
 import { getSocket } from '../services/socket';
 import { SAVED_SPOTS_KEY as SAVED_KEY } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -40,13 +42,13 @@ const VIBES = [
 ];
 
 const REGIONS = [
-  { key: 'all',     label: '🌍 All',      match: null },
-  { key: 'asia',    label: '🌏 Asia',     match: ['Japan', 'Korea', 'Thailand', 'Singapore', 'Philippines', 'Indonesia', 'India', 'Vietnam', 'China'] },
-  { key: 'europe',  label: '🇪🇺 Europe',  match: ['United Kingdom', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Turkey', 'Greece', 'Portugal', 'Ireland'] },
-  { key: 'americas',label: '🌎 Americas', match: ['United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'Colombia'] },
-  { key: 'africa',  label: '🌍 Africa',   match: ['Nigeria', 'South Africa', 'Egypt', 'Morocco', 'Ghana', 'Kenya', 'Ethiopia'] },
-  { key: 'mideast', label: '🕌 Middle East', match: ['Saudi Arabia', 'United Arab Emirates', 'Turkey', 'Lebanon', 'Jordan', 'Kuwait', 'Qatar'] },
-  { key: 'pacific', label: '🌊 Pacific',  match: ['Australia', 'New Zealand'] },
+  { key: 'all',      label: 'All',         match: null },
+  { key: 'asia',     label: 'Asia',        match: ['Japan', 'Korea', 'Thailand', 'Singapore', 'Philippines', 'Indonesia', 'India', 'Vietnam', 'China'] },
+  { key: 'europe',   label: 'Europe',      match: ['United Kingdom', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands', 'Turkey', 'Greece', 'Portugal', 'Ireland'] },
+  { key: 'americas', label: 'Americas',    match: ['United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'Colombia'] },
+  { key: 'africa',   label: 'Africa',      match: ['Nigeria', 'South Africa', 'Egypt', 'Morocco', 'Ghana', 'Kenya', 'Ethiopia'] },
+  { key: 'mideast',  label: 'Middle East', match: ['Saudi Arabia', 'United Arab Emirates', 'Turkey', 'Lebanon', 'Jordan', 'Kuwait', 'Qatar'] },
+  { key: 'pacific',  label: 'Pacific',     match: ['Australia', 'New Zealand'] },
 ];
 
 const EVENT_TYPES = [
@@ -85,43 +87,6 @@ function formatDate(dateStr) {
   } catch { return dateStr; }
 }
 
-// ─── Event pill (horizontal strip) ───────────────────────────────────────────
-function EventPill({ event, onPress }) {
-  const et = EVENT_TYPES.find(e => e.key === event.type) || EVENT_TYPES[0];
-  return (
-    <TouchableOpacity style={[ep.pill, { borderColor: et.color + '50' }]} onPress={onPress} activeOpacity={0.85}>
-      <LinearGradient colors={[et.color + '22', et.color + '08']} style={ep.inner}>
-        <Text style={ep.etIcon}>{et.icon}</Text>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={ep.name} numberOfLines={1}>{event.title}</Text>
-          <Text style={ep.meta} numberOfLines={1}>{countryFlag(event.placeCountry)} {event.placeName}</Text>
-          <Text style={ep.date}>{formatDate(event.date)}</Text>
-        </View>
-        {event.price && event.price !== 'Free' && (
-          <View style={[ep.price, { backgroundColor: et.color + '22' }]}>
-            <Text style={[ep.priceTxt, { color: et.color }]}>{event.price}</Text>
-          </View>
-        )}
-        {(!event.price || event.price === 'Free') && (
-          <View style={[ep.price, { backgroundColor: '#22c55e22' }]}>
-            <Text style={[ep.priceTxt, { color: '#22c55e' }]}>Free</Text>
-          </View>
-        )}
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}
-const ep = StyleSheet.create({
-  pill:  { width: 210, borderRadius: 18, overflow: 'hidden', borderWidth: 1 },
-  inner: { padding: 14, gap: 5, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  etIcon:{ fontSize: 22 },
-  name:  { color: '#fff', fontSize: 13, fontWeight: '800' },
-  meta:  { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-  date:  { color: 'rgba(255,255,255,0.35)', fontSize: 10 },
-  price: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  priceTxt: { fontSize: 10, fontWeight: '800' },
-});
-
 // ─── Vibe button ──────────────────────────────────────────────────────────────
 const VIBE_W = (Dimensions.get('window').width - 48) / 5;
 
@@ -131,7 +96,6 @@ function VibeButton({ vibe, onPress }) {
     <Animated.View style={[{ width: VIBE_W }, anim]}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.82}>
         <LinearGradient colors={[vibe.color + '33', vibe.color + '11']} style={[vb.card, { borderColor: vibe.color + '55' }]}>
-          <Text style={vb.icon}>{vibe.icon}</Text>
           <Text style={[vb.label, { color: vibe.color }]}>{vibe.label}</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -139,9 +103,8 @@ function VibeButton({ vibe, onPress }) {
   );
 }
 const vb = StyleSheet.create({
-  card:  { borderRadius: 16, paddingVertical: 14, paddingHorizontal: 4, alignItems: 'center', gap: 6, borderWidth: 1, margin: 3 },
-  icon:  { fontSize: 24 },
-  label: { fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  card:  { borderRadius: 16, paddingVertical: 16, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderWidth: 1, margin: 3 },
+  label: { fontSize: 11, fontWeight: '900', textAlign: 'center' },
 });
 
 // ─── Country card ─────────────────────────────────────────────────────────────
@@ -170,7 +133,7 @@ const cc = StyleSheet.create({
 
 // ─── Compact spot card (used in horizontal group rows) ───────────────────────
 function CompactSpotCard({ item, onPress, saved, onToggleSave }) {
-  const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF' };
+  const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: BOND_PINK };
   return (
     // Outer View so the save button and the card tap are completely independent
     <View style={csc.card}>
@@ -179,7 +142,7 @@ function CompactSpotCard({ item, onPress, saved, onToggleSave }) {
           {item.isLive && <View style={csc.liveDot} />}
           <Text style={csc.icon}>{meta.icon}</Text>
           <Text style={csc.name} numberOfLines={2}>{item.name}</Text>
-          <Text style={csc.city} numberOfLines={1}>📍 {item.city}</Text>
+          <Text style={csc.city} numberOfLines={1}>{item.city}</Text>
           {item.vibe ? <Text style={[csc.vibe, { color: meta.color }]} numberOfLines={1}>{item.vibe}</Text> : null}
         </LinearGradient>
       </TouchableOpacity>
@@ -204,53 +167,66 @@ const csc = StyleSheet.create({
   saveBtnTxt:{ fontSize: 13 },
   icon:      { fontSize: 32, marginBottom: 2 },
   name:      { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 17 },
-  city:      { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '600' },
+  city:      { color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '600' },
   vibe:      { fontSize: 10, fontWeight: '700' },
 });
 
 // ─── Spot card ────────────────────────────────────────────────────────────────
 function SpotCard({ item, onPress, showCity, index }) {
-  const anim = useFade(true, Math.min(index * 40, 300));
-  const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: '#6C47FF', grad: ['#1C1F23', '#16181C'] };
+  const anim      = useFade(true, Math.min(index * 40, 300));
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const meta      = TYPE_META[item.type] || { label: item.type, color: BOND_PINK };
+
+  useEffect(() => {
+    if (!item.pulseCount) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [item.pulseCount]);
 
   return (
     <Animated.View style={anim}>
-      <TouchableOpacity style={sc.card} onPress={onPress} activeOpacity={0.88}>
-        <LinearGradient colors={meta.grad} style={sc.header}>
-          <Text style={sc.headerIcon}>{meta.icon}</Text>
-          <View style={sc.headerRight}>
-            {item.isLive && (
-              <View style={sc.liveBadge}>
-                <View style={sc.liveDot} />
-                <Text style={sc.liveTxt}>LIVE</Text>
-              </View>
-            )}
-            {item.eventCount > 0 && !item.isLive && (
-              <View style={sc.eventBadge}>
-                <Text style={sc.eventTxt}>📅 {item.eventCount} event{item.eventCount > 1 ? 's' : ''}</Text>
-              </View>
-            )}
-            {item.checkinCount > 0 && (
-              <View style={sc.hereBadge}>
-                <View style={sc.hereDot} />
-                <Text style={sc.hereTxt}>{item.checkinCount} here</Text>
-              </View>
-            )}
-            <View style={[sc.typeBadge, { backgroundColor: meta.color + '28', borderColor: meta.color + '55' }]}>
+      <TouchableOpacity style={[sc.card, item.pulseCount > 0 && sc.cardPulsing]} onPress={onPress} activeOpacity={0.88}>
+        {item.pulseCount > 0 && (
+          <Animated.View style={[sc.pulseRing, { opacity: pulseAnim }]} pointerEvents="none" />
+        )}
+        {item.latestPulse && (
+          <View style={sc.pulseBanner}>
+            <View style={sc.pulseBannerDot} />
+            <Text style={sc.pulseBannerTxt} numberOfLines={1}>{item.latestPulse.message}</Text>
+          </View>
+        )}
+        <View style={sc.body}>
+
+          {/* Type pill + status */}
+          <View style={sc.topRow}>
+            <View style={[sc.typeBadge, { backgroundColor: meta.color + '22', borderColor: meta.color + '44' }]}>
+              <View style={[sc.typeDot, { backgroundColor: meta.color }]} />
               <Text style={[sc.typeLabel, { color: meta.color }]}>{meta.label}</Text>
             </View>
+            <View style={sc.statusRow}>
+              {item.isLive && (
+                <View style={sc.liveBadge}>
+                  <View style={sc.liveDot} />
+                  <Text style={sc.liveTxt}>Live</Text>
+                </View>
+              )}
+              {item.checkinCount > 0 && (
+                <Text style={sc.hereTxt}>{item.checkinCount} here</Text>
+              )}
+            </View>
           </View>
-        </LinearGradient>
 
-        <View style={sc.body}>
           <Text style={sc.name}>{item.name}</Text>
-          {showCity && <Text style={sc.city}>📍 {item.city}</Text>}
+          {showCity && <Text style={sc.city}>{item.city}</Text>}
           <Text style={sc.desc} numberOfLines={2}>{item.description}</Text>
 
-          <View style={sc.metaRow}>
-            <Text style={sc.vibe}>{item.vibe}</Text>
-            <Text style={sc.bestTime}>⏰ {item.bestTime}</Text>
-          </View>
+          {item.bestTime ? <Text style={sc.bestTime}>Best time · {item.bestTime}</Text> : null}
 
           {item.tags?.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sc.tags}>
@@ -262,41 +238,58 @@ function SpotCard({ item, onPress, showCity, index }) {
             </ScrollView>
           )}
 
-          <TouchableOpacity style={[sc.cta, { borderColor: meta.color + '55' }]} onPress={onPress}>
-            <Text style={[sc.ctaTxt, { color: meta.color }]}>📍 Check In & Chat</Text>
-          </TouchableOpacity>
+          <View style={sc.ctaRow}>
+            <TouchableOpacity style={[sc.cta, { borderColor: meta.color + '55', flex: 1 }]} onPress={onPress}>
+              <Text style={[sc.ctaTxt, { color: meta.color }]}>Check In & Chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={sc.dirBtn}
+              onPress={() => {
+                const q = encodeURIComponent(`${item.name} ${item.city || ''}`);
+                Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={sc.dirTxt}>Get Directions</Text>
+              <Text style={sc.dirArrow}>→</Text>
+            </TouchableOpacity>
+          </View>
+
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 const sc = StyleSheet.create({
-  card:       { backgroundColor: '#16181C', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336' },
-  header:     { height: 90, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
-  headerIcon: { fontSize: 46 },
-  headerRight:{ gap: 6, alignItems: 'flex-end', flexShrink: 1 },
-  liveBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ff525222', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#ff525244' },
-  liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
-  liveTxt:    { color: '#ff5252', fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
-  eventBadge: { backgroundColor: '#FFB70022', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderColor: '#FFB70044' },
-  eventTxt:   { color: '#FFB700', fontSize: 11, fontWeight: '700' },
-  hereBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#22c55e18', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: '#22c55e33' },
-  hereDot:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#22c55e' },
-  hereTxt:    { color: '#22c55e', fontSize: 10, fontWeight: '700' },
-  typeBadge:  { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
-  typeLabel:  { fontSize: 11, fontWeight: '700' },
-  body:       { padding: 16, gap: 9 },
-  name:       { color: '#fff', fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
-  city:       { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
-  desc:       { color: '#777', fontSize: 13, lineHeight: 19 },
-  metaRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  vibe:       { color: '#bbb', fontSize: 12, fontWeight: '600', flex: 1 },
-  bestTime:   { color: '#555', fontSize: 11 },
-  tags:       { gap: 6 },
-  tag:        { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, borderWidth: 1 },
-  tagTxt:     { fontSize: 11, fontWeight: '600' },
-  cta:        { borderRadius: 13, paddingVertical: 12, alignItems: 'center', borderWidth: 1, backgroundColor: '#ffffff07', marginTop: 2 },
-  ctaTxt:     { fontSize: 14, fontWeight: '700' },
+  card:      { backgroundColor: '#16181C', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#2a2d33' },
+  body:      { padding: 18, gap: 12 },
+  topRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  typeBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
+  typeDot:   { width: 6, height: 6, borderRadius: 3 },
+  typeLabel: { fontSize: 12, fontWeight: '700' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  liveDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
+  liveTxt:   { color: '#ff5252', fontSize: 11, fontWeight: '800' },
+  hereTxt:   { color: 'rgba(255,255,255,0.35)', fontSize: 11 },
+  name:      { color: '#fff', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 },
+  city:      { color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: '600', marginTop: -4 },
+  desc:      { color: '#999', fontSize: 13, lineHeight: 19 },
+  bestTime:  { color: 'rgba(255,255,255,0.3)', fontSize: 11 },
+  tags:      { gap: 6 },
+  tag:       { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, borderWidth: 1 },
+  tagTxt:    { fontSize: 11, fontWeight: '600' },
+  cardPulsing:    { borderColor: BOND_PINK + '88' },
+  pulseRing:      { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: 20, borderWidth: 2, borderColor: '#9d7cff', zIndex: 1 },
+  pulseBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: BOND_PINK + '18', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BOND_PINK + '33' },
+  pulseBannerDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#9d7cff' },
+  pulseBannerTxt: { color: '#bba8ff', fontSize: 12, fontWeight: '600', flex: 1 },
+  ctaRow:    { flexDirection: 'row', gap: 8, marginTop: 2 },
+  cta:       { borderRadius: 13, paddingVertical: 13, alignItems: 'center', borderWidth: 1, backgroundColor: '#ffffff07' },
+  ctaTxt:    { fontSize: 14, fontWeight: '700' },
+  dirBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 13, borderRadius: 13, backgroundColor: BOND_PINK + '20', borderWidth: 1, borderColor: BOND_PINK + '66' },
+  dirTxt:    { color: '#bba8ff', fontSize: 13, fontWeight: '800' },
+  dirArrow:  { color: '#9d7cff', fontSize: 14, fontWeight: '700' },
 });
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -317,6 +310,10 @@ export default function ExploreScreen({ navigation, user }) {
   const [region,        setRegion]        = useState('all');
   const [loading,       setLoading]       = useState(false);
   const [savedSpots,    setSavedSpots]    = useState([]);   // persisted full spot objects
+  const [locating,        setLocating]        = useState(false);
+  const [gpsTriggered,    setGpsTriggered]    = useState(false);
+  const [detectedCountry, setDetectedCountry] = useState(null); // persists across back nav
+  const [activePulses,    setActivePulses]    = useState([]);   // spots currently pulsing
   const headerAnim = useFade(true);
 
   // ── Saved spots persistence ──
@@ -354,6 +351,12 @@ export default function ExploreScreen({ navigation, user }) {
     socket.on('country_places_list', ({ places }) => { setSpots(places || []); setLoading(false); });
     socket.on('vibe_spots_list',     ({ places }) => { setSpots(places || []); setLoading(false); });
     socket.on('venue_live_update',  () => socket.emit('get_live_venues'));
+    socket.on('all_active_pulses',  pulses => setActivePulses(pulses || []));
+    socket.on('pulse_dropped', ({ pulse }) => setActivePulses(prev => {
+      const without = prev.filter(p => p.id !== pulse.id);
+      return [pulse, ...without];
+    }));
+    socket.emit('get_all_active_pulses');
 
     return () => {
       socket.off('countries_list');
@@ -362,6 +365,8 @@ export default function ExploreScreen({ navigation, user }) {
       socket.off('country_places_list');
       socket.off('vibe_spots_list');
       socket.off('venue_live_update');
+      socket.off('all_active_pulses');
+      socket.off('pulse_dropped');
     };
   }, []);
 
@@ -378,14 +383,27 @@ export default function ExploreScreen({ navigation, user }) {
   }
 
   function openByVibe(vibeKey) {
-    setActiveVibe(vibeKey);
-    setActiveCountry(null);
-    setTypeFilter(vibeKey);
-    setCityFilter('all');
-    setSearch('');
-    setLoading(true);
-    socket.emit('get_spots_by_vibe', { type: vibeKey });
-    setView('spots');
+    if (detectedCountry) {
+      // User's GPS country is known — load that country and pre-filter by vibe
+      setActiveCountry(detectedCountry);
+      setActiveVibe(vibeKey);
+      setTypeFilter(vibeKey);
+      setCityFilter('all');
+      setSearch('');
+      setLoading(true);
+      setGpsTriggered(true);
+      socket.emit('get_country_places', { country: detectedCountry });
+      setView('spots');
+    } else {
+      setActiveVibe(vibeKey);
+      setActiveCountry(null);
+      setTypeFilter(vibeKey);
+      setCityFilter('all');
+      setSearch('');
+      setLoading(true);
+      socket.emit('get_spots_by_vibe', { type: vibeKey });
+      setView('spots');
+    }
   }
 
   function goBack() {
@@ -396,6 +414,74 @@ export default function ExploreScreen({ navigation, user }) {
     setSearch('');
     setTypeFilter('all');
     setCityFilter('all');
+    setGpsTriggered(false);
+    // detectedCountry intentionally kept — GPS location stays active
+  }
+
+  async function detectNearMe() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      if (Platform.OS === 'android') {
+        let granted;
+        try {
+          granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+            { title: 'Location Access', message: 'WorldBond needs your location to find nearby spots.' }
+          );
+        } catch {
+          setLocating(false);
+          return;
+        }
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setLocating(false);
+          Alert.alert('Location needed', 'Allow location access in Settings to find spots near you.');
+          return;
+        }
+      } else {
+        Geolocation.requestAuthorization('whenInUse');
+      }
+
+      Geolocation.getCurrentPosition(
+        async ({ coords }) => {
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}`,
+              { headers: { 'User-Agent': 'WorldBond/1.0' } }
+            );
+            const data = await res.json();
+            const detected = data.address?.country;
+            if (!detected) {
+              Alert.alert('Location', 'Could not identify your country.');
+              return;
+            }
+            const match = countries.find(c =>
+              countryName(c).toLowerCase() === detected.toLowerCase() ||
+              countryName(c).toLowerCase().includes(detected.toLowerCase())
+            );
+            if (match) {
+              setGpsTriggered(true);
+              setDetectedCountry(match);
+              openByCountry(match);
+            } else {
+              Alert.alert('Not available yet', `${detected} isn't in our spot list yet. More countries coming soon.`);
+            }
+          } catch {
+            Alert.alert('Connection error', 'Could not reach location service. Check your internet.');
+          } finally {
+            setLocating(false);
+          }
+        },
+        () => {
+          setLocating(false);
+          Alert.alert('Location needed', 'Allow location access in Settings to find spots near you.');
+        },
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 }
+      );
+    } catch (e) {
+      setLocating(false);
+      Alert.alert('Location error', 'Could not access location. Please try again.');
+    }
   }
 
   function openSpot(place) {
@@ -464,7 +550,6 @@ export default function ExploreScreen({ navigation, user }) {
   // ════════════════════════ DISCOVER VIEW ═══════════════════════════════════
 
   if (view === 'discover') {
-    const activeVibeMeta = activeVibe ? VIBES.find(v => v.key === activeVibe) : null;
     return (
       <LinearGradient colors={['#0d001a', '#050010', '#000000']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -472,7 +557,7 @@ export default function ExploreScreen({ navigation, user }) {
 
           {/* Header */}
           <Animated.View style={[ds.header, headerAnim]}>
-            <Text style={ds.title}>Globe Pulse 🌍</Text>
+            <Text style={ds.title}>Globe Pulse</Text>
             <Text style={ds.sub}>Find where the world hangs out</Text>
           </Animated.View>
 
@@ -482,7 +567,7 @@ export default function ExploreScreen({ navigation, user }) {
             <TextInput
               style={ds.searchInput}
               placeholder="Search countries, cities, spots…"
-              placeholderTextColor="#444"
+              placeholderTextColor="#666"
               value={search}
               onChangeText={setSearch}
               autoCapitalize="none"
@@ -492,12 +577,45 @@ export default function ExploreScreen({ navigation, user }) {
             )}
           </View>
 
+          {/* Near Me button */}
+          <TouchableOpacity style={ds.nearMeBtn} onPress={detectNearMe} activeOpacity={0.85} disabled={locating}>
+            <LinearGradient colors={[BOND_PINK + '30', BOND_PINK + '12']} style={ds.nearMeInner}>
+              {locating
+                ? <ActivityIndicator size="small" color="#9d7cff" style={{ marginRight: 2 }} />
+                : <View style={ds.nearMeDot} />
+              }
+              <Text style={ds.nearMeTxt}>
+                {locating ? 'Locating you…' : detectedCountry ? `Update location` : 'Spots near me'}
+              </Text>
+              {!locating && <Text style={ds.nearMeArrow}>→</Text>}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* GPS location context banner */}
+          {detectedCountry && (
+            <View style={ds.locBanner}>
+              <View style={ds.locBannerLeft}>
+                <Text style={ds.locBannerFlag}>{countryFlag(detectedCountry)}</Text>
+                <View>
+                  <Text style={ds.locBannerTxt}>In {countryName(detectedCountry)}</Text>
+                  <Text style={ds.locBannerSub}>Vibes filtered to your location</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setDetectedCountry(null)}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Text style={ds.locBannerClear}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Saved spots — quick jump from discover view */}
           {savedSpots.length > 0 && (
             <View style={ds.section}>
               <View style={ds.sectionRow}>
-                <Text style={{ fontSize: 15 }}>🔖</Text>
-                <Text style={[ds.sectionTitle, { marginLeft: 6 }]}>Your Saved Spots</Text>
+                <View style={ds.sectionDot} />
+                <Text style={ds.sectionTitle}>Your Saved Spots</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20, paddingBottom: 4 }}>
                 {savedSpots.map(s => (
@@ -513,21 +631,50 @@ export default function ExploreScreen({ navigation, user }) {
             </View>
           )}
 
-          {/* Upcoming Events strip */}
+          {/* Upcoming Events — compact vertical list */}
           {upcomingEvents.length > 0 && (
             <View style={ds.section}>
               <View style={ds.sectionRow}>
                 <View style={ds.sectionDot} />
                 <Text style={ds.sectionTitle}>Events Happening Soon</Text>
+                <Text style={ds.sectionHint}>{upcomingEvents.length} events</Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-                {upcomingEvents.slice(0, 15).map((evt, i) => (
-                  <EventPill key={evt.id || i} event={evt} onPress={() => {
-                    const spot = { id: evt.placeId, name: evt.placeName, country: evt.placeCountry, city: evt.placeCity, type: evt.placeType };
-                    navigation.navigate('PlaceDetail', { place: spot, user });
-                  }} />
-                ))}
-              </ScrollView>
+              <View style={ds.evtList}>
+                {upcomingEvents.slice(0, 4).map((evt, i) => {
+                  const et = EVENT_TYPES.find(e => e.key === evt.type) || EVENT_TYPES[0];
+                  return (
+                    <TouchableOpacity
+                      key={evt.id || i}
+                      style={ds.evtRow}
+                      activeOpacity={0.82}
+                      onPress={() => {
+                        const spot = { id: evt.placeId, name: evt.placeName, country: evt.placeCountry, city: evt.placeCity, type: evt.placeType };
+                        navigation.navigate('PlaceDetail', { place: spot, user });
+                      }}
+                    >
+                      <View style={[ds.evtIcon, { backgroundColor: et.color + '22', borderColor: et.color + '44' }]}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: et.color }} />
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={ds.evtName} numberOfLines={1}>{evt.title}</Text>
+                        <Text style={ds.evtMeta} numberOfLines={1}>
+                          {countryFlag(evt.placeCountry)} {evt.placeName} · {formatDate(evt.date)}
+                        </Text>
+                      </View>
+                      <View style={[ds.evtPricePill, { backgroundColor: (!evt.price || evt.price === 'Free') ? '#22c55e18' : et.color + '18' }]}>
+                        <Text style={[ds.evtPriceTxt, { color: (!evt.price || evt.price === 'Free') ? '#22c55e' : et.color }]}>
+                          {(!evt.price || evt.price === 'Free') ? 'Free' : evt.price}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                {upcomingEvents.length > 4 && (
+                  <TouchableOpacity style={ds.evtSeeAll} onPress={() => navigation.navigate('Events')} activeOpacity={0.8}>
+                    <Text style={ds.evtSeeAllTxt}>View all {upcomingEvents.length} events →</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           )}
 
@@ -536,19 +683,19 @@ export default function ExploreScreen({ navigation, user }) {
             <View style={ds.section}>
               <View style={ds.sectionRow}>
                 <View style={[ds.sectionDot, { backgroundColor: '#ff5252' }]} />
-                <Text style={ds.sectionTitle}>🔴 Live Right Now</Text>
+                <Text style={ds.sectionTitle}>Live Right Now</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
                 {liveVenues.map((v, i) => {
-                  const meta = TYPE_META[v.type] || { icon: '📍', color: '#6C47FF' };
+                  const meta = TYPE_META[v.type] || { color: BOND_PINK, label: v.type };
                   return (
                     <TouchableOpacity key={v.id || i} style={ds.liveCard} onPress={() => navigation.navigate('PlaceDetail', { place: v, user })} activeOpacity={0.85}>
                       <LinearGradient colors={['#ff525218', '#ff525208']} style={ds.liveInner}>
-                        <Text style={{ fontSize: 28 }}>{meta.icon}</Text>
+                        <View style={[ds.liveTypeDot, { backgroundColor: meta.color }]} />
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={ds.liveName} numberOfLines={1}>{v.name}</Text>
                           <Text style={ds.liveInfo}>{countryFlag(v.country)} {v.city}</Text>
-                          {v.liveHost && <Text style={ds.liveHost}>🎙 {v.liveHost.username}</Text>}
+                          {v.liveHost && <Text style={ds.liveHost}>{v.liveHost.username} is live</Text>}
                         </View>
                         <View style={ds.livePill}><View style={ds.livePillDot}/><Text style={ds.livePillTxt}>LIVE</Text></View>
                       </LinearGradient>
@@ -647,7 +794,14 @@ export default function ExploreScreen({ navigation, user }) {
           <Text style={sv.backArrow}>←</Text>
           <Text style={sv.backTxt}>Explore</Text>
         </TouchableOpacity>
-        <Text style={sv.title}>{spotsHeading}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={sv.title}>{spotsHeading}</Text>
+          {gpsTriggered && (
+            <View style={sv.gpsPill}>
+              <Text style={sv.gpsPillTxt}>Near you</Text>
+            </View>
+          )}
+        </View>
         <Text style={sv.sub}>
           {filteredSpots.length} spots
           {!activeCountry && spots.length > 0 && ` · ${new Set(spots.map(p => p.country)).size} countries`}
@@ -663,7 +817,7 @@ export default function ExploreScreen({ navigation, user }) {
           <TextInput
             style={sv.searchInput}
             placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
-            placeholderTextColor="#444"
+            placeholderTextColor="#666"
             value={search}
             onChangeText={setSearch}
             autoCapitalize="none"
@@ -677,13 +831,12 @@ export default function ExploreScreen({ navigation, user }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 14 }}
         >
-          {[{ key: 'all', icon: '✨', label: 'All Vibes', color: '#6C47FF' }, ...VIBES].map(v => (
+          {[{ key: 'all', label: 'All Vibes', color: BOND_PINK }, ...VIBES].map(v => (
             <TouchableOpacity
               key={v.key}
               style={[sv.filterChip, typeFilter === v.key && { backgroundColor: v.color + '28', borderColor: v.color }]}
               onPress={() => setTypeFilter(v.key)}
             >
-              <Text style={{ fontSize: 14 }}>{v.icon}</Text>
               <Text style={[sv.filterTxt, typeFilter === v.key && { color: v.color, fontWeight: '800' }]}>{v.label}</Text>
             </TouchableOpacity>
           ))}
@@ -696,7 +849,7 @@ export default function ExploreScreen({ navigation, user }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingBottom: 14 }}
           >
-            {[{ key: 'all', label: '🏙️ All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
+            {[{ key: 'all', label: 'All Cities' }, ...cities.map(c => ({ key: c, label: c }))].map(c => (
               <TouchableOpacity
                 key={c.key}
                 style={[sv.cityChip, cityFilter === c.key && sv.cityChipOn]}
@@ -712,7 +865,7 @@ export default function ExploreScreen({ navigation, user }) {
         {savedSpots.length > 0 && (
           <View style={sv.section}>
             <View style={sv.sectionRow}>
-              <Text style={{ fontSize: 15 }}>🔖</Text>
+              <View style={sv.dot} />
               <Text style={sv.sectionTitle}>Saved Spots</Text>
               <TouchableOpacity
                 onPress={() => { setSavedSpots([]); AsyncStorage.setItem(SAVED_KEY, '[]'); }}
@@ -735,6 +888,54 @@ export default function ExploreScreen({ navigation, user }) {
           </View>
         )}
 
+        {/* What's On — spots with active pulses in this view */}
+        {activePulses.filter(p => !activeCountry || p.placeCountry === activeCountry).length > 0 && (
+          <View style={sv.section}>
+            <View style={sv.sectionRow}>
+              <View style={[sv.dot, { backgroundColor: '#9d7cff' }]} />
+              <Text style={sv.sectionTitle}>What's On</Text>
+              <Text style={sv.sectionHint}>{activePulses.filter(p => !activeCountry || p.placeCountry === activeCountry).length} spot{activePulses.filter(p => !activeCountry || p.placeCountry === activeCountry).length > 1 ? 's' : ''}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
+              {activePulses.filter(p => !activeCountry || p.placeCountry === activeCountry).map(p => {
+                const typeColor = { event: '#8b5cf6', deal: '#22c55e', theme: '#ec4899', menu: '#f97316', announce: BOND_PINK }[p.type] || BOND_PINK;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[sv.pulseCard, { borderColor: typeColor + '44' }]}
+                    onPress={() => {
+                      const spot = spots.find(s => s.id === p.placeId) || { id: p.placeId, name: p.placeName, country: p.placeCountry, city: p.placeCity };
+                      navigation.navigate('PlaceDetail', { place: spot, user });
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={[sv.pulseTypePill, { backgroundColor: typeColor + '22' }]}>
+                      <View style={[sv.pulseDot, { backgroundColor: typeColor }]} />
+                      <Text style={[sv.pulseTypeLabel, { color: typeColor }]}>
+                        {{ event: 'Event', deal: 'Deal', theme: 'Theme Night', menu: 'New Menu', announce: 'Announcement' }[p.type] || p.type}
+                      </Text>
+                    </View>
+                    <Text style={sv.pulseSpotName} numberOfLines={1}>{p.placeName}</Text>
+                    <Text style={sv.pulseCity} numberOfLines={1}>{p.placeCity}</Text>
+                    <Text style={sv.pulseMsg} numberOfLines={2}>{p.message}</Text>
+                    {p.eventTime ? <Text style={sv.pulseTime}>{p.eventTime}</Text> : null}
+                    <TouchableOpacity
+                      style={sv.pulseDirBtn}
+                      onPress={() => {
+                        const q = encodeURIComponent(p.address || `${p.placeName} ${p.placeCity || ''}`);
+                        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={sv.pulseDirTxt}>Get Directions →</Text>
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Live strip */}
         {liveSpots.length > 0 && (
           <View style={sv.section}>
@@ -744,10 +945,9 @@ export default function ExploreScreen({ navigation, user }) {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
               {liveSpots.map(p => {
-                const meta = TYPE_META[p.type] || { icon: '📍', color: '#6C47FF' };
+                const meta = TYPE_META[p.type] || { icon: '📍', color: BOND_PINK };
                 return (
                   <TouchableOpacity key={p.id} style={sv.liveCard} onPress={() => openSpot(p)} activeOpacity={0.85}>
-                    <Text style={{ fontSize: 24 }}>{meta.icon}</Text>
                     <Text style={sv.liveName} numberOfLines={2}>{p.name}</Text>
                     <View style={sv.livePill}><View style={sv.liveDot}/><Text style={sv.liveTxt}>LIVE</Text></View>
                   </TouchableOpacity>
@@ -788,11 +988,11 @@ export default function ExploreScreen({ navigation, user }) {
         ) : groupedByType ? (
           // Grouped horizontal sections — no endless scrolling
           groupedByType.map(([type, typeSpots]) => {
-            const meta = TYPE_META[type] || { icon: '📍', label: type, color: '#6C47FF' };
+            const meta = TYPE_META[type] || { icon: '📍', label: type, color: BOND_PINK };
             return (
               <View key={type} style={sv.typeGroup}>
                 <View style={sv.typeGroupHeader}>
-                  <Text style={sv.typeGroupIcon}>{meta.icon}</Text>
+                  <View style={[sv.typeGroupDot, { backgroundColor: meta.color }]} />
                   <Text style={[sv.typeGroupLabel, { color: meta.color }]}>{meta.label}</Text>
                   <Text style={sv.typeGroupCount}>{typeSpots.length} spots</Text>
                   <TouchableOpacity onPress={() => setTypeFilter(type)} style={sv.typeGroupSeeAll}>
@@ -841,66 +1041,108 @@ export default function ExploreScreen({ navigation, user }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const ds = StyleSheet.create({
-  scroll:       { paddingBottom: 60 },
-  header:       { paddingHorizontal: 22, paddingTop: 18, paddingBottom: 8 },
+  scroll:       { paddingBottom: 80 },
+  header:       { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
   title:        { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  sub:          { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 3 },
-  searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 18, paddingHorizontal: 16, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 20, marginBottom: 24 },
-  searchIcon:   { fontSize: 15 },
+  sub:          { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 4 },
+  searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#3a3d44', marginHorizontal: 20, marginBottom: 12 },
+  searchIcon:   { fontSize: 15, color: '#777' },
   searchInput:  { flex: 1, color: '#fff', fontSize: 15 },
-  section:      { marginBottom: 28 },
+  section:      { marginBottom: 24 },
   sectionRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 14 },
-  sectionDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF' },
-  sectionTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  sectionHint:  { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginLeft: 'auto' },
+  sectionDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: BOND_PINK },
+  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  sectionHint:  { color: 'rgba(255,255,255,0.45)', fontSize: 12, marginLeft: 'auto' },
   liveCard:     { width: 200, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#ff525230' },
   liveInner:    { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  liveTypeDot:  { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   liveName:     { color: '#fff', fontSize: 13, fontWeight: '800', flex: 1 },
-  liveInfo:     { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
+  liveInfo:     { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 },
   liveHost:     { color: '#ff5252', fontSize: 10, marginTop: 2 },
   livePill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   livePillDot:  { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
   livePillTxt:  { color: '#ff5252', fontSize: 10, fontWeight: '900' },
-  vibeGrid:     { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12 },
-  regionPill:   { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  regionPillOn: { backgroundColor: 'rgba(108,71,255,0.18)', borderColor: '#6C47FF' },
-  regionTxt:    { color: '#555', fontSize: 13, fontWeight: '600' },
-  regionTxtOn:  { color: '#6C47FF', fontWeight: '800' },
+  vibeGrid:     { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14 },
+  regionPill:   { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 22, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#3a3d44' },
+  regionPillOn: { backgroundColor: 'rgba(108,71,255,0.2)', borderColor: BOND_PINK },
+  regionTxt:    { color: '#999', fontSize: 13, fontWeight: '600' },
+  regionTxtOn:  { color: BOND_PINK, fontWeight: '800' },
   empty:        { alignItems: 'center', paddingTop: 40, gap: 10 },
-  emptyTxt:     { color: '#555', fontSize: 14 },
+  emptyTxt:     { color: '#666', fontSize: 14 },
+
+  // GPS location banner
+  locBanner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, marginBottom: 20, backgroundColor: BOND_PINK + '18', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: BOND_PINK + '44' },
+  locBannerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  locBannerFlag:  { fontSize: 28 },
+  locBannerTxt:   { color: '#bba8ff', fontSize: 14, fontWeight: '800' },
+  locBannerSub:   { color: 'rgba(187,168,255,0.6)', fontSize: 11, marginTop: 2 },
+  locBannerClear: { color: '#9d7cff', fontSize: 16, fontWeight: '700', paddingLeft: 12 },
+
+  // Near Me button
+  nearMeBtn:    { marginHorizontal: 20, marginBottom: 20, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: BOND_PINK + '55' },
+  nearMeInner:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 15 },
+  nearMeDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#9d7cff' },
+  nearMeTxt:    { flex: 1, color: '#bba8ff', fontSize: 15, fontWeight: '700' },
+  nearMeArrow:  { color: '#9d7cff', fontSize: 17, fontWeight: '700' },
+
+  // Events vertical list
+  evtList:      { paddingHorizontal: 20, gap: 10 },
+  evtRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#16181C', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
+  evtIcon:      { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  evtName:      { color: '#fff', fontSize: 14, fontWeight: '800' },
+  evtMeta:      { color: '#888', fontSize: 12, marginTop: 2 },
+  evtPricePill: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
+  evtPriceTxt:  { fontSize: 11, fontWeight: '800' },
+  evtSeeAll:    { alignItems: 'center', paddingVertical: 14 },
+  evtSeeAllTxt: { color: '#9d7cff', fontSize: 13, fontWeight: '700' },
 });
 
 const sv = StyleSheet.create({
-  header:          { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 26, gap: 4 },
-  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(108,71,255,0.3)', marginBottom: 14 },
-  backArrow:       { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
-  backTxt:         { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  title:           { color: '#fff', fontSize: 30, fontWeight: '900', letterSpacing: -0.8 },
-  sub:             { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 6 },
-  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#2F3336', marginHorizontal: 16, marginTop: 6, marginBottom: 14 },
+  header:          { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16, gap: 6 },
+  backBtn:         { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(108,71,255,0.35)', marginBottom: 12 },
+  backArrow:       { color: '#9d7cff', fontSize: 15, fontWeight: '700' },
+  backTxt:         { color: '#9d7cff', fontSize: 13, fontWeight: '800' },
+  title:           { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+  sub:             { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
+  searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#3a3d44', marginHorizontal: 20, marginTop: 4, marginBottom: 14 },
   searchInput:     { flex: 1, color: '#fff', fontSize: 14 },
   filterRow:       { borderBottomWidth: 1, borderBottomColor: '#111' },
   cityRow:         { borderBottomWidth: 1, borderBottomColor: '#0d0d0d' },
-  filterChip:      { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  filterTxt:       { color: '#555', fontSize: 12, fontWeight: '600' },
-  cityChip:        { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  cityChipOn:      { backgroundColor: '#6C47FF22', borderColor: '#6C47FF' },
-  cityTxt:         { color: '#555', fontSize: 12, fontWeight: '600' },
-  cityTxtOn:       { color: '#6C47FF', fontWeight: '800' },
-  section:         { marginBottom: 16 },
-  sectionRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
-  dot:             { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6C47FF' },
-  sectionTitle:    { color: '#fff', fontSize: 14, fontWeight: '800' },
-  liveCard:        { width: 120, backgroundColor: '#160505', borderRadius: 14, padding: 12, alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#ff525230' },
-  liveName:        { color: '#fff', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  livePill:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
+  filterChip:      { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#3a3d44' },
+  filterTxt:       { color: '#999', fontSize: 13, fontWeight: '600' },
+  cityChip:        { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#3a3d44' },
+  cityChipOn:      { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK },
+  cityTxt:         { color: '#999', fontSize: 13, fontWeight: '600' },
+  cityTxtOn:       { color: BOND_PINK, fontWeight: '800' },
+  section:         { marginBottom: 22 },
+  sectionRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  dot:             { width: 6, height: 6, borderRadius: 3, backgroundColor: BOND_PINK },
+  sectionTitle:    { color: '#fff', fontSize: 15, fontWeight: '800' },
+  liveCard:        { width: 130, backgroundColor: '#160505', borderRadius: 14, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#ff525230' },
+  liveName:        { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  livePill:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ff525222', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4 },
   liveDot:         { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#ff5252' },
   liveTxt:         { color: '#ff5252', fontSize: 9, fontWeight: '900' },
-  typeGroup:       { marginBottom: 8, paddingTop: 6 },
-  typeGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingBottom: 10 },
-  typeGroupIcon:   { fontSize: 18 },
-  typeGroupLabel:  { fontSize: 14, fontWeight: '900', flex: 1 },
-  typeGroupCount:  { color: 'rgba(255,255,255,0.3)', fontSize: 11 },
-  typeGroupSeeAll: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
-  typeGroupSeeAllTxt: { fontSize: 11, fontWeight: '700' },
+  gpsPill:         { backgroundColor: BOND_PINK + '25', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: BOND_PINK + '55' },
+  gpsPillTxt:      { color: '#bba8ff', fontSize: 12, fontWeight: '700' },
+  typeGroup:       { marginBottom: 10, paddingTop: 4 },
+  typeGroupHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
+  typeGroupDot:    { width: 7, height: 7, borderRadius: 3.5 },
+  typeGroupLabel:  { fontSize: 15, fontWeight: '900', flex: 1 },
+  typeGroupCount:  { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  typeGroupSeeAll: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.07)' },
+  typeGroupSeeAllTxt: { fontSize: 12, fontWeight: '700', color: '#aaa' },
+
+  // What's On pulse cards
+  pulseCard:     { width: 210, backgroundColor: '#16181C', borderRadius: 18, padding: 14, gap: 8, borderWidth: 1 },
+  pulseTypePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 9, alignSelf: 'flex-start' },
+  pulseDot:      { width: 6, height: 6, borderRadius: 3 },
+  pulseTypeLabel:{ fontSize: 11, fontWeight: '700' },
+  pulseSpotName: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  pulseCity:     { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: -4 },
+  pulseMsg:      { color: '#ccc', fontSize: 13, lineHeight: 19 },
+  pulseTime:     { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
+  pulseDirBtn:   { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: BOND_PINK + '20', borderWidth: 1, borderColor: BOND_PINK + '55' },
+  pulseDirTxt:   { color: '#bba8ff', fontSize: 12, fontWeight: '800' },
+  sectionHint:   { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginLeft: 'auto' },
 });

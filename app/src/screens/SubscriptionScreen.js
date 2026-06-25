@@ -1,336 +1,182 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Alert, Animated, Dimensions,
+  TouchableOpacity, Alert, Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { usePremium, TIERS } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
 
-const { width } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 
-// Set to false when real StoreKit IAP is integrated
-const IS_BETA = true;
-
-const FEATURES = {
-  free: [
-    { label: '🤝 Bond — basic request, 5/day', has: true },
-    { label: '➕ Follow anyone', has: true },
-    { label: '💬 Message bonded users', has: true },
-    { label: 'Group chats (8 categories)', has: true },
-    { label: 'Explore spots worldwide', has: true },
-    { label: '3 gifts per day', has: true },
-    { label: '1 Random Connect per day', has: true },
-    { label: 'Join up to 3 events', has: true },
-    { label: '💜 Bond+ with personal intro note', has: false },
-    { label: '💜 Message anyone (not just bonded)', has: false },
-    { label: 'Premium badge on profile', has: false },
-    { label: '⚡ Priority Bond — top of inbox', has: false },
-  ],
-  plus: [
-    { label: 'Everything in Free', has: true },
-    { label: '💜 Bond+ — personal intro note (150 chars)', has: true },
-    { label: '💜 Follow+ — badge shown on notification', has: true },
-    { label: '💜 Message+ anyone, bonded or not', has: true },
-    { label: 'Unlimited gifts', has: true },
-    { label: '5 Random Connects per day', has: true },
-    { label: 'Join unlimited events', has: true },
-    { label: '💜 Premium badge on profile', has: true },
-    { label: 'Priority in People list', has: true },
-    { label: 'See who viewed your profile', has: true },
-    { label: '⚡ Priority Bond — top of inbox', has: false },
-    { label: 'Create & host events', has: false },
-  ],
-  pro: [
-    { label: 'Everything in Plus', has: true },
-    { label: '⚡ Priority Bond — pinned top of inbox', has: true },
-    { label: '⚡ Priority Follow — shown first in notifications', has: true },
-    { label: '⚡ Priority Message — shown at top of inbox', has: true },
-    { label: 'Intro note up to 300 chars with bond request', has: true },
-    { label: 'Unlimited Random Connects', has: true },
-    { label: 'Create & host virtual events', has: true },
-    { label: 'Language Exchange matching', has: true },
-    { label: '🌟 Verified badge', has: true },
-    { label: 'Voice translation in calls', has: true },
-    { label: 'Pin 5 favorite spots', has: true },
-    { label: 'Priority support + early access', has: true },
-  ],
-};
-
-const YEARLY_DISCOUNT = 0.35; // 35% off
-
-function TierCard({ tierId, currentTier, billing, onPress, loading, animValue }) {
-  const t = TIERS[tierId];
-  const features = FEATURES[tierId];
-  const isActive = currentTier === tierId;
-  const isLoading = loading === tierId;
-  const isFree  = tierId === 'free';
-  const isPlus  = tierId === 'plus';
-  const isPro   = tierId === 'pro';
-
-  const monthlyPrice = isFree ? 0 : parseFloat(t.price.replace('$', '').replace('/mo', ''));
-  const displayPrice = isFree
-    ? 'Free'
-    : IS_BETA
-    ? 'Free during beta'
-    : billing === 'yearly'
-    ? `$${(monthlyPrice * (1 - YEARLY_DISCOUNT)).toFixed(2)}/mo`
-    : t.price;
-  const yearlyTotal = (isFree || IS_BETA) ? null : billing === 'yearly'
-    ? `$${(monthlyPrice * (1 - YEARLY_DISCOUNT) * 12).toFixed(0)}/yr`
-    : null;
-
-  const scale = animValue.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] });
-  const opacity = animValue.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-
-  const cardBorderColor = isActive ? t.color : isPro ? t.color + '55' : '#2F3336';
-  const cardBg = isPro ? '#1C1F23' : '#16181C';
-
-  const btnLabel = isLoading
-    ? 'Processing…'
-    : isActive
-    ? 'Current Plan'
-    : isFree
-    ? 'Downgrade to Free'
-    : IS_BETA
-    ? `Activate ${t.label.replace('WorldBond ', 'Bond ')} Free`
-    : `Get ${t.label.replace('WorldBond ', '')}`;
-
-  return (
-    <Animated.View style={[{ opacity, transform: [{ scale }] }]}>
-      <TouchableOpacity
-        style={[styles.card, { borderColor: cardBorderColor, backgroundColor: cardBg }]}
-        onPress={() => onPress(tierId)}
-        activeOpacity={0.85}
-        disabled={isActive}
-      >
-        {isPlus && (
-          <LinearGradient
-            colors={['#FF0080', '#CC0060']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.popularBadge}
-          >
-            <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
-          </LinearGradient>
-        )}
-        {isPro && (
-          <LinearGradient
-            colors={['#FFB700', '#D99500']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.popularBadge}
-          >
-            <Text style={styles.popularBadgeText}>⚡  ELITE</Text>
-          </LinearGradient>
-        )}
-
-        <View style={styles.cardTop}>
-          <View>
-            <Text style={[styles.tierName, { color: t.color }]}>
-              {t.label.replace('WorldBond ', 'Bond ')}
-            </Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceText}>{displayPrice}</Text>
-              {yearlyTotal && (
-                <Text style={styles.yearlyTotal}>{yearlyTotal}</Text>
-              )}
-            </View>
-            {!isFree && billing === 'yearly' && (
-              <Text style={styles.savingsBadge}>Save 35%</Text>
-            )}
-          </View>
-
-          {isActive && (
-            <View style={[styles.activePill, { backgroundColor: t.color + '22', borderColor: t.color }]}>
-              <Text style={[styles.activePillText, { color: t.color }]}>Active</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.featureList}>
-          {features.map((f, i) => (
-            <View key={i} style={styles.featureRow}>
-              <Text style={[styles.featureIcon, f.has ? { color: t.color } : styles.featureIconNo]}>
-                {f.has ? '✓' : '✕'}
-              </Text>
-              <Text style={[styles.featureLabel, !f.has && styles.featureLabelNo]}>
-                {f.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {isActive ? (
-          <View style={[styles.btn, { backgroundColor: t.color + '18', borderWidth: 1, borderColor: t.color }]}>
-            <Text style={[styles.btnText, { color: t.color }]}>Current Plan</Text>
-          </View>
-        ) : isPro ? (
-          <LinearGradient
-            colors={['#FFB700', '#D99500']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.btn}
-          >
-            <Text style={styles.btnText}>{btnLabel}</Text>
-          </LinearGradient>
-        ) : isFree ? (
-          <TouchableOpacity
-            style={[styles.btn, { backgroundColor: '#2F3336', borderWidth: 1, borderColor: '#333' }]}
-            onPress={() => onPress(tierId)}
-            disabled={isActive}
-          >
-            <Text style={[styles.btnText, { color: '#666' }]}>{btnLabel}</Text>
-          </TouchableOpacity>
-        ) : (
-          <LinearGradient
-            colors={['#FF0080', '#CC0060']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.btn}
-          >
-            <Text style={styles.btnText}>{btnLabel}</Text>
-          </LinearGradient>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
+const PASS_FEATURES = [
+  { icon: '♾️',  text: 'Unlimited daily connects'                        },
+  { icon: '✍️',  text: '150-char personal note with every bond request'  },
+  { icon: '💬',  text: 'Message anyone — bonded or not'                  },
+  { icon: '💸',  text: '75% gift payout rate (vs 50% standard)'          },
+  { icon: '📡',  text: '5 Random Connects per day'                       },
+  { icon: '🎛️',  text: 'Advanced matching filters (gender, vibe)'        },
+  { icon: '🎪',  text: 'Create & host events'                            },
+  { icon: '⭐',  text: 'Bond Pass badge on your profile'                  },
+];
 
 export default function SubscriptionScreen({ navigation }) {
-  const { tier, upgradeTo, cancelSubscription } = usePremium();
-  const [loading, setLoading] = useState(null);
-  const [billing, setBilling] = useState('monthly');
+  const { hasBondPass, subscribeToBondPass, cancelBondPass } = useBondPass();
+  const [loading, setLoading] = useState(false);
 
   const heroAnim = useRef(new Animated.Value(0)).current;
-  const cardAnims = useRef([0, 1, 2].map(() => new Animated.Value(0))).current;
-  const toggleAnim = useRef(new Animated.Value(0)).current;
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  const pulse    = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
-      Animated.timing(heroAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.stagger(120, cardAnims.map(a =>
-        Animated.spring(a, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true })
-      )),
+      Animated.timing(heroAnim, { toValue: 1, duration: 550, useNativeDriver: true }),
+      Animated.spring(cardAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
     ]).start();
-  }, []);
 
-  function toggleBilling(b) {
-    setBilling(b);
-    Animated.timing(toggleAnim, {
-      toValue: b === 'yearly' ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  async function handlePress(tierId) {
-    if (tierId === tier) return;
-    if (tierId === 'free') {
-      Alert.alert(
-        'Cancel Subscription',
-        'Are you sure you want to go back to the free plan?',
-        [
-          { text: 'Keep Premium', style: 'cancel' },
-          { text: 'Downgrade', style: 'destructive', onPress: async () => { await cancelSubscription(); } },
-        ],
-      );
-      return;
+    if (hasBondPass) {
+      Animated.loop(Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.06, duration: 2000, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.00, duration: 2000, useNativeDriver: true }),
+      ])).start();
     }
-    setLoading(tierId);
+  }, [hasBondPass]);
+
+  async function handleSubscribe() {
+    setLoading(true);
+    // Production: replace with RevenueCat / StoreKit purchase
     await new Promise(r => setTimeout(r, 1200));
-    await upgradeTo(tierId);
-    setLoading(null);
-    const t = TIERS[tierId];
+    await subscribeToBondPass();
+    setLoading(false);
     Alert.alert(
-      '🎉 Welcome!',
-      `You're now on ${t.label.replace('WorldBond ', 'Bond ')}. Enjoy your new perks!`,
+      '⚡ Bond Pass Active',
+      'Unlimited connects, priority features, and 75% payout rate — all yours.',
       [{ text: "Let's go!", onPress: () => navigation.goBack() }],
     );
   }
 
-  const heroTranslate = heroAnim.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] });
-  const heroOpacity = heroAnim;
+  async function handleCancel() {
+    Alert.alert(
+      'Cancel Bond Pass?',
+      'You will lose access to Bond Pass features at the end of your billing period.',
+      [
+        { text: 'Keep Bond Pass', style: 'cancel' },
+        { text: 'Cancel', style: 'destructive', onPress: async () => {
+          await cancelBondPass();
+          navigation.goBack();
+        }},
+      ],
+    );
+  }
 
-  const toggleKnobX = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 98] });
+  const heroTranslate = heroAnim.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] });
+  const cardScale     = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] });
+  const cardOpacity   = cardAnim;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backArrow}>←</Text>
+    <SafeAreaView style={s.container}>
+
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+          <Text style={s.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Choose Your Plan</Text>
+        <Text style={s.headerTitle}>Bond Pass</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Hero */}
-        <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ translateY: heroTranslate }] }]}>
-          <LinearGradient
-            colors={['#FF008022', '#FFB70011', '#000000']}
-            style={styles.heroBg}
-          >
-            <Text style={styles.heroGlobe}>🌍</Text>
-            <Text style={styles.heroTitle}>Bond Without Limits</Text>
-            <Text style={styles.heroSub}>
-              Connect deeper with people around the world — get more gifts, events, and features
+        {/* ── Hero ── */}
+        <Animated.View style={[s.hero, { opacity: heroAnim, transform: [{ translateY: heroTranslate }] }]}>
+          <LinearGradient colors={[BOND_PINK + '22', BOND_PINK + '08', '#000000']} style={s.heroBg}>
+            <Text style={s.heroGlobe}>🌍</Text>
+            <Text style={s.heroTitle}>Bond Without Limits</Text>
+            <Text style={s.heroSub}>
+              One plan · every feature · no tiers to worry about
             </Text>
           </LinearGradient>
         </Animated.View>
 
-        {/* Billing Toggle (hidden during beta) */}
-        {!IS_BETA && (
-          <View style={styles.toggleWrap}>
-            <TouchableOpacity onPress={() => toggleBilling('monthly')} style={styles.toggleLabel}>
-              <Text style={[styles.toggleText, billing === 'monthly' && styles.toggleTextActive]}>
-                Monthly
-              </Text>
-            </TouchableOpacity>
+        {/* ── Plan card ── */}
+        <Animated.View style={{ opacity: cardOpacity, transform: [{ scale: cardScale }] }}>
+          <View style={[s.card, hasBondPass && s.cardActive]}>
 
-            <TouchableOpacity
-              style={styles.toggleTrack}
-              onPress={() => toggleBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
-              activeOpacity={0.8}
-            >
-              <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: toggleKnobX }] }]} />
-            </TouchableOpacity>
+            {hasBondPass && (
+              <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.activeBadge}>
+                <Text style={s.activeBadgeText}>⚡  ACTIVE</Text>
+              </LinearGradient>
+            )}
 
-            <TouchableOpacity onPress={() => toggleBilling('yearly')} style={styles.toggleLabel}>
-              <Text style={[styles.toggleText, billing === 'yearly' && styles.toggleTextActive]}>
-                Yearly
-              </Text>
-              <View style={styles.savePill}>
-                <Text style={styles.savePillText}>-35%</Text>
+            <View style={s.priceRow}>
+              <Text style={s.planName}>Bond Pass</Text>
+              <View style={s.pricePill}>
+                <Text style={s.priceAmount}>$4.99</Text>
+                <Text style={s.pricePer}>/month</Text>
               </View>
+            </View>
+
+            <View style={s.divider} />
+
+            <View style={s.featureList}>
+              {PASS_FEATURES.map((f, i) => (
+                <View key={i} style={s.featureRow}>
+                  <Text style={s.featureIcon}>{f.icon}</Text>
+                  <Text style={s.featureText}>{f.text}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={s.divider} />
+
+            {hasBondPass ? (
+              <Animated.View style={{ transform: [{ scale: pulse }] }}>
+                <View style={s.activeState}>
+                  <Text style={s.activeStateText}>✓  Bond Pass is active</Text>
+                </View>
+              </Animated.View>
+            ) : (
+              <TouchableOpacity
+                style={[s.ctaWrap, loading && { opacity: 0.6 }]}
+                onPress={handleSubscribe}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.ctaGrad}>
+                  <Text style={s.ctaText}>{loading ? 'Processing…' : 'Get Bond Pass  →'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* ── Free plan comparison ── */}
+        <View style={s.freeCard}>
+          <Text style={s.freePlanName}>Free Plan — what you get without Bond Pass</Text>
+          <View style={s.freeList}>
+            {[
+              '5 daily connects',
+              'Message bonded users only',
+              '50% gift payout rate',
+              '1 Random Connect per day',
+              'Join up to 3 events',
+            ].map((line, i) => (
+              <View key={i} style={s.freeRow}>
+                <Text style={s.freeDot}>·</Text>
+                <Text style={s.freeText}>{line}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* ── Cancel / footer ── */}
+        <View style={s.footer}>
+          {hasBondPass ? (
+            <TouchableOpacity onPress={handleCancel} style={s.cancelBtn}>
+              <Text style={s.cancelText}>Cancel Bond Pass</Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {IS_BETA && (
-          <View style={styles.betaBanner}>
-            <Text style={styles.betaBannerText}>All features are free during beta!</Text>
-          </View>
-        )}
-
-        {/* Cards */}
-        {['free', 'plus', 'pro'].map((tierId, i) => (
-          <TierCard
-            key={tierId}
-            tierId={tierId}
-            currentTier={tier}
-            billing={billing}
-            onPress={handlePress}
-            loading={loading}
-            animValue={cardAnims[i]}
-          />
-        ))}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          {IS_BETA
-            ? <Text style={styles.footerLine}>Free during beta · Subscription pricing coming soon</Text>
-            : <Text style={styles.footerLine}>🔒  Payments secured by App Store · Cancel anytime</Text>
-          }
-          <Text style={styles.footerBrand}>Bond — connecting humanity, one conversation at a time 🌍</Text>
+          ) : (
+            <Text style={s.footerNote}>Cancel anytime · Payments secured by App Store</Text>
+          )}
+          <Text style={s.footerBrand}>Bond — connecting humanity, one conversation at a time 🌍</Text>
         </View>
 
       </ScrollView>
@@ -338,7 +184,7 @@ export default function SubscriptionScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
 
   header: {
@@ -346,94 +192,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: '#1C1F23',
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backArrow: { color: '#6C47FF', fontSize: 24, fontWeight: '300' },
+  backBtn:     { width: 40, height: 40, justifyContent: 'center' },
+  backArrow:   { color: BOND_PINK, fontSize: 24, fontWeight: '300' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
 
-  scroll: { paddingBottom: 40 },
+  scroll: { paddingBottom: 48 },
 
-  hero: { marginBottom: 8 },
-  heroBg: {
-    alignItems: 'center', paddingTop: 32, paddingBottom: 24, paddingHorizontal: 24,
-  },
+  // Hero
+  hero:      { marginBottom: 4 },
+  heroBg:    { alignItems: 'center', paddingTop: 32, paddingBottom: 24, paddingHorizontal: 24 },
   heroGlobe: { fontSize: 64 },
-  heroTitle: {
-    color: '#fff', fontSize: 26, fontWeight: '800',
-    marginTop: 12, textAlign: 'center', letterSpacing: -0.5,
-  },
-  heroSub: {
-    color: '#888', fontSize: 14, marginTop: 10,
-    textAlign: 'center', lineHeight: 21, maxWidth: 300,
-  },
+  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 12, textAlign: 'center', letterSpacing: -0.5 },
+  heroSub:   { color: '#666666', fontSize: 14, marginTop: 10, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
 
-  toggleWrap: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 12, marginBottom: 20,
-  },
-  toggleLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  toggleText: { color: '#555', fontSize: 14, fontWeight: '600' },
-  toggleTextActive: { color: '#fff' },
-  toggleTrack: {
-    width: 52, height: 28, backgroundColor: '#2F3336',
-    borderRadius: 14, justifyContent: 'center',
-    borderWidth: 1, borderColor: '#2F3336',
-  },
-  toggleKnob: {
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#6C47FF', position: 'absolute', left: 2,
-  },
-  savePill: {
-    backgroundColor: '#6C47FF', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  savePillText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-
+  // Plan card
   card: {
-    marginHorizontal: 16, marginBottom: 16, borderRadius: 20,
-    borderWidth: 1.5, padding: 20, overflow: 'hidden',
+    marginHorizontal: 16, marginBottom: 16,
+    borderRadius: 22, borderWidth: 1.5, padding: 22,
+    backgroundColor: '#0f1016', borderColor: '#1e2028', overflow: 'hidden',
   },
+  cardActive: { borderColor: BOND_PINK + '55', backgroundColor: '#0f0a12' },
 
-  popularBadge: {
-    alignSelf: 'flex-start', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 5, marginBottom: 12,
-  },
-  popularBadgeText: { color: '#000', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  activeBadge:     { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 14 },
+  activeBadgeText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
 
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  tierName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 },
-  priceText: { color: '#fff', fontSize: 22, fontWeight: '700' },
-  yearlyTotal: { color: '#666', fontSize: 13 },
-  savingsBadge: {
-    color: '#4ade80', fontSize: 11, fontWeight: '700', marginTop: 3,
-  },
+  priceRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  planName:    { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
+  pricePill:   { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  priceAmount: { color: BOND_PINK, fontSize: 26, fontWeight: '900' },
+  pricePer:    { color: '#555555', fontSize: 14, fontWeight: '600' },
 
-  activePill: {
-    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1,
-  },
-  activePillText: { fontSize: 12, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: '#1e2028', marginVertical: 16 },
 
-  divider: { height: 1, backgroundColor: '#2F3336', marginVertical: 14 },
+  featureList: { gap: 13, marginBottom: 4 },
+  featureRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  featureIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  featureText: { color: '#cccccc', fontSize: 14, lineHeight: 20, flex: 1 },
 
-  featureList: { gap: 9, marginBottom: 18 },
-  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  featureIcon: { fontSize: 13, fontWeight: '700', width: 16, marginTop: 1 },
-  featureIconNo: { color: '#333' },
-  featureLabel: { color: '#ccc', fontSize: 13, lineHeight: 19, flex: 1 },
-  featureLabelNo: { color: '#444' },
+  ctaWrap: { borderRadius: 16, overflow: 'hidden' },
+  ctaGrad: { paddingVertical: 18, alignItems: 'center' },
+  ctaText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
 
-  btn: {
-    borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
-  },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  activeState:     { backgroundColor: BOND_PINK + '15', borderWidth: 1, borderColor: BOND_PINK + '40', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  activeStateText: { color: BOND_PINK, fontSize: 15, fontWeight: '800' },
 
-  betaBanner: {
-    marginHorizontal: 16, marginBottom: 16, backgroundColor: '#6C47FF18',
-    borderWidth: 1, borderColor: '#6C47FF40', borderRadius: 14,
-    paddingVertical: 10, alignItems: 'center',
-  },
-  betaBannerText: { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  // Free comparison card
+  freeCard:    { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0a0a0a', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#1a1a1a' },
+  freePlanName:{ color: '#444444', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
+  freeList:    { gap: 8 },
+  freeRow:     { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  freeDot:     { color: '#333333', fontSize: 16, fontWeight: '900', lineHeight: 20 },
+  freeText:    { color: '#444444', fontSize: 13, lineHeight: 19 },
 
-  footer: { alignItems: 'center', gap: 6, paddingHorizontal: 24, marginTop: 8 },
-  footerLine: { color: '#444', fontSize: 12, textAlign: 'center' },
-  footerBrand: { color: '#333', fontSize: 11, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
+  // Footer
+  footer:      { alignItems: 'center', gap: 8, paddingHorizontal: 24, marginTop: 4 },
+  footerNote:  { color: '#333333', fontSize: 12, textAlign: 'center' },
+  footerBrand: { color: '#2a2a2a', fontSize: 11, textAlign: 'center', fontStyle: 'italic' },
+  cancelBtn:   { paddingVertical: 10 },
+  cancelText:  { color: '#ef4444', fontSize: 14, fontWeight: '600', textAlign: 'center' },
 });

@@ -12,8 +12,10 @@ import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
 import GiftPicker from '../components/GiftPicker';
 import GiftBurst from '../components/GiftBurst';
+import WorldDrop, { isLegendGift } from '../components/WorldDrop';
 
 const { width, height } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
 
 export default function LiveWatchScreen({ route, navigation }) {
@@ -25,6 +27,7 @@ export default function LiveWatchScreen({ route, navigation }) {
   const [viewerCount, setViewerCount] = useState(stream?.viewerCount || 0);
   const [floats,      setFloats]      = useState([]);
   const [bursts,      setBursts]      = useState([]);
+  const [drops,       setDrops]       = useState([]);
   const [text,        setText]        = useState('');
   const [ended,       setEnded]       = useState(false);
   const [giftOpen,    setGiftOpen]    = useState(false);
@@ -58,9 +61,13 @@ export default function LiveWatchScreen({ route, navigation }) {
       setFloats(prev => [...prev, { emoji, id }]);
     });
 
-    socket.on('live_gift_received', ({ senderName, senderCountry, gift }) => {
+    socket.on('live_gift_received', ({ senderName, senderCountry, gift, isStampHolder }) => {
       const id = `${Date.now()}-${Math.random()}`;
-      setBursts(prev => [...prev, { id, senderName, senderCountry, gift }]);
+      if (isLegendGift(gift.id)) {
+        setDrops(prev => [...prev, { id, senderName, senderCountry, gift, isStampHolder }]);
+      } else {
+        setBursts(prev => [...prev, { id, senderName, senderCountry, gift }]);
+      }
     });
 
     socket.on('live_ended', ({ streamId }) => {
@@ -99,6 +106,7 @@ export default function LiveWatchScreen({ route, navigation }) {
 
   function removeFloat(id)  { setFloats(prev => prev.filter(f => f.id !== id)); }
   function removeBurst(id)  { setBursts(prev => prev.filter(b => b.id !== id)); }
+  function removeDrop(id)   { setDrops(prev =>  prev.filter(d => d.id !== id)); }
 
   const avatarColor = stringToColor(stream?.hostName || '');
 
@@ -137,6 +145,13 @@ export default function LiveWatchScreen({ route, navigation }) {
         <FloatingReaction key={f.id} emoji={f.emoji} id={f.id} onDone={removeFloat} />
       ))}
 
+      {/* Burst zone — absolute, centered on screen above chat */}
+      <View style={styles.burstZone} pointerEvents="none">
+        {bursts.map(b => (
+          <GiftBurst key={b.id} burst={b} onDone={removeBurst} />
+        ))}
+      </View>
+
       <SafeAreaView style={styles.overlay}>
 
         {/* ── Top bar ── */}
@@ -163,67 +178,91 @@ export default function LiveWatchScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* ── Chat + gift bursts ── */}
-        <View style={styles.chatArea}>
-          <FlatList
-            ref={flatRef}
-            data={messages}
-            keyExtractor={m => String(m.id)}
-            style={{ flex: 1 }}
-            renderItem={({ item }) => {
-              const isMine = item.senderId === socket.id;
-              return (
-                <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
-                  <Text style={styles.msgName}>{item.senderName}</Text>
-                  <Text style={styles.msgText}> {item.text}</Text>
-                  {item.wasTranslated && <Text style={styles.translated}> 🌐</Text>}
-                </View>
-              );
-            }}
-            contentContainerStyle={styles.chatList}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
-          />
+        {/* Transparent spacer — host fully visible through here */}
+        <View style={{ flex: 1 }} pointerEvents="none" />
 
-          {/* Global Drop burst zone — floats above chat, centered */}
-          <View style={styles.burstZone} pointerEvents="none">
-            {bursts.map(b => (
-              <GiftBurst key={b.id} burst={b} onDone={removeBurst} />
+        {/* ── Bottom section — chat + controls ── */}
+        <View>
+          {/* Chat messages — max 34% height so host stays visible above */}
+          <View style={styles.chatArea}>
+            <FlatList
+              ref={flatRef}
+              data={messages}
+              keyExtractor={m => String(m.id)}
+              renderItem={({ item, index }) => {
+                const nameColor = stringToColor(item.senderName || '');
+                const distFromEnd = messages.length - 1 - index;
+                const opacity = distFromEnd <= 2 ? 1 : distFromEnd <= 5 ? 0.72 : 0.44;
+                return (
+                  <View style={[styles.msgRow, { opacity }]}>
+                    <View style={[styles.msgAccent, { backgroundColor: nameColor }]} />
+                    <View style={styles.msgBody}>
+                      <View style={styles.msgMeta}>
+                        {item.senderCountry ? <Text style={styles.msgFlag}>{item.senderCountry}</Text> : null}
+                        <Text style={[styles.msgName, { color: nameColor }]}>{item.senderName}</Text>
+                      </View>
+                      <Text style={styles.msgText}>{item.text}</Text>
+                      {item.wasTranslated ? <Text style={styles.translated}>🌐</Text> : null}
+                    </View>
+                  </View>
+                );
+              }}
+              contentContainerStyle={styles.chatList}
+              showsVerticalScrollIndicator={false}
+              onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
+            />
+          </View>
+
+          {/* ── Reactions ── */}
+          <View style={styles.reactBar}>
+            {REACTIONS.map(e => (
+              <TouchableOpacity key={e} style={styles.reactBtn} onPress={() => sendReaction(e)}>
+                <Text style={styles.reactEmoji}>{e}</Text>
+              </TouchableOpacity>
             ))}
           </View>
-        </View>
 
-        {/* ── Reactions ── */}
-        <View style={styles.reactBar}>
-          {REACTIONS.map(e => (
-            <TouchableOpacity key={e} style={styles.reactBtn} onPress={() => sendReaction(e)}>
-              <Text style={styles.reactEmoji}>{e}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+          {/* ── Bond Gift strip — unmissable, WorldBond exclusive ── */}
+          <TouchableOpacity onPress={() => setGiftOpen(true)} activeOpacity={0.8}>
+            <LinearGradient
+              colors={['rgba(20,8,46,0.97)', 'rgba(8,3,20,0.97)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.giftStrip}
+            >
+              <WorldMark size={20} color="#FFB700" bondColor="#FFB700" />
+              <View style={styles.giftStripText}>
+                <Text style={styles.giftStripLabel}>BOND GIFT</Text>
+                <Text style={styles.giftStripSub}>WorldBond exclusive</Text>
+              </View>
+              <View style={{ flex: 1 }} />
+              <View style={styles.giftStripBalance}>
+                <View style={styles.giftStripDot} />
+                <Text style={styles.giftStripBalanceTxt}>{balance.toLocaleString()} BC</Text>
+              </View>
+              <Text style={styles.giftStripArrow}>›</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-        {/* ── Input + gift button ── */}
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.inputBar}>
-            <TouchableOpacity style={styles.giftBtn} onPress={() => setGiftOpen(true)} activeOpacity={0.8}>
-              <WorldMark size={22} color="#FFB700" bondColor="#FFB700" />
-            </TouchableOpacity>
-            <TextInput
-              style={styles.input}
-              placeholder="Comment…"
-              placeholderTextColor="rgba(255,255,255,0.3)"
-              value={text}
-              onChangeText={setText}
-              onSubmitEditing={sendMessage}
-              returnKeyType="send"
-            />
-            {text.trim() ? (
-              <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-                <Text style={styles.sendIcon}>➤</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </KeyboardAvoidingView>
+          {/* ── Input ── */}
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={styles.inputBar}>
+              <TextInput
+                style={styles.input}
+                placeholder="Comment…"
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={text}
+                onChangeText={setText}
+                onSubmitEditing={sendMessage}
+                returnKeyType="send"
+              />
+              {text.trim() ? (
+                <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
+                  <Text style={styles.sendIcon}>➤</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
 
       </SafeAreaView>
 
@@ -233,6 +272,10 @@ export default function LiveWatchScreen({ route, navigation }) {
         onSend={sendGift}
         hostName={stream?.hostName}
       />
+
+      {drops.map(d => (
+        <WorldDrop key={d.id} drop={d} onDone={removeDrop} />
+      ))}
     </View>
   );
 }
@@ -261,28 +304,39 @@ const styles = StyleSheet.create({
   viewerCount:  { color: '#fff', fontSize: 13, fontWeight: '700' },
   timerText:    { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
 
-  chatArea:     { flex: 1, justifyContent: 'flex-end' },
-  chatList:     { padding: 12, gap: 6 },
-  msgRow:       { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 7, alignSelf: 'flex-start', maxWidth: '85%' },
-  msgRowMine:   { borderLeftWidth: 2, borderLeftColor: '#6C47FF' },
-  msgName:      { color: '#6C47FF', fontWeight: '700', fontSize: 13 },
-  msgText:      { color: '#fff', fontSize: 13 },
-  translated:   { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
-  burstZone:    { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10 },
+  chatArea:     { maxHeight: height * 0.34, justifyContent: 'flex-end' },
+  chatList:     { padding: 10, gap: 5 },
+  msgRow:       { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.48)', borderRadius: 14, overflow: 'hidden', alignSelf: 'flex-start', maxWidth: '86%' },
+  msgAccent:    { width: 2, opacity: 0.6 },
+  msgBody:      { flex: 1, paddingVertical: 9, paddingLeft: 10, paddingRight: 12, gap: 3 },
+  msgMeta:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  msgFlag:      { fontSize: 12 },
+  msgName:      { fontSize: 12, fontWeight: '800' },
+  msgText:      { color: '#fff', fontSize: 14, lineHeight: 20 },
+  translated:   { color: 'rgba(255,255,255,0.35)', fontSize: 10 },
+  burstZone:    { position: 'absolute', top: height * 0.2, left: 0, right: 0, zIndex: 10 },
+
+  giftStrip:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#FFB70022' },
+  giftStripText:    { gap: 2 },
+  giftStripLabel:   { color: '#FFB700', fontSize: 12, fontWeight: '900', letterSpacing: 1.2 },
+  giftStripSub:     { color: 'rgba(255,183,0,0.45)', fontSize: 10, fontWeight: '600' },
+  giftStripBalance: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,183,0,0.1)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,183,0,0.2)' },
+  giftStripDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFB700' },
+  giftStripBalanceTxt: { color: '#FFB700', fontSize: 12, fontWeight: '800' },
+  giftStripArrow:   { color: 'rgba(255,183,0,0.5)', fontSize: 20, fontWeight: '300' },
 
   reactBar:     { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 8 },
   reactBtn:     { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   reactEmoji:   { fontSize: 22 },
 
   inputBar:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  giftBtn:      { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,183,0,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFB70035' },
   input:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', color: '#fff', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontSize: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
   endedScreen:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   endedTitle:   { color: '#fff', fontSize: 24, fontWeight: '900' },
   endedSub:     { color: '#666', fontSize: 14, marginBottom: 20 },
-  endedBtn:     { backgroundColor: '#6C47FF', borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
+  endedBtn:     { backgroundColor: BOND_PINK, borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
   endedBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

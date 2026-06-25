@@ -49,10 +49,9 @@ const storage = cloudinaryEnabled
 
 const upload = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 120 * 1024 * 1024 }, // 120 MB — covers videos up to ~60s
   fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
-    cb(null, allowed.includes(file.mimetype) || file.mimetype.startsWith('image/'));
+    cb(null, file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/'));
   },
 });
 
@@ -90,9 +89,9 @@ app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, 
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
   try {
-    const { username, userId, country, language, mood, caption, filter } = req.body;
+    const { username, userId, country, postCountry, language, mood, caption, filter } = req.body;
     const imageUrl = await resolveImageUrl(req, 'photos');
-    const photo = addPhoto({ userId, username, country, language, mood, imageUrl, caption, filter });
+    const photo = addPhoto({ userId, username, country, postCountry: postCountry || null, language, mood, imageUrl, caption, filter });
 
     const ioInstance = req.app.get('io');
     ioInstance.emit('new_photo', photo);

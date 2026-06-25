@@ -556,10 +556,10 @@ const styles = StyleSheet.create({
 const dob = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' },
   sheet: {
-    backgroundColor: '#0e0e1c',
+    backgroundColor: '#0a0a0a',
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     padding: 24, paddingBottom: 44,
-    borderTopWidth: 1, borderColor: '#1e1e3a',
+    borderTopWidth: 1, borderColor: '#222222',
   },
   handle:     { width: 36, height: 4, borderRadius: 2, backgroundColor: '#2F3336', alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { color: '#fff', fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
@@ -576,7 +576,7 @@ const dob = StyleSheet.create({
   actionText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
   // Confirm step
-  ageCard:    { backgroundColor: '#16162a', borderRadius: 20, padding: 20, alignItems: 'center', gap: 6, marginBottom: 16, borderWidth: 1, borderColor: '#FF008033' },
+  ageCard:    { backgroundColor: '#16181C', borderRadius: 20, padding: 20, alignItems: 'center', gap: 6, marginBottom: 16, borderWidth: 1, borderColor: '#FF008033' },
   ageDate:    { color: '#fff', fontSize: 18, fontWeight: '700' },
   ageNum:     { color: '#FF0080', fontSize: 14, fontWeight: '600' },
 
@@ -584,8 +584,8 @@ const dob = StyleSheet.create({
   warningTitle: { color: '#f04747', fontSize: 13, fontWeight: '900', marginBottom: 8, letterSpacing: 0.2 },
   warningText:  { color: '#aaa', fontSize: 12, lineHeight: 19 },
 
-  confirmCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, backgroundColor: '#16162a', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#2F3336' },
-  confirmCardOn: { borderColor: '#FF0080', backgroundColor: '#1a1535' },
+  confirmCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, backgroundColor: '#16181C', borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: '#2F3336' },
+  confirmCardOn: { borderColor: '#FF0080', backgroundColor: '#130810' },
   checkbox:    { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#2F3336', backgroundColor: '#16181C', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkboxOn:  { backgroundColor: '#FF0080', borderColor: '#FF0080' },
   checkmark:   { color: '#fff', fontSize: 13, fontWeight: '800' },

@@ -6,7 +6,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { WorldMark } from '../../components/BondLogo';
 
-const { width: SW } = Dimensions.get('window');
+const { width: SW, height: SH } = Dimensions.get('window');
 
 const AMBER   = '#FF0080';
 const AMBER_D = '#CC0060';

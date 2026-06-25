@@ -15,10 +15,10 @@ import { getAccessToken } from '../services/authApi';
 import { stringToColor, timeAgo } from '../utils/apiUtils';
 import FilteredImage from '../components/FilteredImage';
 import FilterPicker from '../components/FilterPicker';
-import StoryViewer from '../components/StoryViewer';
 import { WorldMark } from '../components/BondLogo';
 
 const { width } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -92,21 +92,16 @@ function WorldEntryCard({ photo, user, onComment, onProfile, onFollow, following
     lastTap.current = now;
   }
 
-  const isOwn      = photo.userId === myUid;
-  const lastComment = photo.comments?.length > 0
-    ? photo.comments[photo.comments.length - 1]
-    : null;
+  const isOwn = photo.userId === myUid;
+
+  function handleEcho() {
+    socket.emit('echo_photo', { photoId: photo.id });
+    setEchoed(e => !e);
+    setEchoCount(c => echoed ? c - 1 : c + 1);
+  }
 
   return (
     <View style={we.card}>
-
-      {/* Echo attribution — "[name] echoed" above the thread */}
-      {!!photo._echoAttrib && (
-        <View style={we.echoAttrib}>
-          <Text style={we.echoAttribIcon}>🔊</Text>
-          <Text style={we.echoAttribTxt}>{photo._echoAttrib} echoed</Text>
-        </View>
-      )}
 
       {/* Stamp thread */}
       <View style={we.threadRow}>
@@ -202,54 +197,40 @@ function WorldEntryCard({ photo, user, onComment, onProfile, onFollow, following
               )}
             </TouchableOpacity>
 
-            {/* Blog-style entry caption */}
+            {/* Caption — tap to open post detail */}
             {!!photo.caption && (
-              <Text style={we.entryText}>{photo.caption}</Text>
+              <TouchableOpacity onPress={() => onComment(photo)} activeOpacity={0.85}>
+                <Text style={we.entryText}>{photo.caption}</Text>
+              </TouchableOpacity>
             )}
 
-            {/* Action bar: Mark · Notes · Echo */}
+            {/* Twitter-style action bar */}
             <View style={we.actionsBar}>
-              <TouchableOpacity style={we.actionBtn} onPress={toggleMark}>
-                <Text style={we.actionIcon}>👣</Text>
-                <Text style={[we.actionLbl, marked && we.markedLbl]}>
-                  {markCount > 0 ? `${markCount} ` : ''}Mark
-                </Text>
-              </TouchableOpacity>
-
+              {/* Comment */}
               <TouchableOpacity style={we.actionBtn} onPress={() => onComment(photo)}>
                 <Text style={we.actionIcon}>💬</Text>
-                <Text style={we.actionLbl}>
-                  {photo.comments?.length > 0 ? `${photo.comments.length} ` : ''}Notes
-                </Text>
+                {photo.comments?.length > 0 && (
+                  <Text style={we.actionCount}>{photo.comments.length}</Text>
+                )}
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={we.actionBtn}
-                onPress={() => {
-                  socket.emit('echo_photo', { photoId: photo.id });
-                  setEchoed(e => !e);
-                  setEchoCount(c => echoed ? c - 1 : c + 1);
-                }}
-              >
-                <Text style={we.actionIcon}>🔊</Text>
-                <Text style={[we.actionLbl, echoed && we.echoedLbl]}>
-                  {echoCount > 0 ? `${echoCount} ` : ''}Echo
-                </Text>
+              {/* Echo */}
+              <TouchableOpacity style={we.actionBtn} onPress={handleEcho}>
+                <Text style={[we.actionIcon, echoed ? we.echoedIcon : we.dimIcon]}>🔊</Text>
+                {echoCount > 0 && (
+                  <Text style={[we.actionCount, echoed && we.echoedCount]}>{echoCount}</Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Footprint / Like */}
+              <TouchableOpacity style={we.actionBtn} onPress={toggleMark}>
+                <Text style={[we.actionIcon, marked ? we.markedIcon : we.dimIcon]}>👣</Text>
+                {markCount > 0 && (
+                  <Text style={[we.actionCount, marked && we.markedCount]}>{markCount}</Text>
+                )}
               </TouchableOpacity>
             </View>
 
-            {/* Latest note preview */}
-            {lastComment && (
-              <TouchableOpacity onPress={() => onComment(photo)} style={we.notesPrev}>
-                {photo.comments.length > 1 && (
-                  <Text style={we.notesAll}>Read all {photo.comments.length} notes</Text>
-                )}
-                <View style={we.noteRow}>
-                  <Text style={we.noteUser}>{lastComment.username}</Text>
-                  <Text style={we.noteTxt} numberOfLines={2}> {lastComment.text}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
           </View>
 
         </View>
@@ -260,93 +241,218 @@ function WorldEntryCard({ photo, user, onComment, onProfile, onFollow, following
   );
 }
 
-// ─── Comments modal ───────────────────────────────────────────────────────────
+// ─── Post Detail (Twitter-style post view + comments) ─────────────────────────
 
-function CommentsModal({ visible, photo, user, onClose }) {
-  const [text, setText] = useState('');
+function PostDetailModal({ visible, photo, user, onClose }) {
   const socket = getSocket();
+  const myUid  = user?.userId || socket.id;
+
+  const [marked,    setMarked]    = useState(false);
+  const [markCount, setMarkCount] = useState(0);
+  const [echoed,    setEchoed]    = useState(false);
+  const [echoCount, setEchoCount] = useState(0);
+  const [text,      setText]      = useState('');
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!photo) return;
+    setMarked(photo.likes?.some(l => l.userId === myUid) ?? false);
+    setMarkCount(photo.likes?.length ?? 0);
+    setEchoed(photo.echos?.some(e => e.userId === myUid) ?? false);
+    setEchoCount(photo.echos?.length ?? 0);
+  }, [photo]);
+
+  function toggleMark() {
+    socket.emit('like_photo', { photoId: photo.id });
+    setMarked(m => !m);
+    setMarkCount(c => marked ? c - 1 : c + 1);
+  }
+
+  function toggleEcho() {
+    socket.emit('echo_photo', { photoId: photo.id });
+    setEchoed(e => !e);
+    setEchoCount(c => echoed ? c - 1 : c + 1);
+  }
+
   function submit() {
     if (!text.trim()) return;
-    socket.emit('comment_photo', { photoId: photo?.id, text: text.trim() });
+    socket.emit('comment_photo', { photoId: photo.id, text: text.trim() });
     setText('');
   }
+
   if (!photo) return null;
+
+  const authorColor = stringToColor(photo.username);
+  const photoH     = (width * 3) / 4;
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={cm.overlay}>
-        <TouchableOpacity style={cm.backdrop} activeOpacity={1} onPress={onClose} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={cm.sheet}>
-          <View style={cm.handle} />
-          <Text style={cm.title}>Notes</Text>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={pd.safe}>
+
+        {/* Header */}
+        <View style={pd.header}>
+          <TouchableOpacity onPress={onClose} style={pd.backBtn} hitSlop={{ top: 8, bottom: 8, left: 16, right: 8 }}>
+            <Text style={pd.backIcon}>←</Text>
+          </TouchableOpacity>
+          <Text style={pd.headerTitle}>Post</Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <FlatList
+            ref={scrollRef}
             data={photo.comments || []}
             keyExtractor={c => String(c.id)}
-            style={{ maxHeight: 340 }}
-            ListEmptyComponent={<Text style={cm.empty}>No notes yet — be first!</Text>}
-            renderItem={({ item }) => (
-              <View style={cm.row}>
-                <View style={[cm.av, { backgroundColor: stringToColor(item.username) }]}>
-                  <Text style={cm.avTxt}>{(item.username?.[0] ?? '?').toUpperCase()}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Text style={cm.user}>{item.username}</Text>
-                    <Text style={{ fontSize: 12 }}>{countryFlag(item.country)}</Text>
-                    <Text style={cm.time}>{timeAgo(item.createdAt)}</Text>
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 24 }}
+            ListHeaderComponent={
+              <View>
+                {/* Photo */}
+                {photo.imageUrl ? (
+                  photo.mediaType === 'video' ? (
+                    <View style={[pd.photoEmpty, { height: photoH }]}>
+                      <Text style={pd.photoEmptyFlag}>▶</Text>
+                    </View>
+                  ) : (
+                    <FilteredImage
+                      uri={photo.imageUrl}
+                      filterId={photo.filter || 'normal'}
+                      style={{ width, height: photoH }}
+                      resizeMode="cover"
+                    />
+                  )
+                ) : (
+                  <View style={[pd.photoEmpty, { height: photoH }]}>
+                    <Text style={pd.photoEmptyFlag}>{countryFlag(photo.country)}</Text>
                   </View>
-                  <Text style={cm.txt}>{item.text}</Text>
+                )}
+
+                <View style={pd.body}>
+                  {/* Author */}
+                  <View style={pd.authorRow}>
+                    <View style={[pd.avatar, { backgroundColor: authorColor }]}>
+                      <Text style={pd.avatarTxt}>{(photo.username?.[0] ?? '?').toUpperCase()}</Text>
+                      {photo.mood && <Text style={pd.mood}>{photo.mood}</Text>}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={pd.username}>{photo.username}</Text>
+                      <Text style={pd.meta}>{countryFlag(photo.country)}  {countryName(photo.country)}</Text>
+                    </View>
+                    <Text style={pd.timeStamp}>{timeAgo(photo.createdAt)}</Text>
+                  </View>
+
+                  {/* Caption */}
+                  {!!photo.caption && (
+                    <Text style={pd.caption}>{photo.caption}</Text>
+                  )}
+
+                  {/* Action bar */}
+                  <View style={pd.divider} />
+                  <View style={pd.actionsBar}>
+                    <TouchableOpacity style={pd.actionBtn} onPress={() => scrollRef.current?.scrollToEnd({ animated: true })}>
+                      <Text style={pd.actionIcon}>💬</Text>
+                      {photo.comments?.length > 0 && (
+                        <Text style={pd.actionCount}>{photo.comments.length}</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={pd.actionBtn} onPress={toggleEcho}>
+                      <Text style={[pd.actionIcon, echoed ? pd.echoedIcon : pd.dimIcon]}>🔊</Text>
+                      {echoCount > 0 && (
+                        <Text style={[pd.actionCount, echoed && pd.echoedCount]}>{echoCount}</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={pd.actionBtn} onPress={toggleMark}>
+                      <Text style={[pd.actionIcon, marked ? pd.markedIcon : pd.dimIcon]}>👣</Text>
+                      {markCount > 0 && (
+                        <Text style={[pd.actionCount, marked && pd.markedCount]}>{markCount}</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  <View style={pd.divider} />
+
+                  {photo.comments?.length > 0 && (
+                    <Text style={pd.repliesLabel}>
+                      {photo.comments.length} {photo.comments.length === 1 ? 'reply' : 'replies'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <Text style={pd.empty}>No replies yet — be first!</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={pd.commentRow}>
+                <View style={[pd.commentAv, { backgroundColor: stringToColor(item.username) }]}>
+                  <Text style={pd.commentAvTxt}>{(item.username?.[0] ?? '?').toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={pd.commentUser}>{item.username}</Text>
+                    <Text style={{ fontSize: 12 }}>{countryFlag(item.country)}</Text>
+                    <Text style={pd.commentTime}>{timeAgo(item.createdAt)}</Text>
+                  </View>
+                  <Text style={pd.commentTxt}>{item.text}</Text>
                 </View>
               </View>
             )}
           />
-          <View style={cm.inputRow}>
-            <View style={[cm.av, { backgroundColor: stringToColor(user.username) }]}>
-              <Text style={cm.avTxt}>{user.username?.[0]?.toUpperCase() || '?'}</Text>
+
+          {/* Reply input */}
+          <View style={pd.inputRow}>
+            <View style={[pd.inputAv, { backgroundColor: stringToColor(user.username) }]}>
+              <Text style={pd.inputAvTxt}>{user.username?.[0]?.toUpperCase() || '?'}</Text>
             </View>
             <TextInput
-              style={cm.input}
-              placeholder="Leave a note…"
-              placeholderTextColor="#444"
+              style={pd.input}
+              placeholder="Post your reply…"
+              placeholderTextColor="#555"
               value={text}
               onChangeText={setText}
               multiline
+              onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 200)}
             />
             <TouchableOpacity
-              style={[cm.send, !text.trim() && cm.sendOff]}
+              style={[pd.sendBtn, !text.trim() && pd.sendOff]}
               onPress={submit}
               disabled={!text.trim()}
             >
-              <Text style={cm.sendTxt}>➤</Text>
+              <Text style={pd.sendTxt}>↑</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </View>
+
+      </SafeAreaView>
     </Modal>
   );
 }
 
 // ─── Upload modal ─────────────────────────────────────────────────────────────
 
-function UploadModal({ visible, onClose, user, mode = 'photo' }) {
-  const [imageUri,     setImageUri]     = useState(null);
-  const [caption,      setCaption]      = useState('');
-  const [filter,       setFilter]       = useState('normal');
-  const [uploading,    setUploading]    = useState(false);
-  const [audience,     setAudience]     = useState('world'); // 'world' | 'bonds'
-  const [isVideo,      setIsVideo]      = useState(false);
-  const [postCountry,  setPostCountry]  = useState(null);
-  const [locDetecting, setLocDetecting] = useState(false);
-  const isStory = mode === 'story';
+function UploadModal({ visible, onClose, user }) {
+  const [imageUri,        setImageUri]        = useState(null);
+  const [caption,         setCaption]         = useState('');
+  const [filter,          setFilter]          = useState('normal');
+  const [uploading,       setUploading]       = useState(false);
+  const [isVideo,         setIsVideo]         = useState(false);
+  const [detectedCountry, setDetectedCountry] = useState(null);
+  const [pinToVisited,    setPinToVisited]    = useState(false);
+  const [locDetecting,    setLocDetecting]    = useState(false);
+
+  const isVisiting = detectedCountry && detectedCountry !== user?.country;
 
   function reset() {
     setImageUri(null); setCaption(''); setFilter('normal');
-    setUploading(false); setAudience('world'); setIsVideo(false);
-    setPostCountry(null);
+    setUploading(false); setIsVideo(false);
+    setDetectedCountry(null); setPinToVisited(false);
   }
 
   useEffect(() => {
     if (!visible) return;
-    setPostCountry(null);
+    setDetectedCountry(null);
+    setPinToVisited(false);
     setLocDetecting(true);
     Geolocation.getCurrentPosition(
       ({ coords: { latitude, longitude } }) => {
@@ -354,8 +460,7 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
           .then(r => r.json())
           .then(data => {
             if (data.countryCode) {
-              const flag = countryFlag(data.countryCode);
-              setPostCountry(`${flag} ${data.countryName}`);
+              setDetectedCountry(`${countryFlag(data.countryCode)} ${data.countryName}`);
             }
           })
           .catch(() => {})
@@ -366,20 +471,39 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
     );
   }, [visible]);
 
-  function pick(cam, video = false) {
-    const fn = cam ? launchCamera : launchImageLibrary;
-    fn(
-      video
-        ? { mediaType: 'video', videoQuality: 'high', durationLimit: 60 }
-        : { mediaType: 'mixed', quality: 0.7, maxWidth: 1080, maxHeight: 1080 },
-      r => {
-        if (!r.didCancel && r.assets?.[0]) {
-          const asset = r.assets[0];
-          setImageUri(asset.uri);
-          setIsVideo(video || asset.type?.startsWith('video') || false);
+  function pick(source) {
+    if (source === 'library') {
+      launchImageLibrary(
+        { mediaType: 'mixed', quality: 0.85, maxWidth: 1080, maxHeight: 1080 },
+        r => {
+          if (!r.didCancel && r.assets?.[0]) {
+            const asset = r.assets[0];
+            setImageUri(asset.uri);
+            setIsVideo(asset.type?.startsWith('video') || false);
+          }
         }
-      }
-    );
+      );
+    } else if (source === 'camera') {
+      launchCamera(
+        { mediaType: 'photo', quality: 0.85, maxWidth: 1080, maxHeight: 1080, saveToPhotos: true },
+        r => {
+          if (!r.didCancel && r.assets?.[0]) {
+            setImageUri(r.assets[0].uri);
+            setIsVideo(false);
+          }
+        }
+      );
+    } else if (source === 'video') {
+      launchCamera(
+        { mediaType: 'video', videoQuality: 'high', durationLimit: 60, saveToPhotos: true },
+        r => {
+          if (!r.didCancel && r.assets?.[0]) {
+            setImageUri(r.assets[0].uri);
+            setIsVideo(true);
+          }
+        }
+      );
+    }
   }
 
   async function upload() {
@@ -388,12 +512,13 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
     try {
       const token = await getAccessToken();
       const fd = new FormData();
+      const isMov = imageUri?.toLowerCase().endsWith('.mov');
       fd.append('photo', isVideo
-        ? { uri: imageUri, type: 'video/mp4', name: 'media.mp4' }
+        ? { uri: imageUri, type: isMov ? 'video/quicktime' : 'video/mp4', name: isMov ? 'media.mov' : 'media.mp4' }
         : { uri: imageUri, type: 'image/jpeg', name: 'photo.jpg' }
       );
       fd.append('mediaType', isVideo ? 'video' : 'image');
-      if (postCountry) fd.append('postCountry', postCountry);
+      if (pinToVisited && detectedCountry) fd.append('postCountry', detectedCountry);
       fd.append('username', user.username);
       fd.append('userId', user.userId || user.id || '');
       fd.append('country', user.country);
@@ -401,8 +526,7 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
       fd.append('mood', user.mood || '');
       fd.append('caption', caption.trim());
       fd.append('filter', filter);
-      if (isStory) fd.append('audience', audience);
-      const ep = isStory ? '/api/stories/upload' : '/api/photos/upload';
+      const ep = '/api/photos/upload';
       const res = await fetch(`${SERVER_URL}${ep}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -423,76 +547,69 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
         <TouchableOpacity style={up.backdrop} activeOpacity={1} onPress={() => { reset(); onClose(); }} />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={up.sheet}>
           <View style={up.handle} />
-          <Text style={up.title}>{isStory ? 'New Story ✨' : 'New World Entry ✦'}</Text>
+          <Text style={up.title}>New World Entry ✦</Text>
+          {/* Location row — always shows home country */}
           <View style={up.locRow}>
-            {locDetecting ? (
-              <ActivityIndicator size="small" color="#6C47FF" />
-            ) : (
-              <Text style={up.locTxt}>
-                {postCountry
-                  ? `📍 Posting from ${countryName(postCountry)}`
-                  : `📍 ${countryName(user?.country || '')} (home)`}
-              </Text>
-            )}
+            <Text style={up.locTxt}>{countryName(user?.country || '') || 'Home'}</Text>
+            <View style={up.locBadge}><Text style={up.locBadgeTxt}>Home feed</Text></View>
           </View>
 
-          {/* Story audience selector */}
-          {isStory && (
-            <View style={up.audienceRow}>
-              <Text style={up.audienceLabel}>Who can see this?</Text>
-              <View style={up.audiencePills}>
-                <TouchableOpacity
-                  style={[up.audiencePill, audience === 'world' && up.audiencePillActive]}
-                  onPress={() => setAudience('world')}
-                >
-                  <Text style={up.audiencePillIcon}>🌍</Text>
-                  <Text style={[up.audiencePillTxt, audience === 'world' && up.audiencePillTxtActive]}>World</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[up.audiencePill, audience === 'bonds' && up.audiencePillActive]}
-                  onPress={() => setAudience('bonds')}
-                >
-                  <Text style={up.audiencePillIcon}>🫂</Text>
-                  <Text style={[up.audiencePillTxt, audience === 'bonds' && up.audiencePillTxtActive]}>Bonds only</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={up.audienceHint}>
-                {audience === 'world'
-                  ? 'Everyone on Bond can see your story'
-                  : 'Only people you\'re bonded with can see your story'}
-              </Text>
+          {/* Pin-to-visited toggle — only when GPS finds a different country */}
+          {locDetecting ? (
+            <View style={up.pinDetecting}>
+              <ActivityIndicator size="small" $1={BOND_PINK} />
+              <Text style={up.pinDetectingTxt}>Detecting location…</Text>
             </View>
-          )}
+          ) : isVisiting ? (
+            <TouchableOpacity
+              style={[up.pinRow, pinToVisited && up.pinRowOn]}
+              onPress={() => setPinToVisited(v => !v)}
+              activeOpacity={0.8}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[up.pinLabel, pinToVisited && up.pinLabelOn]}>
+                  Pin to {countryName(detectedCountry)} feed
+                </Text>
+                <Text style={up.pinSub}>
+                  {pinToVisited
+                    ? 'Appears in your home + this country\'s feed'
+                    : 'Only appears in your home feed'}
+                </Text>
+              </View>
+              <View style={[up.pinCheck, pinToVisited && up.pinCheckOn]}>
+                {pinToVisited && <Text style={up.pinCheckMark}>✓</Text>}
+              </View>
+            </TouchableOpacity>
+          ) : null}
 
           {/* Media picker */}
           {!imageUri ? (
             <View style={up.picks}>
-              <TouchableOpacity style={up.pick} onPress={() => pick(false)}>
-                <Text style={up.pickIcon}>🖼️</Text>
-                <Text style={up.pickTxt}>Library</Text>
+              <TouchableOpacity style={up.pick} onPress={() => pick('library')}>
+                <Text style={up.pickTxt}>Photos</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={up.pick} onPress={() => pick(true)}>
-                <Text style={up.pickIcon}>📷</Text>
+              <TouchableOpacity style={up.pick} onPress={() => pick('camera')}>
                 <Text style={up.pickTxt}>Camera</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={up.pick} onPress={() => pick(true, true)}>
-                <Text style={up.pickIcon}>🎬</Text>
-                <Text style={up.pickTxt}>Record</Text>
+              <TouchableOpacity style={up.pick} onPress={() => pick('video')}>
+                <Text style={up.pickTxt}>Video</Text>
               </TouchableOpacity>
             </View>
           ) : isVideo ? (
             <View style={[up.preview, up.videoPrev]}>
-              <Text style={up.videoIcon}>🎬</Text>
               <Text style={up.videoReady}>Video ready</Text>
-              <TouchableOpacity onPress={() => pick(true, true)} style={{ marginTop: 6 }}>
+              <TouchableOpacity onPress={() => pick('video')} style={{ marginTop: 6 }}>
                 <Text style={up.reRecordTxt}>Re-record</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => pick('library')} style={{ marginTop: 4 }}>
+                <Text style={up.reRecordTxt}>Choose different</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={{ alignItems: 'center', marginBottom: 10, gap: 8 }}>
               <FilteredImage uri={imageUri} filterId={filter} style={up.preview} />
-              <TouchableOpacity onPress={() => pick(false)}>
-                <Text style={{ color: '#6C47FF', fontSize: 13, fontWeight: '600' }}>Change photo</Text>
+              <TouchableOpacity onPress={() => pick('library')}>
+                <Text style={{ color: BOND_PINK, fontSize: 13, fontWeight: '600' }}>Change photo</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -501,7 +618,7 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
 
           <TextInput
             style={up.caption}
-            placeholder={isStory ? 'Add a caption…' : 'Write your entry…'}
+            placeholder="Write your entry…"
             placeholderTextColor="#444"
             value={caption}
             onChangeText={setCaption}
@@ -518,9 +635,7 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
             {uploading
               ? <ActivityIndicator color="#fff" />
               : <Text style={up.btnTxt}>
-                  {isStory
-                    ? (audience === 'bonds' ? 'Share to Bonds 🫂' : 'Share to World 🌍')
-                    : 'Post Entry ✦'}
+                  {'Post Entry ✦'}
                 </Text>
             }
           </TouchableOpacity>
@@ -533,80 +648,34 @@ function UploadModal({ visible, onClose, user, mode = 'photo' }) {
 
 // ─── Moment Ring (story bubble) ───────────────────────────────────────────────
 
-function MomentRing({ isSelf, group, viewCount = 0, onPress }) {
-  const color   = stringToColor(group?.username || '?');
-  const flag    = countryFlag(group?.country || '');
-  const initial = (group?.username?.[0] ?? '?').toUpperCase();
-
-  if (isSelf) {
-    return (
-      <TouchableOpacity style={mr.item} onPress={onPress} activeOpacity={0.8}>
-        <View style={[mr.addRing, { backgroundColor: color + '11' }]}>
-          <View style={mr.addInner}>
-            <Text style={mr.addPlus}>+</Text>
-          </View>
-        </View>
-        <Text style={mr.label} numberOfLines={1}>Your Story</Text>
-        {viewCount > 0 && (
-          <View style={mr.viewRow}>
-            <Text style={mr.viewCount}>{viewCount} 👁</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  }
-
-  return (
-    <TouchableOpacity style={mr.item} onPress={onPress} activeOpacity={0.8}>
-      <View style={mr.ringWrap}>
-        <View style={[mr.outerGlow, { borderColor: color }]} />
-        <View style={mr.ring}>
-          <Text style={mr.flagBig}>{flag}</Text>
-        </View>
-        <View style={[mr.initBadge, { backgroundColor: color }]}>
-          <Text style={mr.initTxt}>{initial}</Text>
-        </View>
-      </View>
-      <Text style={mr.label} numberOfLines={1}>{group?.username || ''}</Text>
-    </TouchableOpacity>
-  );
-}
-
-
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PhotoFeedScreen({ navigation, user }) {
-  const DEMO_PHOTOS = useMemo(() => [
-    { id: 'd1', userId: 'demo1', username: 'kenji_tokyo', country: '🇯🇵 Japan',       city: 'Tokyo',      imageUrl: '', caption: 'Night vibes 🌃', likes: [], echos: [], comments: [], createdAt: Date.now() - 3600000 },
-    { id: 'd2', userId: 'demo2', username: 'amara_lagos', country: '🇳🇬 Nigeria',     city: 'Lagos',      imageUrl: '', caption: 'Sunday mood 🔥', likes: [], echos: [], comments: [], createdAt: Date.now() - 7200000 },
-    { id: 'd3', userId: 'demo3', username: 'sofia_br',    country: '🇧🇷 Brazil',      city: 'São Paulo',  imageUrl: '', caption: 'Carnaval prep', likes: [], echos: [], comments: [], createdAt: Date.now() - 10800000 },
-    { id: 'd4', userId: 'demo4', username: 'priya_in',    country: '🇮🇳 India',       city: 'Mumbai',     imageUrl: '', caption: '🎶 rainy season', likes: [], echos: [], comments: [], createdAt: Date.now() - 14400000 },
-    { id: 'd5', userId: 'demo5', username: 'lars_se',     country: '🇸🇪 Sweden',      city: 'Stockholm',  imageUrl: '', caption: 'Midnight sun', likes: [], echos: [], comments: [], createdAt: Date.now() - 18000000 },
-    { id: 'd6', userId: 'demo6', username: 'yemi_gh',     country: '🇬🇭 Ghana',       city: 'Accra',      imageUrl: '', caption: 'Beach day 🏖', likes: [], echos: [], comments: [], createdAt: Date.now() - 21600000 },
-    { id: 'd7', userId: 'demo7', username: 'hiro_jp',     country: '🇯🇵 Japan',       city: 'Osaka',      imageUrl: '', caption: 'Ramen run 🍜', likes: [], echos: [], comments: [], createdAt: Date.now() - 25200000 },
-    { id: 'd8', userId: 'demo8', username: 'ines_pt',     country: '🇵🇹 Portugal',    city: 'Lisbon',     imageUrl: '', caption: 'Sunset fado 🎵', likes: [], echos: [], comments: [], createdAt: Date.now() - 28800000 },
-    { id: 'd9', userId: 'demo9', username: 'carlos_mx',   country: '🇲🇽 Mexico',      city: 'Mexico City',imageUrl: '', caption: 'Tacos at 2am 🌮', likes: [], echos: [], comments: [], createdAt: Date.now() - 32400000 },
-  ], []);
 
-  const [photos,            setPhotos]           = useState([]);
-  const [stories,           setStories]          = useState([]);
-  const [tab,               setTab]              = useState('world');
-  const [showFootprints,    setShowFootprints]    = useState(false);
-  const [showUpload,        setShowUpload]        = useState(false);
-  const [uploadMode,        setUploadMode]        = useState('photo');
-  const [commentPhoto,      setCommentPhoto]      = useState(null);
-  const [viewingStoryGroup, setViewingStoryGroup] = useState(null);
-  const [followingIds,      setFollowingIds]      = useState([]);
+  const [photos,         setPhotos]      = useState([]);
+  const [tab,            setTab]         = useState('world');
+  const [showFootprints, setShowFootprints] = useState(false);
+  const [showUpload,     setShowUpload]  = useState(false);
+  const [commentPhoto,   setCommentPhoto] = useState(null);
+  const [followingIds,   setFollowingIds] = useState([]);
   const [savedCountries,    setSavedCountries]    = useState([]);
-  const [currentCountry,    setCurrentCountry]    = useState(null);
-  const [countryFlagCounts, setCountryFlagCounts] = useState({});   // country -> planted count
-  const [bondCountryFilter, setBondCountryFilter] = useState(null);
+  const [currentCountry,    setCurrentCountry]    = useState(user?.country || null);
+  const [countryFlagCounts, setCountryFlagCounts] = useState({});
   const [refreshing,        setRefreshing]        = useState(false);
   const [activeVideoId,     setActiveVideoId]     = useState(null);
   const globeAnim  = useRef(new Animated.Value(1)).current;
   const landAnim   = useRef(new Animated.Value(0)).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
   const socket = getSocket();
+
+  // On mount: show home country landing banner and fetch its flag count
+  useEffect(() => {
+    if (!user?.country) return;
+    landAnim.setValue(0);
+    Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
+    const fetch = () => socket.emit('get_country_flag_count', { country: user.country });
+    if (socket.connected) fetch(); else socket.once('connect', fetch);
+  }, []);
 
   // Load saved countries and re-plant flags on server after connect
   useEffect(() => {
@@ -634,8 +703,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
   useEffect(() => {
     function init() {
       socket.emit('get_photos');
-      socket.emit('get_stories');
-      socket.emit('get_following', { userId: socket.id });
+      socket.emit('get_following');
     }
     if (socket.connected) init(); else socket.once('connect', init);
 
@@ -645,19 +713,17 @@ export default function PhotoFeedScreen({ navigation, user }) {
       setPhotos(prev => prev.map(p => p.id === up.id ? up : p));
       setCommentPhoto(cp => cp?.id === up.id ? up : cp);
     });
-    socket.on('stories_updated', setStories);
     socket.on('following_list',  ({ following }) => setFollowingIds(following));
     socket.on('follow_status', ({ targetUserId, following }) => {
       setFollowingIds(prev =>
         following ? [...new Set([...prev, targetUserId])] : prev.filter(id => id !== targetUserId)
       );
-      if (following) socket.emit('get_photos'); // pull new bond's posts into feed
     });
     socket.on('country_flag_count', ({ country, count }) =>
       setCountryFlagCounts(prev => ({ ...prev, [country]: count }))
     );
     return () => {
-      ['photos_feed','new_photo','photo_updated','stories_updated','following_list','follow_status','country_flag_count']
+      ['photos_feed','new_photo','photo_updated','following_list','follow_status','country_flag_count']
         .forEach(e => socket.off(e));
     };
   }, []);
@@ -677,51 +743,10 @@ export default function PhotoFeedScreen({ navigation, user }) {
 
   const myUserId = user?.userId || socket.id;
 
-  const myStoryViewCount = useMemo(() => {
-    const myGroup = stories.find(g => g.userId === myUserId);
-    if (!myGroup?.stories?.length) return 0;
-    const viewers = new Set();
-    myGroup.stories.forEach(s => {
-      (s.viewers || []).forEach(v => viewers.add(typeof v === 'string' ? v : v.userId));
-      if (s.viewedBy) viewers.add(s.viewedBy);
-    });
-    return viewers.size;
-  }, [stories]);
-
-  const realBondPhotos = useMemo(() =>
-    photos
-      .filter(p =>
-        followingIds.includes(p.userId) ||
-        p.userId === myUserId ||
-        p.echos?.some(e => followingIds.includes(e.userId))
-      )
-      .map(p => {
-        const isDirectFollow = followingIds.includes(p.userId) || p.userId === myUserId;
-        if (isDirectFollow) return p;
-        const echoer = p.echos?.find(e => followingIds.includes(e.userId));
-        return { ...p, _echoAttrib: echoer?.username || 'A bond' };
-      })
-  , [photos, followingIds, myUserId]);
-
-  // Show demo data when no real bonds exist yet so the footprint is visible
-  const isDemoMode = realBondPhotos.length === 0 && followingIds.length === 0;
-  const allBondPhotos = isDemoMode ? DEMO_PHOTOS : realBondPhotos;
-
-
+  // Bonds feed: own posts + posts from people you follow (Twitter "Following" model)
   const bondPhotos = useMemo(() =>
-    bondCountryFilter
-      ? allBondPhotos.filter(p => p.country === bondCountryFilter)
-      : allBondPhotos
-  , [allBondPhotos, bondCountryFilter]);
-
-  // Stories filtered by audience for bonds tab
-  const bondsStories = useMemo(() =>
-    stories.filter(g => {
-      const isOwn = g.userId === myUserId;
-      const isBonded = followingIds.includes(g.userId);
-      return isOwn || isBonded;
-    })
-  , [stories, followingIds, myUserId]);
+    photos.filter(p => p.userId === myUserId || followingIds.includes(p.userId))
+  , [photos, followingIds, myUserId]);
 
   function teleport() {
     Animated.sequence([
@@ -753,7 +778,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
   function onRefresh() {
     setRefreshing(true);
     socket.emit('get_photos');
-    socket.emit('get_stories');
   }
 
   const onViewableItemsChanged = useCallback(({ viewableItems }) => {
@@ -780,7 +804,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
             }}
             activeOpacity={0.8}
           >
-            <Text style={s.mineFlag}>{countryFlag(user.country)}</Text>
             <Text style={[s.mineTxt, currentCountry === user.country && s.mineTxtOn]}>Mine</Text>
           </TouchableOpacity>
         )}
@@ -805,7 +828,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
       {/* ── Globe teleport OR landing banner ── */}
       {!currentCountry ? (
         <View style={s.globePrompt}>
-          <Animated.Text style={[s.globeEmoji, { transform: [{ scale: globeAnim }] }]}>🌍</Animated.Text>
           <Text style={s.globeTitle}>Explore the world</Text>
           <Text style={s.globeSub}>
             {countries.length > 0
@@ -823,12 +845,11 @@ export default function PhotoFeedScreen({ navigation, user }) {
               }}
               activeOpacity={0.85}
             >
-              <Text style={s.minePromptFlag}>{countryFlag(user.country)}</Text>
               <Text style={s.minePromptTxt}>See my country</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={s.teleportBtn} onPress={teleport} activeOpacity={0.85}>
-            <Text style={s.teleportBtnTxt}>🌍  Take me somewhere</Text>
+            <Text style={s.teleportBtnTxt}>Take me somewhere</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -844,17 +865,32 @@ export default function PhotoFeedScreen({ navigation, user }) {
               </Text>
               <Text style={s.landingCountry}>{countryName(currentCountry) || currentCountry}</Text>
               <View style={s.plantedRow}>
-                <Text style={s.plantedIcon}>📍</Text>
                 <Text style={s.plantedCount}>
                   {(countryFlagCounts[currentCountry] || 0).toLocaleString()} planted
                 </Text>
               </View>
             </View>
-            {currentCountry !== user?.country && (
-              <TouchableOpacity style={s.nextBtn} onPress={teleport} activeOpacity={0.8}>
-                <Text style={s.nextBtnTxt}>Next 🌍</Text>
-              </TouchableOpacity>
-            )}
+            {currentCountry !== user?.country ? (
+              <View style={{ gap: 8, alignItems: 'flex-end' }}>
+                <TouchableOpacity style={s.nextBtn} onPress={teleport} activeOpacity={0.8}>
+                  <Text style={s.nextBtnTxt}>Next</Text>
+                </TouchableOpacity>
+                {user?.country && (
+                  <TouchableOpacity
+                    style={s.backHomeBtn}
+                    onPress={() => {
+                      landAnim.setValue(0);
+                      setCurrentCountry(user.country);
+                      socket.emit('get_country_flag_count', { country: user.country });
+                      Animated.spring(landAnim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 60 }).start();
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={s.backHomeTxt}>My feed</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
           </View>
           <TouchableOpacity
             style={[s.followCountryBtn, savedCountries.includes(currentCountry) && s.followCountryBtnOn]}
@@ -863,8 +899,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
           >
             <Text style={[s.followCountryTxt, savedCountries.includes(currentCountry) && s.followCountryTxtOn]}>
               {savedCountries.includes(currentCountry)
-                ? `📍 Pinned in ${countryName(currentCountry) || currentCountry}`
-                : `📍 Pin yourself in ${countryName(currentCountry) || currentCountry}`}
+                ? `Pinned in ${countryName(currentCountry) || currentCountry}`
+                : `Pin yourself in ${countryName(currentCountry) || currentCountry}`}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -874,46 +910,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
     </View>
   );
 
-  const bondsHeader = (
-    <View>
-      {/* Snap-style story rings */}
-      <View style={s.snapRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.snapContent}
-        >
-          <MomentRing
-            isSelf
-            group={{ username: user?.username, country: user?.country }}
-            viewCount={myStoryViewCount}
-            onPress={() => { setUploadMode('story'); setShowUpload(true); }}
-          />
-          {bondsStories.map(g => (
-            <MomentRing
-              key={g.userId}
-              group={g}
-              onPress={() => setViewingStoryGroup(g)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      {bondCountryFilter && (
-        <TouchableOpacity
-          style={s.bondFilterChip}
-          onPress={() => setBondCountryFilter(null)}
-          activeOpacity={0.8}
-        >
-          <Text style={s.bondFilterFlag}>{countryFlag(bondCountryFilter)}</Text>
-          <Text style={s.bondFilterTxt}>{countryName(bondCountryFilter)}</Text>
-          <Text style={s.bondFilterX}>✕</Text>
-        </TouchableOpacity>
-      )}
-
-      <View style={s.divider} />
-    </View>
-  );
+  const bondsHeader = <View style={s.divider} />;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -923,7 +920,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
         <Text style={s.title}>Photos</Text>
         <TouchableOpacity
           style={s.postBtn}
-          onPress={() => { setUploadMode('photo'); setShowUpload(true); }}
+          onPress={() => { setShowUpload(true); }}
         >
           <Text style={s.postBtnTxt}>+ Post</Text>
         </TouchableOpacity>
@@ -935,20 +932,13 @@ export default function PhotoFeedScreen({ navigation, user }) {
           style={[s.tab, tab === 'world' && s.tabActive]}
           onPress={() => setTab('world')}
         >
-          <Text style={[s.tabTxt, tab === 'world' && s.tabTxtActive]}>🌍  World</Text>
+          <Text style={[s.tabTxt, tab === 'world' && s.tabTxtActive]}>World</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.tab, tab === 'bonds' && s.tabActive]}
           onPress={() => setTab('bonds')}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <WorldMark
-                size={15}
-                color={tab === 'bonds' ? '#fff' : '#555'}
-                bondColor={tab === 'bonds' ? '#6C47FF' : '#444'}
-              />
-              <Text style={[s.tabTxt, tab === 'bonds' && s.tabTxtActive]}>Bonds</Text>
-            </View>
+          <Text style={[s.tabTxt, tab === 'bonds' && s.tabTxtActive]}>Bonds</Text>
         </TouchableOpacity>
       </View>
 
@@ -963,8 +953,8 @@ export default function PhotoFeedScreen({ navigation, user }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6C47FF"
-            colors={['#6C47FF']}
+            $1={BOND_PINK}
+            colors={[BOND_PINK]}
           />
         }
         onViewableItemsChanged={onViewableItemsChanged}
@@ -974,10 +964,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
         }
         ListEmptyComponent={
           <View style={s.empty}>
-            {tab === 'world'
-              ? <Text style={s.emptyIcon}>🌍</Text>
-              : <WorldMark size={48} color="#555" bondColor="#6C47FF" />
-            }
+            {tab === 'bonds' && <WorldMark size={48} color="#555" $1={BOND_PINK} />}
             <Text style={s.emptyTitle}>
               {tab === 'world' ? 'No entries yet' : 'No bond entries yet'}
             </Text>
@@ -989,7 +976,7 @@ export default function PhotoFeedScreen({ navigation, user }) {
             {tab === 'world' && (
               <TouchableOpacity
                 style={s.emptyBtn}
-                onPress={() => { setUploadMode('photo'); setShowUpload(true); }}
+                onPress={() => { setShowUpload(true); }}
               >
                 <Text style={s.emptyBtnTxt}>Post a World Entry</Text>
               </TouchableOpacity>
@@ -1012,23 +999,14 @@ export default function PhotoFeedScreen({ navigation, user }) {
       {/* ── Modals ── */}
       <UploadModal
         visible={showUpload}
-        mode={uploadMode}
         onClose={() => setShowUpload(false)}
         user={user}
       />
-      <CommentsModal
+      <PostDetailModal
         visible={!!commentPhoto}
         photo={commentPhoto}
         user={user}
         onClose={() => setCommentPhoto(null)}
-      />
-      <StoryViewer
-        visible={!!viewingStoryGroup}
-        storyGroup={viewingStoryGroup}
-        onClose={() => setViewingStoryGroup(null)}
-        onDelete={id => socket.emit('delete_story', { storyId: id })}
-        onViewStory={id => socket.emit('view_story', { storyId: id })}
-        currentUserId={socket.id}
       />
 
       {/* ── Footprints bottom sheet ── */}
@@ -1044,7 +1022,6 @@ export default function PhotoFeedScreen({ navigation, user }) {
                 onPress={() => { setCurrentCountry(null); setShowFootprints(false); }}
                 activeOpacity={0.8}
               >
-                <Text style={s.fpCellFlag}>🌍</Text>
                 <Text style={s.fpCellName}>All</Text>
               </TouchableOpacity>
               {savedCountries.map(c => (
@@ -1086,7 +1063,7 @@ const s = StyleSheet.create({
 
   header:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   title:    { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-  postBtn:  { backgroundColor: '#6C47FF', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  postBtn:  { backgroundColor: BOND_PINK, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   postBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
   tabs:         { flexDirection: 'row', marginHorizontal: 16, marginBottom: 4, backgroundColor: '#111', borderRadius: 14, padding: 3 },
@@ -1096,39 +1073,32 @@ const s = StyleSheet.create({
   tabTxtActive: { color: '#fff' },
 
   // Bond feed country filter chip
-  bondFilterChip:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginTop: 2, marginBottom: 8, backgroundColor: '#6C47FF22', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF55', alignSelf: 'flex-start' },
-  bondFilterFlag:  { fontSize: 18 },
-  bondFilterTxt:   { color: '#a78bfa', fontSize: 13, fontWeight: '800' },
-  bondFilterX:     { color: '#6C47FF', fontSize: 14, fontWeight: '900', marginLeft: 4 },
 
   // Footprints row
   footprintRow:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 6, paddingBottom: 10, gap: 8 },
   footprintBtn:        { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
   footprintEmoji:      { fontSize: 16 },
   footprintLabel:      { color: '#fff', fontSize: 13, fontWeight: '800' },
-  footprintBadge:      { backgroundColor: '#6C47FF', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  footprintBadge:      { backgroundColor: BOND_PINK, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
   footprintBadgeTxt:   { color: '#fff', fontSize: 11, fontWeight: '900' },
-  footprintActiveChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#6C47FF18', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: '#6C47FF44', flex: 1 },
+  footprintActiveChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: BOND_PINK + '18', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: BOND_PINK + '44', flex: 1 },
   footprintActiveFlag: { fontSize: 16 },
   footprintActiveName: { color: '#fff', fontSize: 13, fontWeight: '700', flex: 1 },
-  footprintActiveClear:{ color: '#6C47FF', fontSize: 14, fontWeight: '700' },
+  footprintActiveClear:{ color: BOND_PINK, fontSize: 14, fontWeight: '700' },
 
   // Mine button
   mineBtn:       { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
-  mineBtnOn:     { backgroundColor: 'rgba(108,71,255,0.15)', borderColor: '#6C47FF66' },
-  mineFlag:      { fontSize: 16 },
+  mineBtnOn:     { backgroundColor: 'rgba(108,71,255,0.15)', borderColor: BOND_PINK + '66' },
   mineTxt:       { color: '#777', fontSize: 13, fontWeight: '700' },
-  mineTxtOn:     { color: '#6C47FF' },
+  mineTxtOn:     { color: BOND_PINK },
 
   // Globe teleport prompt
   globePrompt:    { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24, gap: 8 },
-  globeEmoji:     { fontSize: 52 },
   globeTitle:     { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 4 },
   globeSub:       { color: '#555', fontSize: 13, textAlign: 'center' },
   minePromptBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1a1a1a', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1, borderColor: '#2a2a2a', marginTop: 6 },
-  minePromptFlag: { fontSize: 18 },
   minePromptTxt:  { color: '#aaa', fontSize: 14, fontWeight: '700' },
-  teleportBtn:    { backgroundColor: '#6C47FF', borderRadius: 26, paddingHorizontal: 28, paddingVertical: 14, marginTop: 4 },
+  teleportBtn:    { backgroundColor: BOND_PINK, borderRadius: 26, paddingHorizontal: 28, paddingVertical: 14, marginTop: 4 },
   teleportBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '900' },
 
   // Landing banner
@@ -1139,10 +1109,12 @@ const s = StyleSheet.create({
   landingCountry:     { color: '#fff', fontSize: 20, fontWeight: '900', marginTop: 2 },
   nextBtn:            { backgroundColor: '#1a1a1a', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: '#2a2a2a' },
   nextBtnTxt:         { color: '#fff', fontSize: 13, fontWeight: '800' },
+  backHomeBtn:        { backgroundColor: BOND_PINK + '18', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: BOND_PINK + '44' },
+  backHomeTxt:        { color: '#9d7cff', fontSize: 13, fontWeight: '800' },
   followCountryBtn:   { backgroundColor: '#1a1a1a', borderRadius: 14, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#2a2a2a' },
-  followCountryBtnOn: { backgroundColor: 'rgba(108,71,255,0.15)', borderColor: '#6C47FF66' },
+  followCountryBtnOn: { backgroundColor: 'rgba(108,71,255,0.15)', borderColor: BOND_PINK + '66' },
   followCountryTxt:   { color: '#666', fontSize: 14, fontWeight: '700' },
-  followCountryTxtOn: { color: '#6C47FF' },
+  followCountryTxtOn: { color: BOND_PINK },
   plantedRow:         { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   plantedIcon:        { fontSize: 12 },
   plantedCount:       { color: '#555', fontSize: 11, fontWeight: '700' },
@@ -1154,7 +1126,7 @@ const s = StyleSheet.create({
   fpTitle:        { color: '#fff', fontSize: 20, fontWeight: '900', paddingHorizontal: 20, marginBottom: 18, letterSpacing: -0.3 },
   fpGrid:         { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 14, gap: 10 },
   fpCell:         { width: '22%', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 4, borderWidth: 1, borderColor: '#222' },
-  fpCellActive:   { borderColor: '#6C47FF', backgroundColor: 'rgba(108,71,255,0.12)' },
+  fpCellActive:   { borderColor: BOND_PINK, backgroundColor: 'rgba(108,71,255,0.12)' },
   fpCellFlag:     { fontSize: 30, marginBottom: 6 },
   fpCellName:     { color: '#aaa', fontSize: 10, textAlign: 'center', fontWeight: '700' },
   fpCellRemove:   { position: 'absolute', top: 5, right: 6 },
@@ -1164,16 +1136,13 @@ const s = StyleSheet.create({
 
   momentSection: { paddingVertical: 14 },
   momentRow:     { paddingHorizontal: 14, gap: 12 },
-  snapRow:       { paddingVertical: 12, borderBottomWidth: 0 },
-  snapContent:   { paddingHorizontal: 14, gap: 14 },
 
   heartBurst: { position: 'absolute', alignSelf: 'center', top: '35%', fontSize: 90 },
 
   empty:      { alignItems: 'center', paddingTop: 60, paddingHorizontal: 40, gap: 10 },
-  emptyIcon:  { fontSize: 52 },
   emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '800' },
   emptySub:   { color: '#555', fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  emptyBtn:   { backgroundColor: '#6C47FF', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 6 },
+  emptyBtn:   { backgroundColor: BOND_PINK, borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10, marginTop: 6 },
   emptyBtnTxt:{ color: '#fff', fontWeight: '700' },
 });
 
@@ -1216,55 +1185,82 @@ const we = StyleSheet.create({
   username:         { color: '#fff', fontWeight: '800', fontSize: 14 },
   dots:             { color: '#444', fontSize: 18 },
   bondBtn:          { borderWidth: 1, borderColor: '#333', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
-  bondBtnOn:        { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  bondBtnOn:        { backgroundColor: BOND_PINK, borderColor: BOND_PINK },
   bondBtnTxt:       { color: '#777', fontSize: 12, fontWeight: '700' },
   bondBtnTxtOn:     { color: '#fff' },
 
   // Blog-style entry caption
   entryText:        { color: 'rgba(255,255,255,0.85)', fontSize: 15, lineHeight: 24, fontWeight: '400', letterSpacing: 0.1 },
 
-  // Action bar
-  actionsBar:       { flexDirection: 'row', alignItems: 'center', gap: 26, paddingTop: 2 },
-  actionBtn:        { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionIcon:       { fontSize: 19 },
-  actionLbl:        { color: '#555', fontSize: 13, fontWeight: '600' },
-  markedLbl:        { color: '#FF0080' },
-  echoedLbl:        { color: '#6C47FF' },
-
-  // Notes preview
-  notesPrev:        { paddingTop: 2, gap: 3 },
-  notesAll:         { color: '#444', fontSize: 12, marginBottom: 2 },
-  noteRow:          { flexDirection: 'row', alignItems: 'flex-start', flexWrap: 'wrap' },
-  noteUser:         { color: '#fff', fontWeight: '700', fontSize: 13 },
-  noteTxt:          { color: '#555', fontSize: 13, flex: 1 },
+  // Action bar — Twitter style (icon + count only)
+  actionsBar:   { flexDirection: 'row', alignItems: 'center', gap: 28, paddingTop: 6, paddingBottom: 2 },
+  actionBtn:    { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  actionIcon:   { fontSize: 17, color: '#555' },
+  actionCount:  { color: '#555', fontSize: 12, fontWeight: '600' },
+  dimIcon:      { opacity: 0.35 },
+  markedIcon:   { opacity: 1 },
+  markedCount:  { color: '#FF0080' },
+  echoedIcon:   { opacity: 1 },
+  echoedCount:  { color: '#57f287' },
 
   divider:          { height: 1, backgroundColor: '#111', marginTop: 10 },
 
   // Echo attribution (Twitter-style "X reposted")
-  echoAttrib:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 30, paddingRight: 16, paddingTop: 8, paddingBottom: 4 },
-  echoAttribIcon: { fontSize: 13 },
-  echoAttribTxt:  { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
 });
 
-// Comments modal
-const cm = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop:{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheet:   { backgroundColor: '#111', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%', paddingBottom: 8 },
-  handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 12 },
-  title:   { color: '#fff', fontSize: 18, fontWeight: '700', paddingHorizontal: 20, marginBottom: 10 },
-  empty:   { color: '#555', textAlign: 'center', paddingVertical: 30 },
-  row:     { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
-  av:      { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  avTxt:   { color: '#fff', fontWeight: 'bold', fontSize: 13 },
-  user:    { color: '#fff', fontWeight: '700', fontSize: 12 },
-  time:    { color: '#444', fontSize: 10 },
-  txt:     { color: '#ccc', fontSize: 13, lineHeight: 18 },
-  inputRow:{ flexDirection: 'row', alignItems: 'flex-end', padding: 12, borderTopWidth: 1, borderTopColor: '#1a1a1a', gap: 8 },
-  input:   { flex: 1, backgroundColor: '#000', color: '#fff', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, maxHeight: 80 },
-  send:    { backgroundColor: '#6C47FF', borderRadius: 20, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  sendOff: { backgroundColor: '#222' },
-  sendTxt: { color: '#fff', fontSize: 16 },
+// Post detail modal
+const pd = StyleSheet.create({
+  safe:         { flex: 1, backgroundColor: '#000' },
+
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  backBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  backIcon:     { color: '#fff', fontSize: 22, fontWeight: '300' },
+  headerTitle:  { color: '#fff', fontSize: 16, fontWeight: '800' },
+
+  photoEmpty:    { width: '100%', backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
+  photoEmptyFlag:{ fontSize: 72 },
+
+  body:      { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, gap: 12 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  avatarTxt: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  mood:      { position: 'absolute', bottom: -2, right: -2, fontSize: 12 },
+  username:  { color: '#fff', fontWeight: '800', fontSize: 15 },
+  meta:      { color: '#555', fontSize: 12, marginTop: 2 },
+  timeStamp: { color: '#444', fontSize: 12 },
+
+  caption:   { color: 'rgba(255,255,255,0.9)', fontSize: 16, lineHeight: 26, fontWeight: '400' },
+
+  divider:   { height: 1, backgroundColor: '#1a1a1a' },
+
+  actionsBar: { flexDirection: 'row', alignItems: 'center', gap: 30, paddingVertical: 10 },
+  actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionIcon: { fontSize: 18, color: '#555' },
+  actionCount:{ color: '#555', fontSize: 13, fontWeight: '600' },
+  dimIcon:    { opacity: 0.35 },
+  markedIcon: { opacity: 1 },
+  markedCount:{ color: '#FF0080' },
+  dimIcon:    { opacity: 0.35 },
+  echoedIcon: { opacity: 1 },
+  echoedCount:{ color: '#57f287' },
+
+  repliesLabel: { color: '#555', fontSize: 13, fontWeight: '700', paddingTop: 10, paddingBottom: 4 },
+  empty:        { color: '#444', textAlign: 'center', paddingVertical: 40, fontSize: 13 },
+
+  commentRow:   { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 12, borderTopWidth: 1, borderTopColor: '#111' },
+  commentAv:    { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  commentAvTxt: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  commentUser:  { color: '#fff', fontWeight: '700', fontSize: 13 },
+  commentTime:  { color: '#444', fontSize: 11 },
+  commentTxt:   { color: 'rgba(255,255,255,0.82)', fontSize: 14, lineHeight: 21 },
+
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#1a1a1a', gap: 10 },
+  inputAv:  { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  inputAvTxt:{ color: '#fff', fontWeight: '800', fontSize: 13 },
+  input:    { flex: 1, backgroundColor: '#111', color: '#fff', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, maxHeight: 80, borderWidth: 1, borderColor: '#1e1e1e' },
+  sendBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  sendOff:  { backgroundColor: '#222' },
+  sendTxt:  { color: '#fff', fontSize: 16 },
 });
 
 // Upload modal
@@ -1274,50 +1270,38 @@ const up = StyleSheet.create({
   sheet:   { backgroundColor: '#111', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40 },
   handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   title:   { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 6 },
-  locRow:  { flexDirection: 'row', alignItems: 'center', minHeight: 20, marginBottom: 14 },
-  locTxt:  { color: '#555', fontSize: 12, fontWeight: '600' },
+  locRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  locTxt:       { color: '#aaa', fontSize: 13, fontWeight: '700', flex: 1 },
+  locBadge:     { backgroundColor: BOND_PINK + '22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: BOND_PINK + '44' },
+  locBadgeTxt:  { color: '#9d7cff', fontSize: 11, fontWeight: '700' },
 
-  audienceRow:  { marginBottom: 16, gap: 8 },
-  audienceLabel:{ color: '#888', fontSize: 13, fontWeight: '600' },
-  audiencePills:{ flexDirection: 'row', gap: 10 },
-  audiencePill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 14, backgroundColor: '#1a1a1a', borderWidth: 1.5, borderColor: '#222' },
-  audiencePillActive: { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' },
-  audiencePillIcon:   { fontSize: 18 },
-  audiencePillTxt:    { color: '#555', fontSize: 13, fontWeight: '700' },
-  audiencePillTxtActive: { color: '#6C47FF' },
-  audienceHint: { color: '#444', fontSize: 11, textAlign: 'center' },
+  pinDetecting: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  pinDetectingTxt: { color: '#444', fontSize: 12 },
 
-  picks:   { flexDirection: 'row', gap: 12, marginBottom: 14 },
-  pick:    { flex: 1, backgroundColor: '#000', borderRadius: 16, padding: 20, alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#1e1e1e' },
-  pickIcon:{ fontSize: 32 },
-  pickTxt: { color: '#888', fontSize: 13 },
+  pinRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#111', borderRadius: 14, padding: 12, marginBottom: 14, borderWidth: 1.5, borderColor: '#222' },
+  pinRowOn:     { borderColor: BOND_PINK + '66', backgroundColor: BOND_PINK + '10' },
+  pinLabel:     { color: '#666', fontSize: 13, fontWeight: '700' },
+  pinLabelOn:   { color: '#bba8ff' },
+  pinSub:       { color: '#444', fontSize: 11, marginTop: 2 },
+  pinCheck:     { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#333', alignItems: 'center', justifyContent: 'center' },
+  pinCheckOn:   { backgroundColor: BOND_PINK, borderColor: BOND_PINK },
+  pinCheckMark: { color: '#fff', fontSize: 12, fontWeight: '900' },
+
+
+  picks:   { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  pick:    { flex: 1, backgroundColor: '#0d0d0d', borderRadius: 14, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#222' },
+  pickTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
   preview:      { width: '100%', height: 220, borderRadius: 16 },
   videoPrev:    { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111', marginBottom: 10 },
-  videoIcon:    { fontSize: 52 },
+
   videoReady:   { color: '#aaa', fontSize: 14, fontWeight: '700', marginTop: 8 },
-  reRecordTxt:  { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
+  reRecordTxt:  { color: BOND_PINK, fontSize: 13, fontWeight: '600' },
   caption: { backgroundColor: '#000', color: '#fff', borderRadius: 12, padding: 14, fontSize: 14, minHeight: 60, borderWidth: 1, borderColor: '#1e1e1e', marginBottom: 14, marginTop: 12 },
-  btn:     { backgroundColor: '#6C47FF', borderRadius: 14, padding: 16, alignItems: 'center' },
+  btn:     { backgroundColor: BOND_PINK, borderRadius: 14, padding: 16, alignItems: 'center' },
   btnOff:  { backgroundColor: '#222' },
   btnTxt:  { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
 
 
-// ─── Moment Ring styles ────────────────────────────────────────────────────────
-const mr = StyleSheet.create({
-  item:      { alignItems: 'center', gap: 6, width: 72 },
-  addRing:   { width: 62, height: 62, borderRadius: 31, borderWidth: 1.5, borderColor: '#6C47FF88', borderStyle: 'dashed', overflow: 'hidden' },
-  addInner:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  addPlus:   { color: '#6C47FF', fontSize: 30, fontWeight: '200' },
-  ringWrap:  { width: 64, height: 64, alignItems: 'center', justifyContent: 'center' },
-  outerGlow: { position: 'absolute', width: 62, height: 62, borderRadius: 31, borderWidth: 2 },
-  ring:      { width: 58, height: 58, borderRadius: 29, backgroundColor: '#1a1a1a', borderWidth: 1.5, borderColor: '#2a2a2a', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  flagBig:   { fontSize: 28 },
-  initBadge:    { position: 'absolute', bottom: 2, right: 2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000' },
-  initTxt:      { color: '#fff', fontSize: 9, fontWeight: '900' },
-  label:        { color: '#666', fontSize: 10, fontWeight: '600', textAlign: 'center', maxWidth: 64 },
-  viewRow:      { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
-  viewCount:    { color: '#6C47FF', fontSize: 9, fontWeight: '800' },
-});
 
 

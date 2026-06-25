@@ -13,7 +13,7 @@ import { getSocket, SERVER_URL } from '../services/socket';
 const { width: SCREEN_W } = Dimensions.get('window');
 const PANEL_W = Math.min(SCREEN_W * 0.78, 320);
 
-const ACCENT  = '#6C47FF';
+const BOND_PINK = '#FF0080';
 const BG      = '#000000';
 const CARD    = '#1C1F23';
 const BORDER  = '#2F3336';
@@ -405,7 +405,7 @@ export default function GroupChatScreen({ route, navigation }) {
           onPress={() => setShowMembers(true)}
           activeOpacity={0.8}
         >
-          <LinearGradient colors={[`${ACCENT}55`, `${ACCENT}33`]} style={styles.membersBtnGradient}>
+          <LinearGradient colors={[`${BOND_PINK}55`, `${BOND_PINK}33`]} style={styles.membersBtnGradient}>
             <View style={styles.memberLiveDot} />
             <Text style={styles.membersBtnCount}>{members.length}</Text>
             <Text style={styles.membersBtnLabel}>{members.length === 1 ? 'person' : 'people'}</Text>
@@ -480,7 +480,7 @@ export default function GroupChatScreen({ route, navigation }) {
 
           {text.trim() ? (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
-              <LinearGradient colors={[ACCENT, '#6C47FF']} style={styles.sendBtn}>
+              <LinearGradient colors={[BOND_PINK, '#CC0060']} style={styles.sendBtn}>
                 <Text style={styles.sendIcon}>➤</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -545,24 +545,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1C1F23', gap: 10,
   },
   backBtn:    { padding: 4 },
-  backArrow:  { color: ACCENT, fontSize: 24 },
+  backArrow:  { color: BOND_PINK, fontSize: 24 },
   headerTitle:{ color: '#fff', fontSize: 16, fontWeight: '800' },
   headerSub:  { color: '#666', fontSize: 11, marginTop: 2 },
   membersBtn: { borderRadius: 14, overflow: 'hidden' },
   membersBtnGradient: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14,
-    borderWidth: 1, borderColor: `${ACCENT}55`,
+    borderWidth: 1, borderColor: `${BOND_PINK}55`,
   },
   memberLiveDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
   membersBtnCount: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  membersBtnLabel: { color: ACCENT, fontSize: 11, fontWeight: '600' },
+  membersBtnLabel: { color: BOND_PINK, fontSize: 11, fontWeight: '600' },
 
   // Room tabs
   roomTabsBar:     { maxHeight: 46, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
   roomTabsContent: { paddingHorizontal: 12, gap: 8, alignItems: 'center', paddingVertical: 8 },
   roomTab:         { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 16, backgroundColor: CARD },
-  roomTabActive:   { backgroundColor: ACCENT },
+  roomTabActive:   { backgroundColor: BOND_PINK },
   roomTabText:     { color: '#666', fontSize: 12, fontWeight: '600' },
   roomTabTextActive:{ color: '#fff', fontWeight: '700' },
 
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
   senderCountry:{ color: '#555', fontSize: 10 },
 
   bubble:      { borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9, gap: 2 },
-  bubbleMine:  { backgroundColor: ACCENT, borderBottomRightRadius: 4 },
+  bubbleMine:  { backgroundColor: BOND_PINK, borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: CARD,   borderBottomLeftRadius:  4 },
 
   imageThumb:    { width: 200, height: 150, borderRadius: 10, marginBottom: 4 },

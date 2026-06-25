@@ -8,6 +8,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { SERVER_URL } from '../services/socket';
 
+const BOND_PINK = '#FF0080';
+
 export default function ChangePasswordScreen({ route, navigation }) {
   const email = route.params?.email || '';
   const [step, setStep] = useState('send'); // 'send' | 'code' | 'done'
@@ -74,7 +76,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
 
           <Animated.View style={{ opacity: fadeAnim }}>
             <View style={styles.iconWrap}>
-              <LinearGradient colors={['#6C47FF30', '#6C47FF10']} style={styles.iconBg}>
+              <LinearGradient colors={[BOND_PINK + '30', BOND_PINK + '10']} style={styles.iconBg}>
                 <Text style={styles.icon}>🔑</Text>
               </LinearGradient>
             </View>
@@ -116,7 +118,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                     <View style={styles.btnGrad}><ActivityIndicator color="#fff" /></View>
                   ) : (
                     <LinearGradient
-                      colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                      colors={[BOND_PINK, '#CC0060']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.btnGrad}
                     >
@@ -198,7 +200,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
                     <View style={styles.btnGrad}><ActivityIndicator color="#fff" /></View>
                   ) : (
                     <LinearGradient
-                      colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                      colors={[BOND_PINK, '#CC0060']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.btnGrad}
                     >
@@ -225,7 +227,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
 
                 <TouchableOpacity style={styles.btn} onPress={() => navigation.goBack()} activeOpacity={0.87}>
                   <LinearGradient
-                    colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                    colors={[BOND_PINK, '#CC0060']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={styles.btnGrad}
                   >
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
 
   iconWrap: { alignItems: 'center', marginBottom: 24 },
-  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#6C47FF40' },
+  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BOND_PINK + '40' },
   icon:     { fontSize: 36 },
 
   header:   { marginBottom: 28, alignItems: 'center' },
@@ -284,5 +286,5 @@ const styles = StyleSheet.create({
   successSub:   { color: '#666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   resendBtn:  { paddingVertical: 16, alignItems: 'center' },
-  resendText: { color: '#6C47FF', fontSize: 14, fontWeight: '600' },
+  resendText: { color: BOND_PINK, fontSize: 14, fontWeight: '600' },
 });

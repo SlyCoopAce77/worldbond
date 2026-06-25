@@ -18,7 +18,7 @@ export default function GiftBurst({ burst, onDone }) {
   const exitScale   = useRef(new Animated.Value(1)).current;
   const fade        = useRef(new Animated.Value(1)).current;
 
-  const c = burst.gift.color || '#6C47FF';
+  const c = burst.gift.color || '#FF0080';
 
   useEffect(() => {
     Animated.sequence([

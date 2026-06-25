@@ -4,12 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const STORAGE_KEY = 'worldbond_wallet';
 const STAMPS_KEY  = 'worldbond_stamps';
 
-// 100 coins = $1. Platform keeps 30%.
+// 100 coins = $1 face value. Payout rates (see PAYOUT_RATES) determine creator share.
 export const COINS_PER_DOLLAR = 100;
-export const PLATFORM_CUT     = 0.30;
+export const PLATFORM_CUT     = 0.30; // platform's share at base rate (1 - 0.70)
 
+// Pure conversion — payout rate is applied separately in the wallet screen.
 export function coinsToUSD(coins) {
-  return ((coins / COINS_PER_DOLLAR) * (1 - PLATFORM_CUT)).toFixed(2);
+  return (coins / COINS_PER_DOLLAR).toFixed(2);
 }
 export function usdToCoins(usd) {
   return Math.ceil(usd * COINS_PER_DOLLAR);
@@ -70,12 +71,11 @@ export const BOND_MONUMENTS = [
 //   + Bond Monument      →  +2%  passive royalty (on gifted streams from your landmark region)
 
 export const PAYOUT_RATES = {
-  base:       0.70,
-  plus:       0.75,
-  pro:        0.80,
-  monthly_1:  0.85,
-  monthly_2:  0.80,
-  monthly_3:  0.75,
+  base:             0.70,
+  bond_pass:        0.75,
+  monthly_1:        0.85,
+  monthly_2:        0.80,
+  monthly_3:        0.75,
   stamp_royalty:    0.03,
   monument_royalty: 0.02,
   platform_cut:     PLATFORM_CUT,

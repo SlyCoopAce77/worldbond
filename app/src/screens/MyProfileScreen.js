@@ -8,42 +8,77 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Sound from 'react-native-sound';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import { launchImageLibrary } from 'react-native-image-picker';
 import axios from 'axios';
 import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
-import { usePremium } from '../context/PremiumContext';
 import { useTheme } from '../context/ThemeContext';
 import { getCountryFlag } from '../utils/countryUtils';
+import { stringToColor } from '../utils/apiUtils';
 import { CONNECTION_TYPES } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 
 const LANGUAGES = [
-  { code: 'en', flag: '🇺🇸', label: 'English' },
-  { code: 'ja', flag: '🇯🇵', label: 'Japanese' },
-  { code: 'es', flag: '🇪🇸', label: 'Spanish' },
-  { code: 'ko', flag: '🇰🇷', label: 'Korean' },
-  { code: 'zh', flag: '🇨🇳', label: 'Chinese' },
-  { code: 'fr', flag: '🇫🇷', label: 'French' },
-  { code: 'de', flag: '🇩🇪', label: 'German' },
+  { code: 'en', flag: '🇺🇸', label: 'English'    },
+  { code: 'ja', flag: '🇯🇵', label: 'Japanese'   },
+  { code: 'es', flag: '🇪🇸', label: 'Spanish'    },
+  { code: 'ko', flag: '🇰🇷', label: 'Korean'     },
+  { code: 'zh', flag: '🇨🇳', label: 'Chinese'    },
+  { code: 'fr', flag: '🇫🇷', label: 'French'     },
+  { code: 'de', flag: '🇩🇪', label: 'German'     },
   { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
-  { code: 'th', flag: '🇹🇭', label: 'Thai' },
-  { code: 'ar', flag: '🇸🇦', label: 'Arabic' },
-  { code: 'hi', flag: '🇮🇳', label: 'Hindi' },
+  { code: 'th', flag: '🇹🇭', label: 'Thai'       },
+  { code: 'ar', flag: '🇸🇦', label: 'Arabic'     },
+  { code: 'hi', flag: '🇮🇳', label: 'Hindi'      },
   { code: 'id', flag: '🇮🇩', label: 'Indonesian' },
 ];
 
-const CULTURE_CATS   = ['food', 'tradition', 'music', 'humor', 'language', 'places', 'daily life', 'celebration'];
-const CULTURE_EMOJIS = ['🌍', '🍜', '🎵', '😂', '🏛️', '🗺️', '🎉', '🤝', '🏠', '👨‍👩‍👧‍👦', '🎭', '🌺'];
+const STREAM_REGIONS = [
+  { id: 'all',      label: 'All'          },
+  { id: 'africa',   label: 'Africa'       },
+  { id: 'asia',     label: 'Asia'         },
+  { id: 'europe',   label: 'Europe'       },
+  { id: 'americas', label: 'Americas'     },
+  { id: 'mideast',  label: 'Middle East'  },
+  { id: 'pacific',  label: 'Pacific'      },
+];
 
-// World Impressions — the 3 footprint prompts
+const STREAM_CATS = [
+  { id: 'all',     label: 'All'     },
+  { id: 'music',   label: 'Music'   },
+  { id: 'food',    label: 'Food'    },
+  { id: 'talk',    label: 'Talk'    },
+  { id: 'dance',   label: 'Dance'   },
+  { id: 'travel',  label: 'Travel'  },
+  { id: 'gaming',  label: 'Gaming'  },
+  { id: 'art',     label: 'Art'     },
+  { id: 'sport',   label: 'Sport'   },
+  { id: 'culture', label: 'Culture' },
+];
+
+const STREAM_REGION_CODES = {
+  africa:   ['NG','GH','ZA','KE','EG','SN','CI','TZ','ET','MA','CM','TN','DZ','SD','UG','RW'],
+  asia:     ['CN','JP','KR','IN','PH','TH','ID','VN','MY','SG','BD','PK','MM','KH','LK','NP'],
+  europe:   ['GB','FR','DE','IT','ES','NL','SE','NO','PL','UA','RU','TR','PT','GR','RO','HU'],
+  americas: ['US','CA','MX','BR','CO','AR','PE','CL','EC','DO','CU','JM','HT','BO','VE'],
+  mideast:  ['SA','AE','OM','QA','KW','BH','IQ','LB','JO','IL','SY','YE','PS','IR'],
+  pacific:  ['AU','NZ','FJ','PG','WS','TO','VU','KI','FM','PW'],
+};
+
 const IMPRESSION_PROMPTS = [
-  { key: 'give',    icon: '🌍', prompt: 'One thing my country gave the world…' },
-  { key: 'draw',    icon: '🤝', prompt: 'What draws me to meeting new people…' },
-  { key: 'moment',  icon: '👣', prompt: 'The moment that left the biggest footprint on me…' },
+  { key: 'give',   icon: '🌍', prompt: 'One thing my country gave the world…'            },
+  { key: 'draw',   icon: '🤝', prompt: 'What draws me to meeting new people…'            },
+  { key: 'moment', icon: '👣', prompt: 'The moment that left the biggest footprint on me…' },
+];
+
+const UNLOCK_GATES = [
+  { threshold: 1,  label: 'Photos',      icon: '📸' },
+  { threshold: 3,  label: 'Live Stream', icon: '📡' },
+  { threshold: 5,  label: 'Groups',      icon: '👥' },
+  { threshold: 10, label: 'Leaderboard', icon: '🏆' },
 ];
 
 function completionPct(profile) {
@@ -53,7 +88,7 @@ function completionPct(profile) {
   return Math.round(((filled + (hasTypes ? 1 : 0)) / (fields.length + 1)) * 100);
 }
 
-// ─── Voice note player ────────────────────────────────────────────────────────
+// ─── VoiceNotePlayer ──────────────────────────────────────────────────────────
 function VoiceNotePlayer({ url }) {
   const [loading,  setLoading]  = useState(true);
   const [playing,  setPlaying]  = useState(false);
@@ -106,36 +141,36 @@ function VoiceNotePlayer({ url }) {
   }
 
   return (
-    <TouchableOpacity style={vStyles.container} onPress={togglePlay} activeOpacity={0.85} disabled={loading || loadErr}>
+    <TouchableOpacity style={vn.container} onPress={togglePlay} activeOpacity={0.85} disabled={loading || loadErr}>
       {loading ? (
-        <ActivityIndicator color="#6C47FF" size="small" />
+        <ActivityIndicator color={BOND_PINK} size="small" />
       ) : (
-        <View style={[vStyles.btn, playing && vStyles.btnActive]}>
-          <Text style={vStyles.btnIcon}>{playing ? '⏸' : '▶'}</Text>
+        <View style={[vn.btn, playing && vn.btnActive]}>
+          <Text style={vn.btnIcon}>{playing ? '⏸' : '▶'}</Text>
         </View>
       )}
-      <View style={vStyles.waveform}>
+      <View style={vn.waveform}>
         {bars.map((h, i) => (
-          <View key={i} style={[vStyles.bar, { height: h, opacity: playing ? 1 : 0.35 }]} />
+          <View key={i} style={[vn.bar, { height: h, opacity: playing ? 1 : 0.35 }]} />
         ))}
       </View>
-      <Text style={vStyles.dur}>{loadErr ? '--:--' : fmt(playing ? position : duration)}</Text>
+      <Text style={vn.dur}>{loadErr ? '--:--' : fmt(playing ? position : duration)}</Text>
     </TouchableOpacity>
   );
 }
-const vStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6C47FF12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#6C47FF30' },
-  btn:       { width: 42, height: 42, borderRadius: 21, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
-  btnActive: { backgroundColor: '#5533DD' },
+const vn = StyleSheet.create({
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: BOND_PINK + '12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: BOND_PINK + '30' },
+  btn:       { width: 42, height: 42, borderRadius: 21, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
+  btnActive: { backgroundColor: '#CC0060' },
   btnIcon:   { color: '#fff', fontSize: 14 },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
-  bar:       { width: 3, borderRadius: 2, backgroundColor: '#6C47FF' },
+  bar:       { width: 3, borderRadius: 2, backgroundColor: BOND_PINK },
   dur:       { color: '#666', fontSize: 12 },
 });
 
-// ─── Edit modal ───────────────────────────────────────────────────────────────
+// ─── EditModal ────────────────────────────────────────────────────────────────
 function EditModal({ visible, profile, onSave, onClose }) {
-  const [form, setForm]     = useState({});
+  const [form,   setForm]   = useState({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -173,55 +208,55 @@ function EditModal({ visible, profile, onSave, onClose }) {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={eStyles.container}>
-        <View style={eStyles.header}>
-          <TouchableOpacity onPress={onClose}><Text style={eStyles.cancel}>Cancel</Text></TouchableOpacity>
-          <Text style={eStyles.title}>Edit Profile</Text>
+      <SafeAreaView style={em.container}>
+        <View style={em.header}>
+          <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
+          <Text style={em.title}>Edit Profile</Text>
           <TouchableOpacity onPress={save} disabled={saving}>
-            {saving ? <ActivityIndicator color="#6C47FF" /> : <Text style={eStyles.save}>Save</Text>}
+            {saving ? <ActivityIndicator color={BOND_PINK} /> : <Text style={em.save}>Save</Text>}
           </TouchableOpacity>
         </View>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={eStyles.body} showsVerticalScrollIndicator={false}>
-            <View style={eStyles.group}>
-              <Text style={eStyles.label}>Display Name</Text>
-              <TextInput style={eStyles.input} value={form.display_name} onChangeText={t => setForm(f => ({ ...f, display_name: t }))} maxLength={30} placeholderTextColor="#555" />
+          <ScrollView contentContainerStyle={em.body} showsVerticalScrollIndicator={false}>
+            <View style={em.group}>
+              <Text style={em.label}>Display Name</Text>
+              <TextInput style={em.input} value={form.display_name} onChangeText={t => setForm(f => ({ ...f, display_name: t }))} maxLength={30} placeholderTextColor="#555" />
             </View>
-            <View style={eStyles.row}>
-              <View style={[eStyles.group, { flex: 1 }]}>
-                <Text style={eStyles.label}>Age</Text>
-                <TextInput style={eStyles.input} value={form.age} onChangeText={t => setForm(f => ({ ...f, age: t }))} keyboardType="number-pad" maxLength={3} placeholderTextColor="#555" />
+            <View style={em.row}>
+              <View style={[em.group, { flex: 1 }]}>
+                <Text style={em.label}>Age</Text>
+                <TextInput style={em.input} value={form.age} onChangeText={t => setForm(f => ({ ...f, age: t }))} keyboardType="number-pad" maxLength={3} placeholderTextColor="#555" />
               </View>
-              <View style={[eStyles.group, { flex: 2 }]}>
-                <Text style={eStyles.label}>City</Text>
-                <TextInput style={eStyles.input} value={form.city} onChangeText={t => setForm(f => ({ ...f, city: t }))} placeholder="Your city" placeholderTextColor="#555" />
+              <View style={[em.group, { flex: 2 }]}>
+                <Text style={em.label}>City</Text>
+                <TextInput style={em.input} value={form.city} onChangeText={t => setForm(f => ({ ...f, city: t }))} placeholder="Your city" placeholderTextColor="#555" />
               </View>
             </View>
-            <View style={eStyles.group}>
-              <Text style={eStyles.label}>Bio <Text style={{ color: '#555', fontWeight: '400' }}>(optional)</Text></Text>
-              <TextInput style={[eStyles.input, { minHeight: 90 }]} value={form.bio} onChangeText={t => setForm(f => ({ ...f, bio: t }))} placeholder="What makes you interesting?" placeholderTextColor="#555" multiline maxLength={200} textAlignVertical="top" />
+            <View style={em.group}>
+              <Text style={em.label}>Bio <Text style={{ color: '#555', fontWeight: '400' }}>(optional)</Text></Text>
+              <TextInput style={[em.input, { minHeight: 90 }]} value={form.bio} onChangeText={t => setForm(f => ({ ...f, bio: t }))} placeholder="What makes you interesting?" placeholderTextColor="#555" multiline maxLength={200} textAlignVertical="top" />
               <Text style={{ color: '#555', fontSize: 11, textAlign: 'right' }}>{(form.bio || '').length}/200</Text>
             </View>
-            <View style={eStyles.group}>
-              <Text style={eStyles.label}>Language</Text>
+            <View style={em.group}>
+              <Text style={em.label}>Language</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {LANGUAGES.map(l => (
-                  <TouchableOpacity key={l.code} style={[eStyles.chip, form.language === l.code && eStyles.chipOn]} onPress={() => setForm(f => ({ ...f, language: l.code }))}>
+                  <TouchableOpacity key={l.code} style={[em.chip, form.language === l.code && em.chipOn]} onPress={() => setForm(f => ({ ...f, language: l.code }))}>
                     <Text>{l.flag}</Text>
-                    <Text style={[eStyles.chipText, form.language === l.code && { color: '#6C47FF', fontWeight: '700' }]}>{l.label}</Text>
+                    <Text style={[em.chipText, form.language === l.code && { color: BOND_PINK, fontWeight: '700' }]}>{l.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
-            <View style={eStyles.group}>
-              <Text style={eStyles.label}>Here For</Text>
-              <View style={eStyles.ctGrid}>
+            <View style={em.group}>
+              <Text style={em.label}>Here For</Text>
+              <View style={em.ctGrid}>
                 {CONNECTION_TYPES.map(ct => {
                   const on = form.connection_types?.includes(ct.key);
                   return (
-                    <TouchableOpacity key={ct.key} style={[eStyles.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]} onPress={() => toggleType(ct.key)}>
+                    <TouchableOpacity key={ct.key} style={[em.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]} onPress={() => toggleType(ct.key)}>
                       <Text style={{ fontSize: 18 }}>{ct.emoji}</Text>
-                      <Text style={[eStyles.ctLabel, on && { color: ct.color }]}>{ct.label}</Text>
+                      <Text style={[em.ctLabel, on && { color: ct.color }]}>{ct.label}</Text>
                       {on && <Text style={{ fontSize: 11, fontWeight: '800', color: ct.color, marginLeft: 'auto' }}>✓</Text>}
                     </TouchableOpacity>
                   );
@@ -234,26 +269,26 @@ function EditModal({ visible, profile, onSave, onClose }) {
     </Modal>
   );
 }
-const eStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
+const em = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#000' },
   header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
   cancel:    { color: '#555', fontSize: 16, fontWeight: '600' },
   title:     { color: '#fff', fontSize: 18, fontWeight: '900' },
-  save:      { color: '#6C47FF', fontSize: 16, fontWeight: '800' },
+  save:      { color: BOND_PINK, fontSize: 16, fontWeight: '800' },
   body:      { padding: 20, gap: 22, paddingBottom: 60 },
   row:       { flexDirection: 'row', gap: 12 },
   group:     { gap: 8 },
   label:     { color: '#555', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
   input:     { backgroundColor: '#16181C', color: '#fff', fontSize: 15, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
   chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  chipOn:    { backgroundColor: '#6C47FF18', borderColor: '#6C47FF55' },
+  chipOn:    { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' },
   chipText:  { color: '#666', fontSize: 13, fontWeight: '600' },
   ctGrid:    { gap: 10 },
   ctCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
   ctLabel:   { color: '#666', fontSize: 14, fontWeight: '700' },
 });
 
-// ─── World Impression card ─────────────────────────────────────────────────
+// ─── ImpressionCard ───────────────────────────────────────────────────────────
 function ImpressionCard({ data, onEdit }) {
   return (
     <TouchableOpacity style={imp.card} onPress={onEdit} activeOpacity={0.85}>
@@ -261,13 +296,9 @@ function ImpressionCard({ data, onEdit }) {
         <Text style={imp.icon}>{data.icon}</Text>
         <Text style={imp.prompt}>{data.prompt}</Text>
       </View>
-      {data.answer ? (
-        <Text style={imp.answer}>"{data.answer}"</Text>
-      ) : (
-        <View style={imp.emptyRow}>
-          <Text style={imp.emptyText}>Tap to leave your impression…</Text>
-        </View>
-      )}
+      {data.answer
+        ? <Text style={imp.answer}>"{data.answer}"</Text>
+        : <Text style={imp.emptyText}>Tap to leave your impression…</Text>}
     </TouchableOpacity>
   );
 }
@@ -277,11 +308,10 @@ const imp = StyleSheet.create({
   icon:      { fontSize: 20 },
   prompt:    { color: 'rgba(255,255,255,0.38)', fontSize: 12, fontWeight: '700', flex: 1, lineHeight: 17 },
   answer:    { color: '#fff', fontSize: 15, fontStyle: 'italic', lineHeight: 23, paddingLeft: 30 },
-  emptyRow:  { paddingLeft: 30 },
-  emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 13, fontStyle: 'italic' },
+  emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 13, fontStyle: 'italic', paddingLeft: 30 },
 });
 
-// ─── Impression edit modal ─────────────────────────────────────────────────
+// ─── ImpressionEditModal ──────────────────────────────────────────────────────
 function ImpressionEditModal({ visible, item, onSave, onClose }) {
   const [text, setText] = useState('');
   useEffect(() => { if (visible) setText(item?.answer || ''); }, [visible]);
@@ -289,12 +319,12 @@ function ImpressionEditModal({ visible, item, onSave, onClose }) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-        <View style={impEdit.sheet}>
-          <View style={impEdit.handle} />
-          <Text style={impEdit.icon}>{item?.icon}</Text>
-          <Text style={impEdit.prompt}>{item?.prompt}</Text>
+        <View style={ie.sheet}>
+          <View style={ie.handle} />
+          <Text style={ie.icon}>{item?.icon}</Text>
+          <Text style={ie.prompt}>{item?.prompt}</Text>
           <TextInput
-            style={impEdit.input}
+            style={ie.input}
             value={text}
             onChangeText={setText}
             placeholder="Write your impression…"
@@ -303,72 +333,145 @@ function ImpressionEditModal({ visible, item, onSave, onClose }) {
             maxLength={180}
             autoFocus
           />
-          <Text style={impEdit.count}>{text.length}/180</Text>
+          <Text style={ie.count}>{text.length}/180</Text>
           <TouchableOpacity
-            style={[impEdit.saveBtn, !text.trim() && { opacity: 0.4 }]}
+            style={[ie.saveBtn, !text.trim() && { opacity: 0.4 }]}
             onPress={() => { onSave(text.trim()); onClose(); }}
             disabled={!text.trim()}
           >
-            <Text style={impEdit.saveTxt}>Save Impression</Text>
+            <Text style={ie.saveTxt}>Save Impression</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
-const impEdit = StyleSheet.create({
+const ie = StyleSheet.create({
   sheet:   { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14, paddingBottom: 40 },
   handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   icon:    { fontSize: 28, textAlign: 'center' },
   prompt:  { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
   input:   { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2a2a2a', lineHeight: 23 },
   count:   { color: '#333', fontSize: 11, textAlign: 'right' },
-  saveBtn: { backgroundColor: '#6C47FF', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  saveBtn: { backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
   saveTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
 
-// ─── Bond Mark — milestone tier badge ──────────────────────────────────────────
-function BondCrest({ tier }) {
-  if (!tier || tier === 'free') return null;
-  const isPro = tier === 'pro';
-  const bg = isPro ? '#B8860B' : '#5B21B6';
+// ─── PassportSection ──────────────────────────────────────────────────────────
+function PassportSection({ bondCount, countries, onViewAll }) {
+  const flags = countries.slice(0, 8);
+  const extra = Math.max(0, countries.length - 8);
+  const nextGate = UNLOCK_GATES.find(g => bondCount < g.threshold);
+  const progress = nextGate ? Math.min(bondCount / nextGate.threshold, 1) : 1;
+
   return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: isPro ? 2 : 0,
-      paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5,
-      backgroundColor: bg,
-    }}>
-      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>
-      {isPro && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>}
+    <View style={ps.card}>
+      <View style={ps.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={ps.title}>World Passport</Text>
+          <Text style={ps.sub}>
+            {countries.length} {countries.length === 1 ? 'country' : 'countries'} bonded
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onViewAll} style={ps.viewAllBtn}>
+          <Text style={ps.viewAllTxt}>View All</Text>
+        </TouchableOpacity>
+      </View>
+
+      {countries.length > 0 ? (
+        <View style={ps.flagGrid}>
+          {flags.map((country, i) => (
+            <View key={i} style={ps.chip}>
+              <Text style={ps.chipFlag}>{getCountryFlag(country)}</Text>
+            </View>
+          ))}
+          {extra > 0 && (
+            <View style={[ps.chip, ps.extraChip]}>
+              <Text style={ps.extraTxt}>+{extra}</Text>
+            </View>
+          )}
+        </View>
+      ) : (
+        <Text style={ps.emptyTxt}>Bond with someone to earn your first stamp</Text>
+      )}
+
+      {nextGate && (
+        <View style={ps.progressWrap}>
+          <View style={ps.progressTrack}>
+            <Animated.View style={[ps.progressFill, { width: `${progress * 100}%` }]} />
+          </View>
+          <Text style={ps.progressLabel}>
+            {nextGate.icon}  {nextGate.threshold - bondCount} more bond{nextGate.threshold - bondCount !== 1 ? 's' : ''} to unlock {nextGate.label}
+          </Text>
+        </View>
+      )}
+
+      <View style={ps.gatesRow}>
+        {UNLOCK_GATES.map((gate, i) => {
+          const unlocked = bondCount >= gate.threshold;
+          return (
+            <View key={i} style={[ps.gate, unlocked && ps.gateOn]}>
+              <Text style={ps.gateIcon}>{gate.icon}</Text>
+              <Text style={[ps.gateLabel, unlocked && ps.gateLabelOn]} numberOfLines={1}>{gate.label}</Text>
+              {unlocked
+                ? <Text style={ps.gateCheck}>✓</Text>
+                : <Text style={ps.gateThreshold}>{gate.threshold}</Text>}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
+const ps = StyleSheet.create({
+  card:         { backgroundColor: '#0d0d0d', borderRadius: 22, padding: 18, gap: 16, borderWidth: 1, borderColor: BOND_PINK + '25', marginHorizontal: 20 },
+  header:       { flexDirection: 'row', alignItems: 'center' },
+  title:        { color: '#fff', fontSize: 17, fontWeight: '900' },
+  sub:          { color: BOND_PINK, fontSize: 12, marginTop: 2, fontWeight: '600' },
+  viewAllBtn:   { backgroundColor: BOND_PINK + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: BOND_PINK + '40' },
+  viewAllTxt:   { color: BOND_PINK, fontSize: 12, fontWeight: '700' },
+  flagGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:         { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: BOND_PINK + '25', alignItems: 'center', justifyContent: 'center' },
+  chipFlag:     { fontSize: 24 },
+  extraChip:    { backgroundColor: BOND_PINK + '15' },
+  extraTxt:     { color: BOND_PINK, fontSize: 13, fontWeight: '800' },
+  emptyTxt:     { color: '#444', fontSize: 13, lineHeight: 19 },
+  progressWrap: { gap: 6 },
+  progressTrack:{ height: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
+  progressLabel:{ color: '#555', fontSize: 12 },
+  gatesRow:     { flexDirection: 'row', gap: 8 },
+  gate:         { flex: 1, alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  gateOn:       { backgroundColor: BOND_PINK + '12', borderColor: BOND_PINK + '35' },
+  gateIcon:     { fontSize: 16 },
+  gateLabel:    { color: '#444', fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  gateLabelOn:  { color: BOND_PINK },
+  gateCheck:    { color: BOND_PINK, fontSize: 10, fontWeight: '900' },
+  gateThreshold:{ color: '#333', fontSize: 9, fontWeight: '700' },
+});
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
+// ─── MyProfileScreen ──────────────────────────────────────────────────────────
 export default function MyProfileScreen({ navigation, user, onLogout }) {
-  const { tier, tierInfo, isPremium } = usePremium();
   const { colors } = useTheme();
   const socket = getSocket();
 
-  const [profile, setProfile]         = useState(null);
-  const [loading, setLoading]         = useState(true);
-  const [myExps, setMyExps]           = useState([]);
-  const [matchCount, setMatchCount]   = useState(0);
-  const [flagsPlanted, setFlagsPlanted]   = useState([]);   // array of country strings
-  const [showEdit, setShowEdit]       = useState(false);
-  const [tab, setTab]                 = useState('profile');
-  const [galleryUploading, setGalleryUploading] = useState(false);
-  const [viewingPhoto, setViewingPhoto] = useState(null);
-  const [coverPhotoUrl, setCoverPhotoUrl] = useState(null);
-
-  const [culturePosts, setCulturePosts] = useState([]);
-  const [cultureText, setCultureText]   = useState('');
-  const [cultureEmoji, setCultureEmoji] = useState('🌍');
-  const [cultureCat, setCultureCat]     = useState('daily life');
-
-  // World Impressions
-  const [impressions, setImpressions]       = useState({ give: '', draw: '', moment: '' });
-  const [editingImp,  setEditingImp]        = useState(null); // the prompt object being edited
+  const [profile,         setProfile]         = useState(null);
+  const [loading,         setLoading]         = useState(true);
+  const [myExps,          setMyExps]          = useState([]);
+  const [matchCount,      setMatchCount]      = useState(0);
+  const [flagsPlanted,    setFlagsPlanted]    = useState([]);
+  const [showEdit,        setShowEdit]        = useState(false);
+  const [tab,             setTab]             = useState('profile');
+  const [galleryUploading,setGalleryUploading]= useState(false);
+  const [viewingPhoto,    setViewingPhoto]    = useState(null);
+  const [coverPhotoUrl,   setCoverPhotoUrl]   = useState(null);
+  const [liveStreams,   setLiveStreams]  = useState([]);
+  const [liveRegion,   setLiveRegion]  = useState('all');
+  const [filterCat,    setFilterCat]   = useState('all');
+  const [searchQuery,  setSearchQuery] = useState('');
+  const [filterOpen,   setFilterOpen]  = useState(null);
+  const [impressions,     setImpressions]     = useState({ give: '', draw: '', moment: '' });
+  const [editingImp,      setEditingImp]      = useState(null);
 
   const fadeAnim  = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -379,20 +482,17 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       if (!token) { setLoading(false); return; }
       const headers = { Authorization: `Bearer ${token}` };
       const [pRes, eRes, mRes] = await Promise.allSettled([
-        axios.get(`${SERVER_URL}/api/profiles/me`, { headers, timeout: 8000 }),
+        axios.get(`${SERVER_URL}/api/profiles/me`,      { headers, timeout: 8000 }),
         axios.get(`${SERVER_URL}/api/experiences/mine`, { headers, timeout: 8000 }),
-        axios.get(`${SERVER_URL}/api/matches`, { headers, timeout: 8000 }),
+        axios.get(`${SERVER_URL}/api/matches`,          { headers, timeout: 8000 }),
       ]);
       if (pRes.status === 'fulfilled') setProfile(pRes.value.data);
       if (eRes.status === 'fulfilled') setMyExps(eRes.value.data);
       if (mRes.status === 'fulfilled') setMatchCount(mRes.value.data.length);
 
-      // Load footprint countries
-      const raw = await AsyncStorage.getItem('bond_saved_countries');
-      setFlagsPlanted(raw ? JSON.parse(raw) : []);
-
-      // Load World Impressions
+      const raw    = await AsyncStorage.getItem('bond_saved_countries');
       const impRaw = await AsyncStorage.getItem('world_impressions');
+      setFlagsPlanted(raw ? JSON.parse(raw) : []);
       if (impRaw) setImpressions(JSON.parse(impRaw));
     } catch {}
     finally { setLoading(false); }
@@ -400,16 +500,16 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
   useEffect(() => {
     loadData();
-    if (socket.connected) socket.emit('get_cultural_posts');
-    else socket.once('connect', () => socket.emit('get_cultural_posts'));
-    socket.on('cultural_posts', setCulturePosts);
-    return () => socket.off('cultural_posts');
+    if (socket.connected) socket.emit('get_live_streams');
+    else socket.once('connect', () => socket.emit('get_live_streams'));
+    socket.on('live_streams', setLiveStreams);
+    return () => socket.off('live_streams', setLiveStreams);
   }, [loadData]);
 
   useEffect(() => {
     if (!loading) {
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true }),
       ]).start();
     }
@@ -491,10 +591,10 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
     try {
       const token = await getAccessToken();
       const form  = new FormData();
-      form.append('photo', { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'photo.jpg' });
-      form.append('userId', user?.userId || '');
+      form.append('photo',    { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'photo.jpg' });
+      form.append('userId',   user?.userId || '');
       form.append('username', profile?.display_name || user?.username || '');
-      form.append('country', profile?.country || user?.country || '');
+      form.append('country',  profile?.country || user?.country || '');
       form.append('language', profile?.language || 'en');
       const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
@@ -536,27 +636,19 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
     await AsyncStorage.setItem('world_impressions', JSON.stringify(updated));
   }
 
-  function submitCulturePost() {
-    if (!cultureText.trim()) return;
-    socket.emit('submit_cultural_post', { text: cultureText.trim(), emoji: cultureEmoji, category: cultureCat });
-    setCultureText('');
-  }
-
   const pct         = completionPct(profile);
   const displayName = profile?.display_name || user?.username || 'You';
-  const tierColor   = tierInfo?.color || '#6C47FF';
-
-  const countryStr = profile?.country || user?.country || '';
+  const countryStr  = profile?.country || user?.country || '';
   const countryFlag = getCountryFlag(countryStr);
   const countryCity = [profile?.city, countryStr].filter(Boolean).join(', ');
 
   return (
-    <LinearGradient colors={['#1e0025', '#110018', '#070010', '#000000']} locations={[0, 0.3, 0.65, 1]} style={{ flex: 1 }}>
+    <LinearGradient colors={['#080a10', '#07080f', '#050608']} style={{ flex: 1 }}>
     <SafeAreaView style={s.container}>
 
       {/* ── Top bar ── */}
       <View style={s.topBar}>
-        <Text style={s.topBarTitle}>Me</Text>
+        <Text style={s.topBarTitle}>Profile</Text>
         <View style={s.topBarActions}>
           <TouchableOpacity style={s.editBtn} onPress={() => setShowEdit(true)}>
             <Text style={s.editBtnTxt}>Edit</Text>
@@ -576,43 +668,35 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
         ))}
       </View>
 
-      {/* ════════════════════════ PROFILE TAB ════════════════════════ */}
+      {/* ════════════════════ PROFILE TAB ════════════════════ */}
       {tab === 'profile' && (
         <Animated.ScrollView
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
         >
+
           {/* ── Banner ── */}
           <View style={s.banner}>
             {(coverPhotoUrl || profile?.cover_photo_url) ? (
-              <Image
-                source={{ uri: coverPhotoUrl || profile.cover_photo_url }}
-                style={s.bannerBg}
-                resizeMode="cover"
-              />
+              <Image source={{ uri: coverPhotoUrl || profile.cover_photo_url }} style={s.bannerBg} resizeMode="cover" />
             ) : (
-              <LinearGradient
-                colors={[tierColor + 'cc', tierColor + '55', tierColor + '22']}
-                style={s.bannerBg}
-              />
+              <LinearGradient colors={[BOND_PINK + 'cc', BOND_PINK + '55', BOND_PINK + '22']} style={s.bannerBg} />
             )}
             <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={s.bannerFade} />
-
-            {/* 3-dot edit cover */}
             <TouchableOpacity style={s.editBgBtn} onPress={pickCoverPhoto} activeOpacity={0.75}>
               <Text style={s.editBgDots}>•••</Text>
             </TouchableOpacity>
           </View>
 
-          {/* ── Avatar action row — overlaps banner seam ── */}
-          <View style={s.avatarActionRow}>
+          {/* ── Avatar ── */}
+          <View style={s.avatarRow}>
             <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85} style={s.avatarWrap}>
               <View style={s.avatarRing}>
                 {profile?.photo_url ? (
                   <Image source={{ uri: profile.photo_url }} style={s.avatar} />
                 ) : (
-                  <LinearGradient colors={[tierColor, tierColor + 'aa']} style={s.avatarFallback}>
+                  <LinearGradient colors={[BOND_PINK, BOND_PINK + 'aa']} style={s.avatarFallback}>
                     <Text style={s.avatarInitial}>{displayName[0]?.toUpperCase()}</Text>
                   </LinearGradient>
                 )}
@@ -621,40 +705,46 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </TouchableOpacity>
           </View>
 
-          {/* ── Profile info ── */}
+          {/* ── Name + location ── */}
           <View style={s.profileInfo}>
-            <View style={s.heroNameRow}>
-              <Text style={s.heroName} numberOfLines={1}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
-              <BondCrest tier={tier} />
-            </View>
+            <Text style={s.heroName} numberOfLines={1}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
             {countryCity ? <Text style={s.heroLoc}>{countryCity} {countryFlag}</Text> : null}
             {profile?.gender ? <Text style={s.heroGender}>{profile.gender}</Text> : null}
           </View>
 
-          {/* ── Bio — blended, no label ── */}
-          <TouchableOpacity style={s.headerStory} onPress={() => setShowEdit(true)} activeOpacity={0.7}>
+          {/* ── Bio ── */}
+          <TouchableOpacity style={s.bioWrap} onPress={() => setShowEdit(true)} activeOpacity={0.7}>
             {profile?.bio
-              ? <Text style={s.headerBioText}>{profile.bio}</Text>
-              : <Text style={s.headerBioPlaceholder}>Add a bio</Text>}
+              ? <Text style={s.bioText}>{profile.bio}</Text>
+              : <Text style={s.bioPlaceholder}>Add a bio</Text>}
           </TouchableOpacity>
 
-          {/* ── Stats — Twitter-style inline text ── */}
-          <View style={s.twitterStats}>
-            <View style={s.twitterStat}>
-              <Text style={s.twitterStatNum}>{matchCount ?? '—'}</Text>
-              <Text style={s.twitterStatLabel}> Bonds</Text>
+          {/* ── Stats ── */}
+          <View style={s.statsRow}>
+            <View style={s.stat}>
+              <Text style={s.statNum}>{matchCount ?? '—'}</Text>
+              <Text style={s.statLabel}> Bonds</Text>
             </View>
-            <Text style={s.twitterDot}>·</Text>
-            <View style={s.twitterStat}>
-              <Text style={s.twitterStatNum}>{flagsPlanted.length ?? '—'}</Text>
-              <Text style={s.twitterStatLabel}> Bonding</Text>
+            <Text style={s.statDot}>·</Text>
+            <View style={s.stat}>
+              <Text style={s.statNum}>{flagsPlanted.length ?? '—'}</Text>
+              <Text style={s.statLabel}> Countries</Text>
             </View>
-            <Text style={s.twitterDot}>·</Text>
-            <View style={s.twitterStat}>
-              <Text style={s.twitterStatNum}>{myExps.length ?? '—'}</Text>
-              <Text style={s.twitterStatLabel}> Footprints</Text>
+            <Text style={s.statDot}>·</Text>
+            <View style={s.stat}>
+              <Text style={s.statNum}>{myExps.length ?? '—'}</Text>
+              <Text style={s.statLabel}> Footprints</Text>
             </View>
           </View>
+
+          {/* ── World Passport ── */}
+          <PassportSection
+            bondCount={matchCount}
+            countries={flagsPlanted}
+            onViewAll={() => navigation.navigate('CountryStampChallenge', {
+              stamp: flagsPlanted.length > 0 ? { flag: getCountryFlag(flagsPlanted[0]) } : {},
+            })}
+          />
 
           {/* ── Profile completion ── */}
           {pct < 100 && (
@@ -671,7 +761,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </TouchableOpacity>
           )}
 
-          {/* ── Moments (photo strip) ── */}
+          {/* ── Moments ── */}
           <View style={s.section}>
             <View style={s.sectionRow}>
               <Text style={s.sectionLabel}>📸 Moments</Text>
@@ -679,16 +769,12 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.polaroidRow}>
               <TouchableOpacity style={s.polaroidAdd} onPress={addGalleryPhoto} disabled={galleryUploading} activeOpacity={0.8}>
-                {galleryUploading ? <ActivityIndicator color="#6C47FF" size="small" /> : <Text style={s.polaroidAddIcon}>+</Text>}
+                {galleryUploading
+                  ? <ActivityIndicator color={BOND_PINK} size="small" />
+                  : <Text style={s.polaroidAddIcon}>+</Text>}
               </TouchableOpacity>
               {(profile?.gallery_photos || []).map((url, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={s.polaroid}
-                  onPress={() => setViewingPhoto(url)}
-                  onLongPress={() => removeGalleryPhoto(i)}
-                  activeOpacity={0.9}
-                >
+                <TouchableOpacity key={i} style={s.polaroid} onPress={() => setViewingPhoto(url)} onLongPress={() => removeGalleryPhoto(i)} activeOpacity={0.9}>
                   <Image source={{ uri: url }} style={s.polaroidImg} />
                   <TouchableOpacity style={s.polaroidRemove} onPress={() => removeGalleryPhoto(i)}>
                     <Text style={{ color: '#fff', fontSize: 9, fontWeight: '900' }}>✕</Text>
@@ -722,8 +808,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             )}
           </View>
 
-
-          {/* ── World Impressions (1 of 1 footprint feature) ── */}
+          {/* ── World Impressions ── */}
           <View style={s.section}>
             <View style={s.sectionRow}>
               <Text style={s.sectionLabel}>👣 World Impressions</Text>
@@ -738,11 +823,12 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             ))}
           </View>
 
-
           {/* ── Go Live ── */}
           <View style={s.section}>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Live', { user: { username: profile?.display_name || user?.username, userId: user?.userId, photo_url: profile?.photo_url || user?.photo_url } })}
+              onPress={() => navigation.navigate('Live', {
+                user: { username: profile?.display_name || user?.username, userId: user?.userId, photo_url: profile?.photo_url || user?.photo_url },
+              })}
               activeOpacity={0.85}
             >
               <LinearGradient colors={['#380808', '#200404']} style={s.liveCard}>
@@ -768,90 +854,206 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </TouchableOpacity>
           </View>
 
-          {/* ── Subscription ── */}
+          {/* ── Bond Pass ── */}
           <View style={s.section}>
-            <Text style={s.sectionLabel}>💎 Subscription</Text>
-            {isPremium ? (
-              <LinearGradient colors={['#1C1F23', '#1C1F23']} style={[s.subCard, { borderColor: tierColor + '55' }]}>
-                <View>
-                  <Text style={[s.subName, { color: tierColor }]}>{tier === 'plus' ? '💜 Bond Plus' : '⭐ Bond Pro'}</Text>
-                  <Text style={s.subPrice}>Free during beta</Text>
+            <Text style={s.sectionLabel}>⚡ Bond Pass</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85} style={s.passCard}>
+              <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.passInner}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.passTitle}>Bond Pass — $4.99/month</Text>
+                  <Text style={s.passSub}>Unlimited daily connects · Priority matching</Text>
                 </View>
-                <TouchableOpacity style={[s.manageBtn, { backgroundColor: tierColor + '22', borderColor: tierColor + '66' }]} onPress={() => navigation.navigate('Subscription')}>
-                  <Text style={[s.manageTxt, { color: tierColor }]}>Manage</Text>
-                </TouchableOpacity>
+                <Text style={s.passArrow}>→</Text>
               </LinearGradient>
-            ) : (
-              <TouchableOpacity style={s.upgradeCard} onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85}>
-                <LinearGradient colors={['#6C47FF', '#5533DD']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.upgradeInner}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.upgradeTitle}>Upgrade to Bond Plus</Text>
-                    <Text style={s.upgradeSub}>Unlimited gifts · See who viewed you · Priority listing</Text>
-                  </View>
-                  <Text style={s.upgradeArrow}>→</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
+            </TouchableOpacity>
           </View>
 
         </Animated.ScrollView>
       )}
 
-      {/* ════════════════════════ MY WORLD TAB ════════════════════════ */}
-      {tab === 'culture' && (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={s.cultureForm}>
-            <Text style={s.cultureFormTitle}>🌍 Share something about your culture</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-              {CULTURE_EMOJIS.map(e => (
-                <TouchableOpacity key={e} style={[s.emojiBtn, cultureEmoji === e && s.emojiBtnOn]} onPress={() => setCultureEmoji(e)}>
-                  <Text style={{ fontSize: 22 }}>{e}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              {CULTURE_CATS.map(c => (
-                <TouchableOpacity key={c} style={[s.catChip, cultureCat === c && s.catChipOn]} onPress={() => setCultureCat(c)}>
-                  <Text style={[s.catChipTxt, cultureCat === c && { color: '#fff', fontWeight: '700' }]}>{c}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <TextInput
-              style={s.cultureInput}
-              placeholder={`${cultureEmoji} Tell the world something about your culture...`}
-              placeholderTextColor="rgba(255,255,255,0.2)"
-              value={cultureText} onChangeText={setCultureText} multiline maxLength={280}
-            />
-            <TouchableOpacity style={[s.postBtn, !cultureText.trim() && s.postBtnOff]} onPress={submitCulturePost} disabled={!cultureText.trim()}>
-              <Text style={s.postBtnTxt}>Post to the World 🌍</Text>
-            </TouchableOpacity>
-          </View>
+      {/* ════════════════════ MY WORLD TAB ════════════════════ */}
+      {tab === 'culture' && (() => {
+        const q = searchQuery.trim().toLowerCase();
+        let visible = liveStreams.filter(st => {
+          if (q && !(st.hostName || '').toLowerCase().includes(q) && !(st.title || '').toLowerCase().includes(q)) return false;
+          if (filterCat !== 'all' && (st.category || '').toLowerCase() !== filterCat) return false;
+          if (liveRegion !== 'all' && !(STREAM_REGION_CODES[liveRegion] || []).includes((st.hostCountry || '').toUpperCase())) return false;
+          return true;
+        });
+        visible.sort((a, b) => ((b.viewerCount || 0) + (b.giftCount || 0) * 5) - ((a.viewerCount || 0) + (a.giftCount || 0) * 5));
 
-          <FlatList
-            data={culturePosts}
-            keyExtractor={p => String(p.id)}
-            scrollEnabled={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40, gap: 12 }}
-            renderItem={({ item }) => (
-              <View style={s.postCard}>
-                <View style={s.postHeader}>
-                  <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.postUser}>{item.username} · {item.country}</Text>
-                    <View style={s.postCatBadge}><Text style={s.postCatTxt}>{item.category}</Text></View>
-                  </View>
-                  <TouchableOpacity onPress={() => socket.emit('like_cultural_post', { postId: item.id })} style={{ alignItems: 'center', gap: 2 }}>
-                    <Text style={{ fontSize: 18 }}>❤️</Text>
-                    <Text style={{ color: '#e57373', fontSize: 11, fontWeight: '700' }}>{item.likes}</Text>
+        const catLabel    = STREAM_CATS.find(c => c.id === filterCat)?.label || 'Category';
+        const regionLabel = STREAM_REGIONS.find(r => r.id === liveRegion)?.label || 'Region';
+        const hasFilter   = filterCat !== 'all' || liveRegion !== 'all';
+
+        return (
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
+            {/* Search */}
+            <View style={s.searchWrap}>
+              <View style={s.searchBar}>
+                <View style={s.searchDot} />
+                <TextInput
+                  style={s.searchInput}
+                  placeholder="Search streamers or topics..."
+                  placeholderTextColor="rgba(255,255,255,0.25)"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Text style={s.searchClear}>✕</Text>
                   </TouchableOpacity>
-                </View>
-                <Text style={s.postTxt}>{item.text}</Text>
+                )}
+              </View>
+            </View>
+
+            {/* Combined filter bar */}
+            <View style={s.filterBar}>
+              <TouchableOpacity
+                style={[s.filterPill, filterCat !== 'all' && s.filterPillOn]}
+                onPress={() => setFilterOpen(filterOpen === 'cat' ? null : 'cat')}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.filterPillTxt, filterCat !== 'all' && s.filterPillTxtOn]}>
+                  {catLabel}  {filterOpen === 'cat' ? '▲' : '▾'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.filterPill, liveRegion !== 'all' && s.filterPillOn]}
+                onPress={() => setFilterOpen(filterOpen === 'region' ? null : 'region')}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.filterPillTxt, liveRegion !== 'all' && s.filterPillTxtOn]}>
+                  {regionLabel}  {filterOpen === 'region' ? '▲' : '▾'}
+                </Text>
+              </TouchableOpacity>
+
+              {hasFilter && (
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => { setFilterCat('all'); setLiveRegion('all'); setFilterOpen(null); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.clearTxt}>Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Dropdown panels */}
+            {filterOpen === 'cat' && (
+              <View style={s.dropPanel}>
+                {STREAM_CATS.map(c => (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[s.dropItem, filterCat === c.id && s.dropItemOn]}
+                    onPress={() => { setFilterCat(c.id); setFilterOpen(null); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.dropTxt, filterCat === c.id && s.dropTxtOn]}>{c.label}</Text>
+                    {filterCat === c.id && <View style={s.dropCheck} />}
+                  </TouchableOpacity>
+                ))}
               </View>
             )}
-            ListEmptyComponent={<Text style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 40, fontSize: 15 }}>No posts yet — be the first! 🌍</Text>}
-          />
-        </ScrollView>
-      )}
+
+            {filterOpen === 'region' && (
+              <View style={s.dropPanel}>
+                {STREAM_REGIONS.map(r => (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={[s.dropItem, liveRegion === r.id && s.dropItemOn]}
+                    onPress={() => { setLiveRegion(r.id); setFilterOpen(null); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.dropTxt, liveRegion === r.id && s.dropTxtOn]}>{r.label}</Text>
+                    {liveRegion === r.id && <View style={s.dropCheck} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Stream count header */}
+            {visible.length > 0 && (
+              <View style={s.streamHeader}>
+                <View style={s.streamHeaderDot} />
+                <Text style={s.streamHeaderTxt}>
+                  {visible.length} live {visible.length === 1 ? 'stream' : 'streams'}
+                </Text>
+              </View>
+            )}
+
+            {/* Empty state */}
+            {visible.length === 0 && (
+              <View style={s.worldEmpty}>
+                <Text style={s.worldEmptyTitle}>No streams right now</Text>
+                <Text style={s.worldEmptyTxt}>
+                  {liveStreams.length === 0
+                    ? 'Nobody is live yet — be the first.'
+                    : 'Try changing your filters.'}
+                </Text>
+                {liveStreams.length === 0 && (
+                  <TouchableOpacity onPress={() => navigation.navigate('Live', { user })} activeOpacity={0.85} style={s.worldGoLive}>
+                    <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.worldGoLiveGrad}>
+                      <Text style={s.worldGoLiveTxt}>Go Live</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Stream list */}
+            {visible.map(st => {
+              const col = stringToColor(st.hostName || '');
+              return (
+                <TouchableOpacity
+                  key={st.streamId}
+                  style={s.streamRow}
+                  onPress={() => navigation.navigate('LiveWatch', { stream: st, currentUser: user })}
+                  activeOpacity={0.85}
+                >
+                  <View style={[s.streamAvatar, { backgroundColor: col }]}>
+                    <Text style={s.streamAvatarTxt}>{(st.hostName || '?')[0].toUpperCase()}</Text>
+                    {st.hostCountry ? (
+                      <View style={s.streamFlagBadge}>
+                        <Text style={s.streamFlagTxt}>{getCountryFlag(st.hostCountry)}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <View style={s.streamInfo}>
+                    <View style={s.streamNameRow}>
+                      <Text style={s.streamName} numberOfLines={1}>{st.hostName}</Text>
+                      <View style={s.streamLiveBadge}>
+                        <View style={s.streamLiveDot} />
+                        <Text style={s.streamLiveTxt}>LIVE</Text>
+                      </View>
+                    </View>
+                    <Text style={s.streamTitle} numberOfLines={1}>{st.title || 'Live on WorldBond'}</Text>
+                    <View style={s.streamMeta}>
+                      <Text style={s.streamViewers}>{st.viewerCount || 0} watching</Text>
+                      {st.category ? (
+                        <View style={s.streamCatBadge}>
+                          <Text style={s.streamCatTxt}>{st.category}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.joinBtn}>
+                    <Text style={s.joinTxt}>Join</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })}
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        );
+      })()}
 
       <EditModal visible={showEdit} profile={profile} onSave={saveProfile} onClose={() => setShowEdit(false)} />
 
@@ -864,7 +1066,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
       {loading && (
         <View style={s.loadingOverlay} pointerEvents="none">
-          <ActivityIndicator color="#6C47FF" size="large" />
+          <ActivityIndicator color={BOND_PINK} size="large" />
         </View>
       )}
 
@@ -883,155 +1085,165 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
 const GLASS  = 'rgba(255,255,255,0.05)';
 const BORDER = 'rgba(255,255,255,0.09)';
 
 const s = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: 'transparent' },
-  loadingOverlay:  { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
+  container:      { flex: 1, backgroundColor: 'transparent' },
+  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
 
-  topBar:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 10 },
-  topBarTitle:     { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-  topBarActions:   { flexDirection: 'row', gap: 10 },
-  editBtn:         { backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(108,71,255,0.35)' },
-  editBtnTxt:      { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  settingsBtn:     { width: 40, height: 40, borderRadius: 14, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  topBar:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 10 },
+  topBarTitle:   { color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  topBarActions: { flexDirection: 'row', gap: 10 },
+  editBtn:       { backgroundColor: BOND_PINK + '18', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: BOND_PINK + '40' },
+  editBtnTxt:    { color: BOND_PINK, fontSize: 13, fontWeight: '800' },
+  settingsBtn:   { width: 40, height: 40, borderRadius: 14, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
 
-  tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)', marginHorizontal: 20, marginBottom: 2 },
-  tab:             { flex: 1, paddingVertical: 13, alignItems: 'center' },
-  tabActive:       { borderBottomWidth: 2, borderBottomColor: '#6C47FF' },
-  tabTxt:          { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '700' },
-  tabTxtActive:    { color: '#6C47FF' },
+  tabBar:      { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)', marginHorizontal: 20, marginBottom: 2 },
+  tab:         { flex: 1, paddingVertical: 13, alignItems: 'center' },
+  tabActive:   { borderBottomWidth: 2, borderBottomColor: BOND_PINK },
+  tabTxt:      { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '700' },
+  tabTxtActive:{ color: BOND_PINK },
 
-  scroll:          { paddingBottom: 90, gap: 26 },
+  scroll: { paddingBottom: 90, gap: 24 },
 
   // Banner
-  banner:          { height: 185, overflow: 'hidden', backgroundColor: '#05000a' },
-  bannerBg:        { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  bannerFade:      { position: 'absolute', bottom: 0, left: 0, right: 0, height: 85 },
-  editBgBtn:       { position: 'absolute', top: 12, right: 14, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', zIndex: 10 },
-  editBgDots:      { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 1.5 },
+  banner:    { height: 185, overflow: 'hidden', backgroundColor: '#05000a' },
+  bannerBg:  { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bannerFade:{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 85 },
+  editBgBtn: { position: 'absolute', top: 12, right: 14, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', zIndex: 10 },
+  editBgDots:{ color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 1.5 },
 
-  // Avatar action row — overlaps banner seam
-  avatarActionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: -42, paddingBottom: 8 },
-  avatarWrap:      { position: 'relative' },
-  avatarRing:      { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: '#000', backgroundColor: '#000', overflow: 'hidden' },
-  avatar:          { width: '100%', height: '100%' },
-  avatarFallback:  { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  avatarInitial:   { color: '#fff', fontSize: 32, fontWeight: '900' },
-  cameraBtn:       { position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  // Avatar
+  avatarRow:      { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, marginTop: -42, paddingBottom: 8 },
+  avatarWrap:     { position: 'relative' },
+  avatarRing:     { width: 84, height: 84, borderRadius: 42, borderWidth: 4, borderColor: '#000', backgroundColor: '#000', overflow: 'hidden' },
+  avatar:         { width: '100%', height: '100%' },
+  avatarFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  avatarInitial:  { color: '#fff', fontSize: 32, fontWeight: '900' },
+  cameraBtn:      { position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
 
   // Profile info
-  profileInfo:     { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 3 },
-  heroNameRow:     { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 2 },
-  heroName:        { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
-  heroLoc:         { color: 'rgba(255,255,255,0.42)', fontSize: 13 },
-  heroGender:      { color: 'rgba(255,255,255,0.28)', fontSize: 12 },
+  profileInfo: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, gap: 3 },
+  heroName:    { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  heroLoc:     { color: 'rgba(255,255,255,0.42)', fontSize: 13 },
+  heroGender:  { color: 'rgba(255,255,255,0.28)', fontSize: 12 },
 
-  // Bio — blended inline (no label, no card)
-  headerStory:          { marginHorizontal: 16, marginTop: 8, marginBottom: 2 },
-  headerBioText:        { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21 },
-  headerBioPlaceholder: { color: 'rgba(255,255,255,0.22)', fontSize: 14, lineHeight: 21 },
-
-  // Twitter-style stats
-  twitterStats:     { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
-  twitterStat:      { flexDirection: 'row', alignItems: 'baseline' },
-  twitterStatNum:   { color: '#fff', fontSize: 15, fontWeight: '800' },
-  twitterStatLabel: { color: 'rgba(255,255,255,0.42)', fontSize: 14, fontWeight: '400' },
-  twitterDot:       { color: 'rgba(255,255,255,0.2)', fontSize: 16, fontWeight: '300' },
-
-  // Completion
-  completionBar:   { marginHorizontal: 20, backgroundColor: 'rgba(108,71,255,0.08)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(108,71,255,0.2)' },
-  completionRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  completionLbl:   { color: '#6C47FF', fontSize: 13, fontWeight: '800' },
-  completionHint:  { color: 'rgba(108,71,255,0.6)', fontSize: 11, fontWeight: '600' },
-  completionTrack: { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
-  completionFill:  { height: '100%', backgroundColor: '#6C47FF', borderRadius: 2 },
+  // Bio
+  bioWrap:      { marginHorizontal: 16, marginBottom: 4 },
+  bioText:      { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21 },
+  bioPlaceholder:{ color: 'rgba(255,255,255,0.22)', fontSize: 14, lineHeight: 21 },
 
   // Stats
+  statsRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8 },
+  stat:      { flexDirection: 'row', alignItems: 'baseline' },
+  statNum:   { color: '#fff', fontSize: 15, fontWeight: '800' },
+  statLabel: { color: 'rgba(255,255,255,0.42)', fontSize: 14, fontWeight: '400' },
+  statDot:   { color: 'rgba(255,255,255,0.2)', fontSize: 16, fontWeight: '300' },
+
+  // Completion
+  completionBar:  { marginHorizontal: 20, backgroundColor: BOND_PINK + '10', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: BOND_PINK + '25' },
+  completionRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  completionLbl:  { color: BOND_PINK, fontSize: 13, fontWeight: '800' },
+  completionHint: { color: BOND_PINK + '88', fontSize: 11, fontWeight: '600' },
+  completionTrack:{ height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  completionFill: { height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
 
   // Sections
-  section:         { paddingHorizontal: 20, gap: 12 },
-  sectionRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionLabel:    { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
-  sectionSub:      { color: 'rgba(255,255,255,0.22)', fontSize: 10, fontWeight: '600' },
-  editLink:        { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  section:    { paddingHorizontal: 20, gap: 12 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionLabel:{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
+  sectionSub: { color: 'rgba(255,255,255,0.22)', fontSize: 10, fontWeight: '600' },
 
   // Voice
-  voiceEmpty:      { flexDirection: 'row', alignItems: 'center', backgroundColor: GLASS, borderRadius: 18, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed' },
-  voiceEmptyTitle: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700' },
-  voiceEmptyHint:  { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 3 },
-  voiceArrow:      { color: '#6C47FF', fontSize: 22, fontWeight: '300' },
-
-  // Story card
-  storyCard:       { borderRadius: 18, padding: 20, borderWidth: 1, borderColor: 'rgba(108,71,255,0.18)' },
-  storyQuote:      { color: '#6C47FF', fontSize: 36, fontWeight: '900', lineHeight: 36, marginBottom: -8 },
-  storyText:       { color: 'rgba(255,255,255,0.78)', fontSize: 15, lineHeight: 24, fontStyle: 'italic' },
-
-  dashedCard:      { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, paddingVertical: 20, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', borderStyle: 'dashed' },
-  dashedTxt:       { color: 'rgba(255,255,255,0.28)', fontSize: 14, fontWeight: '600' },
-
-  // Mission Stamps
-  stampsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  stamp:           { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 22, borderWidth: 1.5 },
-  stampEmoji:      { fontSize: 16 },
-  stampLabel:      { fontSize: 13, fontWeight: '800' },
+  voiceEmpty:     { flexDirection: 'row', alignItems: 'center', backgroundColor: GLASS, borderRadius: 18, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed' },
+  voiceEmptyTitle:{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700' },
+  voiceEmptyHint: { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 3 },
+  voiceArrow:     { color: BOND_PINK, fontSize: 22, fontWeight: '300' },
 
   // Go Live
-  liveCard:        { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(229,57,53,0.25)' },
-  liveBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
-  liveDot:         { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  liveBadgeTxt:    { color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
-  liveTitle:       { color: '#fff', fontWeight: '800', fontSize: 15 },
-  liveSub:         { color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 2 },
-  liveArrow:       { color: 'rgba(255,255,255,0.3)', fontSize: 26 },
+  liveCard:    { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(229,57,53,0.25)' },
+  liveBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
+  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveBadgeTxt:{ color: '#fff', fontWeight: '900', fontSize: 11, letterSpacing: 1 },
+  liveTitle:   { color: '#fff', fontWeight: '800', fontSize: 15 },
+  liveSub:     { color: 'rgba(255,255,255,0.38)', fontSize: 12, marginTop: 2 },
+  liveArrow:   { color: 'rgba(255,255,255,0.3)', fontSize: 26 },
 
-  // Polaroid photo strip
-  polaroidRow:     { gap: 10, paddingVertical: 4 },
-  polaroid:        { width: 120, height: 130, borderRadius: 12, backgroundColor: '#111', overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: BORDER },
-  polaroidImg:     { width: '100%', height: '100%', borderRadius: 10 },
-  polaroidRemove:  { position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
-  polaroidAdd:     { width: 120, height: 130, borderRadius: 12, backgroundColor: GLASS, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-  polaroidAddIcon: { color: 'rgba(255,255,255,0.3)', fontSize: 32, fontWeight: '200' },
-  galleryCount:    { color: 'rgba(255,255,255,0.28)', fontSize: 12, fontWeight: '700' },
-  galleryHint:     { color: 'rgba(255,255,255,0.18)', fontSize: 11, textAlign: 'center' },
+  // Gallery
+  polaroidRow:    { gap: 10, paddingVertical: 4 },
+  polaroid:       { width: 120, height: 130, borderRadius: 12, backgroundColor: '#111', overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: BORDER },
+  polaroidImg:    { width: '100%', height: '100%', borderRadius: 10 },
+  polaroidRemove: { position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', justifyContent: 'center' },
+  polaroidAdd:    { width: 120, height: 130, borderRadius: 12, backgroundColor: GLASS, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  polaroidAddIcon:{ color: 'rgba(255,255,255,0.3)', fontSize: 32, fontWeight: '200' },
+  galleryCount:   { color: 'rgba(255,255,255,0.28)', fontSize: 12, fontWeight: '700' },
+  galleryHint:    { color: 'rgba(255,255,255,0.18)', fontSize: 11, textAlign: 'center' },
 
-  // Subscription
-  subCard:         { borderRadius: 20, padding: 18, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  subName:         { fontSize: 16, fontWeight: '900' },
-  subPrice:        { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 4 },
-  manageBtn:       { borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10, borderWidth: 1 },
-  manageTxt:       { fontSize: 13, fontWeight: '700' },
-  walletCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f1116',
-                     borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FFB70033' },
-  walletTitle:     { color: '#fff', fontSize: 15, fontWeight: '800' },
-  walletSub:       { color: '#555', fontSize: 12 },
-  walletArrow:     { color: '#FFB700', fontSize: 18, fontWeight: '800' },
-  upgradeCard:     { borderRadius: 20, overflow: 'hidden' },
-  upgradeInner:    { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 12 },
-  upgradeTitle:    { color: '#fff', fontSize: 15, fontWeight: '900' },
-  upgradeSub:      { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4, lineHeight: 18 },
-  upgradeArrow:    { color: '#fff', fontSize: 24, fontWeight: '200' },
+  // Wallet
+  walletCard:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0f1116', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FFB70033' },
+  walletTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  walletSub:   { color: '#555', fontSize: 12 },
+  walletArrow: { color: '#FFB700', fontSize: 18, fontWeight: '800' },
 
-  // Culture / My World tab
-  cultureForm:     { backgroundColor: GLASS, margin: 16, borderRadius: 22, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER },
-  cultureFormTitle:{ color: '#fff', fontSize: 15, fontWeight: '800' },
-  emojiBtn:        { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.04)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-  emojiBtnOn:      { backgroundColor: 'rgba(108,71,255,0.22)', borderColor: 'rgba(108,71,255,0.5)' },
-  catChip:         { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-  catChipOn:       { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
-  catChipTxt:      { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600' },
-  cultureInput:    { backgroundColor: 'rgba(0,0,0,0.3)', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)' },
-  postBtn:         { backgroundColor: '#6C47FF', borderRadius: 16, padding: 15, alignItems: 'center' },
-  postBtnOff:      { backgroundColor: 'rgba(255,255,255,0.08)' },
-  postBtnTxt:      { color: '#fff', fontSize: 15, fontWeight: '800' },
-  postCard:        { backgroundColor: GLASS, borderRadius: 20, padding: 18, borderWidth: 1, borderColor: BORDER, gap: 12 },
-  postHeader:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  postUser:        { color: '#fff', fontWeight: '800', fontSize: 13 },
-  postCatBadge:    { backgroundColor: 'rgba(108,71,255,0.15)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start', marginTop: 5, borderWidth: 1, borderColor: 'rgba(108,71,255,0.28)' },
-  postCatTxt:      { color: '#6C47FF', fontSize: 10, fontWeight: '800' },
-  postTxt:         { color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 22 },
+  // Bond Pass
+  passCard:  { borderRadius: 20, overflow: 'hidden' },
+  passInner: { flexDirection: 'row', alignItems: 'center', padding: 20, gap: 12 },
+  passTitle: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  passSub:   { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 4, lineHeight: 18 },
+  passArrow: { color: '#fff', fontSize: 24, fontWeight: '200' },
+
+  // My World — discovery hub
+  searchWrap:       { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 },
+  searchBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  searchDot:        { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
+  searchInput:      { flex: 1, color: '#fff', fontSize: 14, fontWeight: '500', padding: 0 },
+  searchClear:      { color: 'rgba(255,255,255,0.35)', fontSize: 14, fontWeight: '700' },
+
+  filterBar:        { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 6 },
+  filterPill:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  filterPillOn:     { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '70' },
+  filterPillTxt:    { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '700' },
+  filterPillTxtOn:  { color: BOND_PINK },
+  clearBtn:         { paddingHorizontal: 12, paddingVertical: 9 },
+  clearTxt:         { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '700' },
+
+  dropPanel:        { marginHorizontal: 16, marginBottom: 8, backgroundColor: '#0f0f1a', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', overflow: 'hidden' },
+  dropItem:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  dropItemOn:       { backgroundColor: 'rgba(255,0,128,0.08)' },
+  dropTxt:          { color: 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: '600' },
+  dropTxtOn:        { color: '#fff', fontWeight: '800' },
+  dropCheck:        { width: 8, height: 8, borderRadius: 4, backgroundColor: BOND_PINK },
+
+  streamHeader:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  streamHeaderDot:  { width: 7, height: 7, borderRadius: 4, backgroundColor: '#e53935' },
+  streamHeaderTxt:  { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+
+  streamRow:        { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  streamAvatar:     { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  streamAvatarTxt:  { color: '#fff', fontSize: 20, fontWeight: '900' },
+  streamFlagBadge:  { position: 'absolute', bottom: -2, right: -2, backgroundColor: '#0f0f1a', borderRadius: 8, paddingHorizontal: 2, paddingVertical: 1 },
+  streamFlagTxt:    { fontSize: 11 },
+  streamInfo:       { flex: 1, gap: 3 },
+  streamNameRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  streamName:       { color: '#fff', fontSize: 15, fontWeight: '800', flex: 1 },
+  streamLiveBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e5393530', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  streamLiveDot:    { width: 5, height: 5, borderRadius: 3, backgroundColor: '#e53935' },
+  streamLiveTxt:    { color: '#e57373', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  streamTitle:      { color: 'rgba(255,255,255,0.45)', fontSize: 13 },
+  streamMeta:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  streamViewers:    { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '600' },
+  streamCatBadge:   { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
+  streamCatTxt:     { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700' },
+  joinBtn:          { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, flexShrink: 0 },
+  joinTxt:          { color: '#fff', fontSize: 13, fontWeight: '900' },
+
+  worldEmpty:       { alignItems: 'center', paddingVertical: 56, paddingHorizontal: 32, gap: 10 },
+  worldEmptyTitle:  { color: 'rgba(255,255,255,0.7)', fontSize: 17, fontWeight: '800' },
+  worldEmptyTxt:    { color: 'rgba(255,255,255,0.3)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  worldGoLive:      { borderRadius: 16, overflow: 'hidden', marginTop: 10 },
+  worldGoLiveGrad:  { paddingHorizontal: 32, paddingVertical: 13 },
+  worldGoLiveTxt:   { color: '#fff', fontSize: 15, fontWeight: '900' },
 
   // Photo modal
   photoModal:      { flex: 1, backgroundColor: '#000000f2', alignItems: 'center', justifyContent: 'center' },

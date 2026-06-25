@@ -13,7 +13,7 @@ import { stringToColor } from '../utils/apiUtils';
 import { SERVER_URL } from '../services/socket';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
-import { DEMO_STAMPS } from '../context/WalletContext';
+import { DEMO_STAMPS, BOND_MONUMENTS } from '../context/WalletContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
@@ -288,6 +288,88 @@ const pte = StyleSheet.create({
   emptyTxt:  { color: '#444', fontSize: 13, lineHeight: 19 },
 });
 
+// ─── MonumentTeaser ───────────────────────────────────────────────────────────
+function MonumentCard({ monument, onPress }) {
+  const unclaimed = !monument.holder;
+  const accent    = unclaimed ? '#FFB700' : BOND_PINK;
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={[mte.card, { borderColor: accent + '30' }]}>
+      {unclaimed && (
+        <View style={mte.unclaimedBadge}>
+          <Text style={mte.unclaimedTxt}>UNCLAIMED</Text>
+        </View>
+      )}
+      <Text style={mte.icon}>{monument.icon}</Text>
+      <Text style={mte.name} numberOfLines={1}>{monument.name}</Text>
+      <Text style={mte.location} numberOfLines={1}>{monument.location}</Text>
+      <View style={mte.divider} />
+      {unclaimed ? (
+        <View style={{ gap: 8 }}>
+          <Text style={mte.freeLabel}>Claim it free</Text>
+          <View style={[mte.btn, mte.claimBtn]}>
+            <Text style={[mte.btnTxt, { color: '#FFB700' }]}>Claim Free</Text>
+          </View>
+        </View>
+      ) : (
+        <View style={{ gap: 4 }}>
+          <Text style={mte.holder} numberOfLines={1}>{monument.holder}</Text>
+          <Text style={mte.earned}>{(monument.coinsEarned || 0).toLocaleString()} BC earned</Text>
+          <View style={[mte.btn, mte.challengeBtn]}>
+            <Text style={[mte.btnTxt, { color: BOND_PINK }]}>Challenge</Text>
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+function MonumentTeaser({ onPress, onViewAll }) {
+  return (
+    <View style={mte.wrap}>
+      <TouchableOpacity onPress={onViewAll} activeOpacity={0.8} style={mte.header}>
+        <View>
+          <Text style={mte.title}>Bond Monuments</Text>
+          <Text style={mte.sub}>500 worldwide — win one, earn forever</Text>
+        </View>
+        <Text style={mte.arrow}>›</Text>
+      </TouchableOpacity>
+      <FlatList
+        horizontal
+        data={BOND_MONUMENTS}
+        keyExtractor={m => m.id}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 10 }}
+        renderItem={({ item }) => (
+          <MonumentCard monument={item} onPress={() => onPress(item)} />
+        )}
+      />
+    </View>
+  );
+}
+
+const mte = StyleSheet.create({
+  wrap:           { gap: 14 },
+  header:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  title:          { color: '#fff', fontSize: 16, fontWeight: '800' },
+  sub:            { color: '#555', fontSize: 12, marginTop: 2, fontWeight: '600' },
+  arrow:          { color: '#444', fontSize: 24, fontWeight: '300' },
+
+  card:           { width: 162, backgroundColor: '#0d0d18', borderRadius: 18, padding: 16, gap: 8, borderWidth: 1 },
+  unclaimedBadge: { backgroundColor: '#FFB70015', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#FFB70040' },
+  unclaimedTxt:   { color: '#FFB700', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  icon:           { fontSize: 30 },
+  name:           { color: '#fff', fontSize: 13, fontWeight: '800' },
+  location:       { color: 'rgba(255,255,255,0.3)', fontSize: 11 },
+  divider:        { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginVertical: 2 },
+  freeLabel:      { color: '#FFB700', fontSize: 11, fontWeight: '600' },
+  holder:         { color: '#fff', fontSize: 12, fontWeight: '700' },
+  earned:         { color: 'rgba(255,255,255,0.3)', fontSize: 10 },
+  btn:            { borderRadius: 10, paddingVertical: 9, alignItems: 'center', borderWidth: 1, marginTop: 4 },
+  claimBtn:       { borderColor: '#FFB70055', backgroundColor: '#FFB70010' },
+  challengeBtn:   { borderColor: BOND_PINK + '45', backgroundColor: BOND_PINK + '0d' },
+  btnTxt:         { fontSize: 12, fontWeight: '800' },
+});
+
 // ─── MatchCard ────────────────────────────────────────────────────────────────
 function compatColor(score) {
   return score >= 75 ? '#57f287' : score >= 50 ? '#fee75c' : '#f04747';
@@ -417,7 +499,7 @@ function BondStreakBadge({ tier, primary, milestones, longest, onPress }) {
               <Text style={[sk.countNum, { color: tier.color }]}>{primary.value}</Text>
             </Animated.View>
             <Text style={[sk.countUnit, { color: tier.color + 'aa' }]}>{primary.unit}</Text>
-            <Text style={sk.countLabel}>CURRENT STREAK</Text>
+            <Text style={sk.countLabel}>CURRENT HEAT</Text>
           </View>
           <View style={[sk.divider, { backgroundColor: tier.color + '25' }]} />
           <View style={sk.milestonesBlock}>
@@ -498,7 +580,7 @@ export default function HomeScreen({ navigation, user }) {
   const hdrOpacity  = scrollY.interpolate({ inputRange: [0, 80],  outputRange: [0, 1], extrapolate: 'clamp' });
   const heroScale   = scrollY.interpolate({ inputRange: [0, 140], outputRange: [1, 0.94], extrapolate: 'clamp' });
   const heroOpacity = scrollY.interpolate({ inputRange: [0, 140], outputRange: [1, 0],   extrapolate: 'clamp' });
-  const sectAnim    = useRef([...Array(7)].map(() => new Animated.Value(0))).current;
+  const sectAnim    = useRef([...Array(8)].map(() => new Animated.Value(0))).current;
 
   const heroStats = [
     { value: onlineUsers.length > 0 ? onlineUsers.length.toLocaleString() : '—', label: 'ONLINE',     color: '#57f287' },
@@ -638,15 +720,21 @@ export default function HomeScreen({ navigation, user }) {
               <View style={s.heroInner}>
                 <View style={s.heroLogoBar}>
                   <HomeLogoMark />
-                  <TouchableOpacity style={s.notifBtn} onPress={() => navigation.navigate('Notifications')}>
-                    <View style={s.notifBellWrap}>
-                      <Text style={s.notifIcon}>🔔</Text>
-                      {unreadCount > 0 && (
-                        <View style={s.notifBadge}>
-                          <Text style={s.notifBadgeTxt}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                        </View>
-                      )}
+                  <TouchableOpacity style={[s.notifBtn, unreadCount > 0 && s.notifBtnActive]} onPress={() => navigation.navigate('Notifications')}>
+                    {/* Bell shape */}
+                    <View style={s.bellWrap}>
+                      <View style={s.bellDome} />
+                      <View style={s.bellBody} />
+                      <View style={s.bellLedge} />
                     </View>
+                    <View style={s.bellClapper} />
+                    {/* Inline count */}
+                    {unreadCount > 0 && (
+                      <>
+                        <View style={s.notifDivider} />
+                        <Text style={s.notifCount}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 </View>
                 <View style={s.heroGreetBlock}>
@@ -665,6 +753,43 @@ export default function HomeScreen({ navigation, user }) {
             </SafeAreaView>
           </LinearGradient>
         </Animated.View>
+
+        {/* ── Bonds Live pill ── */}
+        {liveStreams.length > 0 && (() => {
+          const sorted = [...liveStreams].sort((a, b) =>
+            ((b.viewerCount || 0) + (b.giftCount || 0) * 5) - ((a.viewerCount || 0) + (a.giftCount || 0) * 5)
+          );
+          const shown = sorted.slice(0, 3);
+          const extra = liveStreams.length - 3;
+          return (
+            <TouchableOpacity
+              style={blp.wrap}
+              onPress={() => navigation.navigate('LiveHub')}
+              activeOpacity={0.85}
+            >
+              <View style={blp.avatars}>
+                {shown.map((st, i) => {
+                  const col = stringToColor(st.hostName || '');
+                  return (
+                    <View key={st.streamId} style={[blp.avatar, { backgroundColor: col, marginLeft: i === 0 ? 0 : -10, zIndex: 3 - i }]}>
+                      <Text style={blp.avatarTxt}>{(st.hostName || '?')[0].toUpperCase()}</Text>
+                    </View>
+                  );
+                })}
+                {extra > 0 && (
+                  <View style={[blp.avatar, blp.overflow, { marginLeft: -10, zIndex: 0 }]}>
+                    <Text style={blp.overflowTxt}>+{extra}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={blp.liveDot} />
+              <Text style={blp.label}>
+                {liveStreams.length} {liveStreams.length === 1 ? 'bond' : 'bonds'} live now
+              </Text>
+              <Text style={blp.chevron}>›</Text>
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* ── Daily Icebreaker ── */}
         {icebreaker.question ? (
@@ -697,8 +822,16 @@ export default function HomeScreen({ navigation, user }) {
           />
         </Animated.View>
 
-        {/* ── Daily Bond Matches ── */}
+        {/* ── Bond Monuments ── */}
         <Animated.View style={[s.section, sect(3)]}>
+          <MonumentTeaser
+            onPress={monument => navigation.navigate('MonumentChallenge', { monument, currentUser: user })}
+            onViewAll={() => navigation.navigate('Wallet')}
+          />
+        </Animated.View>
+
+        {/* ── Daily Bond Matches ── */}
+        <Animated.View style={[s.section, sect(4)]}>
           <SectionHead
             title="Your Bond Matches"
             sub={dailyMatches.length ? `${dailyMatches.length} curated for you today` : 'Updated every day'}
@@ -740,7 +873,7 @@ export default function HomeScreen({ navigation, user }) {
 
         {/* ── Live Now — only renders when streams are active ── */}
         {liveStreams.length > 0 && (
-          <Animated.View style={[s.section, sect(4)]}>
+          <Animated.View style={[s.section, sect(5)]}>
             <SectionHead
               title="🔴 Live Now"
               sub={`${liveStreams.length} stream${liveStreams.length > 1 ? 's' : ''} happening`}
@@ -775,7 +908,7 @@ export default function HomeScreen({ navigation, user }) {
 
         {/* ── Online Now ── */}
         {onlineUsers.length > 0 && (
-          <Animated.View style={[s.section, sect(5)]}>
+          <Animated.View style={[s.section, sect(6)]}>
             <SectionHead
               title="Online Now"
               sub={`${onlineUsers.length} people around the world`}
@@ -793,9 +926,9 @@ export default function HomeScreen({ navigation, user }) {
 
         {/* ── Bond Streak — visible to all users ── */}
         {streak > 0 && streakTier && (
-          <Animated.View style={[s.section, sect(6)]}>
+          <Animated.View style={[s.section, sect(7)]}>
             <SectionHead
-              title="Your Bond Streak"
+              title="Your Bond Heat"
               sub="1-of-1 footprint — unique to your journey"
             />
             <BondStreakBadge
@@ -812,6 +945,18 @@ export default function HomeScreen({ navigation, user }) {
     </View>
   );
 }
+
+const blp = StyleSheet.create({
+  wrap:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginTop: 14, marginBottom: 4, backgroundColor: '#0f0f1a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#ffffff10' },
+  avatars:     { flexDirection: 'row', alignItems: 'center' },
+  avatar:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#07080f' },
+  avatarTxt:   { color: '#fff', fontSize: 11, fontWeight: '900' },
+  overflow:    { backgroundColor: '#1a1a2e' },
+  overflowTxt: { color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '800' },
+  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' },
+  label:       { flex: 1, color: '#fff', fontSize: 13, fontWeight: '700' },
+  chevron:     { color: 'rgba(255,255,255,0.35)', fontSize: 20, fontWeight: '300' },
+});
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#07080f' },
@@ -830,11 +975,15 @@ const s = StyleSheet.create({
   heroInner: { paddingHorizontal: 22, paddingTop: 6, gap: 20 },
 
   heroLogoBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  notifBtn:      { paddingHorizontal: 12, height: 40, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
-  notifBellWrap: { position: 'relative' },
-  notifIcon:     { fontSize: 18 },
-  notifBadge:    { position: 'absolute', top: -7, right: -8, backgroundColor: '#FF3B30', borderRadius: 9, minWidth: 17, height: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  notifBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  notifBtn:       { flexDirection: 'row', alignItems: 'center', gap: 0, height: 36, paddingHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  notifBtnActive: { borderColor: BOND_PINK + '55', backgroundColor: BOND_PINK + '12' },
+  bellWrap:       { alignItems: 'center', gap: 0 },
+  bellDome:       { width: 11, height: 6, borderRadius: 6, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderWidth: 1.5, borderColor: BOND_PINK, backgroundColor: 'transparent', borderBottomWidth: 0 },
+  bellBody:       { width: 13, height: 5, borderLeftWidth: 1.5, borderRightWidth: 1.5, borderColor: BOND_PINK, backgroundColor: 'transparent', marginTop: -0.5 },
+  bellLedge:      { width: 15, height: 2, borderRadius: 1, backgroundColor: BOND_PINK },
+  bellClapper:    { width: 4, height: 4, borderRadius: 2, backgroundColor: BOND_PINK, opacity: 0.7, marginTop: 1 },
+  notifDivider:   { width: 1, height: 16, backgroundColor: 'rgba(255,255,255,0.15)', marginHorizontal: 8 },
+  notifCount:     { color: BOND_PINK, fontSize: 13, fontWeight: '900' },
 
   heroGreetBlock: { gap: 3 },
   greetLine:      { color: 'rgba(255,255,255,0.38)', fontSize: 13, fontWeight: '500', letterSpacing: 0.3 },

@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
 import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE } from '../context/ChallengeContext';
 import { getFlagName } from '../utils/countryUtils';
 
@@ -44,13 +44,12 @@ function ScoreSide({ label, username, scores, accent, isLeading }) {
       <Text style={sc.sideTotalLabel}>POINTS</Text>
       <View style={sc.breakdown}>
         {[
-          { icon: '🪙', label: 'Gifts',   val: scores.gifts     },
-          { icon: '🤝', label: 'Bonds',   val: scores.bonds     },
-          { icon: '📡', label: 'Live',    val: scores.liveHours },
-          { icon: '🗳',  label: 'Votes',  val: scores.votes     },
+          { label: 'Gifts',   val: scores.gifts     },
+          { label: 'Bonds',   val: scores.bonds     },
+          { label: 'Live',    val: scores.liveHours },
+          { label: 'Votes',   val: scores.votes     },
         ].map(row => (
           <View key={row.label} style={sc.breakRow}>
-            <Text style={sc.breakIcon}>{row.icon}</Text>
             <Text style={sc.breakLabel}>{row.label}</Text>
             <Text style={[sc.breakVal, { color: accent }]}>{row.val.toLocaleString()}</Text>
           </View>
@@ -65,20 +64,18 @@ const sc = StyleSheet.create({
   sideLabel:      { fontSize: 9, fontWeight: '900', letterSpacing: 2, marginBottom: 2 },
   sideUser:       { color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 8 },
   sideTotal:      { fontSize: 26, fontWeight: '900' },
-  sideTotalLabel: { color: '#555555', fontSize: 9, letterSpacing: 1, marginBottom: 10 },
+  sideTotalLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 9, letterSpacing: 1, marginBottom: 10 },
   breakdown:      { gap: 5 },
-  breakRow:       { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  breakIcon:      { fontSize: 12, width: 18 },
-  breakLabel:     { color: '#666', fontSize: 11, flex: 1 },
+  breakRow:       { flexDirection: 'row', alignItems: 'center' },
+  breakLabel:     { color: 'rgba(255,255,255,0.4)', fontSize: 11, flex: 1 },
   breakVal:       { fontSize: 11, fontWeight: '700' },
 });
 
 // ── Contribution card (Pro only) ──────────────────────────────────────────────
-function ContribCard({ icon, title, rateLine, used, cap, unit, amounts, onContrib, disabled }) {
+function ContribCard({ title, rateLine, used, cap, unit, amounts, onContrib, disabled }) {
   const pct = Math.min(1, used / cap);
   return (
     <View style={cc.card}>
-      <Text style={cc.icon}>{icon}</Text>
       <Text style={cc.title}>{title}</Text>
       <Text style={cc.rate}>{rateLine}</Text>
       <View style={cc.barBg}>
@@ -93,7 +90,7 @@ function ContribCard({ icon, title, rateLine, used, cap, unit, amounts, onContri
             onPress={() => !disabled && onContrib(a)}
             activeOpacity={0.8}
           >
-            <Text style={[cc.btnTxt, disabled && { color: '#444' }]}>+{a}</Text>
+            <Text style={[cc.btnTxt, disabled && { color: 'rgba(255,255,255,0.2)' }]}>+{a}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -101,13 +98,12 @@ function ContribCard({ icon, title, rateLine, used, cap, unit, amounts, onContri
   );
 }
 const cc = StyleSheet.create({
-  card:   { flex: 1, backgroundColor: '#0d0f1a', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#ffffff08', gap: 4 },
-  icon:   { fontSize: 22 },
+  card:   { flex: 1, backgroundColor: '#0d0f1a', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#ffffff08', gap: 5 },
   title:  { color: '#fff', fontSize: 12, fontWeight: '800' },
-  rate:   { color: '#555555', fontSize: 10 },
+  rate:   { color: 'rgba(255,255,255,0.4)', fontSize: 10 },
   barBg:  { height: 3, backgroundColor: '#1a1a2e', borderRadius: 2, overflow: 'hidden' },
   barFill:{ height: '100%', backgroundColor: '#4fc3f7', borderRadius: 2 },
-  usage:  { color: '#444', fontSize: 9 },
+  usage:  { color: 'rgba(255,255,255,0.3)', fontSize: 9 },
   btns:   { flexDirection: 'row', gap: 5, marginTop: 4 },
   btn:    { flex: 1, backgroundColor: '#4fc3f715', borderRadius: 8, borderWidth: 1, borderColor: '#4fc3f735', alignItems: 'center', paddingVertical: 6 },
   btnOff: { backgroundColor: '#ffffff05', borderColor: '#ffffff08' },
@@ -124,7 +120,9 @@ function CommentsSection({ comments = [], onPost }) {
   }
   return (
     <View style={cm.wrap}>
-      <Text style={cm.title}>COMMENTS  <Text style={cm.count}>{comments.length}</Text></Text>
+      <Text style={cm.title}>
+        COMMENTS  <Text style={cm.count}>{comments.length}</Text>
+      </Text>
       {comments.length === 0 && (
         <Text style={cm.empty}>No comments yet. Be the first!</Text>
       )}
@@ -148,7 +146,7 @@ function CommentsSection({ comments = [], onPost }) {
           value={draft}
           onChangeText={setDraft}
           placeholder="Add a comment…"
-          placeholderTextColor="#444"
+          placeholderTextColor="rgba(255,255,255,0.25)"
           maxLength={180}
           returnKeyType="send"
           onSubmitEditing={submit}
@@ -168,15 +166,15 @@ function CommentsSection({ comments = [], onPost }) {
 const cm = StyleSheet.create({
   wrap:       { backgroundColor: '#0a0a12', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#ffffff08', gap: 12 },
   title:      { color: '#4fc3f7', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  count:      { color: '#555555', fontWeight: '400', letterSpacing: 0 },
-  empty:      { color: '#444', fontSize: 12, textAlign: 'center', paddingVertical: 8 },
+  count:      { color: 'rgba(255,255,255,0.4)', fontWeight: '400', letterSpacing: 0 },
+  empty:      { color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', paddingVertical: 8 },
   row:        { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   avatar:     { width: 32, height: 32, borderRadius: 10, backgroundColor: '#0d1a20', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarTxt:  { color: '#4fc3f7', fontSize: 14, fontWeight: '800' },
   meta:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
   user:       { color: '#fff', fontSize: 12, fontWeight: '700' },
-  time:       { color: '#444', fontSize: 10 },
-  text:       { color: '#aaa', fontSize: 13, lineHeight: 18 },
+  time:       { color: 'rgba(255,255,255,0.3)', fontSize: 10 },
+  text:       { color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 },
   inputRow:   { flexDirection: 'row', gap: 8, alignItems: 'center', borderTopWidth: 1, borderTopColor: '#ffffff08', paddingTop: 12 },
   input:      { flex: 1, backgroundColor: '#111218', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: '#fff', fontSize: 13, borderWidth: 1, borderColor: '#ffffff0c' },
   sendBtn:    { backgroundColor: '#4fc3f7', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
@@ -188,8 +186,10 @@ const cm = StyleSheet.create({
 function FreeGate({ navigation }) {
   return (
     <View style={gt.wrap}>
-      <Text style={gt.lock}>🔒</Text>
-      <Text style={gt.title}>Bond Plus & Pro Only</Text>
+      <View style={gt.lockBox}>
+        <Text style={gt.lockTxt}>PLUS ONLY</Text>
+      </View>
+      <Text style={gt.title}>Bond Plus &amp; Pro Only</Text>
       <Text style={gt.sub}>Country Stamp challenges are available to WorldBond Plus and Pro members.</Text>
       <TouchableOpacity style={gt.btn} onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85}>
         <LinearGradient colors={['#4fc3f7', '#0288d1']} style={gt.btnGrad}>
@@ -200,10 +200,11 @@ function FreeGate({ navigation }) {
   );
 }
 const gt = StyleSheet.create({
-  wrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 14 },
-  lock:    { fontSize: 48 },
+  wrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16 },
+  lockBox: { backgroundColor: 'rgba(79,195,247,0.15)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: '#4fc3f740' },
+  lockTxt: { color: '#4fc3f7', fontSize: 11, fontWeight: '900', letterSpacing: 1.5 },
   title:   { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  sub:     { color: '#555555', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  sub:     { color: 'rgba(255,255,255,0.45)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   btn:     { borderRadius: 14, overflow: 'hidden', marginTop: 8 },
   btnGrad: { paddingHorizontal: 32, paddingVertical: 14 },
   btnTxt:  { color: '#000', fontSize: 15, fontWeight: '900' },
@@ -213,22 +214,20 @@ const gt = StyleSheet.create({
 function PlusViewBanner({ navigation }) {
   return (
     <View style={pb.wrap}>
-      <Text style={pb.icon}>👁</Text>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, gap: 3 }}>
         <Text style={pb.title}>Viewing as WorldBond Plus</Text>
         <Text style={pb.sub}>Upgrade to Pro to contribute, vote, and initiate challenges.</Text>
       </View>
       <TouchableOpacity onPress={() => navigation.navigate('Subscription')} style={pb.btn} activeOpacity={0.85}>
-        <Text style={pb.btnTxt}>Upgrade →</Text>
+        <Text style={pb.btnTxt}>Upgrade</Text>
       </TouchableOpacity>
     </View>
   );
 }
 const pb = StyleSheet.create({
-  wrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0d0f1a', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#4fc3f720' },
-  icon:   { fontSize: 22 },
+  wrap:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0d0f1a', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#4fc3f720' },
   title:  { color: '#fff', fontSize: 13, fontWeight: '700' },
-  sub:    { color: '#555555', fontSize: 11, marginTop: 2 },
+  sub:    { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
   btn:    { backgroundColor: '#4fc3f720', borderRadius: 10, borderWidth: 1, borderColor: '#4fc3f745', paddingHorizontal: 12, paddingVertical: 8 },
   btnTxt: { color: '#4fc3f7', fontSize: 12, fontWeight: '800' },
 });
@@ -237,12 +236,12 @@ const pb = StyleSheet.create({
 function RulesSection() {
   const [open, setOpen] = useState(false);
   const RULES = [
-    ['🪙', 'Gift Coins during country streams',   `+1 pt/coin · max ${DAILY_LIMITS.gifts} coins/day\nPrevents whales from buying the win`],
-    ['🤝', 'Bond with users from that country',   `+${POINT_RATES.bonds} pts/bond · max ${DAILY_LIMITS.bonds}/day\nReal connections, not repeat bonding`],
-    ['📡', 'Stream live from that country',        `+${POINT_RATES.liveHours} pts/hr · max ${DAILY_LIMITS.liveHours} hrs/day\nRequires genuine presence in that country`],
-    ['🗳',  'Community vote',                     `+${POINT_RATES.votes} pts · once per user per contest\nCommunity sentiment — cannot be gamed`],
-    ['⏱',  '7-day contest',                      `${ENTRY_FEE} Bond Coins to initiate (burned)\nHighest total points after 7 days wins the stamp`],
-    ['🕐',  '30-day cooldown',                    'Same stamp can only be challenged once every 30 days'],
+    ['Gift Coins during country streams',  `+1 pt per coin · max ${DAILY_LIMITS.gifts} coins/day\nPrevents whales from buying the win`],
+    ['Bond with users from that country',  `+${POINT_RATES.bonds} pts per bond · max ${DAILY_LIMITS.bonds}/day\nReal connections, not repeat bonding`],
+    ['Stream live from that country',      `+${POINT_RATES.liveHours} pts per hour · max ${DAILY_LIMITS.liveHours} hrs/day\nRequires genuine presence in that country`],
+    ['Community vote',                     `+${POINT_RATES.votes} pts · once per user per contest\nCommunity sentiment — cannot be gamed`],
+    ['7-day contest',                      `${ENTRY_FEE} Bond Coins to initiate (burned)\nHighest total points after 7 days wins the stamp`],
+    ['30-day cooldown',                    'Same stamp can only be challenged once every 30 days'],
   ];
   return (
     <View style={rl.wrap}>
@@ -252,10 +251,12 @@ function RulesSection() {
       </TouchableOpacity>
       {open && (
         <View style={rl.body}>
-          {RULES.map(([icon, title, desc], i) => (
+          {RULES.map(([title, desc], i) => (
             <View key={i} style={rl.row}>
-              <Text style={rl.rowIcon}>{icon}</Text>
-              <View style={{ flex: 1, gap: 2 }}>
+              <View style={rl.rowNum}>
+                <Text style={rl.rowNumTxt}>{i + 1}</Text>
+              </View>
+              <View style={{ flex: 1, gap: 3 }}>
                 <Text style={rl.rowTitle}>{title}</Text>
                 <Text style={rl.rowDesc}>{desc}</Text>
               </View>
@@ -270,24 +271,22 @@ const rl = StyleSheet.create({
   wrap:      { backgroundColor: '#0a0a12', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ffffff08' },
   toggle:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   toggleTxt: { color: '#4fc3f7', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
-  arrow:     { color: '#555555', fontSize: 12 },
+  arrow:     { color: 'rgba(255,255,255,0.35)', fontSize: 12 },
   body:      { paddingHorizontal: 14, paddingBottom: 14, gap: 14, borderTopWidth: 1, borderTopColor: '#ffffff08', paddingTop: 14 },
-  row:       { flexDirection: 'row', gap: 10 },
-  rowIcon:   { fontSize: 18, width: 26 },
-  rowTitle:  { color: '#ccc', fontSize: 12, fontWeight: '700' },
-  rowDesc:   { color: '#555555', fontSize: 11, lineHeight: 16 },
+  row:       { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  rowNum:    { width: 22, height: 22, borderRadius: 11, backgroundColor: '#4fc3f720', borderWidth: 1, borderColor: '#4fc3f740', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  rowNumTxt: { color: '#4fc3f7', fontSize: 10, fontWeight: '900' },
+  rowTitle:  { color: '#fff', fontSize: 12, fontWeight: '700' },
+  rowDesc:   { color: 'rgba(255,255,255,0.4)', fontSize: 11, lineHeight: 16 },
 });
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function CountryStampChallengeScreen({ route, navigation }) {
   const { stamp, currentUser } = route.params || {};
-  // stamp = { flag: '🇺🇸', holder: 'DeShawn_ATL', coinsEarned: 14200 }
 
-  const { tier }    = usePremium();
-  const isPro       = tier === 'pro';
-  const isPlus      = tier === 'plus';
-  const canView     = isPro || isPlus;
-  const canContrib  = isPro;
+  const { hasBondPass } = useBondPass();
+  const canView    = hasBondPass;
+  const canContrib = hasBondPass;
 
   const {
     getActiveStampChallenge, getStampCooldown,
@@ -305,7 +304,6 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
   const activeChallenge = flag ? getActiveStampChallenge(flag)  : null;
   const cooldownUntil   = flag ? getStampCooldown(flag)         : null;
 
-  // Countdown ticker
   useEffect(() => {
     if (!activeChallenge) return;
     const tick = () => setTimeLeft(Math.max(0, activeChallenge.endsAt - Date.now()));
@@ -314,7 +312,6 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
     return () => clearInterval(id);
   }, [activeChallenge?.id]);
 
-  // Animated progress bar
   const progressAnim = useRef(new Animated.Value(0.5)).current;
   useEffect(() => {
     if (!activeChallenge) return;
@@ -333,7 +330,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
     if (!canContrib || !stamp?.holder) return;
     Alert.alert(
       'Start Stamp Challenge',
-      `Challenge @${stamp.holder} for the ${countryName} stamp ${flag}?\n\nBurns ${ENTRY_FEE} Bond Coins. The holder earns +3% royalty from all ${countryName} streams — win a 7-day contest to take it.`,
+      `Challenge @${stamp.holder} for the ${countryName} stamp?\n\nBurns ${ENTRY_FEE} Bond Coins. The holder earns +3% royalty from all ${countryName} streams — win a 7-day contest to take it.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -401,7 +398,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
               <View style={s.holderRow}>
                 <Text style={s.holderLabel}>HELD BY</Text>
                 <Text style={s.holderName}>@{stamp.holder}</Text>
-                <Text style={s.holderCoins}>🪙 {stamp.coinsEarned?.toLocaleString()} earned</Text>
+                <Text style={s.holderCoins}>{stamp.coinsEarned?.toLocaleString()} BC earned</Text>
               </View>
             )}
           </LinearGradient>
@@ -414,17 +411,17 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
             /* ── Unclaimed ── */
             <View style={s.section}>
               <View style={s.card}>
-                <Text style={s.cardEmoji}>🌍</Text>
+                <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>UNCLAIMED</Text></View>
                 <Text style={s.cardTitle}>Unclaimed Country Stamp</Text>
                 <Text style={s.cardSub}>
-                  Be the first to own the {countryName} {flag} stamp and earn +3% royalty on every gift sent during streams from {countryName}.
+                  Be the first to own the {countryName} stamp and earn +3% royalty on every gift sent during streams from {countryName}.
                 </Text>
                 {canContrib ? (
                   <TouchableOpacity
                     style={s.primaryBtn}
                     onPress={() => Alert.alert(
                       'Claim Stamp',
-                      `Claim the ${countryName} ${flag} stamp?\n\nYou'll earn +3% royalty on all gifts sent during ${countryName} streams.`,
+                      `Claim the ${countryName} stamp?\n\nYou'll earn +3% royalty on all gifts sent during ${countryName} streams.`,
                       [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'Claim Free', onPress: () => navigation.goBack() },
@@ -446,7 +443,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
             /* ── Cooldown ── */
             <View style={s.section}>
               <View style={s.card}>
-                <Text style={s.cardEmoji}>⏳</Text>
+                <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>COOLDOWN</Text></View>
                 <Text style={s.cardTitle}>Challenge Cooldown</Text>
                 <Text style={s.cardSub}>
                   Next challenge opens on{' '}
@@ -464,7 +461,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
                   <View style={s.timerDot} />
                   <Text style={s.timerLabel}>STAMP CHALLENGE ACTIVE</Text>
                   <Text style={s.timerValue}>{formatCountdown(timeLeft)}</Text>
-                  <Text style={s.timerSub}>remaining · {countryName} {flag}</Text>
+                  <Text style={s.timerSub}>remaining · {countryName}</Text>
                 </LinearGradient>
               </View>
 
@@ -497,18 +494,17 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
                   <Text style={s.sectionTitle}>SUPPORT THE CHALLENGER</Text>
                   <Text style={s.sectionSub}>Daily caps prevent spam — all types count equally.</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <ContribCard icon="🪙" title="Gift Coins"   rateLine={`+1pt/coin · max ${DAILY_LIMITS.gifts}/day`}                              used={myUsage?.gifts || 0}     cap={DAILY_LIMITS.gifts}     unit="coins" amounts={[50, 250]} onContrib={a => handleContrib('gifts', a)}     disabled={(myUsage?.gifts || 0) >= DAILY_LIMITS.gifts} />
-                    <ContribCard icon="🤝" title="Bond Region"  rateLine={`+${POINT_RATES.bonds}pts/bond · max ${DAILY_LIMITS.bonds}/day`}           used={myUsage?.bonds || 0}     cap={DAILY_LIMITS.bonds}     unit="bonds" amounts={[1, 3]}   onContrib={a => handleContrib('bonds', a)}     disabled={(myUsage?.bonds || 0) >= DAILY_LIMITS.bonds} />
+                    <ContribCard title="Gift Coins"  rateLine={`+1pt/coin · max ${DAILY_LIMITS.gifts}/day`}                             used={myUsage?.gifts || 0}     cap={DAILY_LIMITS.gifts}     unit="coins" amounts={[50, 250]} onContrib={a => handleContrib('gifts', a)}     disabled={(myUsage?.gifts || 0) >= DAILY_LIMITS.gifts} />
+                    <ContribCard title="Bond Region" rateLine={`+${POINT_RATES.bonds}pts/bond · max ${DAILY_LIMITS.bonds}/day`}         used={myUsage?.bonds || 0}     cap={DAILY_LIMITS.bonds}     unit="bonds" amounts={[1, 3]}   onContrib={a => handleContrib('bonds', a)}     disabled={(myUsage?.bonds || 0) >= DAILY_LIMITS.bonds} />
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <ContribCard icon="📡" title="Stream Live"  rateLine={`+${POINT_RATES.liveHours}pts/hr · max ${DAILY_LIMITS.liveHours}hrs/day`}  used={myUsage?.liveHours || 0} cap={DAILY_LIMITS.liveHours} unit="hrs"   amounts={[0.5, 1]} onContrib={a => handleContrib('liveHours', a)} disabled={(myUsage?.liveHours || 0) >= DAILY_LIMITS.liveHours} />
-                    {/* Vote */}
+                    <ContribCard title="Stream Live" rateLine={`+${POINT_RATES.liveHours}pts/hr · max ${DAILY_LIMITS.liveHours}hrs/day`} used={myUsage?.liveHours || 0} cap={DAILY_LIMITS.liveHours} unit="hrs"   amounts={[0.5, 1]} onContrib={a => handleContrib('liveHours', a)} disabled={(myUsage?.liveHours || 0) >= DAILY_LIMITS.liveHours} />
+                    {/* Vote card */}
                     <View style={cc.card}>
-                      <Text style={cc.icon}>🗳</Text>
                       <Text style={cc.title}>Community Vote</Text>
                       <Text style={cc.rate}>+{POINT_RATES.votes} pts · once per contest</Text>
                       {myVoted || myUsage?.voted ? (
-                        <Text style={[cc.rate, { color: '#57f287', marginTop: 8 }]}>✓ Vote cast</Text>
+                        <Text style={[cc.rate, { color: '#57f287', marginTop: 8 }]}>Vote cast</Text>
                       ) : (
                         <View style={{ gap: 5, marginTop: 6 }}>
                           <TouchableOpacity style={[cc.btn, { borderColor: '#ef444435', backgroundColor: '#ef444415' }]} onPress={() => handleVote('challenger')}>
@@ -539,19 +535,22 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
             <View style={s.section}>
               {canContrib ? (
                 <View style={s.card}>
-                  <Text style={s.cardEmoji}>⚔️</Text>
-                  <Text style={s.cardTitle}>Challenge for {countryName} {flag}</Text>
+                  <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>CHALLENGE</Text></View>
+                  <Text style={s.cardTitle}>Challenge for {countryName}</Text>
                   <Text style={s.cardSub}>
                     @{stamp.holder} holds this stamp and earns +3% royalty on every gift sent during {countryName} streams. Win a 7-day contest to claim it.
                   </Text>
                   <View style={s.rulesList}>
                     {[
-                      `🪙 Entry fee: ${ENTRY_FEE} Bond Coins (burned)`,
-                      '⏱ Contest: 7 days of multi-dimension scoring',
-                      '🚫 Spam-protected: daily caps per contribution type',
-                      '🕐 30-day cooldown between challenges',
+                      `Entry fee: ${ENTRY_FEE} Bond Coins (burned)`,
+                      'Contest: 7 days of multi-dimension scoring',
+                      'Spam-protected: daily caps per contribution type',
+                      '30-day cooldown between challenges',
                     ].map((txt, i) => (
-                      <Text key={i} style={s.ruleItem}>{txt}</Text>
+                      <View key={i} style={s.ruleRow}>
+                        <View style={s.ruleDot} />
+                        <Text style={s.ruleItem}>{txt}</Text>
+                      </View>
                     ))}
                   </View>
                   <TouchableOpacity style={s.primaryBtn} onPress={handleInitiate} activeOpacity={0.88}>
@@ -562,10 +561,10 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
                 </View>
               ) : (
                 <View style={s.card}>
-                  <Text style={s.cardEmoji}>⚔️</Text>
+                  <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>OPEN</Text></View>
                   <Text style={s.cardTitle}>No Active Challenge</Text>
                   <Text style={s.cardSub}>
-                    @{stamp.holder} holds the {countryName} {flag} stamp. A Pro member can initiate a 7-day challenge to claim it.
+                    @{stamp.holder} holds the {countryName} stamp. A Pro member can initiate a 7-day challenge to claim it.
                   </Text>
                   <PlusViewBanner navigation={navigation} />
                 </View>
@@ -607,9 +606,9 @@ const s = StyleSheet.create({
   scroll:         { paddingBottom: 60 },
   section:        { padding: 16, gap: 10 },
   sectionTitle:   { color: '#4fc3f7', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  sectionSub:     { color: '#555555', fontSize: 11 },
+  sectionSub:     { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
   centered:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTxt:       { color: '#555555', fontSize: 14 },
+  emptyTxt:       { color: 'rgba(255,255,255,0.4)', fontSize: 14 },
 
   // Hero
   hero:           { padding: 28, alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#4fc3f720' },
@@ -618,17 +617,20 @@ const s = StyleSheet.create({
   heroName:       { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 4 },
   heroSub:        { color: '#4fc3f7', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   holderRow:      { alignItems: 'center', marginTop: 8, gap: 2 },
-  holderLabel:    { color: '#555555', fontSize: 9, letterSpacing: 2 },
+  holderLabel:    { color: 'rgba(255,255,255,0.35)', fontSize: 9, letterSpacing: 2 },
   holderName:     { color: '#4fc3f7', fontSize: 15, fontWeight: '800' },
-  holderCoins:    { color: '#555555', fontSize: 11 },
+  holderCoins:    { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
   // Card
   card:           { backgroundColor: '#0d0f1a', borderRadius: 16, padding: 20, gap: 12, borderWidth: 1, borderColor: '#ffffff08' },
-  cardEmoji:      { fontSize: 40 },
+  cardBadge:      { alignSelf: 'flex-start', backgroundColor: 'rgba(79,195,247,0.12)', borderRadius: 7, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#4fc3f730' },
+  cardBadgeTxt:   { color: '#4fc3f7', fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
   cardTitle:      { color: '#fff', fontSize: 18, fontWeight: '900' },
-  cardSub:        { color: '#666', fontSize: 13, lineHeight: 20 },
-  rulesList:      { gap: 6 },
-  ruleItem:       { color: '#555555', fontSize: 12, lineHeight: 18 },
+  cardSub:        { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 20 },
+  rulesList:      { gap: 8 },
+  ruleRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  ruleDot:        { width: 5, height: 5, borderRadius: 3, backgroundColor: '#4fc3f7', marginTop: 5, flexShrink: 0 },
+  ruleItem:       { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 18, flex: 1 },
 
   // Primary button
   primaryBtn:     { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
@@ -640,12 +642,12 @@ const s = StyleSheet.create({
   timerDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4fc3f7', marginBottom: 4 },
   timerLabel:     { color: '#4fc3f7', fontSize: 9, fontWeight: '900', letterSpacing: 2 },
   timerValue:     { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 2 },
-  timerSub:       { color: '#555555', fontSize: 11 },
+  timerSub:       { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
   // Progress
   progressWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   progressLabel:  { fontSize: 11, fontWeight: '800', width: 32, textAlign: 'center' },
   progressBg:     { flex: 1, height: 6, backgroundColor: '#4fc3f730', borderRadius: 3, overflow: 'hidden' },
   progressFill:   { height: '100%', backgroundColor: '#ef4444', borderRadius: 3 },
-  leadingTxt:     { color: '#555555', fontSize: 11, textAlign: 'center' },
+  leadingTxt:     { color: 'rgba(255,255,255,0.45)', fontSize: 11, textAlign: 'center' },
 });

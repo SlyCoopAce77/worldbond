@@ -5,26 +5,27 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { WorldMark } from '../components/BondLogo';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
 import {
   useWallet, coinsToUSD,
   DEMO_TOP_CREATORS, BOND_MONUMENTS,
 } from '../context/WalletContext';
 
-// ── Payout system constants ───────────────────────────────────────────────────
-// Free is intentionally low to drive upgrades — the 20% gap vs Plus is the hook
-const TIER_PAYOUT_RATE = { free: 0.50, plus: 0.70, pro: 0.80 };
-const MIN_PAYOUT_COINS = 5000;   // ~$14 minimum; keeps transaction costs manageable
-const TOP_CREATOR_RATE = 0.85;   // top 3 monthly creators earn this
+const BOND_PINK   = '#FF0080';
+const BOND_GOLD   = '#FFB700';
+
+const BASE_PAYOUT = 0.70;
+const PASS_PAYOUT = 0.75;
+const MIN_PAYOUT_COINS = 5000;
 
 const TABS = ['Earnings', 'Spending', 'Creators', 'Footprints'];
 
 // ── BondCoin — WorldMark as the in-app currency icon ─────────────────────────
 function BondCoin({ size = 18 }) {
-  return <WorldMark size={size} color="#FFB700" bondColor="#FFB700" />;
+  return <WorldMark size={size} color={BOND_GOLD} bondColor={BOND_GOLD} />;
 }
 
-// ── CoinRow — Bond logo + amount side by side ─────────────────────────────────
+// ── CoinRow ───────────────────────────────────────────────────────────────────
 function CoinRow({ amount, textStyle, size = 18 }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -57,7 +58,7 @@ function sourceLabel(source) {
   return map[source] || source;
 }
 
-// ── Payout requirements checklist ─────────────────────────────────────────────
+// ── Payout requirements ───────────────────────────────────────────────────────
 function PayoutRequirements({ reqs }) {
   return (
     <View style={pr.wrap}>
@@ -83,14 +84,13 @@ const pr = StyleSheet.create({
   dotUnmet:  { backgroundColor: '#ef4444' },
   label:     { flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 13 },
   labelUnmet:{ color: 'rgba(255,255,255,0.45)' },
-  actionBtn: { backgroundColor: '#FFB70020', borderWidth: 1, borderColor: '#FFB700',
-               borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  actionTxt: { color: '#FFB700', fontSize: 11, fontWeight: '800' },
+  actionBtn: { backgroundColor: BOND_GOLD + '20', borderWidth: 1, borderColor: BOND_GOLD, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  actionTxt: { color: BOND_GOLD, fontSize: 11, fontWeight: '800' },
 });
 
 // ── Creator Podium ─────────────────────────────────────────────────────────────
 function bonusPct(creator) {
-  return Math.round((creator.payoutRate - 0.70) * 100);
+  return Math.round((creator.payoutRate - BASE_PAYOUT) * 100);
 }
 
 function CreatorPodium({ creators }) {
@@ -139,26 +139,23 @@ function CreatorPodium({ creators }) {
   );
 }
 const pod = StyleSheet.create({
-  wrap:       { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center',
-                gap: 10, paddingHorizontal: 20, paddingTop: 12 },
+  wrap:       { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12 },
   col:        { alignItems: 'center', flex: 1 },
-  avatar:     { width: 52, height: 52, borderRadius: 26, alignItems: 'center',
-                justifyContent: 'center', marginBottom: 4 },
+  avatar:     { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   avatarGold: { backgroundColor: '#b8860b', borderWidth: 2, borderColor: '#ffd700' },
   avatarTxt:  { color: '#fff', fontSize: 22, fontWeight: '900' },
   rank:       { fontSize: 20, marginBottom: 2 },
   name:       { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   flag:       { fontSize: 16, marginTop: 2, marginBottom: 6 },
-  plinth:     { width: '100%', borderTopLeftRadius: 10, borderTopRightRadius: 10,
-                alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 2 },
+  plinth:     { width: '100%', borderTopLeftRadius: 10, borderTopRightRadius: 10, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 2 },
   plinthCoins:{ color: '#fff', fontSize: 11, fontWeight: '800' },
   plinthBonus:{ color: 'rgba(255,255,255,0.75)', fontSize: 10 },
 });
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function WalletScreen({ navigation, route }) {
-  const currentUser = route?.params?.currentUser || null;
-  const { tier } = usePremium();
+  const currentUser     = route?.params?.currentUser || null;
+  const { hasBondPass } = useBondPass();
   const {
     balance, transactions, myStamps, myMonuments, monthlyEarned,
     stamps, earnCoins,
@@ -167,44 +164,28 @@ export default function WalletScreen({ navigation, route }) {
   const [activeTab,  setActiveTab]  = useState('Earnings');
   const [idVerified, setIdVerified] = useState(false);
 
-  const payoutRate    = TIER_PAYOUT_RATE[tier] || 0.70;
-  const availableUSD  = coinsToUSD(Math.floor(balance * payoutRate));
-  const earned        = transactions.filter(t => t.type === 'earn');
-  const spends        = transactions.filter(t => t.type === 'spend');
-  const totalEarned   = earned.reduce((s, t) => s + t.amount, 0);
+  const payoutRate   = hasBondPass ? PASS_PAYOUT : BASE_PAYOUT;
+  const availableUSD = coinsToUSD(Math.floor(balance * payoutRate));
+  const earned       = transactions.filter(t => t.type === 'earn');
+  const spends       = transactions.filter(t => t.type === 'spend');
+  const totalEarned  = earned.reduce((sum, t) => sum + t.amount, 0);
 
-  // ── Payout requirements (anti-spam / anti-fake-account gates) ─────────────
   const reqs = [
+    { id: 'age',     label: 'Account 30+ days old', met: true },
     {
-      id: 'age',
-      label: 'Account 30+ days old',
-      met: true,
-    },
-    {
-      id: 'verify',
-      label: 'Identity verified',
-      met: idVerified,
+      id: 'verify', label: 'Identity verified', met: idVerified,
       actionLabel: 'Verify ID',
-      onAction: () =>
-        Alert.alert(
-          'Identity Verification',
-          'Verify your identity to protect the creator community from fraudulent accounts. One verification per person — no multi-accounting.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Start Verification', onPress: () => setIdVerified(true) },
-          ]
-        ),
+      onAction: () => Alert.alert(
+        'Identity Verification',
+        'Verify your identity to protect the creator community from fraudulent accounts.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Start Verification', onPress: () => setIdVerified(true) },
+        ]
+      ),
     },
-    {
-      id: 'min',
-      label: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins`,
-      met: balance >= MIN_PAYOUT_COINS,
-    },
-    {
-      id: 'cooldown',
-      label: 'No payout in last 30 days',
-      met: true,
-    },
+    { id: 'min',      label: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins`, met: balance >= MIN_PAYOUT_COINS },
+    { id: 'cooldown', label: 'No payout in last 30 days', met: true },
   ];
   const allReqsMet = reqs.every(r => r.met);
 
@@ -223,17 +204,16 @@ export default function WalletScreen({ navigation, route }) {
     if (!allReqsMet) return;
     Alert.alert(
       'Request Payout',
-      `You'll receive $${availableUSD} USD (${Math.round(payoutRate * 100)}% of ${balance.toLocaleString()} BC).\n\nWorldBond keeps ${Math.round((1 - payoutRate) * 100)}% to cover platform, fraud protection, and payment processing.\n\nPayout via PayPal or bank transfer within 3–5 business days.`,
+      `You'll receive $${availableUSD} USD (${Math.round(payoutRate * 100)}% of ${balance.toLocaleString()} BC).\n\nWorldBond keeps ${Math.round((1 - payoutRate) * 100)}% to cover platform costs and payment processing.\n\nPayout via PayPal or bank transfer within 3–5 business days.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: () => Alert.alert('Payout Requested ✓', 'You\'ll receive your funds within 3–5 business days.') },
+        { text: 'Confirm', onPress: () => Alert.alert('Payout Requested ✓', "You'll receive your funds within 3–5 business days.") },
       ]
     );
   }
 
   return (
     <SafeAreaView style={s.safe}>
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
           <Text style={s.backIcon}>←</Text>
@@ -245,17 +225,26 @@ export default function WalletScreen({ navigation, route }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
         {/* ── Balance card ── */}
-        <LinearGradient colors={['#1a1060', '#0d0a2e']} style={s.balanceCard}>
+        <LinearGradient colors={['#0f0a1a', '#07080f']} style={s.balanceCard}>
           <Text style={s.balanceLbl}>Bond Coins</Text>
           <View style={s.balanceRow}>
-            <WorldMark size={52} color="#FFB700" bondColor="#FFB700" />
+            <WorldMark size={52} color={BOND_GOLD} bondColor={BOND_GOLD} />
             <Text style={s.balanceNum}>{balance.toLocaleString()}</Text>
           </View>
-          <Text style={s.balanceUSD}>≈ ${coinsToUSD(balance)} USD · {Math.round(payoutRate * 100)}% payout rate</Text>
+          <Text style={s.balanceUSD}>
+            ≈ ${coinsToUSD(balance)} USD · {Math.round(payoutRate * 100)}% {hasBondPass ? 'Bond Pass' : 'standard'} rate
+          </Text>
           <TouchableOpacity style={s.buyBtn} onPress={handleBuyCoins}>
             <Text style={s.buyBtnTxt}>+ Buy Bond Coins</Text>
           </TouchableOpacity>
         </LinearGradient>
+
+        {/* ── Bond Pass payout notice ── */}
+        {!hasBondPass && (
+          <TouchableOpacity style={s.passNudge} onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85}>
+            <Text style={s.passNudgeText}>⚡ Get Bond Pass for 80% payout rate →</Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Payout card ── */}
         <View style={s.payoutCard}>
@@ -264,7 +253,7 @@ export default function WalletScreen({ navigation, route }) {
               <Text style={s.payoutLbl}>Available to cash out</Text>
               <Text style={s.payoutAmount}>${availableUSD} USD</Text>
               <Text style={s.payoutSub}>
-                {balance.toLocaleString()} BC × {Math.round(payoutRate * 100)}% ({tier} rate)
+                {balance.toLocaleString()} BC × {Math.round(payoutRate * 100)}% ({hasBondPass ? 'Bond Pass' : 'standard'} rate)
               </Text>
             </View>
             <View style={s.payoutRateBadge}>
@@ -281,7 +270,7 @@ export default function WalletScreen({ navigation, route }) {
             disabled={!allReqsMet}
           >
             <LinearGradient
-              colors={allReqsMet ? ['#4ade80', '#16a34a'] : ['#222', '#1a1a1a']}
+              colors={allReqsMet ? ['#4ade80', '#16a34a'] : ['#222222', '#1a1a1a']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={s.payoutBtnGrad}
             >
@@ -367,7 +356,7 @@ export default function WalletScreen({ navigation, route }) {
             <View style={s.creatorHeader}>
               <Text style={s.creatorTitle}>Top Creators — June 2026</Text>
               <Text style={s.creatorSub}>
-                Ranking resets every calendar month. Top 3 earn a bonus payout on top of the standard 70%.
+                Ranking resets every calendar month. Top 3 earn a bonus payout above the base 70%.
               </Text>
             </View>
             <CreatorPodium creators={DEMO_TOP_CREATORS} />
@@ -401,16 +390,15 @@ export default function WalletScreen({ navigation, route }) {
               <Text style={s.compareTitle}>WorldBond vs Other Platforms</Text>
               <Text style={s.compareSub}>What creators keep per $1 in gifts received</Text>
               {[
-                { label: 'Bigo Live',          pct: '35%',  color: '#555',    you: false },
-                { label: 'TikTok LIVE',         pct: '50%',  color: '#555',    you: false },
-                { label: 'YouTube SuperChat',   pct: '70%',  color: '#888',    you: false },
-                { label: 'Twitch Bits',         pct: '71%',  color: '#888',    you: false },
-                { label: 'WorldBond Free',      pct: '50%',  color: '#6C47FF', you: true  },
-                { label: 'WorldBond Plus',      pct: '70%',  color: '#FF0080', you: true  },
-                { label: 'WorldBond Pro',       pct: '80%',  color: '#FFB700', you: true  },
-                { label: '🥇 Top Creator',      pct: '85%',  color: '#ffd700', you: true  },
-                { label: '+ Stamp Royalty',     pct: '+3%',  color: '#4ade80', you: true  },
-                { label: '+ Monument Royalty',  pct: '+2%',  color: '#4ade80', you: true  },
+                { label: 'Bigo Live',            pct: '35%', color: '#555555', you: false },
+                { label: 'TikTok LIVE',           pct: '50%', color: '#555555', you: false },
+                { label: 'YouTube SuperChat',     pct: '70%', color: '#888888', you: false },
+                { label: 'Twitch Bits',           pct: '71%', color: '#888888', you: false },
+                { label: 'WorldBond Standard',    pct: '50%', color: BOND_PINK,  you: true  },
+                { label: 'WorldBond Bond Pass',   pct: '75%', color: BOND_PINK,  you: true  },
+                { label: '🥇 Top Creator',        pct: '85%', color: '#ffd700', you: true  },
+                { label: '+ Stamp Royalty',       pct: '+3%', color: '#4ade80', you: true  },
+                { label: '+ Monument Royalty',    pct: '+2%', color: '#4ade80', you: true  },
               ].map(row => (
                 <View key={row.label} style={[s.compareRow, row.you && s.compareRowYou]}>
                   <Text style={[s.compareLabel, row.you && { color: '#fff' }]}>{row.label}</Text>
@@ -452,10 +440,7 @@ export default function WalletScreen({ navigation, route }) {
                     : (
                       <TouchableOpacity
                         style={unclaimed ? s.claimBtn : s.challengeBtn}
-                        onPress={() => navigation.navigate('CountryStampChallenge', {
-                          stamp: { flag, ...stamp },
-                          currentUser,
-                        })}
+                        onPress={() => navigation.navigate('CountryStampChallenge', { stamp: { flag, ...stamp }, currentUser })}
                       >
                         <Text style={unclaimed ? s.claimBtnTxt : s.challengeBtnTxt}>
                           {unclaimed ? 'Claim' : 'Challenge'}
@@ -483,15 +468,11 @@ export default function WalletScreen({ navigation, route }) {
                   <View style={{ flex: 1 }}>
                     <Text style={s.fpHolder}>{m.name}</Text>
                     <Text style={s.fpSub}>{m.location} {m.country}</Text>
-                    {m.holder && !isMine && (
-                      <Text style={s.fpHolderName}>@{m.holder}</Text>
-                    )}
+                    {m.holder && !isMine && <Text style={s.fpHolderName}>@{m.holder}</Text>}
                     {isMine && (
                       <CoinRow amount={`${m.coinsEarned.toLocaleString()} earned`} textStyle={s.fpEarned} size={13} />
                     )}
-                    {unclaimed && (
-                      <Text style={[s.fpHolderName, { color: '#4ade80' }]}>Unclaimed — tap to claim!</Text>
-                    )}
+                    {unclaimed && <Text style={[s.fpHolderName, { color: '#4ade80' }]}>Unclaimed — tap to claim!</Text>}
                   </View>
                   {isMine
                     ? <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>
@@ -519,119 +500,101 @@ export default function WalletScreen({ navigation, route }) {
 }
 
 const s = StyleSheet.create({
-  safe:            { flex: 1, backgroundColor: '#08090d' },
-  scroll:          { paddingBottom: 60 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  backBtn:         { width: 38, height: 38, borderRadius: 19, backgroundColor: '#111318',
-                     alignItems: 'center', justifyContent: 'center' },
-  backIcon:        { color: '#fff', fontSize: 20 },
-  title:           { color: '#fff', fontSize: 20, fontWeight: '900' },
+  safe:   { flex: 1, backgroundColor: '#08090d' },
+  scroll: { paddingBottom: 60 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  backBtn:{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#111318', alignItems: 'center', justifyContent: 'center' },
+  backIcon:{ color: '#fff', fontSize: 20 },
+  title:  { color: '#fff', fontSize: 20, fontWeight: '900' },
 
   // Balance card
-  balanceCard:     { margin: 16, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10 },
-  balanceLbl:      { color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  balanceRow:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  balanceNum:      { color: '#fff', fontSize: 48, fontWeight: '900', letterSpacing: -1 },
-  balanceUSD:      { color: 'rgba(255,255,255,0.35)', fontSize: 12, textAlign: 'center' },
-  buyBtn:          { backgroundColor: '#6C47FF', borderRadius: 16, paddingVertical: 13,
-                     paddingHorizontal: 32, marginTop: 4 },
-  buyBtnTxt:       { color: '#fff', fontSize: 15, fontWeight: '800' },
+  balanceCard: { margin: 16, borderRadius: 24, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: BOND_PINK + '20' },
+  balanceLbl:  { color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
+  balanceRow:  { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  balanceNum:  { color: '#fff', fontSize: 48, fontWeight: '900', letterSpacing: -1 },
+  balanceUSD:  { color: 'rgba(255,255,255,0.35)', fontSize: 12, textAlign: 'center' },
+  buyBtn:      { backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 13, paddingHorizontal: 32, marginTop: 4 },
+  buyBtnTxt:   { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  // Bond Pass nudge
+  passNudge:    { marginHorizontal: 16, marginBottom: 4, backgroundColor: BOND_PINK + '12', borderRadius: 12, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: BOND_PINK + '30' },
+  passNudgeText:{ color: BOND_PINK, fontSize: 13, fontWeight: '700' },
 
   // Payout card
-  payoutCard:      { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0f1116',
-                     borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1e2028' },
+  payoutCard:      { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0f1116', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1e2028' },
   payoutTop:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  payoutLbl:       { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700',
-                     letterSpacing: 0.5, marginBottom: 4 },
+  payoutLbl:       { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 4 },
   payoutAmount:    { color: '#fff', fontSize: 28, fontWeight: '900' },
   payoutSub:       { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2 },
-  payoutRateBadge: { alignItems: 'center', backgroundColor: '#4ade8015',
-                     borderWidth: 1, borderColor: '#4ade8040',
-                     borderRadius: 14, padding: 12 },
+  payoutRateBadge: { alignItems: 'center', backgroundColor: '#4ade8015', borderWidth: 1, borderColor: '#4ade8040', borderRadius: 14, padding: 12 },
   payoutRatePct:   { color: '#4ade80', fontSize: 22, fontWeight: '900' },
   payoutRateLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700' },
   payoutBtn:       { borderRadius: 14, overflow: 'hidden' },
   payoutBtnLocked: { opacity: 0.6 },
   payoutBtnGrad:   { paddingVertical: 14, alignItems: 'center' },
   payoutBtnTxt:    { color: '#fff', fontSize: 14, fontWeight: '800' },
-  payoutNote:      { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'center',
-                     marginTop: 12, lineHeight: 16 },
+  payoutNote:      { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 16 },
 
   // Stats row
-  statsRow:        { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
-  statCard:        { flex: 1, backgroundColor: '#0f1116', borderRadius: 16, padding: 14,
-                     alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#1e2028' },
-  statNum:         { color: '#fff', fontSize: 13, fontWeight: '800' },
-  statLbl:         { color: '#555', fontSize: 11 },
+  statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
+  statCard: { flex: 1, backgroundColor: '#0f1116', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#1e2028' },
+  statNum:  { color: '#fff', fontSize: 13, fontWeight: '800' },
+  statLbl:  { color: '#555555', fontSize: 11 },
 
   // Tabs
-  tabsRow:         { paddingHorizontal: 16, gap: 8, paddingBottom: 14 },
-  tab:             { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22,
-                     backgroundColor: '#0f1116', borderWidth: 1, borderColor: '#1e2028' },
-  tabActive:       { backgroundColor: '#6C47FF22', borderColor: '#6C47FF55' },
-  tabTxt:          { color: '#555', fontSize: 13, fontWeight: '700' },
-  tabTxtActive:    { color: '#7c5cfc' },
+  tabsRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 14 },
+  tab:         { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, backgroundColor: '#0f1116', borderWidth: 1, borderColor: '#1e2028' },
+  tabActive:   { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '40' },
+  tabTxt:      { color: '#555555', fontSize: 13, fontWeight: '700' },
+  tabTxtActive:{ color: BOND_PINK },
 
   // Transaction list
-  list:            { paddingHorizontal: 16, gap: 8 },
-  txRow:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                     backgroundColor: '#0f1116', borderRadius: 14, padding: 14,
-                     borderWidth: 1, borderColor: '#1e2028' },
-  txSource:        { color: '#fff', fontSize: 14, fontWeight: '700' },
-  txTime:          { color: '#444', fontSize: 12, marginTop: 3 },
-  txEarn:          { color: '#4ade80', fontSize: 14, fontWeight: '800' },
-  txSpend:         { color: '#f87171', fontSize: 14, fontWeight: '800' },
-  emptyTxt:        { color: '#444', fontSize: 14, textAlign: 'center',
-                     paddingVertical: 40, paddingHorizontal: 16 },
+  list:    { paddingHorizontal: 16, gap: 8 },
+  txRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0f1116', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#1e2028' },
+  txSource:{ color: '#fff', fontSize: 14, fontWeight: '700' },
+  txTime:  { color: '#444444', fontSize: 12, marginTop: 3 },
+  txEarn:  { color: '#4ade80', fontSize: 14, fontWeight: '800' },
+  txSpend: { color: '#f87171', fontSize: 14, fontWeight: '800' },
+  emptyTxt:{ color: '#444444', fontSize: 14, textAlign: 'center', paddingVertical: 40, paddingHorizontal: 16 },
 
   // Creators tab
-  creatorHeader:   { paddingHorizontal: 16, paddingBottom: 8 },
-  creatorTitle:    { color: '#fff', fontSize: 17, fontWeight: '900' },
-  creatorSub:      { color: '#555', fontSize: 13, marginTop: 4, lineHeight: 18 },
-  creatorCard:     { borderRadius: 16, padding: 16, flexDirection: 'row',
-                     alignItems: 'center', borderWidth: 1, borderColor: '#1e2028' },
-  creatorLeft:     { flex: 1, gap: 3 },
-  creatorBadge:    { color: '#ffd700', fontSize: 12, fontWeight: '800' },
-  creatorName:     { color: '#fff', fontSize: 15, fontWeight: '800' },
-  creatorStats:    { color: '#555', fontSize: 12 },
-  creatorRight:    { alignItems: 'center', minWidth: 70 },
-  creatorPayout:   { fontSize: 22, fontWeight: '900' },
-  creatorPayoutLbl:{ color: '#555', fontSize: 11 },
-  creatorUSD:      { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  creatorHeader:    { paddingHorizontal: 16, paddingBottom: 8 },
+  creatorTitle:     { color: '#fff', fontSize: 17, fontWeight: '900' },
+  creatorSub:       { color: '#555555', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  creatorCard:      { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#1e2028' },
+  creatorLeft:      { flex: 1, gap: 3 },
+  creatorBadge:     { color: '#ffd700', fontSize: 12, fontWeight: '800' },
+  creatorName:      { color: '#fff', fontSize: 15, fontWeight: '800' },
+  creatorStats:     { color: '#555555', fontSize: 12 },
+  creatorRight:     { alignItems: 'center', minWidth: 70 },
+  creatorPayout:    { fontSize: 22, fontWeight: '900' },
+  creatorPayoutLbl: { color: '#555555', fontSize: 11 },
+  creatorUSD:       { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
 
   // Platform comparison
-  compareCard:     { margin: 16, backgroundColor: '#0f1116', borderRadius: 18, padding: 18,
-                     borderWidth: 1, borderColor: '#1e2028' },
-  compareTitle:    { color: '#fff', fontSize: 15, fontWeight: '900', marginBottom: 4 },
-  compareSub:      { color: '#555', fontSize: 12, marginBottom: 12 },
-  compareRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                     paddingVertical: 8, borderBottomWidth: 1, borderColor: '#1a1c28' },
-  compareRowYou:   { backgroundColor: '#6C47FF0a', marginHorizontal: -18, paddingHorizontal: 18 },
-  compareLabel:    { color: '#777', fontSize: 13 },
-  comparePct:      { fontSize: 14, fontWeight: '900' },
+  compareCard:   { margin: 16, backgroundColor: '#0f1116', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#1e2028' },
+  compareTitle:  { color: '#fff', fontSize: 15, fontWeight: '900', marginBottom: 4 },
+  compareSub:    { color: '#555555', fontSize: 12, marginBottom: 12 },
+  compareRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: '#1a1c1a' },
+  compareRowYou: { backgroundColor: BOND_PINK + '0a', marginHorizontal: -18, paddingHorizontal: 18 },
+  compareLabel:  { color: '#777777', fontSize: 13 },
+  comparePct:    { fontSize: 14, fontWeight: '900' },
 
   // Footprints tab
-  fpSection:       { backgroundColor: '#0f1116', borderRadius: 16, padding: 16,
-                     borderWidth: 1, borderColor: '#1e2028', gap: 6, marginBottom: 4 },
-  fpSectionTitle:  { color: '#fff', fontSize: 16, fontWeight: '900' },
-  fpSectionSub:    { color: '#555', fontSize: 12, lineHeight: 18 },
-  fpRow:           { flexDirection: 'row', alignItems: 'center', gap: 12,
-                     backgroundColor: '#0f1116', borderRadius: 14, padding: 14,
-                     borderWidth: 1, borderColor: '#1e2028' },
-  fpRowMine:       { borderColor: '#6C47FF55', backgroundColor: '#6C47FF0a' },
-  fpIcon:          { fontSize: 26 },
-  fpHolder:        { color: '#fff', fontSize: 13, fontWeight: '700' },
-  fpHolderName:    { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 2 },
-  fpSub:           { color: '#555', fontSize: 11, marginTop: 1 },
-  fpEarned:        { color: '#FFB700', fontSize: 12, marginTop: 2 },
-  mineBadge:       { backgroundColor: '#6C47FF33', borderRadius: 8, paddingHorizontal: 10,
-                     paddingVertical: 4, borderWidth: 1, borderColor: '#6C47FF66' },
-  mineBadgeTxt:    { color: '#7c5cfc', fontSize: 11, fontWeight: '800' },
-  claimBtn:        { backgroundColor: '#4ade8022', borderRadius: 10, paddingHorizontal: 12,
-                     paddingVertical: 6, borderWidth: 1, borderColor: '#4ade8055' },
-  claimBtnTxt:     { color: '#4ade80', fontSize: 12, fontWeight: '800' },
-  challengeBtn:    { backgroundColor: '#FFB70018', borderRadius: 10, paddingHorizontal: 10,
-                     paddingVertical: 6, borderWidth: 1, borderColor: '#FFB70044' },
-  challengeBtnTxt: { color: '#FFB700', fontSize: 11, fontWeight: '700' },
+  fpSection:      { backgroundColor: '#0f1116', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e2028', gap: 6, marginBottom: 4 },
+  fpSectionTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  fpSectionSub:   { color: '#555555', fontSize: 12, lineHeight: 18 },
+  fpRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0f1116', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#1e2028' },
+  fpRowMine:      { borderColor: BOND_PINK + '40', backgroundColor: BOND_PINK + '08' },
+  fpIcon:         { fontSize: 26 },
+  fpHolder:       { color: '#fff', fontSize: 13, fontWeight: '700' },
+  fpHolderName:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 2 },
+  fpSub:          { color: '#555555', fontSize: 11, marginTop: 1 },
+  fpEarned:       { color: BOND_GOLD, fontSize: 12, marginTop: 2 },
+  mineBadge:      { backgroundColor: BOND_PINK + '20', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: BOND_PINK + '40' },
+  mineBadgeTxt:   { color: BOND_PINK, fontSize: 11, fontWeight: '800' },
+  claimBtn:       { backgroundColor: '#4ade8022', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#4ade8055' },
+  claimBtnTxt:    { color: '#4ade80', fontSize: 12, fontWeight: '800' },
+  challengeBtn:   { backgroundColor: BOND_GOLD + '18', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: BOND_GOLD + '44' },
+  challengeBtnTxt:{ color: BOND_GOLD, fontSize: 11, fontWeight: '700' },
 });

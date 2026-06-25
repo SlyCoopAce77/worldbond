@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Pressable,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform,
@@ -10,8 +10,10 @@ import { authHeader } from '../utils/apiUtils';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import GiftPicker from '../components/GiftPicker';
+import GiftIcon from '../components/GiftIcon';
+import { WorldMark } from '../components/BondLogo';
 
-const ACCENT  = '#6C47FF';
+const BOND_PINK = '#FF0080';
 const BG      = '#000000';
 const CARD    = '#1C1F23';
 const BORDER  = '#2F3336';
@@ -122,7 +124,7 @@ function Avatar({ photo_url, name, size = 38 }) {
     );
   }
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: size * 0.42 }}>{initials}</Text>
     </View>
   );
@@ -370,12 +372,29 @@ export default function ChatScreen({ route, navigation }) {
     const msgRxns = reactions[item.id] || [];
 
     if (item.type === 'gift') {
+      const gc = item.gift?.color || BOND_PINK;
       return (
-        <View style={styles.giftRow}>
-          <LinearGradient colors={['#2a1a4e', '#1a1a3e']} style={styles.giftBubble}>
-            <Text style={styles.giftEmoji}>{item.gift?.emoji}</Text>
-            <Text style={styles.giftText}>
-              {isMine ? 'You' : item.senderName} sent a {item.gift?.name}!
+        <View style={[styles.giftRow, isMine && { alignSelf: 'flex-end' }]}>
+          <LinearGradient
+            colors={['rgba(30,5,55,0.97)', 'rgba(8,0,22,0.97)']}
+            style={[styles.giftBubble, { borderColor: gc + '55' }]}
+          >
+            <View style={[styles.giftIconWrap, { backgroundColor: gc + '1a', borderColor: gc + '44' }]}>
+              <GiftIcon id={item.gift?.id} color={gc} size={40} />
+            </View>
+            <Text style={[styles.giftName, { color: gc }]}>{item.gift?.name}</Text>
+            {item.gift?.tagline ? (
+              <Text style={styles.giftTagline}>{item.gift.tagline}</Text>
+            ) : null}
+            <View style={[styles.giftCoinRow, { borderColor: gc + '35' }]}>
+              <Text style={[styles.giftCoins, { color: gc }]}>
+                {item.gift?.coins >= 1000
+                  ? `${(item.gift.coins / 1000).toFixed(item.gift.coins % 1000 === 0 ? 0 : 1)}k`
+                  : item.gift?.coins} BC
+              </Text>
+            </View>
+            <Text style={styles.giftSender}>
+              {isMine ? 'You' : item.senderName} sent this gift
             </Text>
             <Text style={styles.giftTime}>{timeStr(item.timestamp)}</Text>
           </LinearGradient>
@@ -459,16 +478,21 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Gift fly-in overlay */}
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.giftOverlay, {
-          opacity:   giftAnim,
-          transform: [{ scale: giftAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
-        }]}
-      >
-        {lastGift && <Text style={styles.giftOverlayEmoji}>{lastGift.gift?.emoji}</Text>}
-      </Animated.View>
+      {/* Gift fly-in overlay — shows the actual GiftIcon, no emoji */}
+      {lastGift && (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.giftOverlay, {
+            opacity:   giftAnim,
+            transform: [{ scale: giftAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }],
+          }]}
+        >
+          <View style={[styles.giftOverlayCircle, { borderColor: (lastGift.gift?.color || BOND_PINK) + '66', backgroundColor: (lastGift.gift?.color || BOND_PINK) + '18' }]}>
+            <GiftIcon id={lastGift.gift?.id} color={lastGift.gift?.color || BOND_PINK} size={72} />
+          </View>
+          <Text style={[styles.giftOverlayName, { color: lastGift.gift?.color || BOND_PINK }]}>{lastGift.gift?.name}</Text>
+        </Animated.View>
+      )}
 
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -513,7 +537,7 @@ export default function ChatScreen({ route, navigation }) {
 
       {/* Compatibility banner */}
       {compatibilityScore != null && (
-        <LinearGradient colors={[`${ACCENT}1a`, 'transparent']} style={styles.compatBanner}>
+        <LinearGradient colors={[`${BOND_PINK}1a`, 'transparent']} style={styles.compatBanner}>
           <Text style={styles.compatText}>✨ {compatibilityScore}% Bond Match</Text>
         </LinearGradient>
       )}
@@ -595,8 +619,8 @@ export default function ChatScreen({ route, navigation }) {
           >
             <Text style={styles.inputActionIcon}>{uploading ? '⏳' : '📷'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.inputAction} onPress={() => setShowGifts(true)}>
-            <Text style={styles.inputActionIcon}>🎁</Text>
+          <TouchableOpacity style={[styles.inputAction, styles.giftInputBtn]} onPress={() => setShowGifts(true)}>
+            <WorldMark size={18} color="#FFB700" bondColor="#FFB700" />
           </TouchableOpacity>
           <TextInput
             ref={inputRef}
@@ -610,7 +634,7 @@ export default function ChatScreen({ route, navigation }) {
           />
           {text.trim() ? (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
-              <LinearGradient colors={[ACCENT, '#6C47FF']} style={styles.sendBtn}>
+              <LinearGradient colors={[BOND_PINK, '#CC0060']} style={styles.sendBtn}>
                 <Text style={styles.sendIcon}>➤</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -691,8 +715,10 @@ const styles = StyleSheet.create({
   giftOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', zIndex: 99, pointerEvents: 'none',
+    gap: 14,
   },
-  giftOverlayEmoji: { fontSize: 110 },
+  giftOverlayCircle: { width: 140, height: 140, borderRadius: 70, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  giftOverlayName:   { fontSize: 18, fontWeight: '900', letterSpacing: -0.2 },
 
   // Header
   header: {
@@ -702,7 +728,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   backBtn:    { padding: 4 },
-  backArrow:  { color: ACCENT, fontSize: 24 },
+  backArrow:  { color: BOND_PINK, fontSize: 24 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerOnlineDot: {
     position: 'absolute', bottom: 0, right: 0,
@@ -717,7 +743,7 @@ const styles = StyleSheet.create({
 
   // Compatibility banner
   compatBanner: { paddingHorizontal: 16, paddingVertical: 7, alignItems: 'center' },
-  compatText:   { color: ACCENT, fontSize: 12, fontWeight: '700' },
+  compatText:   { color: BOND_PINK, fontSize: 12, fontWeight: '700' },
 
   // Messages
   msgList: { padding: 14, paddingBottom: 8, gap: 6 },
@@ -737,13 +763,13 @@ const styles = StyleSheet.create({
     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5,
     marginBottom: -4, borderLeftWidth: 3,
   },
-  replyPreviewMine:  { backgroundColor: `${ACCENT}33`, borderLeftColor: ACCENT, alignSelf: 'flex-end' },
+  replyPreviewMine:  { backgroundColor: `${BOND_PINK}33`, borderLeftColor: BOND_PINK, alignSelf: 'flex-end' },
   replyPreviewOther: { backgroundColor: '#252540',      borderLeftColor: '#888'  },
-  replyPreviewName:  { color: ACCENT, fontSize: 10, fontWeight: '700', marginBottom: 2 },
+  replyPreviewName:  { color: BOND_PINK, fontSize: 10, fontWeight: '700', marginBottom: 2 },
   replyPreviewText:  { color: '#999', fontSize: 11 },
 
   bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9, gap: 2 },
-  bubbleMine:  { backgroundColor: ACCENT, borderBottomRightRadius: 4 },
+  bubbleMine:  { backgroundColor: BOND_PINK, borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: CARD,   borderBottomLeftRadius: 4 },
 
   imageThumb:   { width: 200, height: 150, borderRadius: 10, marginBottom: 6 },
@@ -763,15 +789,16 @@ const styles = StyleSheet.create({
   },
   reactionEmoji: { fontSize: 14 },
 
-  // Gift
-  giftRow:  { alignItems: 'center', marginVertical: 10 },
-  giftBubble: {
-    borderRadius: 20, paddingHorizontal: 24, paddingVertical: 14,
-    alignItems: 'center', gap: 6, borderWidth: 1, borderColor: `${ACCENT}44`,
-  },
-  giftEmoji: { fontSize: 44 },
-  giftText:  { color: '#ddd', fontSize: 14, fontWeight: '600' },
-  giftTime:  { color: '#666', fontSize: 10 },
+  // Gift bubble
+  giftRow:     { alignSelf: 'flex-start', marginVertical: 6, maxWidth: '72%' },
+  giftBubble:  { borderRadius: 22, padding: 18, alignItems: 'center', gap: 9, borderWidth: 1.5 },
+  giftIconWrap:{ width: 72, height: 72, borderRadius: 36, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  giftName:    { fontSize: 16, fontWeight: '900', textAlign: 'center', letterSpacing: -0.2 },
+  giftTagline: { color: 'rgba(255,255,255,0.38)', fontSize: 11, fontStyle: 'italic', textAlign: 'center' },
+  giftCoinRow: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 5 },
+  giftCoins:   { fontSize: 14, fontWeight: '800' },
+  giftSender:  { color: 'rgba(255,255,255,0.38)', fontSize: 11 },
+  giftTime:    { color: 'rgba(255,255,255,0.22)', fontSize: 10 },
 
   // Typing
   typingRow:   { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 8, paddingHorizontal: 14 },
@@ -796,7 +823,7 @@ const styles = StyleSheet.create({
   emptyHint:     { color: '#888', fontSize: 13, marginBottom: 8 },
   // Pulse Drops
   pulseHeader:  { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 10, alignSelf: 'flex-start' },
-  pulseDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: ACCENT },
+  pulseDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: BOND_PINK },
   pulseTitle:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   pulseDate:    { color: '#333', fontSize: 11, fontWeight: '600', marginLeft: 'auto' },
   pulseCard:    { width: '100%', flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, borderLeftWidth: 0, marginBottom: 8 },
@@ -814,8 +841,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#16162a', paddingHorizontal: 14, paddingVertical: 10,
     borderTopWidth: 1, borderTopColor: BORDER,
   },
-  replyBarAccent: { width: 3, height: '100%', backgroundColor: ACCENT, borderRadius: 2 },
-  replyBarName:   { color: ACCENT, fontSize: 11, fontWeight: '700', marginBottom: 2 },
+  replyBarAccent: { width: 3, height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
+  replyBarName:   { color: BOND_PINK, fontSize: 11, fontWeight: '700', marginBottom: 2 },
   replyBarPreview:{ color: '#888', fontSize: 12 },
   replyBarClose:  { color: '#666', fontSize: 16, paddingHorizontal: 4 },
 
@@ -830,6 +857,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20, backgroundColor: CARD,
     alignItems: 'center', justifyContent: 'center',
   },
+  giftInputBtn: { backgroundColor: 'rgba(255,183,0,0.12)', borderWidth: 1, borderColor: 'rgba(255,183,0,0.25)' },
   inputActionIcon: { fontSize: 20 },
   input: {
     flex: 1, backgroundColor: CARD, color: '#fff', borderRadius: 22,

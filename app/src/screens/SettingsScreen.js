@@ -8,7 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { getAccessToken, logout } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
+
+const BOND_PINK = '#FF0080';
 import { useTheme } from '../context/ThemeContext';
 
 const SETTINGS_KEY = 'bond_settings';
@@ -48,8 +50,8 @@ function ToggleRow({ icon, label, sublabel, value, onToggle, disabled }) {
         value={value}
         onValueChange={onToggle}
         disabled={disabled}
-        trackColor={{ false: colors.border, true: '#6C47FF55' }}
-        thumbColor={value ? '#6C47FF' : colors.textMuted}
+        trackColor={{ false: colors.border, true: BOND_PINK + '55' }}
+        thumbColor={value ? BOND_PINK : colors.textMuted}
         ios_backgroundColor={colors.border}
       />
     </View>
@@ -83,11 +85,11 @@ function RadioGroup({ label, options, value, onChange }) {
           <TouchableOpacity
             key={opt.value}
             style={[s.radioBtn, { backgroundColor: colors.bg, borderColor: colors.border },
-              value === opt.value && { backgroundColor: '#6C47FF18', borderColor: '#6C47FF55' }]}
+              value === opt.value && { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' }]}
             onPress={() => onChange(opt.value)}
           >
             <Text style={[s.radioBtnText, { color: colors.textMuted },
-              value === opt.value && { color: '#6C47FF' }]}>
+              value === opt.value && { color: BOND_PINK }]}>
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -108,7 +110,7 @@ function Divider() {
 }
 
 export default function SettingsScreen({ navigation, onLogout }) {
-  const { tier, tierInfo } = usePremium();
+  const { hasBondPass } = useBondPass();
   const { colors, isDark, toggleTheme } = useTheme();
   const [settings, setSettings] = useState(DEFAULTS);
   const [saving, setSaving]     = useState(false);
@@ -224,7 +226,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
 
       {saving && (
         <View style={s.savingBanner}>
-          <ActivityIndicator size="small" color="#6C47FF" />
+          <ActivityIndicator size="small" color={BOND_PINK} />
           <Text style={s.savingText}>Processing…</Text>
         </View>
       )}
@@ -273,7 +275,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
           <NavRow
             icon="⭐"
             label="Subscription"
-            value={tier === 'free' ? 'Free' : tier === 'plus' ? 'Plus' : 'Pro'}
+            value={hasBondPass ? 'Bond Pass' : 'Free'}
             onPress={() => navigation.navigate('Subscription')}
           />
         </Card>
@@ -470,8 +472,8 @@ const s = StyleSheet.create({
   backIcon:     { fontSize: 26, lineHeight: 30 },
   headerTitle:  { fontSize: 20, fontWeight: '900' },
 
-  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#6C47FF15', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#6C47FF30' },
-  savingText:   { color: '#6C47FF', fontSize: 13, fontWeight: '600' },
+  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: BOND_PINK + '15', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BOND_PINK + '30' },
+  savingText:   { color: BOND_PINK, fontSize: 13, fontWeight: '600' },
 
   scroll:       { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
 
@@ -484,7 +486,7 @@ const s = StyleSheet.create({
   rowIcon:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   rowLabel:     { fontSize: 15, fontWeight: '600' },
   rowSub:       { fontSize: 12, marginTop: 2 },
-  rowValue:     { color: '#6C47FF', fontSize: 13, fontWeight: '700' },
+  rowValue:     { color: BOND_PINK, fontSize: 13, fontWeight: '700' },
   chevron:      { fontSize: 22, fontWeight: '300' },
 
   radioGroup:   { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },

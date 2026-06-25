@@ -12,9 +12,13 @@ import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { getCountryFlag } from '../utils/countryUtils';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
 import { stringToColor } from '../utils/apiUtils';
 import { CONNECTION_TYPES } from '../utils/constants';
+import GiftPicker from '../components/GiftPicker';
+import { WorldMark } from '../components/BondLogo';
+
+const BOND_PINK = '#FF0080';
 
 const { width, height } = Dimensions.get('window');
 
@@ -105,7 +109,7 @@ function VoiceNotePlayer({ url }) {
       <Text style={vStyles.label}>Voice Note</Text>
       <View style={vStyles.container}>
         {loading ? (
-          <ActivityIndicator color="#6C47FF" style={{ marginRight: 12 }} />
+          <ActivityIndicator color={BOND_PINK} style={{ marginRight: 12 }} />
         ) : (
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <TouchableOpacity
@@ -131,12 +135,12 @@ function VoiceNotePlayer({ url }) {
 const vStyles = StyleSheet.create({
   section:   { gap: 10 },
   label:     { color: '#666', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6C47FF12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: '#6C47FF30' },
-  btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
-  btnActive: { backgroundColor: '#5533DD' },
+  container: { flexDirection: 'row', alignItems: 'center', backgroundColor: BOND_PINK + '12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: BOND_PINK + '30' },
+  btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
+  btnActive: { backgroundColor: '#CC0060' },
   btnIcon:   { color: '#fff', fontSize: 16 },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2, height: 44 },
-  bar:       { width: 3, borderRadius: 2, backgroundColor: '#6C47FF' },
+  bar:       { width: 3, borderRadius: 2, backgroundColor: BOND_PINK },
   dur:       { color: '#666', fontSize: 12 },
   hint:      { color: '#555', fontSize: 12, textAlign: 'center' },
 });
@@ -199,28 +203,9 @@ const cStyles = StyleSheet.create({
   row:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowLabel:  { color: '#888', fontSize: 12, width: 120 },
   track:     { flex: 1, height: 4, backgroundColor: '#2F3336', borderRadius: 2, overflow: 'hidden' },
-  fill:      { height: '100%', backgroundColor: '#6C47FF', borderRadius: 2 },
-  pct:       { color: '#6C47FF', fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
+  fill:      { height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
+  pct:       { color: BOND_PINK, fontSize: 12, fontWeight: '700', width: 34, textAlign: 'right' },
 });
-
-// ─── Bond Mark — milestone tier badge ──────────────────────────────────────
-// One check = Plus, two checks = Pro. Pill shape (not a circle) so it reads
-// as a progression milestone rather than a generic verify icon.
-function BondCrest({ tier }) {
-  if (!tier || tier === 'free') return null;
-  const isPro = tier === 'pro';
-  const bg = isPro ? '#B8860B' : '#5B21B6';
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: isPro ? 2 : 0,
-      paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5,
-      backgroundColor: bg,
-    }}>
-      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>
-      {isPro && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900', lineHeight: 13 }}>✓</Text>}
-    </View>
-  );
-}
 
 // ─── Main screen ───────────────────────────────────────────────────────────
 export default function ProfileScreen({ route, navigation }) {
@@ -240,10 +225,11 @@ export default function ProfileScreen({ route, navigation }) {
   const [viewingPhoto,     setViewingPhoto]     = useState(null);
   const [showBondSheet,    setShowBondSheet]    = useState(false);
   const [bondNote,         setBondNote]         = useState('');
+  const [showGiftPicker,   setShowGiftPicker]   = useState(false);
   const [isLive,           setIsLive]           = useState(false);
   const [coverPhotoUrl,    setCoverPhotoUrl]    = useState(null);
 
-  const { tierInfo, tier } = usePremium();
+  const { hasBondPass } = useBondPass();
 
   const slideAnim = useRef(new Animated.Value(60)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -334,9 +320,6 @@ export default function ProfileScreen({ route, navigation }) {
     if (!targetId) return;
     socket.emit(following ? 'unfollow_user' : 'follow_user', {
       targetUserId: targetId,
-      senderTier:  tierInfo.id,
-      senderBadge: tierInfo.followBadge,
-      priority:    tierInfo.bondPriority,
     });
     setFollowing(f => !f);
     setFollowCounts(c => ({
@@ -356,15 +339,12 @@ export default function ProfileScreen({ route, navigation }) {
         targetUserId: bondUserId,
         connectionType: ct,
         note: note.trim() || undefined,
-        priority: tierInfo.bondPriority,
-        senderTier: tierInfo.id,
-        senderBadge: tierInfo.followBadge,
       }, { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 });
       setConnected(true);
       setBondNote('');
       Alert.alert(
-        `${tierInfo.bondIcon} Bonded!`,
-        `Your ${tierInfo.bondLabel} request was sent to ${displayName}.`,
+        '🌍 Bonded!',
+        `Your Bond request was sent to ${displayName}.`,
       );
     } catch (err) {
       const msg = err.response?.data?.error || 'Could not connect. Try again.';
@@ -373,6 +353,12 @@ export default function ProfileScreen({ route, navigation }) {
     } finally { setConnecting(false); }
   }
 
+
+  function sendGift(gift) {
+    const socket = getSocket();
+    socket.emit('send_gift', { toSocketId: profileUser?.socketId, gift });
+    setShowGiftPicker(false);
+  }
 
   async function pickCoverPhoto() {
     const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.85 });
@@ -459,10 +445,10 @@ export default function ProfileScreen({ route, navigation }) {
           </View>
           {!isOwnProfile && (
             <TouchableOpacity
-              style={[styles.followBtn, { borderColor: tierInfo.color }, following && { backgroundColor: tierInfo.color + '22' }]}
+              style={[styles.followBtn, { borderColor: BOND_PINK }, following && { backgroundColor: BOND_PINK + '22' }]}
               onPress={toggleFollow}
             >
-              <Text style={[styles.followBtnText, { color: tierInfo.color }]}>
+              <Text style={[styles.followBtnText, { color: BOND_PINK }]}>
                 {following ? '✓ Bonded' : '+ Bond'}
               </Text>
             </TouchableOpacity>
@@ -480,7 +466,11 @@ export default function ProfileScreen({ route, navigation }) {
                 <Text style={styles.verifyTxt}>✓</Text>
               </View>
             )}
-            <BondCrest tier={bondProfile?.tier || bondProfile?.subscription_tier} />
+            {bondProfile?.bond_pass && (
+              <View style={{ backgroundColor: BOND_PINK + '22', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 }}>
+                <Text style={{ color: BOND_PINK, fontSize: 10, fontWeight: '900' }}>⚡ PASS</Text>
+              </View>
+            )}
           </View>
 
           {(() => {
@@ -517,7 +507,7 @@ export default function ProfileScreen({ route, navigation }) {
             <Text style={styles.twitterStatNum}>{countryFlagCount ?? '—'}</Text>
             <Text style={styles.twitterStatLabel}> Footprints</Text>
           </View>
-          {tier === 'pro' && bondProfile?.rank != null && (
+          {hasBondPass && bondProfile?.rank != null && (
             <>
               <Text style={styles.twitterDot}>·</Text>
               <View style={styles.twitterStat}>
@@ -533,7 +523,7 @@ export default function ProfileScreen({ route, navigation }) {
 
           {loadingBond && (
             <View style={styles.loadingRow}>
-              <ActivityIndicator color="#6C47FF" size="small" />
+              <ActivityIndicator color={BOND_PINK} size="small" />
               <Text style={styles.loadingText}>Loading profile…</Text>
             </View>
           )}
@@ -701,26 +691,36 @@ export default function ProfileScreen({ route, navigation }) {
       {!isOwnProfile && (
         <View style={styles.actionBar}>
 
-          {/* Bond button — styled by tier */}
+          {/* Bond Gift button */}
+          <TouchableOpacity
+            style={styles.giftActionBtn}
+            onPress={() => setShowGiftPicker(true)}
+            activeOpacity={0.8}
+          >
+            <WorldMark size={18} color="#FFB700" bondColor="#FFB700" />
+            <Text style={styles.giftActionTxt}>BOND GIFT</Text>
+          </TouchableOpacity>
+
+          {/* Bond button */}
           {bondUserId && (
             connected ? (
-              <View style={[styles.bondedBtn, { borderColor: tierInfo.color, backgroundColor: tierInfo.color + '20' }]}>
-                <Text style={[styles.bondedBtnText, { color: tierInfo.color }]}>✓ 🌍 Bonded</Text>
+              <View style={styles.bondedBtn}>
+                <Text style={styles.bondedBtnText}>✓ 🌍 Bonded</Text>
               </View>
             ) : (
               <LinearGradient
-                colors={tierInfo.bondGradColors}
+                colors={[BOND_PINK, '#CC0060']}
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={styles.bondBtn}
               >
                 <TouchableOpacity
-                  onPress={() => tierInfo.canSendBondNote ? setShowBondSheet(true) : handleConnect()}
+                  onPress={() => hasBondPass ? setShowBondSheet(true) : handleConnect()}
                   disabled={connecting}
                   style={styles.bondBtnInner}
                 >
                   {connecting
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.bondBtnText}>🌍  {tierInfo.bondLabel}</Text>
+                    : <Text style={styles.bondBtnText}>🌍  Bond</Text>
                   }
                 </TouchableOpacity>
               </LinearGradient>
@@ -745,42 +745,36 @@ export default function ProfileScreen({ route, navigation }) {
           {/* Sheet handle */}
           <View style={styles.sheetHandle} />
 
-          {/* Tier badge header */}
-          <View style={[styles.sheetTierBadge, { backgroundColor: tierInfo.bondBorderColor + '22', borderColor: tierInfo.bondBorderColor + '55' }]}>
-            <Text style={styles.sheetTierIcon}>{tierInfo.bondIcon}</Text>
-            <Text style={[styles.sheetTierLabel, { color: tierInfo.bondBorderColor }]}>{tierInfo.label}</Text>
-            {tierInfo.bondPriority && (
-              <View style={styles.priorityTag}>
-                <Text style={styles.priorityTagTxt}>PRIORITY</Text>
-              </View>
-            )}
+          {/* Bond Pass badge header */}
+          <View style={[styles.sheetTierBadge, { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '55' }]}>
+            <Text style={styles.sheetTierIcon}>🌍</Text>
+            <Text style={[styles.sheetTierLabel, { color: BOND_PINK }]}>Bond Pass</Text>
           </View>
 
           <Text style={styles.sheetTitle}>Send a Bond Request</Text>
           <Text style={styles.sheetSub}>
             Introduce yourself to <Text style={{ color: '#fff', fontWeight: '700' }}>{displayName}</Text>
-            {tierInfo.bondPriority ? ' — your request will appear at the top of their inbox ⭐' : ''}
           </Text>
 
           {/* Note input */}
-          <View style={[styles.sheetInputWrap, { borderColor: tierInfo.bondBorderColor + '55' }]}>
+          <View style={[styles.sheetInputWrap, { borderColor: BOND_PINK + '55' }]}>
             <TextInput
               style={styles.sheetInput}
-              placeholder={`Write a personal note… (${tierInfo.bondNoteLimit} chars)`}
+              placeholder="Write a personal note… (150 chars)"
               placeholderTextColor="#444"
               value={bondNote}
-              onChangeText={t => setBondNote(t.slice(0, tierInfo.bondNoteLimit))}
+              onChangeText={t => setBondNote(t.slice(0, 150))}
               multiline
-              maxLength={tierInfo.bondNoteLimit}
+              maxLength={150}
             />
             <Text style={styles.sheetCharCount}>
-              {bondNote.length}/{tierInfo.bondNoteLimit}
+              {bondNote.length}/150
             </Text>
           </View>
 
           {/* Send button */}
           <LinearGradient
-            colors={tierInfo.bondGradColors}
+            colors={[BOND_PINK, '#CC0060']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.sheetSendBtn}
           >
@@ -791,7 +785,7 @@ export default function ProfileScreen({ route, navigation }) {
             >
               {connecting
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.sheetSendTxt}>🌍  Send {tierInfo.bondLabel}</Text>
+                : <Text style={styles.sheetSendTxt}>🌍  Send Bond</Text>
               }
             </TouchableOpacity>
           </LinearGradient>
@@ -802,6 +796,14 @@ export default function ProfileScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* ── Bond Gift Picker ── */}
+      <GiftPicker
+        visible={showGiftPicker}
+        onClose={() => setShowGiftPicker(false)}
+        onSend={sendGift}
+        hostName={displayName}
+      />
     </View>
   );
 }
@@ -889,17 +891,19 @@ const styles = StyleSheet.create({
   expIcon:         { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   expTitle:        { color: '#fff', fontSize: 15, fontWeight: '700' },
   expDesc:         { color: '#666', fontSize: 13, marginTop: 4, lineHeight: 18 },
-  interestBtn:     { backgroundColor: '#6C47FF', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  interestBtn:     { backgroundColor: BOND_PINK, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   interestBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   socialCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111316', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#222527', gap: 12 },
   socialIcon:      { fontSize: 26 },
   socialPlatform:  { color: '#555', fontSize: 11, marginBottom: 2 },
   socialHandle:    { color: '#fff', fontSize: 14, fontWeight: '600' },
-  socialArrow:     { color: '#6C47FF', fontSize: 20, fontWeight: '700' },
+  socialArrow:     { color: BOND_PINK, fontSize: 20, fontWeight: '700' },
 
-  actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 34, backgroundColor: '#000000f2', borderTopWidth: 1, borderTopColor: '#1C1F23' },
-  bondBtn:         { flex: 2, borderRadius: 18, overflow: 'hidden' },
+  actionBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 34, backgroundColor: '#000000f2', borderTopWidth: 1, borderTopColor: '#1C1F23' },
+  giftActionBtn:   { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 18, backgroundColor: 'rgba(255,183,0,0.1)', borderWidth: 1.5, borderColor: 'rgba(255,183,0,0.3)' },
+  giftActionTxt:   { color: '#FFB700', fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
+  bondBtn:         { flex: 1, borderRadius: 18, overflow: 'hidden' },
   bondBtnInner:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
   bondedBtn:       { flex: 2, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#57f28720', borderWidth: 1, borderColor: '#57f287' },
@@ -915,8 +919,7 @@ const styles = StyleSheet.create({
                      paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   sheetTierIcon:   { fontSize: 16 },
   sheetTierLabel:  { fontSize: 13, fontWeight: '800' },
-  priorityTag:     { backgroundColor: '#FFB70033', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  priorityTagTxt:  { color: '#FFB700', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+
   sheetTitle:      { color: '#fff', fontSize: 20, fontWeight: '900' },
   sheetSub:        { color: '#666', fontSize: 14, lineHeight: 20 },
   sheetInputWrap:  { backgroundColor: '#111318', borderRadius: 16, borderWidth: 1, padding: 14, gap: 8 },

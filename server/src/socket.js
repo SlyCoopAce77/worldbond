@@ -13,6 +13,7 @@ const {
 const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment, deleteResponse: deleteIcebreakerResponse } = require('./icebreaker');
 const { createEvent, getEvents, getEventById, joinEvent, leaveEvent, addEventMessage, getEventMessages } = require('./events');
 const { createCulturalPost, likePost, getCulturalPosts } = require('./culturalPosts');
+const { createPulse, getActivePulsesForSpot, getAllActivePulses, removePulse } = require('./pulses');
 const { toggleLike, addComment, deletePhoto, getPhotos, getPhotoById, toggleEcho } = require('./photos');
 const { getStoriesGrouped, viewStory, deleteStory, getStoryById } = require('./stories');
 const { followUser, unfollowUser, getFollowing, getFollowers, isFollowing } = require('./follows');
@@ -255,36 +256,31 @@ function setupSocket(io) {
       socket.emit('cities_list', { country, cities: getCitiesInCountry(country) });
     });
 
-    socket.on('get_places', ({ country, city }) => {
-      const places = getPlacesInCity(country, city).map(p => ({
+    function enrichSpot(p) {
+      const activePulses = getActivePulsesForSpot(p.id);
+      return {
         ...p,
-        typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
+        typeInfo:     PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
         checkinCount: getCheckins(p.id).length,
-        isLive: getVenueLiveStatus(p.id).isLive,
-        eventCount: getVenueEvents(p.id).length,
-      }));
+        isLive:       getVenueLiveStatus(p.id).isLive,
+        eventCount:   getVenueEvents(p.id).length,
+        pulseCount:   activePulses.length,
+        latestPulse:  activePulses[0] || null,
+      };
+    }
+
+    socket.on('get_places', ({ country, city }) => {
+      const places = getPlacesInCity(country, city).map(enrichSpot);
       socket.emit('places_list', { country, city, places });
     });
 
     socket.on('get_country_places', ({ country }) => {
-      const places = getPlacesInCountry(country).map(p => ({
-        ...p,
-        typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
-        checkinCount: getCheckins(p.id).length,
-        isLive: getVenueLiveStatus(p.id).isLive,
-        eventCount: getVenueEvents(p.id).length,
-      }));
+      const places = getPlacesInCountry(country).map(enrichSpot);
       socket.emit('country_places_list', { country, places });
     });
 
     socket.on('get_spots_by_vibe', ({ type }) => {
-      const places = getPlacesByType(type).map(p => ({
-        ...p,
-        typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type },
-        checkinCount: getCheckins(p.id).length,
-        isLive: getVenueLiveStatus(p.id).isLive,
-        eventCount: getVenueEvents(p.id).length,
-      }));
+      const places = getPlacesByType(type).map(enrichSpot);
       socket.emit('vibe_spots_list', { type, places });
     });
 
@@ -399,6 +395,43 @@ function setupSocket(io) {
 
     socket.on('get_venue_events', ({ placeId }) => {
       socket.emit('venue_events', { placeId, events: getVenueEvents(placeId) });
+    });
+
+    // ── VENUE PULSE ──
+
+    socket.on('post_pulse', ({ placeId, placeName, placeCountry, placeCity, type, message, eventTime, duration, address }) => {
+      const user = connectedUsers[socket.id];
+      if (!user || !message?.trim()) return;
+      const pulse = createPulse({
+        placeId, placeName, placeCountry, placeCity,
+        type: type || 'announce',
+        message: message.trim(),
+        eventTime: eventTime || null,
+        duration: duration || '24h',
+        address: address || null,
+        ownerName: user.username,
+        ownerId: user.userId || socket.id,
+      });
+      // All users currently viewing this spot get the pulse immediately
+      io.to(`place:${placeId}`).emit('spot_pulse_added', { placeId, pulse });
+      // Broadcast to all so explore lists can show the pulse ring
+      io.emit('pulse_dropped', { placeId, pulse });
+      socket.emit('spot_pulses', { placeId, pulses: getActivePulsesForSpot(placeId) });
+    });
+
+    socket.on('get_spot_pulses', ({ placeId }) => {
+      socket.emit('spot_pulses', { placeId, pulses: getActivePulsesForSpot(placeId) });
+    });
+
+    socket.on('remove_pulse', ({ pulseId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user) return;
+      const removed = removePulse(pulseId, user.userId || socket.id);
+      if (removed) socket.emit('pulse_removed', { pulseId });
+    });
+
+    socket.on('get_all_active_pulses', () => {
+      socket.emit('all_active_pulses', getAllActivePulses());
     });
 
     // ── VENUE LIVE ──
@@ -1001,25 +1034,32 @@ function setupSocket(io) {
 
     socket.on('follow_user', ({ targetUserId }) => {
       const user = connectedUsers[socket.id];
-      if (!user || targetUserId === socket.id) return;
-      followUser(socket.id, targetUserId);
+      if (!user) return;
+      const followerId = user.userId || socket.id;
+      if (targetUserId === followerId) return;
+      followUser(followerId, targetUserId);
       socket.emit('follow_status', { targetUserId, following: true, followersCount: getFollowers(targetUserId).length });
-      // Notify the target if they're online
-      const targetSocket = Object.values(connectedUsers).find(u => u.socketId === targetUserId);
+      socket.emit('following_list', { following: getFollowing(followerId) });
+      // Notify the target if online
+      const targetSocket = Object.values(connectedUsers).find(u => (u.userId || u.socketId) === targetUserId);
       if (targetSocket) {
-        io.to(targetSocket.socketId).emit('new_follower', { followerId: user.userId || socket.id, followerName: user.username, followerCountry: user.country });
+        io.to(targetSocket.socketId).emit('new_follower', { followerId, followerName: user.username, followerCountry: user.country });
       }
     });
 
     socket.on('unfollow_user', ({ targetUserId }) => {
-      unfollowUser(socket.id, targetUserId);
+      const user = connectedUsers[socket.id];
+      const followerId = user?.userId || socket.id;
+      unfollowUser(followerId, targetUserId);
       socket.emit('follow_status', { targetUserId, following: false, followersCount: getFollowers(targetUserId).length });
+      socket.emit('following_list', { following: getFollowing(followerId) });
     });
 
     socket.on('get_follow_status', ({ targetUserId }) => {
+      const followerId = connectedUsers[socket.id]?.userId || socket.id;
       socket.emit('follow_status', {
         targetUserId,
-        following: isFollowing(socket.id, targetUserId),
+        following: isFollowing(followerId, targetUserId),
         followersCount: getFollowers(targetUserId).length,
         followingCount: getFollowing(targetUserId).length,
       });
@@ -1029,8 +1069,9 @@ function setupSocket(io) {
       socket.emit('followers_list', { userId, followers: getFollowers(userId) });
     });
 
-    socket.on('get_following', ({ userId }) => {
-      socket.emit('following_list', { userId, following: getFollowing(userId) });
+    socket.on('get_following', () => {
+      const followerId = connectedUsers[socket.id]?.userId || socket.id;
+      socket.emit('following_list', { following: getFollowing(followerId) });
     });
 
     // ── COUNTRY FLAGS (Plant / Uproot) ─────────────────────────────────

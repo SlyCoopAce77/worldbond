@@ -2,13 +2,15 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, ScrollView,
-  Modal, Alert,
+  Modal, Alert, Linking,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket } from '../services/socket';
 import { stringToColor } from '../utils/apiUtils';
 import { SAVED_SPOTS_KEY as SAVED_KEY } from '../utils/constants';
+
+const BOND_PINK = '#FF0080';
 
 const EVENT_TYPES = [
   { key: 'concert',  icon: '🎵', label: 'Concert',      color: '#8b5cf6' },
@@ -50,6 +52,14 @@ export default function PlaceDetailScreen({ route, navigation }) {
   const [evtDesc,   setEvtDesc]   = useState('');
   const [evtPrice,  setEvtPrice]  = useState('Free');
   const [saved,         setSaved]         = useState(false);
+  // Pulse state
+  const [spotPulses,    setSpotPulses]    = useState([]);
+  const [showPulseForm, setShowPulseForm] = useState(false);
+  const [pulseMsg,      setPulseMsg]      = useState('');
+  const [pulseType,     setPulseType]     = useState('announce');
+  const [pulseTime,     setPulseTime]     = useState('');
+  const [pulseDuration, setPulseDuration] = useState('24h');
+  const [pulseAddress,  setPulseAddress]  = useState('');
   const flatRef      = useRef(null);
   const checkedInRef = useRef(false);
   const socket       = getSocket();
@@ -97,6 +107,16 @@ export default function PlaceDetailScreen({ route, navigation }) {
     socket.on('venue_live_update', ({ placeId, isLive }) => {
       if (placeId === place?.id) setIsVenueLive(isLive);
     });
+    socket.on('spot_pulses', ({ placeId, pulses }) => {
+      if (placeId === place?.id) setSpotPulses(pulses || []);
+    });
+    socket.on('spot_pulse_added', ({ placeId, pulse }) => {
+      if (placeId === place?.id) setSpotPulses(prev => [pulse, ...prev]);
+    });
+    socket.on('pulse_removed', ({ pulseId }) => {
+      setSpotPulses(prev => prev.filter(p => p.id !== pulseId));
+    });
+    socket.emit('get_spot_pulses', { placeId: place?.id });
 
     return () => {
       if (checkedInRef.current) socket.emit('checkout_place', { placeId: place?.id });
@@ -106,6 +126,9 @@ export default function PlaceDetailScreen({ route, navigation }) {
       socket.off('place_message');
       socket.off('venue_events');
       socket.off('venue_live_update');
+      socket.off('spot_pulses');
+      socket.off('spot_pulse_added');
+      socket.off('pulse_removed');
     };
   }, []);
 
@@ -162,6 +185,38 @@ export default function PlaceDetailScreen({ route, navigation }) {
     socket.emit('submit_review', { placeId: place?.id, rating: myRating, text: reviewText.trim() });
     setReviewText('');
     setSubmittingReview(false);
+  }
+
+  function submitPulse() {
+    if (!pulseMsg.trim()) return Alert.alert('Required', 'Add a message for your pulse.');
+    socket.emit('post_pulse', {
+      placeId: place?.id,
+      placeName: place?.name,
+      placeCountry: place?.country,
+      placeCity: place?.city,
+      type: pulseType,
+      message: pulseMsg.trim(),
+      eventTime: pulseTime.trim() || null,
+      duration: pulseDuration,
+      address: pulseAddress.trim() || null,
+    });
+    setPulseMsg(''); setPulseTime(''); setPulseAddress('');
+    setPulseType('announce'); setPulseDuration('24h');
+    setShowPulseForm(false);
+  }
+
+  function openDirections() {
+    const q = encodeURIComponent(`${place?.name} ${place?.city || ''}`);
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
+  }
+
+  function formatPulseAge(ts) {
+    const mins = Math.floor((Date.now() - ts) / 60000);
+    if (mins < 1)   return 'just now';
+    if (mins < 60)  return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs  < 24)  return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
   }
 
   function renderMessage({ item }) {
@@ -241,7 +296,11 @@ export default function PlaceDetailScreen({ route, navigation }) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.ownerBtn} onPress={() => setShowPostEvent(true)}>
-          <Text style={styles.ownerBtnTxt}>📅 Post Event</Text>
+          <Text style={styles.ownerBtnTxt}>Post Event</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.ownerBtn, styles.ownerBtnPulse]} onPress={() => setShowPulseForm(true)}>
+          <View style={styles.pulseDot} />
+          <Text style={[styles.ownerBtnTxt, { color: '#bba8ff' }]}>Drop a Pulse</Text>
         </TouchableOpacity>
       </View>
 
@@ -253,11 +312,12 @@ export default function PlaceDetailScreen({ route, navigation }) {
         contentContainerStyle={styles.tabBarContent}
       >
         {[
-          { key: 'info',    icon: '📋', label: 'Info',    badge: null },
-          { key: 'events',  icon: '📅', label: 'Events',  badge: venueEvents.length || null },
-          { key: 'reviews', icon: '⭐', label: 'Reviews', badge: reviews.length || null },
-          { key: 'chat',    icon: '💬', label: 'Chat',    badge: messages.length || null },
-          { key: 'people',  icon: '👥', label: 'People',  badge: checkins.length || null },
+          { key: 'info',    label: 'Info',    badge: null },
+          { key: 'pulse',   label: 'Pulse',   badge: spotPulses.length || null },
+          { key: 'events',  label: 'Events',  badge: venueEvents.length || null },
+          { key: 'reviews', label: 'Reviews', badge: reviews.length || null },
+          { key: 'chat',    label: 'Chat',    badge: messages.length || null },
+          { key: 'people',  label: 'People',  badge: checkins.length || null },
         ].map(t => {
           const active = tab === t.key;
           return (
@@ -267,7 +327,6 @@ export default function PlaceDetailScreen({ route, navigation }) {
               onPress={() => setTab(t.key)}
               activeOpacity={0.75}
             >
-              <Text style={styles.tabIcon}>{t.icon}</Text>
               <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
               {t.badge ? (
                 <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
@@ -313,6 +372,62 @@ export default function PlaceDetailScreen({ route, navigation }) {
           </TouchableOpacity>
           {!checkedIn && (
             <Text style={styles.checkinHint}>Check in to chat with people who are here right now</Text>
+          )}
+          <TouchableOpacity style={styles.directionsBtn} onPress={openDirections} activeOpacity={0.82}>
+            <Text style={styles.directionsTxt}>Get Directions →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* PULSE TAB */}
+      {tab === 'pulse' && (
+        <ScrollView contentContainerStyle={styles.pulseScroll}>
+          <TouchableOpacity style={styles.dropPulseBtn} onPress={() => setShowPulseForm(true)} activeOpacity={0.82}>
+            <View style={styles.pulseDot} />
+            <Text style={styles.dropPulseTxt}>Drop a Pulse</Text>
+            <Text style={styles.dropPulseArrow}>→</Text>
+          </TouchableOpacity>
+
+          {spotPulses.length === 0 ? (
+            <View style={styles.emptyPulse}>
+              <Text style={styles.emptyPulseTxt}>No active pulses</Text>
+              <Text style={styles.emptyPulseSub}>Let people know what's happening — drop a pulse above</Text>
+            </View>
+          ) : (
+            spotPulses.map(p => {
+              const typeColor = { event: '#8b5cf6', deal: '#22c55e', theme: '#ec4899', menu: '#f97316', announce: BOND_PINK }[p.type] || BOND_PINK;
+              return (
+                <View key={p.id} style={[styles.pulseCard, { borderColor: typeColor + '44' }]}>
+                  <View style={styles.pulseCardTop}>
+                    <View style={[styles.pulseTypePill, { backgroundColor: typeColor + '22' }]}>
+                      <View style={[styles.pulseDot, { backgroundColor: typeColor }]} />
+                      <Text style={[styles.pulseTypeLabel, { color: typeColor }]}>
+                        {{ event: 'Event', deal: 'Deal', theme: 'Theme Night', menu: 'New Menu', announce: 'Announcement' }[p.type] || p.type}
+                      </Text>
+                    </View>
+                    <Text style={styles.pulseAge}>{formatPulseAge(p.postedAt)}</Text>
+                  </View>
+                  <Text style={styles.pulseMsg}>{p.message}</Text>
+                  {p.eventTime ? <Text style={styles.pulseTime}>{p.eventTime}</Text> : null}
+                  {p.address ? (
+                    <TouchableOpacity
+                      style={styles.pulseDir}
+                      onPress={() => {
+                        const q = encodeURIComponent(p.address || `${place?.name} ${place?.city}`);
+                        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${q}`);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.pulseDirTxt}>Get Directions →</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.pulseDir} onPress={openDirections} activeOpacity={0.8}>
+                      <Text style={styles.pulseDirTxt}>Get Directions →</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -505,6 +620,70 @@ export default function PlaceDetailScreen({ route, navigation }) {
           )}
         />
       )}
+      {/* Pulse Form Modal */}
+      <Modal visible={showPulseForm} animationType="slide" transparent onRequestClose={() => setShowPulseForm(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowPulseForm(false)} />
+          <View style={styles.pulseSheet}>
+            <View style={styles.evtHandle} />
+            <Text style={styles.pulseSheetTitle}>Drop a Pulse at {place?.name}</Text>
+            <Text style={styles.pulseSheetSub}>Let people know what's coming up</Text>
+
+            {/* Type picker */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {[
+                { key: 'event',    label: 'Event',        color: '#8b5cf6' },
+                { key: 'deal',     label: 'Deal',         color: '#22c55e' },
+                { key: 'theme',    label: 'Theme Night',  color: '#ec4899' },
+                { key: 'menu',     label: 'New Menu',     color: '#f97316' },
+                { key: 'announce', label: 'Announcement', color: BOND_PINK },
+              ].map(pt => (
+                <TouchableOpacity
+                  key={pt.key}
+                  style={[styles.pulseTypeChip, pulseType === pt.key && { backgroundColor: pt.color + '28', borderColor: pt.color }]}
+                  onPress={() => setPulseType(pt.key)}
+                >
+                  <Text style={[styles.pulseTypeChipTxt, pulseType === pt.key && { color: pt.color, fontWeight: '800' }]}>{pt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TextInput
+              style={styles.pulseInput}
+              placeholder="What's happening? (e.g. Ladies Night this Friday, free entry before midnight)"
+              placeholderTextColor="#555"
+              value={pulseMsg}
+              onChangeText={t => setPulseMsg(t.slice(0, 160))}
+              multiline
+              maxLength={160}
+            />
+            <Text style={styles.pulseCharCount}>{pulseMsg.length}/160</Text>
+
+            <TextInput style={styles.pulseInput} placeholder="When? (e.g. Friday Dec 27, 9pm — optional)" placeholderTextColor="#555" value={pulseTime} onChangeText={setPulseTime} />
+            <TextInput style={styles.pulseInput} placeholder="Address for directions (e.g. 1-2-3 Shibuya, Tokyo — optional)" placeholderTextColor="#555" value={pulseAddress} onChangeText={setPulseAddress} />
+
+            {/* Duration */}
+            <Text style={styles.pulseDurationLabel}>Show this pulse for</Text>
+            <View style={styles.pulseDurationRow}>
+              {[{ k: '24h', l: '24 hours' }, { k: '48h', l: '48 hours' }, { k: '1week', l: '1 week' }, { k: 'manual', l: 'Until removed' }].map(d => (
+                <TouchableOpacity
+                  key={d.k}
+                  style={[styles.durationChip, pulseDuration === d.k && styles.durationChipOn]}
+                  onPress={() => setPulseDuration(d.k)}
+                >
+                  <Text style={[styles.durationChipTxt, pulseDuration === d.k && styles.durationChipTxtOn]}>{d.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.pulseSubmitBtn} onPress={submitPulse} activeOpacity={0.85}>
+              <View style={[styles.pulseDot, { width: 8, height: 8, borderRadius: 4 }]} />
+              <Text style={styles.pulseSubmitTxt}>Drop Pulse</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Post Event Modal */}
       <Modal visible={showPostEvent} animationType="slide" transparent onRequestClose={() => setShowPostEvent(false)}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -547,7 +726,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#1C1F23', gap: 10,
   },
   backBtn: { padding: 6 },
-  backText: { color: '#6C47FF', fontSize: 22 },
+  backText: { color: BOND_PINK, fontSize: 22 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIcon: { fontSize: 28 },
   headerName: { color: '#fff', fontSize: 15, fontWeight: '700', maxWidth: 160 },
@@ -556,12 +735,12 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19, backgroundColor: '#1C1F23',
     alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#2F3336',
   },
-  saveBtnOn: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF66' },
+  saveBtnOn: { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '66' },
   checkinBtn: {
     backgroundColor: '#1C1F23', borderRadius: 20, paddingHorizontal: 12,
     paddingVertical: 7, borderWidth: 1, borderColor: '#2F3336',
   },
-  checkinBtnActive: { backgroundColor: '#6C47FF', borderColor: '#6C47FF' },
+  checkinBtnActive: { backgroundColor: BOND_PINK, borderColor: BOND_PINK },
   checkinBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   liveBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20,
@@ -577,12 +756,12 @@ const styles = StyleSheet.create({
     borderRadius: 22, backgroundColor: '#16181C',
     borderWidth: 1, borderColor: '#2F3336',
   },
-  tabActive: { backgroundColor: '#6C47FF22', borderColor: '#6C47FF66' },
+  tabActive: { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '66' },
   tabIcon:  { fontSize: 16 },
   tabLabel: { color: '#666', fontSize: 13, fontWeight: '700' },
-  tabLabelActive: { color: '#6C47FF' },
+  tabLabelActive: { color: BOND_PINK },
   tabBadge: { backgroundColor: '#2F3336', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, minWidth: 22, alignItems: 'center' },
-  tabBadgeActive: { backgroundColor: '#6C47FF44' },
+  tabBadgeActive: { backgroundColor: BOND_PINK + '44' },
   tabBadgeTxt: { color: '#888', fontSize: 11, fontWeight: '800' },
   tabBadgeTxtActive: { color: '#a78bff' },
   infoScroll: { padding: 20, gap: 16 },
@@ -594,10 +773,10 @@ const styles = StyleSheet.create({
   infoItemValue: { color: '#fff', fontSize: 14, fontWeight: '600' },
   infoSectionLabel: { color: '#888', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { backgroundColor: '#6C47FF22', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  tagText: { color: '#6C47FF', fontSize: 13 },
+  tag: { backgroundColor: BOND_PINK + '22', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { color: BOND_PINK, fontSize: 13 },
   bigCheckinBtn: {
-    backgroundColor: '#6C47FF', borderRadius: 14, padding: 16,
+    backgroundColor: BOND_PINK, borderRadius: 14, padding: 16,
     alignItems: 'center', marginTop: 8,
   },
   bigCheckinBtnActive: { backgroundColor: '#333' },
@@ -609,7 +788,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2F3336',
   },
   lockedText: { color: '#aaa', fontSize: 13, flex: 1 },
-  lockedBtn: { backgroundColor: '#6C47FF', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
+  lockedBtn: { backgroundColor: BOND_PINK, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, marginLeft: 10 },
   lockedBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   messageList: { padding: 14, gap: 10, flexGrow: 1 },
   emptyChatWrap: { flex: 1, alignItems: 'center', paddingTop: 60, gap: 10 },
@@ -621,7 +800,7 @@ const styles = StyleSheet.create({
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   avatarText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   bubble: { maxWidth: '78%', borderRadius: 16, padding: 12 },
-  bubbleMine: { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
+  bubbleMine: { backgroundColor: BOND_PINK, borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: '#1C1F23', borderBottomLeftRadius: 4 },
   senderRow: { flexDirection: 'row', gap: 6, marginBottom: 4, alignItems: 'center' },
   senderName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
@@ -637,7 +816,7 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#1C1F23', color: '#fff', borderRadius: 20,
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 100,
   },
-  sendBtn: { backgroundColor: '#6C47FF', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { backgroundColor: BOND_PINK, borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: '#333' },
   sendBtnText: { color: '#fff', fontSize: 18 },
   peopleList: { padding: 16, gap: 10 },
@@ -653,8 +832,8 @@ const styles = StyleSheet.create({
   personInfo: { flex: 1, marginLeft: 12 },
   personName: { color: '#fff', fontSize: 15, fontWeight: '600' },
   personCountry: { color: '#888', fontSize: 12, marginTop: 2 },
-  personLang: { backgroundColor: '#6C47FF33', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  personLangText: { color: '#6C47FF', fontSize: 12, fontWeight: '700' },
+  personLang: { backgroundColor: BOND_PINK + '33', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  personLangText: { color: BOND_PINK, fontSize: 12, fontWeight: '700' },
 
   // Rating strip
   ratingStrip: {
@@ -682,7 +861,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2F3336',
   },
   submitReviewBtn: {
-    backgroundColor: '#6C47FF', borderRadius: 12, padding: 14, alignItems: 'center',
+    backgroundColor: BOND_PINK, borderRadius: 12, padding: 14, alignItems: 'center',
   },
   submitReviewBtnDisabled: { backgroundColor: '#333' },
   submitReviewBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
@@ -704,11 +883,17 @@ const styles = StyleSheet.create({
   reviewText: { color: '#ccc', fontSize: 14, lineHeight: 20 },
   reviewDate: { color: '#555', fontSize: 11 },
 
+  // Directions button (info tab)
+  directionsBtn: { marginHorizontal: 16, marginTop: 8, marginBottom: 16, borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: BOND_PINK + '18', borderWidth: 1, borderColor: BOND_PINK + '44' },
+  directionsTxt: { color: '#bba8ff', fontSize: 15, fontWeight: '800' },
+
   // Owner bar
-  ownerBar:      { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1C1F23' },
+  ownerBar:      { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#1C1F23', flexWrap: 'wrap' },
   ownerBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14, backgroundColor: '#1C1F23', borderWidth: 1, borderColor: '#2F3336' },
   ownerBtnLive:  { backgroundColor: '#ff525215', borderColor: '#ff525230' },
+  ownerBtnPulse: { backgroundColor: BOND_PINK + '15', borderColor: BOND_PINK + '33' },
   ownerBtnDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ff5252' },
+  pulseDot:      { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#9d7cff' },
   ownerBtnTxt:   { color: '#aaa', fontSize: 12, fontWeight: '700' },
 
   // Events tab
@@ -723,9 +908,44 @@ const styles = StyleSheet.create({
   eventDesc:     { color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 19 },
   eventPostedBy: { color: '#444', fontSize: 11 },
   addEventBtn:   { backgroundColor: 'rgba(108,71,255,0.12)', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(108,71,255,0.25)', marginTop: 4 },
-  addEventTxt:   { color: '#6C47FF', fontSize: 14, fontWeight: '700' },
-  postEventCta:  { backgroundColor: '#6C47FF', borderRadius: 14, paddingHorizontal: 22, paddingVertical: 12 },
+  addEventTxt:   { color: BOND_PINK, fontSize: 14, fontWeight: '700' },
+  postEventCta:  { backgroundColor: BOND_PINK, borderRadius: 14, paddingHorizontal: 22, paddingVertical: 12 },
   postEventCtaTxt:{ color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // Pulse tab
+  pulseScroll:      { padding: 16, gap: 14, paddingBottom: 60 },
+  dropPulseBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: BOND_PINK + '18', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 15, borderWidth: 1, borderColor: BOND_PINK + '44', marginBottom: 4 },
+  dropPulseTxt:     { color: '#bba8ff', fontSize: 15, fontWeight: '800', flex: 1 },
+  dropPulseArrow:   { color: '#9d7cff', fontSize: 16, fontWeight: '700' },
+  emptyPulse:       { alignItems: 'center', paddingTop: 50, gap: 10 },
+  emptyPulseTxt:    { color: '#fff', fontSize: 17, fontWeight: '700' },
+  emptyPulseSub:    { color: '#666', fontSize: 13, textAlign: 'center', paddingHorizontal: 20, lineHeight: 20 },
+  pulseCard:        { backgroundColor: '#16181C', borderRadius: 18, padding: 16, borderWidth: 1, gap: 10 },
+  pulseCardTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pulseTypePill:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  pulseTypeLabel:   { fontSize: 12, fontWeight: '700' },
+  pulseAge:         { color: '#555', fontSize: 11 },
+  pulseMsg:         { color: '#fff', fontSize: 15, lineHeight: 22, fontWeight: '500' },
+  pulseTime:        { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
+  pulseDir:         { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: BOND_PINK + '20', borderWidth: 1, borderColor: BOND_PINK + '55' },
+  pulseDirTxt:      { color: '#bba8ff', fontSize: 13, fontWeight: '800' },
+
+  // Pulse form modal
+  pulseSheet:       { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, paddingBottom: 44 },
+  pulseSheetTitle:  { color: '#fff', fontSize: 17, fontWeight: '900' },
+  pulseSheetSub:    { color: '#666', fontSize: 13, marginTop: -4 },
+  pulseInput:       { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, borderWidth: 1, borderColor: '#2a2a2a', textAlignVertical: 'top' },
+  pulseCharCount:   { color: '#444', fontSize: 11, textAlign: 'right', marginTop: -8 },
+  pulseTypeChip:    { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
+  pulseTypeChipTxt: { color: '#666', fontSize: 13, fontWeight: '600' },
+  pulseDurationLabel:{ color: '#888', fontSize: 12, fontWeight: '600', marginTop: 4 },
+  pulseDurationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  durationChip:     { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
+  durationChipOn:   { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK },
+  durationChipTxt:  { color: '#666', fontSize: 12, fontWeight: '600' },
+  durationChipTxtOn:{ color: '#bba8ff', fontWeight: '800' },
+  pulseSubmitBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, marginTop: 4 },
+  pulseSubmitTxt:   { color: '#fff', fontSize: 16, fontWeight: '800' },
 
   // Post Event modal
   evtSheet:      { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, paddingBottom: 44 },
@@ -734,6 +954,6 @@ const styles = StyleSheet.create({
   evtInput:      { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, borderWidth: 1, borderColor: '#2a2a2a' },
   evtTypeChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
   evtTypeLabel:  { color: '#666', fontSize: 13, fontWeight: '600' },
-  evtSubmitBtn:  { backgroundColor: '#6C47FF', borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
+  evtSubmitBtn:  { backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   evtSubmitTxt:  { color: '#fff', fontSize: 16, fontWeight: '800' },
 });

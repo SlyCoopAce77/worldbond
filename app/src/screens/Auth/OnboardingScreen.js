@@ -11,6 +11,7 @@ import { SERVER_URL } from '../../services/socket';
 import { finalizeProfile, getAccessToken } from '../../services/authApi';
 
 const { width } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 
 const GENDERS = [
   { id: 'Man',   icon: '👨', label: 'Man'   },
@@ -68,7 +69,7 @@ function StepBar({ step }) {
   return (
     <View style={bar.container}>
       {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-        <View key={i} style={[bar.seg, i < step && bar.segOn, i === step - 1 && bar.segActive]} />
+        <View key={i} style={[bar.seg, i < step - 1 && bar.segDone, i === step - 1 && bar.segActive]} />
       ))}
     </View>
   );
@@ -76,8 +77,8 @@ function StepBar({ step }) {
 const bar = StyleSheet.create({
   container: { flexDirection: 'row', gap: 6, marginBottom: 28 },
   seg:       { flex: 1, height: 4, borderRadius: 2, backgroundColor: '#2F3336' },
-  segOn:     { backgroundColor: '#6C47FF' },
-  segActive: { backgroundColor: '#7c87f5' },
+  segDone:   { backgroundColor: BOND_PINK + 'aa' },
+  segActive: { backgroundColor: BOND_PINK },
 });
 
 export default function OnboardingScreen({ userId, onComplete }) {
@@ -307,7 +308,6 @@ export default function OnboardingScreen({ userId, onComplete }) {
                     onChangeText={setCity}
                   />
                 </View>
-
               </View>
             )}
 
@@ -425,7 +425,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                 <View style={s.nextGrad}><ActivityIndicator color="#fff" /></View>
               ) : (
                 <LinearGradient
-                  colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                  colors={[BOND_PINK, '#CC0060']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={s.nextGrad}
                 >
@@ -459,85 +459,74 @@ const s = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#000000' },
   scroll:     { flexGrow: 1, padding: 24, paddingTop: 20, paddingBottom: 50 },
 
-  stepHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 28 },
-  stepIconBadge:{ width: 52, height: 52, borderRadius: 16, backgroundColor: '#6C47FF18', borderWidth: 1, borderColor: '#6C47FF30', alignItems: 'center', justifyContent: 'center' },
+  stepHeader:   { flexDirection: 'row', alignItems: 'flex-start', gap: 16, marginBottom: 28 },
+  stepIconBadge:{ width: 52, height: 52, borderRadius: 16, backgroundColor: BOND_PINK + '18', borderWidth: 1, borderColor: BOND_PINK + '30', alignItems: 'center', justifyContent: 'center' },
   stepIconText: { fontSize: 26 },
-  stepCount:  { color: '#6C47FF', fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3 },
-  stepTitle:  { fontSize: 26, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
-  stepSub:    { fontSize: 13, color: '#536471', marginTop: 4 },
+  stepCount:    { color: BOND_PINK, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginBottom: 3 },
+  stepTitle:    { fontSize: 26, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+  stepSub:      { fontSize: 13, color: '#536471', marginTop: 4 },
 
-  content:    {},
+  content:  {},
 
-  form:       { gap: 22 },
-  row:        { flexDirection: 'row', gap: 14 },
-  field:      { gap: 8 },
-  labelRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label:      { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  optional:   { color: '#333355', fontSize: 12 },
+  form:     { gap: 22 },
+  row:      { flexDirection: 'row', gap: 14 },
+  field:    { gap: 8 },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label:    { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  optional: { color: '#555555', fontSize: 12 },
 
-  input:      { backgroundColor: '#16181C', color: '#fff', fontSize: 16, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
-  bioInput:   { minHeight: 110, textAlignVertical: 'top' },
+  input:    { backgroundColor: '#16181C', color: '#fff', fontSize: 16, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2F3336' },
+  bioInput: { minHeight: 110, textAlignVertical: 'top' },
 
-  chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:       { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 14, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  chipOn:     { backgroundColor: '#6C47FF20', borderColor: '#6C47FF' },
-  chipText:   { color: '#536471', fontSize: 13, fontWeight: '600' },
-  chipTextOn: { color: '#6C47FF', fontWeight: '700' },
+  listBox:      { backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', maxHeight: 220 },
+  listItem:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  listItemOn:   { backgroundColor: BOND_PINK + '15' },
+  listItemText: { flex: 1, color: '#aaa', fontSize: 15 },
+  check:        { color: BOND_PINK, fontSize: 16, fontWeight: '800' },
 
-  listBox:    { backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', maxHeight: 220 },
-  listItem:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 12, borderBottomWidth: 1, borderBottomColor: '#1a1a30' },
-  listItemOn: { backgroundColor: '#6C47FF15' },
-  listItemText:{ flex: 1, color: '#aaa', fontSize: 15 },
-  check:      { color: '#6C47FF', fontSize: 16, fontWeight: '800' },
+  ctList:    { gap: 10 },
+  ctCard:    { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, backgroundColor: '#16181C', borderRadius: 18, borderWidth: 1.5, borderColor: '#2F3336' },
+  ctIconWrap:{ width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  ctTitle:   { color: '#aaa', fontSize: 16, fontWeight: '700' },
+  ctDesc:    { color: '#444', fontSize: 13, marginTop: 2 },
+  ctCheck:   { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
 
-  langGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  langChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  langChipOn: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF55' },
-  langText:   { color: '#536471', fontSize: 13, fontWeight: '600' },
-
-  ctList:     { gap: 10 },
-  ctCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, backgroundColor: '#16181C', borderRadius: 18, borderWidth: 1.5, borderColor: '#2F3336' },
-  ctIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  ctTitle:    { color: '#aaa', fontSize: 16, fontWeight: '700' },
-  ctDesc:     { color: '#444', fontSize: 13, marginTop: 2 },
-  ctCheck:    { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
-
-  photoBox:       { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed', height: 200 },
-  photoPreview:   { width: '100%', height: '100%', resizeMode: 'cover' },
-  photoOverlay:   { ...StyleSheet.absoluteFillObject, backgroundColor: '#00000055', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  photoOverlayText:{ color: '#fff', fontWeight: '700', fontSize: 14 },
-  photoPlaceholder:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  photoBox:            { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed', height: 200 },
+  photoPreview:        { width: '100%', height: '100%', resizeMode: 'cover' },
+  photoOverlay:        { ...StyleSheet.absoluteFillObject, backgroundColor: '#00000055', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  photoOverlayText:    { color: '#fff', fontWeight: '700', fontSize: 14 },
+  photoPlaceholder:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   photoPlaceholderTitle:{ color: '#888', fontSize: 16, fontWeight: '700' },
-  photoPlaceholderSub:  { color: '#444', fontSize: 13 },
-  removePhoto:    { alignItems: 'center', marginTop: 10 },
-  removePhotoText:{ color: '#f04747', fontSize: 14 },
+  photoPlaceholderSub: { color: '#444', fontSize: 13 },
+  removePhoto:         { alignItems: 'center', marginTop: 10 },
+  removePhotoText:     { color: '#f04747', fontSize: 14 },
 
-  btnArea:    { marginTop: 32, gap: 6 },
-  nextBtn:    { borderRadius: 18, overflow: 'hidden' },
-  nextGrad:   { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: '#6C47FF' },
-  nextText:   { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
-  skipBtn:    { paddingVertical: 14, alignItems: 'center' },
-  skipText:   { color: '#333355', fontSize: 15 },
-  backBtn:    { paddingVertical: 12, alignItems: 'center' },
-  backText:   { color: '#6C47FF', fontSize: 15, fontWeight: '700' },
+  btnArea:  { marginTop: 32, gap: 6 },
+  nextBtn:  { borderRadius: 18, overflow: 'hidden' },
+  nextGrad: { paddingVertical: 19, alignItems: 'center', borderRadius: 18, backgroundColor: BOND_PINK },
+  nextText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
+  skipBtn:  { paddingVertical: 14, alignItems: 'center' },
+  skipText: { color: '#555555', fontSize: 15 },
+  backBtn:  { paddingVertical: 12, alignItems: 'center' },
+  backText: { color: BOND_PINK, fontSize: 15, fontWeight: '700' },
 
   // Gender cards (Step 1)
-  genderRow:     { flexDirection: 'row', gap: 10 },
-  genderCard:    { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 6, position: 'relative' },
-  genderCardOn:  { borderColor: '#6C47FF', backgroundColor: '#6C47FF12' },
-  genderIcon:    { fontSize: 30 },
-  genderLabel:   { color: '#536471', fontSize: 14, fontWeight: '700' },
-  genderLabelOn: { color: '#6C47FF' },
-  genderCheck:   { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  genderRow:    { flexDirection: 'row', gap: 10 },
+  genderCard:   { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 6, position: 'relative' },
+  genderCardOn: { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '12' },
+  genderIcon:   { fontSize: 30 },
+  genderLabel:  { color: '#536471', fontSize: 14, fontWeight: '700' },
+  genderLabelOn:{ color: BOND_PINK },
+  genderCheck:  { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
 
   // App language grid (Step 5)
-  appLangGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  appLangCard:    { width: '47%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', position: 'relative', overflow: 'hidden' },
-  appLangCardOn:  { borderColor: '#6C47FF', backgroundColor: '#6C47FF12' },
-  appLangActiveLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: '#6C47FF' },
-  appLangFlag:    { fontSize: 22 },
-  appLangLabel:   { flex: 1, color: '#536471', fontSize: 14, fontWeight: '600' },
-  appLangLabelOn: { color: '#fff', fontWeight: '700' },
-  appLangCheck:   { color: '#6C47FF', fontSize: 14, fontWeight: '900' },
-  appLangHint:    { color: '#333355', fontSize: 12, textAlign: 'center', marginTop: 4 },
+  appLangGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  appLangCard:      { width: '47%', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', position: 'relative', overflow: 'hidden' },
+  appLangCardOn:    { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '12' },
+  appLangActiveLine:{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: BOND_PINK },
+  appLangFlag:      { fontSize: 22 },
+  appLangLabel:     { flex: 1, color: '#536471', fontSize: 14, fontWeight: '600' },
+  appLangLabelOn:   { color: '#fff', fontWeight: '700' },
+  appLangCheck:     { color: BOND_PINK, fontSize: 14, fontWeight: '900' },
+  appLangHint:      { color: '#555555', fontSize: 12, textAlign: 'center', marginTop: 4 },
 });

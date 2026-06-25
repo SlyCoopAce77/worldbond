@@ -7,9 +7,9 @@ import { navigate } from '../services/navigationRef';
 const TYPE_META = {
   follower:  { icon: '👤', color: '#57f287' },
   gift:      { icon: '🎁', color: '#f06292' },
-  random:    { icon: '🌀', color: '#6C47FF' },
+  random:    { icon: '🌀', color: '#FF0080' },
   live:      { icon: '🔴', color: '#e53935' },
-  match:     { icon: '🌍', color: '#6C47FF' },
+  match:     { icon: '🌍', color: '#FF0080' },
   message:   { icon: '💬', color: '#26c6da' },
   comment:   { icon: '💬', color: '#26c6da' },
   bond:      { icon: '🤝', color: '#57f287' },
@@ -17,7 +17,7 @@ const TYPE_META = {
   call:      { icon: '📞', color: '#66bb6a' },
   missed:    { icon: '📵', color: '#e53935' },
   like:      { icon: '👣', color: '#f06292' },
-  echo:      { icon: '🔁', color: '#6C47FF' },
+  echo:      { icon: '🔁', color: '#FF0080' },
   milestone: { icon: '🏆', color: '#ffd700' },
 };
 

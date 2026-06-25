@@ -8,6 +8,7 @@ import { getSocket } from '../services/socket';
 
 const { width } = Dimensions.get('window');
 const CARD_W = (width - 48) / 2;
+const BOND_PINK = '#FF0080';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ const COLORS = {
   'sports':            { from: '#1d4ed8', to: '#1e40af', accent: '#93c5fd' },
 };
 
-function getC(id) { return COLORS[id] || { from: '#1a1a3a', to: '#16181C', accent: '#6C47FF' }; }
+function getC(id) { return COLORS[id] || { from: '#1a1a3a', to: '#16181C', accent: BOND_PINK }; }
 
 // ─── Room card (grid tile) ────────────────────────────────────────────────────
 function RoomCard({ room, categoryId, accent, from, to, count, onPress }) {

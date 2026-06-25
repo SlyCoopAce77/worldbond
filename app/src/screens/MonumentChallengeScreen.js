@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
 import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE } from '../context/ChallengeContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,13 +43,12 @@ function ScoreSide({ label, username, scores, accent, isLeading }) {
       <Text style={sc.sideTotalLabel}>POINTS</Text>
       <View style={sc.breakdown}>
         {[
-          { icon: '🪙', label: 'Gifts',   val: scores.gifts     },
-          { icon: '🤝', label: 'Bonds',   val: scores.bonds     },
-          { icon: '📡', label: 'Live',    val: scores.liveHours },
-          { icon: '🗳',  label: 'Votes',  val: scores.votes     },
+          { label: 'Gifts',    val: scores.gifts     },
+          { label: 'Bonds',    val: scores.bonds     },
+          { label: 'Live hrs', val: scores.liveHours },
+          { label: 'Votes',    val: scores.votes     },
         ].map(row => (
           <View key={row.label} style={sc.breakRow}>
-            <Text style={sc.breakIcon}>{row.icon}</Text>
             <Text style={sc.breakLabel}>{row.label}</Text>
             <Text style={[sc.breakVal, { color: accent }]}>{row.val.toLocaleString()}</Text>
           </View>
@@ -64,20 +63,18 @@ const sc = StyleSheet.create({
   sideLabel:      { fontSize: 9, fontWeight: '900', letterSpacing: 2, marginBottom: 2 },
   sideUser:       { color: '#fff', fontSize: 12, fontWeight: '700', marginBottom: 8 },
   sideTotal:      { fontSize: 26, fontWeight: '900' },
-  sideTotalLabel: { color: '#555555', fontSize: 9, letterSpacing: 1, marginBottom: 10 },
+  sideTotalLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 9, letterSpacing: 1, marginBottom: 10 },
   breakdown:      { gap: 5 },
   breakRow:       { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  breakIcon:      { fontSize: 12, width: 18 },
-  breakLabel:     { color: '#666', fontSize: 11, flex: 1 },
+  breakLabel:     { color: 'rgba(255,255,255,0.45)', fontSize: 11, flex: 1 },
   breakVal:       { fontSize: 11, fontWeight: '700' },
 });
 
 // ── Contribution card (Pro only) ──────────────────────────────────────────────
-function ContribCard({ icon, title, rateLine, used, cap, unit, amounts, onContrib, disabled }) {
+function ContribCard({ title, rateLine, used, cap, unit, amounts, onContrib, disabled }) {
   const pct = Math.min(1, used / cap);
   return (
     <View style={cc.card}>
-      <Text style={cc.icon}>{icon}</Text>
       <Text style={cc.title}>{title}</Text>
       <Text style={cc.rate}>{rateLine}</Text>
       <View style={cc.barBg}>
@@ -101,9 +98,8 @@ function ContribCard({ icon, title, rateLine, used, cap, unit, amounts, onContri
 }
 const cc = StyleSheet.create({
   card:   { flex: 1, backgroundColor: '#0d0f1a', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#ffffff08', gap: 4 },
-  icon:   { fontSize: 22 },
   title:  { color: '#fff', fontSize: 12, fontWeight: '800' },
-  rate:   { color: '#555555', fontSize: 10 },
+  rate:   { color: 'rgba(255,255,255,0.4)', fontSize: 10 },
   barBg:  { height: 3, backgroundColor: '#1a1a2e', borderRadius: 2, overflow: 'hidden' },
   barFill:{ height: '100%', backgroundColor: '#FFB700', borderRadius: 2 },
   usage:  { color: '#444', fontSize: 9 },
@@ -168,7 +164,7 @@ function CommentsSection({ comments = [], onPost, username }) {
 const cm = StyleSheet.create({
   wrap:       { backgroundColor: '#0a0a12', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#ffffff08', gap: 12 },
   title:      { color: '#FFB700', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  count:      { color: '#555555', fontWeight: '400', letterSpacing: 0 },
+  count:      { color: 'rgba(255,255,255,0.4)', fontWeight: '400', letterSpacing: 0 },
   empty:      { color: '#444', fontSize: 12, textAlign: 'center', paddingVertical: 8 },
   row:        { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   avatar:     { width: 32, height: 32, borderRadius: 10, backgroundColor: '#1a1a2e', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -188,7 +184,7 @@ const cm = StyleSheet.create({
 function FreeGate({ navigation }) {
   return (
     <View style={gt.wrap}>
-      <Text style={gt.lock}>🔒</Text>
+      <View style={gt.lockBox}><Text style={gt.lockTxt}>PRO ONLY</Text></View>
       <Text style={gt.title}>Bond Pro Exclusive</Text>
       <Text style={gt.sub}>Monument challenges are available to WorldBond Plus and Pro members only.</Text>
       <TouchableOpacity style={gt.btn} onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85}>
@@ -200,10 +196,11 @@ function FreeGate({ navigation }) {
   );
 }
 const gt = StyleSheet.create({
-  wrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 14 },
-  lock:    { fontSize: 48 },
+  wrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 16 },
+  lockBox: { backgroundColor: '#FFB70018', borderRadius: 10, borderWidth: 1, borderColor: '#FFB70050', paddingHorizontal: 14, paddingVertical: 7 },
+  lockTxt: { color: '#FFB700', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
   title:   { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  sub:     { color: '#555555', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  sub:     { color: 'rgba(255,255,255,0.45)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
   btn:     { borderRadius: 14, overflow: 'hidden', marginTop: 8 },
   btnGrad: { paddingHorizontal: 32, paddingVertical: 14 },
   btnTxt:  { color: '#000', fontSize: 15, fontWeight: '900' },
@@ -213,7 +210,6 @@ const gt = StyleSheet.create({
 function PlusViewBanner({ navigation }) {
   return (
     <View style={pb.wrap}>
-      <Text style={pb.icon}>👁</Text>
       <View style={{ flex: 1 }}>
         <Text style={pb.title}>Viewing as WorldBond Plus</Text>
         <Text style={pb.sub}>Upgrade to Pro to contribute, vote, and initiate challenges.</Text>
@@ -226,9 +222,8 @@ function PlusViewBanner({ navigation }) {
 }
 const pb = StyleSheet.create({
   wrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0d0f1a', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FFB70020' },
-  icon:   { fontSize: 22 },
   title:  { color: '#fff', fontSize: 13, fontWeight: '700' },
-  sub:    { color: '#555555', fontSize: 11, marginTop: 2 },
+  sub:    { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
   btn:    { backgroundColor: '#FFB70020', borderRadius: 10, borderWidth: 1, borderColor: '#FFB70045', paddingHorizontal: 12, paddingVertical: 8 },
   btnTxt: { color: '#FFB700', fontSize: 12, fontWeight: '800' },
 });
@@ -237,12 +232,12 @@ const pb = StyleSheet.create({
 function RulesSection() {
   const [open, setOpen] = useState(false);
   const RULES = [
-    ['🪙', 'Gift Coins during region streams',   `+1 pt/coin · max ${DAILY_LIMITS.gifts} coins/day\nPrevents single whales from buying victories`],
-    ['🤝', 'Bond with users from that region',    `+${POINT_RATES.bonds} pts/bond · max ${DAILY_LIMITS.bonds}/day\nReal connections, not repeat bonding`],
-    ['📡', 'Stream live from that region',        `+${POINT_RATES.liveHours} pts/hr · max ${DAILY_LIMITS.liveHours} hrs/day\nRequires genuine streaming presence`],
-    ['🗳',  'Community vote',                     `+${POINT_RATES.votes} pts · once per user per contest\nCommunity sentiment — can't be gamed`],
-    ['⏱',  '7-day contest',                      `${ENTRY_FEE} Bond Coins to initiate (burned)\nHighest total points after 7 days wins the monument`],
-    ['🕐',  '30-day cooldown',                    'Same monument can only be challenged once every 30 days'],
+    ['Gift Coins',       'Gift coins during streams from that region',  `+1 pt per coin · max ${DAILY_LIMITS.gifts} coins/day · prevents single buyers from dominating`],
+    ['Bond Region',      'Bond with users from that region',            `+${POINT_RATES.bonds} pts per bond · max ${DAILY_LIMITS.bonds}/day · real connections, not repeat bonding`],
+    ['Stream Live',      'Stream live from that region',                `+${POINT_RATES.liveHours} pts per hr · max ${DAILY_LIMITS.liveHours} hrs/day · requires genuine live presence`],
+    ['Community Vote',   'Vote for challenger or holder',               `+${POINT_RATES.votes} pts · once per user per contest · community sentiment, cannot be gamed`],
+    ['7-Day Contest',    'Challenge runs for 7 days',                   `${ENTRY_FEE} Bond Coins to initiate (burned) · highest total points after 7 days wins the monument`],
+    ['30-Day Cooldown',  'Cooldown between challenges',                 'The same monument can only be challenged once every 30 days'],
   ];
   return (
     <View style={rl.wrap}>
@@ -252,10 +247,11 @@ function RulesSection() {
       </TouchableOpacity>
       {open && (
         <View style={rl.body}>
-          {RULES.map(([icon, title, desc], i) => (
+          {RULES.map(([label, title, desc], i) => (
             <View key={i} style={rl.row}>
-              <Text style={rl.rowIcon}>{icon}</Text>
+              <View style={rl.rowNum}><Text style={rl.rowNumTxt}>{i + 1}</Text></View>
               <View style={{ flex: 1, gap: 2 }}>
+                <Text style={rl.rowLabel}>{label}</Text>
                 <Text style={rl.rowTitle}>{title}</Text>
                 <Text style={rl.rowDesc}>{desc}</Text>
               </View>
@@ -267,25 +263,25 @@ function RulesSection() {
   );
 }
 const rl = StyleSheet.create({
-  wrap:      { backgroundColor: '#0a0a12', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ffffff08' },
-  toggle:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  toggleTxt: { color: '#FFB700', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
-  arrow:     { color: '#555555', fontSize: 12 },
-  body:      { paddingHorizontal: 14, paddingBottom: 14, gap: 14, borderTopWidth: 1, borderTopColor: '#ffffff08', paddingTop: 14 },
-  row:       { flexDirection: 'row', gap: 10 },
-  rowIcon:   { fontSize: 18, width: 26 },
-  rowTitle:  { color: '#ccc', fontSize: 12, fontWeight: '700' },
-  rowDesc:   { color: '#555555', fontSize: 11, lineHeight: 16 },
+  wrap:       { backgroundColor: '#0a0a12', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#ffffff08' },
+  toggle:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  toggleTxt:  { color: '#FFB700', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+  arrow:      { color: 'rgba(255,255,255,0.35)', fontSize: 12 },
+  body:       { paddingHorizontal: 14, paddingBottom: 14, gap: 14, borderTopWidth: 1, borderTopColor: '#ffffff08', paddingTop: 14 },
+  row:        { flexDirection: 'row', gap: 12 },
+  rowNum:     { width: 22, height: 22, borderRadius: 6, backgroundColor: '#FFB70018', borderWidth: 1, borderColor: '#FFB70040', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  rowNumTxt:  { color: '#FFB700', fontSize: 10, fontWeight: '900' },
+  rowLabel:   { color: '#FFB700', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  rowTitle:   { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600' },
+  rowDesc:    { color: 'rgba(255,255,255,0.35)', fontSize: 11, lineHeight: 16 },
 });
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function MonumentChallengeScreen({ route, navigation }) {
   const { monument, currentUser } = route.params || {};
-  const { tier }    = usePremium();
-  const isPro       = tier === 'pro';
-  const isPlus      = tier === 'plus';
-  const canView     = isPro || isPlus;   // Plus + Pro can view
-  const canContrib  = isPro;             // Pro only: contribute / initiate / vote
+  const { hasBondPass } = useBondPass();
+  const canView    = hasBondPass;
+  const canContrib = hasBondPass;
 
   const { getActiveChallenge, getCooldown, initiateChallenge, contribute, addComment, vote } = useChallenge();
 
@@ -394,7 +390,7 @@ export default function MonumentChallengeScreen({ route, navigation }) {
               <View style={s.holderRow}>
                 <Text style={s.holderLabel}>HELD BY</Text>
                 <Text style={s.holderName}>@{monument.holder}</Text>
-                <Text style={s.holderCoins}>🪙 {monument.coinsEarned.toLocaleString()} earned</Text>
+                <Text style={s.holderCoins}>{monument.coinsEarned.toLocaleString()} BC earned</Text>
               </View>
             )}
           </LinearGradient>
@@ -407,7 +403,7 @@ export default function MonumentChallengeScreen({ route, navigation }) {
             /* ── Unclaimed ── */
             <View style={s.section}>
               <View style={s.card}>
-                <Text style={s.cardEmoji}>🏆</Text>
+                <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>UNCLAIMED</Text></View>
                 <Text style={s.cardTitle}>Unclaimed Monument</Text>
                 <Text style={s.cardSub}>
                   Be the first to own {monument.name} and earn +2% royalty on every gift sent during streams from {monument.location}.
@@ -440,7 +436,7 @@ export default function MonumentChallengeScreen({ route, navigation }) {
             /* ── Cooldown ── */
             <View style={s.section}>
               <View style={s.card}>
-                <Text style={s.cardEmoji}>⏳</Text>
+                <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>COOLDOWN</Text></View>
                 <Text style={s.cardTitle}>Challenge Cooldown</Text>
                 <Text style={s.cardSub}>
                   Next challenge opens on{' '}
@@ -493,14 +489,13 @@ export default function MonumentChallengeScreen({ route, navigation }) {
                   <Text style={s.sectionTitle}>SUPPORT THE CHALLENGER</Text>
                   <Text style={s.sectionSub}>Daily caps prevent spam — all types count equally.</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <ContribCard icon="🪙" title="Gift Coins"   rateLine={`+1pt/coin · max ${DAILY_LIMITS.gifts}/day`}     used={myUsage?.gifts || 0}     cap={DAILY_LIMITS.gifts}     unit="coins" amounts={[50, 250]} onContrib={a => handleContrib('gifts', a)}     disabled={(myUsage?.gifts || 0) >= DAILY_LIMITS.gifts} />
-                    <ContribCard icon="🤝" title="Bond Region"  rateLine={`+${POINT_RATES.bonds}pts/bond · max ${DAILY_LIMITS.bonds}/day`} used={myUsage?.bonds || 0}     cap={DAILY_LIMITS.bonds}     unit="bonds" amounts={[1, 3]}   onContrib={a => handleContrib('bonds', a)}     disabled={(myUsage?.bonds || 0) >= DAILY_LIMITS.bonds} />
+                    <ContribCard title="Gift Coins"   rateLine={`+1pt/coin · max ${DAILY_LIMITS.gifts}/day`}     used={myUsage?.gifts || 0}     cap={DAILY_LIMITS.gifts}     unit="coins" amounts={[50, 250]} onContrib={a => handleContrib('gifts', a)}     disabled={(myUsage?.gifts || 0) >= DAILY_LIMITS.gifts} />
+                    <ContribCard title="Bond Region"  rateLine={`+${POINT_RATES.bonds}pts/bond · max ${DAILY_LIMITS.bonds}/day`} used={myUsage?.bonds || 0}     cap={DAILY_LIMITS.bonds}     unit="bonds" amounts={[1, 3]}   onContrib={a => handleContrib('bonds', a)}     disabled={(myUsage?.bonds || 0) >= DAILY_LIMITS.bonds} />
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <ContribCard icon="📡" title="Stream Live"  rateLine={`+${POINT_RATES.liveHours}pts/hr · max ${DAILY_LIMITS.liveHours}hrs/day`} used={myUsage?.liveHours || 0} cap={DAILY_LIMITS.liveHours} unit="hrs"   amounts={[0.5, 1]} onContrib={a => handleContrib('liveHours', a)} disabled={(myUsage?.liveHours || 0) >= DAILY_LIMITS.liveHours} />
+                    <ContribCard title="Stream Live"  rateLine={`+${POINT_RATES.liveHours}pts/hr · max ${DAILY_LIMITS.liveHours}hrs/day`} used={myUsage?.liveHours || 0} cap={DAILY_LIMITS.liveHours} unit="hrs"   amounts={[0.5, 1]} onContrib={a => handleContrib('liveHours', a)} disabled={(myUsage?.liveHours || 0) >= DAILY_LIMITS.liveHours} />
                     {/* Vote card */}
                     <View style={cc.card}>
-                      <Text style={cc.icon}>🗳</Text>
                       <Text style={cc.title}>Community Vote</Text>
                       <Text style={cc.rate}>+{POINT_RATES.votes} pts · once per contest</Text>
                       {myVoted || myUsage?.voted ? (
@@ -540,19 +535,22 @@ export default function MonumentChallengeScreen({ route, navigation }) {
             <View style={s.section}>
               {canContrib ? (
                 <View style={s.card}>
-                  <Text style={s.cardEmoji}>⚔️</Text>
+                  <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>CHALLENGE</Text></View>
                   <Text style={s.cardTitle}>Challenge for this Monument</Text>
                   <Text style={s.cardSub}>
                     @{monument.holder} currently holds {monument.name} and earns +2% royalty from {monument.location} streams. Win a 7-day contest to take it.
                   </Text>
                   <View style={s.rulesList}>
                     {[
-                      `🪙 Entry fee: ${ENTRY_FEE} Bond Coins (burned)`,
-                      '⏱ Contest: 7 days of multi-dimension scoring',
-                      '🚫 Spam-protected: daily caps per contribution type',
-                      '🕐 30-day cooldown between challenges',
+                      `Entry fee: ${ENTRY_FEE} Bond Coins (burned)`,
+                      'Contest: 7 days of multi-dimension scoring',
+                      'Spam-protected: daily caps per contribution type',
+                      '30-day cooldown between challenges',
                     ].map((txt, i) => (
-                      <Text key={i} style={s.ruleItem}>{txt}</Text>
+                      <View key={i} style={s.ruleRow}>
+                        <View style={s.ruleDot} />
+                        <Text style={s.ruleItem}>{txt}</Text>
+                      </View>
                     ))}
                   </View>
                   <TouchableOpacity style={s.primaryBtn} onPress={handleInitiate} activeOpacity={0.88}>
@@ -563,7 +561,7 @@ export default function MonumentChallengeScreen({ route, navigation }) {
                 </View>
               ) : (
                 <View style={s.card}>
-                  <Text style={s.cardEmoji}>⚔️</Text>
+                  <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>OPEN</Text></View>
                   <Text style={s.cardTitle}>No Active Challenge</Text>
                   <Text style={s.cardSub}>@{monument.holder} is the current holder. A Pro member can initiate a 7-day challenge to try to claim this monument.</Text>
                   <PlusViewBanner navigation={navigation} />
@@ -606,28 +604,31 @@ const s = StyleSheet.create({
   scroll:         { paddingBottom: 60, gap: 0 },
   section:        { padding: 16, gap: 10 },
   sectionTitle:   { color: '#FFB700', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  sectionSub:     { color: '#555555', fontSize: 11 },
+  sectionSub:     { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
   centered:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyTxt:       { color: '#555555', fontSize: 14 },
+  emptyTxt:       { color: 'rgba(255,255,255,0.4)', fontSize: 14 },
 
   // Hero
   hero:           { padding: 24, alignItems: 'center', gap: 6, borderBottomWidth: 1, borderBottomColor: '#FFB70020' },
   goldBar:        { position: 'absolute', top: 0, left: 0, right: 0, height: 3 },
   heroIcon:       { fontSize: 52, marginTop: 8 },
   heroName:       { color: '#fff', fontSize: 22, fontWeight: '900', marginTop: 4 },
-  heroLoc:        { color: '#555555', fontSize: 13 },
+  heroLoc:        { color: 'rgba(255,255,255,0.45)', fontSize: 13 },
   holderRow:      { alignItems: 'center', marginTop: 8, gap: 2 },
-  holderLabel:    { color: '#555555', fontSize: 9, letterSpacing: 2 },
+  holderLabel:    { color: 'rgba(255,255,255,0.35)', fontSize: 9, letterSpacing: 2 },
   holderName:     { color: '#FFB700', fontSize: 15, fontWeight: '800' },
-  holderCoins:    { color: '#555555', fontSize: 11 },
+  holderCoins:    { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
   // Generic card
   card:           { backgroundColor: '#0d0f1a', borderRadius: 16, padding: 20, gap: 12, borderWidth: 1, borderColor: '#ffffff08' },
-  cardEmoji:      { fontSize: 40 },
+  cardBadge:      { alignSelf: 'flex-start', backgroundColor: '#FFB70015', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#FFB70040' },
+  cardBadgeTxt:   { color: '#FFB700', fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
   cardTitle:      { color: '#fff', fontSize: 18, fontWeight: '900' },
-  cardSub:        { color: '#666', fontSize: 13, lineHeight: 20 },
-  rulesList:      { gap: 6 },
-  ruleItem:       { color: '#555555', fontSize: 12, lineHeight: 18 },
+  cardSub:        { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 20 },
+  rulesList:      { gap: 8 },
+  ruleRow:        { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  ruleDot:        { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFB700', marginTop: 6, flexShrink: 0 },
+  ruleItem:       { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 18, flex: 1 },
 
   // Primary button
   primaryBtn:     { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
@@ -639,12 +640,12 @@ const s = StyleSheet.create({
   timerDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444', marginBottom: 4 },
   timerLabel:     { color: '#ef4444', fontSize: 9, fontWeight: '900', letterSpacing: 2 },
   timerValue:     { color: '#fff', fontSize: 32, fontWeight: '900', letterSpacing: 2 },
-  timerSub:       { color: '#555555', fontSize: 11 },
+  timerSub:       { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
   // Progress
   progressWrap:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   progressLabel:  { fontSize: 11, fontWeight: '800', width: 32, textAlign: 'center' },
   progressBg:     { flex: 1, height: 6, backgroundColor: '#FFB70030', borderRadius: 3, overflow: 'hidden' },
   progressFill:   { height: '100%', backgroundColor: '#ef4444', borderRadius: 3 },
-  leadingTxt:     { color: '#555555', fontSize: 11, textAlign: 'center' },
+  leadingTxt:     { color: 'rgba(255,255,255,0.45)', fontSize: 11, textAlign: 'center' },
 });

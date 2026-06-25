@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
 
 // ── Stage type categories (cultural experiences) ──────────────────────────────
 const STAGE_TYPES = {
@@ -579,7 +579,7 @@ const cm = StyleSheet.create({
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function EventsScreen({ navigation, route }) {
-  const { isPro, isPlus } = usePremium();
+  const { hasBondPass } = useBondPass();
   const user = route?.params?.currentUser || route?.params?.user || null;
   const [stages, setStages] = useState(DEMO_STAGES);
   const [filter, setFilter] = useState('all');
@@ -682,13 +682,13 @@ export default function EventsScreen({ navigation, route }) {
   }
 
   function handleGoLive() {
-    if (!isPro && !isPlus) {
+    if (!hasBondPass) {
       Alert.alert(
-        'Upgrade to Host',
-        'Host live stages with Plus or Pro. Pro hosts get featured placement.',
+        'Bond Pass Required',
+        'Host live stages with Bond Pass.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => navigation.navigate('Subscription') },
+          { text: 'Get Bond Pass', onPress: () => navigation.navigate('Subscription') },
         ]
       );
       return;
@@ -744,8 +744,8 @@ export default function EventsScreen({ navigation, route }) {
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Pro priority banner */}
-        {isPro && (
+        {/* Bond Pass host banner */}
+        {hasBondPass && (
           <TouchableOpacity style={s.proBanner} onPress={handleGoLive}>
             <LinearGradient
               colors={['#FFB70018', '#FFB70008']}
@@ -849,7 +849,7 @@ export default function EventsScreen({ navigation, route }) {
         visible={createVisible}
         onClose={() => setCreateVisible(false)}
         onSubmit={handleCreateSubmit}
-        isPro={isPro}
+        isPro={hasBondPass}
       />
     </SafeAreaView>
   );

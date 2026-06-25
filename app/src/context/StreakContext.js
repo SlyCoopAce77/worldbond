@@ -49,7 +49,7 @@ export const STREAK_TIERS = [
     minDays: 180,
     color:   '#818cf8',
     grad:    ['#0f0a2e', '#1e1b4b'],
-    glowColor: '#6C47FF',
+    glowColor: '#FF0080',
   },
   {
     id:      'eternal',

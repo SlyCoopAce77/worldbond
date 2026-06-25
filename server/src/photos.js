@@ -2,12 +2,13 @@ const { v4: uuidv4 } = require('uuid');
 
 const photos = [];
 
-function addPhoto({ userId, username, country, language, mood, imageUrl, caption, filter }) {
+function addPhoto({ userId, username, country, postCountry, language, mood, imageUrl, caption, filter }) {
   const photo = {
     id: uuidv4(),
     userId,
     username,
-    country,
+    country,                    // user's home country — always in this feed
+    postCountry: postCountry || null, // pinned visited country — opt-in second feed
     language,
     mood: mood || '',
     imageUrl,

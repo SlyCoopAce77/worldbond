@@ -10,7 +10,9 @@ import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { getSocket, SERVER_URL } from '../services/socket';
-import { usePremium } from '../context/PremiumContext';
+import { useBondPass } from '../context/PremiumContext';
+
+const BOND_PINK = '#FF0080';
 import { useTheme } from '../context/ThemeContext';
 import { getCountryFlag, getCountryName } from '../utils/countryUtils';
 import { WorldMark } from '../components/BondLogo';
@@ -25,7 +27,7 @@ const TAB_W = width / TABS.length;
 
 
 
-import { stringToColor } from '../utils/apiUtils';
+import { stringToColor, authHeader } from '../utils/apiUtils';
 
 const CT_META = {
   dating:     { emoji:'❤️',  label:'Dating',           color:'#e91e63' },
@@ -48,7 +50,6 @@ function Avatar({ photo_url, name, size = 44 }) {
 
 // ─── Icebreaker tab ───────────────────────────────────────────────────────────
 function IcebreakerTab({ user, navigation }) {
-  const { tierInfo, isPremium } = usePremium();
   const [question,         setQuestion]         = useState('');
   const [responses,        setResponses]        = useState([]);
   const [myAnswer,         setMyAnswer]         = useState('');
@@ -179,7 +180,7 @@ function IcebreakerTab({ user, navigation }) {
     });
   }
 
-  const visible = isPremium ? responses : responses.slice(0, tierInfo?.icebreakerResponses ?? 3);
+  const visible = responses;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90} style={{ flex: 1 }}>
@@ -219,7 +220,7 @@ function IcebreakerTab({ user, navigation }) {
               disabled={!myAnswer.trim()}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#6C47FF', '#5533DD']} style={tab.submitGrad}>
+              <LinearGradient colors={[BOND_PINK, '#CC0060']} style={tab.submitGrad}>
                 <Text style={tab.submitText}>Share with the World 🌍</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -338,7 +339,7 @@ function IcebreakerTab({ user, navigation }) {
                           {/* Thread rail: logo node + vertical line */}
                           <View style={tab.threadRail}>
                             <View style={tab.threadNode}>
-                              <WorldMark size={8} color="#6C47FF" bondColor="#9B72FF" />
+                              <WorldMark size={8} color={BOND_PINK} bondColor={BOND_PINK} />
                             </View>
                             {!isLastC && <View style={tab.threadLine} />}
                           </View>
@@ -415,12 +416,6 @@ function IcebreakerTab({ user, navigation }) {
         </View>
       )}
 
-      {!isPremium && responses.length > (tierInfo?.icebreakerResponses ?? 3) && (
-        <View style={tab.lockedMore}>
-          <Text style={tab.lockedText}>🔒  +{responses.length - (tierInfo?.icebreakerResponses ?? 3)} more responses</Text>
-          <Text style={tab.lockedSub}>Upgrade to Bond Plus to read all answers</Text>
-        </View>
-      )}
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -431,8 +426,8 @@ const tab = StyleSheet.create({
   questionCard:      { borderRadius: 24, padding: 22, gap: 14, borderWidth: 1, borderColor: 'rgba(232,0,61,0.25)' },
   questionTop:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   questionBadge:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  questionDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6C47FF' },
-  questionBadgeText: { color: '#6C47FF', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  questionDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: BOND_PINK },
+  questionBadgeText: { color: BOND_PINK, fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   responseCount:     { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '600' },
   questionText:      { color: '#ffffff', fontSize: 19, lineHeight: 30, fontStyle: 'italic', fontWeight: '600', letterSpacing: 0.1 },
   questionFooter:    { flexDirection: 'row', alignItems: 'center', paddingTop: 4 },
@@ -453,7 +448,7 @@ const tab = StyleSheet.create({
   myAnswerText:       { color: '#ffffff', fontSize: 15, lineHeight: 24 },
   myAnswerDeleteBtn:  { padding: 6, marginLeft: 4 },
   myAnswerDeleteIcon: { color: 'rgba(255,255,255,0.3)', fontSize: 16, fontWeight: '700' },
-  liveBadge:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#6C47FF', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  liveBadge:         { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: BOND_PINK, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
   liveDot:           { width: 5, height: 5, borderRadius: 3, backgroundColor: '#fff' },
   liveBadgeText:     { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
 
@@ -476,7 +471,7 @@ const tab = StyleSheet.create({
   likeIcon:          { fontSize: 20, opacity: 0.3 },
   likeIconActive:    { opacity: 1 },
   footerCount:       { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
-  likeCountActive:   { color: '#6C47FF' },
+  likeCountActive:   { color: BOND_PINK },
   commentIcon:       { fontSize: 20 },
   commentIconActive: { },
   commentCountActive:{ color: '#57c4ff' },
@@ -488,8 +483,8 @@ const tab = StyleSheet.create({
 
   commentItem:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, minHeight: 52 },
   threadRail:        { width: 20, alignItems: 'center', paddingTop: 2 },
-  threadNode:        { width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(108,71,255,0.15)', borderWidth: 1.5, borderColor: 'rgba(108,71,255,0.5)', alignItems: 'center', justifyContent: 'center' },
-  threadLine:        { width: 2, flex: 1, marginTop: 3, backgroundColor: 'rgba(108,71,255,0.25)', borderRadius: 1, minHeight: 20 },
+  threadNode:        { width: 18, height: 18, borderRadius: 9, backgroundColor: '#FF008015', borderWidth: 1.5, borderColor: '#FF008050', alignItems: 'center', justifyContent: 'center' },
+  threadLine:        { width: 2, flex: 1, marginTop: 3, backgroundColor: '#FF008025', borderRadius: 1, minHeight: 20 },
   commentBody:       { flex: 1, gap: 5, paddingBottom: 8 },
   commentMeta:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
   commentName:       { color: '#ffffff', fontSize: 13, fontWeight: '700' },
@@ -504,31 +499,22 @@ const tab = StyleSheet.create({
 
   commentInputRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 22, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   commentInput:      { flex: 1, color: '#ffffff', fontSize: 13, paddingVertical: 6 },
-  commentSendBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+  commentSendBtn:    { width: 34, height: 34, borderRadius: 17, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
   commentSendIcon:   { color: '#fff', fontSize: 14 },
 
-  lockedMore:        { backgroundColor: 'rgba(232,0,61,0.08)', borderRadius: 18, padding: 18, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(232,0,61,0.25)', borderStyle: 'dashed' },
-  lockedText:        { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
-  lockedSub:         { color: 'rgba(232,0,61,0.6)', fontSize: 12 },
 });
 
 // ─── Signal Trail Discovery ───────────────────────────────────────────────────
 
-function buildSignalCfg(tierInfo) {
-  if (!tierInfo) return {
-    color: '#555', ringColor: '#33333388', ringCount: 1, bars: 1,
-    upgradeHint: 'Upgrade to boost your signal',
-    lockTitle: 'Searching…', lockSub: '5 bonds per day',
-  };
-  const lockSubs = { free: '5 bonds/day', plus: '30 bonds/day', pro: 'Unlimited bonds' };
+function buildSignalCfg(hasBondPass) {
   return {
-    color:      tierInfo.signalColor,
-    ringColor:  tierInfo.signalColor + '55',
-    ringCount:  tierInfo.signalRings,
-    bars:       tierInfo.signalRings,
-    upgradeHint: tierInfo.id === 'free' ? 'Upgrade to boost your signal' : null,
-    lockTitle:  tierInfo.id === 'pro' ? 'Finding your match…' : 'Searching…',
-    lockSub:    lockSubs[tierInfo.id] ?? '5 bonds/day',
+    color:       hasBondPass ? BOND_PINK : '#555555',
+    ringColor:   hasBondPass ? BOND_PINK + '55' : '#33333388',
+    ringCount:   hasBondPass ? 3 : 1,
+    bars:        hasBondPass ? 3 : 1,
+    upgradeHint: hasBondPass ? null : 'Get Bond Pass for a stronger signal',
+    lockTitle:   hasBondPass ? 'Finding your match…' : 'Searching…',
+    lockSub:     hasBondPass ? 'Unlimited bonds' : '5 bonds/day',
   };
 }
 
@@ -607,7 +593,7 @@ const DEMO_SIGNALS = [
 ];
 
 const GENDER_OPTIONS_FP = [
-  { id: 'everyone', label: 'Everyone', icon: '🌍', color: '#6C47FF' },
+  { id: 'everyone', label: 'Everyone', icon: '🌍', color: BOND_PINK },
   { id: 'women',    label: 'Women',    icon: '👩', color: '#e91e63' },
   { id: 'men',      label: 'Men',      icon: '👨', color: '#0984e3' },
 ];
@@ -810,7 +796,7 @@ const ALL_COUNTRIES = [
 const REACH_OPTIONS = [
   { id: 'nearby',    label: 'Near Me',    icon: '📍', desc: 'Bonds in your city',    color: '#57f287' },
   { id: 'country',   label: 'My Country', icon: '🏠', desc: 'Same country as you',   color: '#4fc3f7' },
-  { id: 'worldwide', label: 'Worldwide',  icon: '🌍', desc: 'Anyone on the planet',  color: '#6C47FF' },
+  { id: 'worldwide', label: 'Worldwide',  icon: '🌍', desc: 'Anyone on the planet',  color: BOND_PINK },
 ];
 
 
@@ -830,35 +816,15 @@ function getRegionForCode(code) {
   return 'all';
 }
 
-// ─── Upgrade Modal ────────────────────────────────────────────────────────────
+// ─── Bond Pass Upgrade Modal ──────────────────────────────────────────────────
 function UpgradeModal({ visible, onClose, navigation }) {
-  const TIERS = [
-    {
-      id: 'signal_plus',
-      name: 'Signal+',
-      price: '$4.99 / mo',
-      color: '#6C47FF',
-      perks: [
-        'Unlimited daily swipes',
-        'Filter by frequency (Romantic, Friends…)',
-        'See who locked your signal',
-        'Priority match queue',
-      ],
-    },
-    {
-      id: 'signal_pro',
-      name: 'Signal Pro',
-      price: '$9.99 / mo',
-      color: '#e91e63',
-      badge: 'BEST',
-      perks: [
-        'Everything in Signal+',
-        'See profile photos on cards',
-        '⚡ Super Lock — direct connection',
-        'Advanced country & language filters',
-        'Signal Resonance boost (+20%)',
-      ],
-    },
+  const PERKS = [
+    'Unlimited daily bonds',
+    'Advanced filters — gender, country, vibe',
+    'Stronger signal — 3x search rings',
+    '75% gift payout rate (vs 50% standard)',
+    '150-char note with every bond request',
+    'Message anyone, bonded or not',
   ];
 
   return (
@@ -866,36 +832,38 @@ function UpgradeModal({ visible, onClose, navigation }) {
       <TouchableOpacity style={up.overlay} activeOpacity={1} onPress={onClose}>
         <View style={up.sheet}>
           <View style={up.handle} />
-          <Text style={up.title}>Upgrade Your Signal</Text>
-          <Text style={up.sub}>Better frequency = better connections</Text>
-          {TIERS.map(tier => (
-            <View key={tier.id} style={[up.tierCard, { borderColor: tier.color + '55' }]}>
-              <View style={[up.tierTop, { backgroundColor: tier.color + '18' }]}>
-                {tier.badge && (
-                  <View style={[up.tierBadge, { backgroundColor: tier.color }]}>
-                    <Text style={up.tierBadgeTxt}>{tier.badge}</Text>
-                  </View>
-                )}
-                <Text style={[up.tierName, { color: tier.color }]}>{tier.name}</Text>
-                <Text style={up.tierPrice}>{tier.price}</Text>
+          <Text style={up.title}>Get Bond Pass</Text>
+          <Text style={up.sub}>Everything unlocked — one flat price</Text>
+
+          <View style={up.card}>
+            <View style={up.cardTop}>
+              <Text style={up.planName}>Bond Pass</Text>
+              <View style={up.pricePill}>
+                <Text style={up.priceAmt}>$4.99</Text>
+                <Text style={up.pricePer}>/mo</Text>
               </View>
-              <View style={up.tierPerks}>
-                {tier.perks.map((p, i) => (
-                  <View key={i} style={up.perkRow}>
-                    <Text style={[up.perkDot, { color: tier.color }]}>●</Text>
-                    <Text style={up.perkTxt}>{p}</Text>
-                  </View>
-                ))}
-              </View>
-              <TouchableOpacity
-                style={[up.tierBtn, { backgroundColor: tier.color }]}
-                onPress={() => { onClose(); navigation?.navigate('Subscription'); }}
-                activeOpacity={0.85}
-              >
-                <Text style={up.tierBtnTxt}>Get {tier.name}</Text>
-              </TouchableOpacity>
             </View>
-          ))}
+            <View style={up.divider} />
+            <View style={up.perks}>
+              {PERKS.map((p, i) => (
+                <View key={i} style={up.perkRow}>
+                  <Text style={up.perkDot}>⚡</Text>
+                  <Text style={up.perkTxt}>{p}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={up.ctaBtn}
+            onPress={() => { onClose(); navigation?.navigate('Subscription'); }}
+            activeOpacity={0.85}
+          >
+            <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={up.ctaGrad}>
+              <Text style={up.ctaTxt}>See Bond Pass  →</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
           <TouchableOpacity style={up.closeBtn} onPress={onClose}>
             <Text style={up.closeTxt}>Maybe later</Text>
           </TouchableOpacity>
@@ -905,25 +873,27 @@ function UpgradeModal({ visible, onClose, navigation }) {
   );
 }
 const up = StyleSheet.create({
-  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
-  sheet:        { backgroundColor: '#0a0c12', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 16, paddingBottom: 40 },
-  handle:       { width: 40, height: 4, borderRadius: 2, backgroundColor: '#2F3336', alignSelf: 'center', marginBottom: 4 },
-  title:        { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.4 },
-  sub:          { color: '#555', fontSize: 13, textAlign: 'center' },
-  tierCard:     { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
-  tierTop:      { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 10, position: 'relative' },
-  tierBadge:    { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  tierBadgeTxt: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  tierName:     { fontSize: 17, fontWeight: '900', flex: 1 },
-  tierPrice:    { color: '#fff', fontSize: 14, fontWeight: '800' },
-  tierPerks:    { padding: 16, gap: 10, borderTopWidth: 1, borderTopColor: '#1e2028' },
-  perkRow:      { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  perkDot:      { fontSize: 7, marginTop: 5 },
-  perkTxt:      { color: '#bbb', fontSize: 13, lineHeight: 18, flex: 1 },
-  tierBtn:      { margin: 12, marginTop: 4, borderRadius: 14, paddingVertical: 13, alignItems: 'center' },
-  tierBtnTxt:   { color: '#fff', fontSize: 15, fontWeight: '900' },
-  closeBtn:     { alignItems: 'center', paddingVertical: 8 },
-  closeTxt:     { color: '#444', fontSize: 14 },
+  overlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet:    { backgroundColor: '#0a0c12', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14, paddingBottom: 40 },
+  handle:   { width: 40, height: 4, borderRadius: 2, backgroundColor: '#2F3336', alignSelf: 'center', marginBottom: 4 },
+  title:    { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', letterSpacing: -0.4 },
+  sub:      { color: '#555', fontSize: 13, textAlign: 'center' },
+  card:     { borderRadius: 20, borderWidth: 1, borderColor: BOND_PINK + '40', overflow: 'hidden', backgroundColor: '#0f0a12' },
+  cardTop:  { padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  planName: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  pricePill:{ flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  priceAmt: { color: BOND_PINK, fontSize: 20, fontWeight: '900' },
+  pricePer: { color: '#555', fontSize: 13 },
+  divider:  { height: 1, backgroundColor: '#1e2028' },
+  perks:    { padding: 16, gap: 10 },
+  perkRow:  { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  perkDot:  { fontSize: 12 },
+  perkTxt:  { color: '#bbb', fontSize: 13, lineHeight: 18, flex: 1 },
+  ctaBtn:   { borderRadius: 16, overflow: 'hidden' },
+  ctaGrad:  { paddingVertical: 16, alignItems: 'center' },
+  ctaTxt:   { color: '#fff', fontSize: 16, fontWeight: '900' },
+  closeBtn: { alignItems: 'center', paddingVertical: 8 },
+  closeTxt: { color: '#444', fontSize: 14 },
 });
 
 const CARD_W = width - 32;
@@ -1081,11 +1051,11 @@ function todayKey() {
 }
 
 function RandomTab({ user, navigation, onMatch, switchTab }) {
-  const { isPremium, tier, tierInfo } = usePremium();
-  const signalCfg = buildSignalCfg(tierInfo);
+  const { hasBondPass } = useBondPass();
+  const signalCfg = buildSignalCfg(hasBondPass);
 
-  const bondsPerDay  = tierInfo?.bondsPerDay ?? 5;
-  const isUnlimited  = bondsPerDay === Infinity;
+  const bondsPerDay = hasBondPass ? Infinity : 5;
+  const isUnlimited = bondsPerDay === Infinity;
 
   const [state,          setState]         = useState('idle');
   const [matchedUser,    setMatchedUser]    = useState(null);
@@ -1141,12 +1111,10 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
   // Build ordered card pool based on tier
   const cardPool = useMemo(() => {
-    let pool = [...DEMO_SIGNALS];
-    if (tierInfo?.cardOrder === 'priority') {
-      pool.sort((a, b) => b.strength - a.strength);
-    }
+    const pool = [...DEMO_SIGNALS];
+    if (hasBondPass) pool.sort((a, b) => b.strength - a.strength);
     return pool;
-  }, [tierInfo?.cardOrder]);
+  }, [hasBondPass]);
 
   const socket      = getSocket();
   const matchScaleA = useRef(new Animated.Value(0.7)).current;
@@ -1251,7 +1219,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   useEffect(() => {
     if (state !== 'locking') { rings.forEach(r => r.setValue(1)); return; }
     const count    = signalCfg.ringCount;
-    const duration = tier === 'pro' ? 900 : tier === 'plus' ? 1200 : 1600;
+    const duration = hasBondPass ? 1000 : 1600;
     const activeRings = rings.slice(0, count);
     const activeOps   = ringOps.slice(0, count);
     const initOps     = [0.5, 0.3, 0.15, 0.10, 0.07].slice(0, count);
@@ -1271,7 +1239,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     );
     anims.forEach(a => a.start());
     return () => anims.forEach(a => a.stop());
-  }, [state, tier]);
+  }, [state, hasBondPass]);
 
   function doNext()    { setCardIndex(i => i + 1); }
   function doConnect() {
@@ -1303,7 +1271,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           ))}
           <LinearGradient colors={orbColors} style={st.lockOrb}>
             {state === 'timeout'
-              ? <Text style={{ fontSize: 52 }}>😶</Text>
+              ? <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: '#1a0808', borderWidth: 1.5, borderColor: '#e5393540', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#e53935', fontSize: 18, fontWeight: '900' }}>0</Text></View>
               : <WorldMark size={52} color={sc.color} />}
           </LinearGradient>
         </View>
@@ -1338,7 +1306,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     );
   }
 
-  // ── Mutual Match (both bonded each other — chat now unlocked) ────────────────
+  // ── Bond formed (both bonded each other) ─────────────────────────────────────
   if (state === 'matching' && matchedUser) {
     const mu      = matchedUser;
     const myColor = stringToColor(user?.display_name || user?.username || 'me');
@@ -1353,15 +1321,24 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
       <View style={st.matchScreen}>
         <LinearGradient colors={['#0a0010','#1a0030','#0a0010']} style={StyleSheet.absoluteFill} />
         <Animated.View style={[st.matchContent, { transform: [{ scale: matchScaleA }], opacity: matchOpA }]}>
-          <Text style={st.matchEmoji}>🌐</Text>
-          <Text style={st.matchTitle}>It's a Match!</Text>
-          <Text style={st.matchSub}>You both bonded each other — your connection is live</Text>
+          {/* Logo mark */}
+          <View style={st.matchLogoWrap}>
+            <LinearGradient colors={[BOND_PINK + '30', 'transparent']} style={st.matchLogoGlow} />
+            <WorldMark size={48} color="#fff" bondColor={BOND_PINK} />
+          </View>
+          <Text style={st.matchTitle}>It's a Bond!</Text>
+          <Text style={st.matchSub}>You both connected — your bond is now live</Text>
+          {/* Avatar row with connection line */}
           <View style={st.matchAvatarRow}>
             <View style={st.matchAvatarWrap}>
               <View style={[st.matchAvatar, { backgroundColor: myColor }]}><Text style={st.matchAvatarInitial}>{myInit}</Text></View>
               <Text style={st.matchAvatarLabel}>You</Text>
             </View>
-            <Text style={st.matchHeart}>💜</Text>
+            <View style={st.matchConnector}>
+              <View style={[st.matchConnLine, { backgroundColor: BOND_PINK + '40' }]} />
+              <View style={[st.matchConnDot, { backgroundColor: BOND_PINK }]} />
+              <View style={[st.matchConnLine, { backgroundColor: BOND_PINK + '40' }]} />
+            </View>
             <View style={st.matchAvatarWrap}>
               <View style={[st.matchAvatar, { backgroundColor: muColor }]}><Text style={st.matchAvatarInitial}>{muInit}</Text></View>
               <Text style={st.matchAvatarLabel}>{mu.display_name || mu.username}</Text>
@@ -1372,13 +1349,15 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             clearMatch();
             if (switchTab) switchTab('people');
           }} activeOpacity={0.85}>
-            <Text style={st.matchMsgTxt}>View Bond</Text>
+            <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.matchMsgGrad}>
+              <Text style={st.matchMsgTxt}>Start Chatting</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={st.matchSkipBtn} onPress={() => {
             if (onMatch) onMatch(matchedUser, roomKey);
             clearMatch(); setCardIndex(i => i + 1);
           }} activeOpacity={0.8}>
-            <Text style={st.matchSkipTxt}>Save & Keep Exploring</Text>
+            <Text style={st.matchSkipTxt}>Save Bond · Keep Exploring</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -1417,11 +1396,11 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
       {/* ── Filter chip + shuffle ─────────────────────────────────────────── */}
       <View style={fp2.topRow}>
         <TouchableOpacity
-          style={[fp2.vibeChip, hasFilter && { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' }]}
+          style={[fp2.vibeChip, hasFilter && { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '18' }]}
           onPress={() => setShowFilterSheet(true)} activeOpacity={0.8}
         >
-          <Text style={[fp2.vibeIcon, hasFilter && { color: '#6C47FF' }]}>⋮</Text>
-          <Text style={[fp2.vibeTxt, hasFilter && { color: '#6C47FF' }]}>{filterLabel}</Text>
+          <Text style={[fp2.vibeIcon, hasFilter && { color: BOND_PINK }]}>⋮</Text>
+          <Text style={[fp2.vibeTxt, hasFilter && { color: BOND_PINK }]}>{filterLabel}</Text>
           <Text style={fp2.caret}>▾</Text>
         </TouchableOpacity>
         <TouchableOpacity style={fp2.shuffleBtn} onPress={doNext} activeOpacity={0.8}>
@@ -1434,7 +1413,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
       {/* ── Cooldown wall (free users out of bonds) ──────────────────────── */}
       {outOfBonds && (
         <View style={fp2.cooldownWall}>
-          <Text style={fp2.cooldownLock}>🔒</Text>
+          <View style={fp2.cooldownLockBox}><Text style={fp2.cooldownLockTxt}>LOCKED</Text></View>
           <Text style={fp2.cooldownTitle}>Out of Bonds</Text>
           <Text style={fp2.cooldownSub}>You've used all your bonds for today</Text>
           <View style={fp2.cooldownTimerBox}>
@@ -1443,9 +1422,9 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             <Text style={fp2.cooldownTimerNote}>Daily at midnight</Text>
           </View>
           <TouchableOpacity style={fp2.cooldownUpgradeBtn} onPress={() => setShowUpgrade(true)} activeOpacity={0.85}>
-            <Text style={fp2.cooldownUpgradeTxt}>⚡  Get WorldBond Plus</Text>
+            <Text style={fp2.cooldownUpgradeTxt}>⚡  Get Bond Pass</Text>
           </TouchableOpacity>
-          <Text style={fp2.cooldownOr}>Unlimited bonds · Better signal · Priority matches</Text>
+          <Text style={fp2.cooldownOr}>Unlimited bonds · Stronger signal · Priority matches</Text>
         </View>
       )}
 
@@ -1559,7 +1538,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           <View style={fp.reachRow}>
             {REACH_OPTIONS.map(r => {
               const active  = reachFilter === r.id;
-              const locked  = r.id === 'nearby' && !tierInfo?.canFilterGender;
+              const locked  = r.id === 'nearby' && !hasBondPass;
               return (
                 <TouchableOpacity
                   key={r.id}
@@ -1579,15 +1558,15 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           {/* ── Looking for ── */}
           <View style={[fp.sectionRow, { marginTop: 22 }]}>
             <Text style={fp.sectionLabel}>LOOKING FOR</Text>
-            {!tierInfo?.canFilterGender && <Text style={fp.lockBadge}>🔒 Plus+</Text>}
+            {!hasBondPass && <Text style={fp.lockBadge}>🔒 Bond Pass</Text>}
           </View>
-          <View style={[fp.genderRow, !tierInfo?.canFilterGender && fp.lockedSection]}>
+          <View style={[fp.genderRow, !hasBondPass && fp.lockedSection]}>
             {GENDER_OPTIONS_FP.map(g => {
-              const active = genderFilter === g.id && tierInfo?.canFilterGender;
+              const active = genderFilter === g.id && hasBondPass;
               return (
                 <TouchableOpacity key={g.id}
                   style={[fp.genderPill, active && { backgroundColor: g.color, borderColor: g.color }]}
-                  onPress={() => tierInfo?.canFilterGender ? setGenderFilter(g.id) : setShowUpgrade(true)}
+                  onPress={() => hasBondPass ? setGenderFilter(g.id) : setShowUpgrade(true)}
                   activeOpacity={0.8}
                 >
                   <Text style={[fp.genderPillTxt, active && { color: '#fff' }]}>{g.label}</Text>
@@ -1626,9 +1605,9 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           {/* ── Country ── */}
           <View style={[fp.sectionRow, { marginTop: 22 }]}>
             <Text style={fp.sectionLabel}>COUNTRY</Text>
-            {!tierInfo?.canFilterCountry && <Text style={fp.lockBadge}>🔒 Pro</Text>}
+            {!hasBondPass && <Text style={fp.lockBadge}>🔒 Bond Pass</Text>}
           </View>
-          <View style={[!tierInfo?.canFilterCountry && fp.lockedSection]}>
+          <View style={[!hasBondPass && fp.lockedSection]}>
 
             {/* Search bar */}
             <View style={fp.countrySearchBar}>
@@ -1664,12 +1643,12 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             {/* Anywhere pill */}
             {(countrySearch === '' || 'anywhere'.includes(countrySearch.toLowerCase())) && (
               <TouchableOpacity
-                style={[fp.anywherePill, countryFilter === null && tierInfo?.canFilterCountry && fp.anywherePillActive]}
-                onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(null) : setShowUpgrade(true)}
+                style={[fp.anywherePill, countryFilter === null && hasBondPass && fp.anywherePillActive]}
+                onPress={() => hasBondPass ? setCountryFilter(null) : setShowUpgrade(true)}
                 activeOpacity={0.8}
               >
-                <Text style={[fp.anywhereTxt, countryFilter === null && tierInfo?.canFilterCountry && { color: '#6C47FF' }]}>Anywhere</Text>
-                {countryFilter === null && tierInfo?.canFilterCountry && <Text style={fp.anywhereCheck}>✓</Text>}
+                <Text style={[fp.anywhereTxt, countryFilter === null && hasBondPass && { color: BOND_PINK }]}>Anywhere</Text>
+                {countryFilter === null && hasBondPass && <Text style={fp.anywhereCheck}>✓</Text>}
               </TouchableOpacity>
             )}
 
@@ -1677,12 +1656,12 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             <ScrollView style={fp.countryGridScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
               <View style={fp.flagGrid}>
                 {filteredCountries.map(c => {
-                  const active = countryFilter === c.code && tierInfo?.canFilterCountry;
+                  const active = countryFilter === c.code && hasBondPass;
                   return (
                     <TouchableOpacity
                       key={c.code}
                       style={[fp.flagTile, active && fp.flagTileActive]}
-                      onPress={() => tierInfo?.canFilterCountry ? setCountryFilter(active ? null : c.code) : setShowUpgrade(true)}
+                      onPress={() => hasBondPass ? setCountryFilter(active ? null : c.code) : setShowUpgrade(true)}
                       activeOpacity={0.75}
                     >
                       <Text style={fp.flagEmoji}>{c.flag}</Text>
@@ -1740,7 +1719,7 @@ const fp = StyleSheet.create({
   genderPillTxt:  { color: '#aaa', fontSize: 13, fontWeight: '800' },
 
   // Age range steppers
-  ageRangeVal:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
+  ageRangeVal:    { color: BOND_PINK, fontSize: 12, fontWeight: '800' },
   ageRow:         { flexDirection: 'row', alignItems: 'center', gap: 16 },
   ageStepper:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                     backgroundColor: '#111318', borderRadius: 18, borderWidth: 1.5, borderColor: '#1e2028',
@@ -1764,18 +1743,18 @@ const fp = StyleSheet.create({
   regionTabRow:    { gap: 6, paddingRight: 4 },
   regionTab:       { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
                      backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028' },
-  regionTabActive: { backgroundColor: '#6C47FF20', borderColor: '#6C47FF' },
+  regionTabActive: { backgroundColor: BOND_PINK + '20', borderColor: BOND_PINK },
   regionTabTxt:    { color: '#777', fontSize: 12, fontWeight: '800' },
-  regionTabTxtActive: { color: '#6C47FF' },
+  regionTabTxtActive: { color: BOND_PINK },
 
   // Anywhere pill
   anywherePill:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#111318',
                      borderRadius: 14, borderWidth: 1.5, borderColor: '#1e2028',
                      paddingHorizontal: 14, paddingVertical: 10, marginBottom: 8 },
-  anywherePillActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
+  anywherePillActive: { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK },
   anywhereFlag:    { fontSize: 20 },
   anywhereTxt:     { color: '#bbb', fontSize: 13, fontWeight: '800', flex: 1 },
-  anywhereCheck:   { color: '#6C47FF', fontSize: 13, fontWeight: '900' },
+  anywhereCheck:   { color: BOND_PINK, fontSize: 13, fontWeight: '900' },
 
   // Country flag grid
   countryGridScroll: { maxHeight: 220 },
@@ -1783,17 +1762,17 @@ const fp = StyleSheet.create({
   flagTile:       { width: '18%', alignItems: 'center', gap: 4, paddingVertical: 8,
                     borderRadius: 14, backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028',
                     position: 'relative' },
-  flagTileActive: { backgroundColor: '#6C47FF18', borderColor: '#6C47FF' },
+  flagTileActive: { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK },
   flagEmoji:      { fontSize: 22 },
   flagName:       { color: '#888', fontSize: 9, fontWeight: '700', textAlign: 'center' },
-  flagNameActive: { color: '#6C47FF' },
+  flagNameActive: { color: BOND_PINK },
   flagCheck:      { position: 'absolute', top: 4, right: 4, width: 13, height: 13,
-                    borderRadius: 6.5, backgroundColor: '#6C47FF', alignItems: 'center', justifyContent: 'center' },
+                    borderRadius: 6.5, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
   flagCheckTxt:   { color: '#fff', fontSize: 7, fontWeight: '900' },
 
   // Apply button
-  applyBtn:       { marginTop: 24, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
-                    shadowColor: '#6C47FF', shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  applyBtn:       { marginTop: 24, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: BOND_PINK,
+                    shadowColor: BOND_PINK, shadowOpacity: 0.45, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
   applyTxt:       { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
 });
 
@@ -1852,13 +1831,14 @@ const fp2 = StyleSheet.create({
   actions:      { flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingBottom: 14, paddingTop: 4 },
   nextBtn:      { flex: 1, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#161820', borderWidth: 1, borderColor: '#353744' },
   nextTxt:      { color: '#aaa', fontSize: 15, fontWeight: '800' },
-  bondBtn:      { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: '#6C47FF',
+  bondBtn:      { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center', backgroundColor: BOND_PINK,
                   shadowOpacity: 0.45, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   bondTxt:      { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.4 },
 
   // Cooldown wall
   cooldownWall:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
-  cooldownLock:      { fontSize: 54, marginBottom: 4 },
+  cooldownLockBox:   { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginBottom: 4 },
+  cooldownLockTxt:   { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   cooldownTitle:     { color: '#fff', fontSize: 26, fontWeight: '900', textAlign: 'center' },
   cooldownSub:       { color: '#444', fontSize: 14, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   cooldownTimerBox:  { alignItems: 'center', backgroundColor: '#0e1016', borderRadius: 24, borderWidth: 1,
@@ -1867,7 +1847,7 @@ const fp2 = StyleSheet.create({
   cooldownTimer:     { color: '#fff', fontSize: 46, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: 2 },
   cooldownTimerNote: { color: '#2a2c34', fontSize: 11, fontWeight: '700' },
   cooldownUpgradeBtn:{ marginTop: 12, width: '100%', borderRadius: 24, paddingVertical: 17, alignItems: 'center',
-                       backgroundColor: '#6C47FF', shadowColor: '#6C47FF', shadowOpacity: 0.5,
+                       backgroundColor: BOND_PINK, shadowColor: BOND_PINK, shadowOpacity: 0.5,
                        shadowRadius: 18, shadowOffset: { width: 0, height: 6 } },
   cooldownUpgradeTxt:{ color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
   cooldownOr:        { color: '#2a2c34', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 4 },
@@ -1906,7 +1886,7 @@ const pv = StyleSheet.create({
   emptyPhotoTxt: { color: '#1e2028', fontSize: 12, fontWeight: '700' },
   photoDots:   { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 10 },
   photoDot:    { width: 5, height: 5, borderRadius: 3, backgroundColor: '#1e2028' },
-  photoDotActive: { backgroundColor: '#6C47FF', width: 16 },
+  photoDotActive: { backgroundColor: BOND_PINK, width: 16 },
 
   // Identity
   identity:    { paddingHorizontal: 20, paddingTop: 18, gap: 4 },
@@ -1955,7 +1935,7 @@ const pv = StyleSheet.create({
                  backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#1e2028' },
   nextTxt:     { color: '#444', fontSize: 15, fontWeight: '800' },
   bondBtn:     { flex: 2, borderRadius: 24, paddingVertical: 17, alignItems: 'center',
-                 backgroundColor: '#6C47FF', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 5 } },
+                 backgroundColor: BOND_PINK, shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 5 } },
   bondTxt:     { color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
 });
 
@@ -1964,7 +1944,7 @@ const st = StyleSheet.create({
   filterScrollView:    { flexGrow: 0, flexShrink: 0 },
   filterRow:           { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
   filterChip:          { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#0e1016', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#1e2028' },
-  filterChipActive:    { borderColor: '#6C47FF', backgroundColor: '#6C47FF18' },
+  filterChipActive:    { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '18' },
   filterChipIcon:      { fontSize: 13 },
   filterChipTxt:       { color: '#555', fontSize: 12, fontWeight: '700' },
   filterChipTxtActive: { color: '#fff' },
@@ -1996,8 +1976,8 @@ const st = StyleSheet.create({
   // Swipe stamp labels
   swipeLabel:       { position: 'absolute', top: 34, paddingHorizontal: 14, paddingVertical: 7,
                       borderRadius: 8, borderWidth: 2.5, zIndex: 20 },
-  connectLabel:     { right: 18, borderColor: '#6C47FF', transform: [{ rotate: '14deg' }] },
-  connectLabelTxt:  { color: '#6C47FF', fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
+  connectLabel:     { right: 18, borderColor: BOND_PINK, transform: [{ rotate: '14deg' }] },
+  connectLabelTxt:  { color: BOND_PINK, fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
   passLabel:        { left: 18, borderColor: '#888', transform: [{ rotate: '-14deg' }] },
   passLabelTxt:     { color: '#888', fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
 
@@ -2010,12 +1990,12 @@ const st = StyleSheet.create({
   btnPassIcon:      { color: '#555', fontSize: 22, fontWeight: '900' },
   btnRandom:        { alignItems: 'center', justifyContent: 'center', gap: 2,
                       width: 78, height: 78, borderRadius: 39,
-                      backgroundColor: '#6C47FF', shadowColor: '#6C47FF',
+                      backgroundColor: BOND_PINK, shadowColor: BOND_PINK,
                       shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
   btnRandomIcon:    { fontSize: 28 },
   btnRandomLabel:   { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   btnConnect:       { alignItems: 'center', gap: 3, width: 64, height: 64, borderRadius: 32,
-                      backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: '#6C47FF66',
+                      backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: BOND_PINK + '66',
                       justifyContent: 'center' },
   btnConnectIcon:   { fontSize: 22 },
   btnLabel:         { color: '#555', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
@@ -2049,7 +2029,7 @@ const st = StyleSheet.create({
                            backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#2a2a2a' },
   profileBtnPassTxt:     { color: '#666', fontSize: 15, fontWeight: '800' },
   profileBtnConnect:     { flex: 2, borderRadius: 22, paddingVertical: 14, alignItems: 'center',
-                           backgroundColor: '#6C47FF' },
+                           backgroundColor: BOND_PINK },
   profileBtnConnectTxt:  { color: '#fff', fontSize: 15, fontWeight: '900' },
 
   // Locking / searching
@@ -2067,21 +2047,24 @@ const st = StyleSheet.create({
   // Match screen
   matchScreen:        { flex: 1, alignItems: 'center', justifyContent: 'center' },
   matchContent:       { alignItems: 'center', gap: 18, paddingHorizontal: 32 },
-  matchEmoji:         { fontSize: 52 },
+  matchLogoWrap:      { width: 80, height: 80, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  matchLogoGlow:      { position: 'absolute', width: 80, height: 80, borderRadius: 40 },
   matchTitle:         { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: -0.8 },
   matchSub:           { color: 'rgba(255,255,255,0.45)', fontSize: 15, textAlign: 'center' },
-  matchAvatarRow:     { flexDirection: 'row', alignItems: 'center', gap: 16, marginVertical: 8 },
+  matchAvatarRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 8 },
   matchAvatarWrap:    { alignItems: 'center', gap: 8 },
+  matchConnector:     { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  matchConnLine:      { width: 20, height: 2 },
+  matchConnDot:       { width: 10, height: 10, borderRadius: 5 },
   matchAvatar:        { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center',
-                        borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.15)' },
+                        borderWidth: 2.5, borderColor: BOND_PINK + '60' },
   matchAvatarInitial: { color: '#fff', fontSize: 30, fontWeight: '900' },
   matchAvatarLabel:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700' },
-  matchHeart:         { color: '#6C47FF', fontSize: 30 },
-  matchMsgBtn:        { backgroundColor: '#6C47FF', borderRadius: 28, paddingVertical: 16,
-                        paddingHorizontal: 48, width: '100%', alignItems: 'center' },
+  matchMsgBtn:        { borderRadius: 28, overflow: 'hidden', width: '100%' },
+  matchMsgGrad:       { paddingVertical: 16, paddingHorizontal: 48, alignItems: 'center' },
   matchMsgTxt:        { color: '#fff', fontSize: 16, fontWeight: '900' },
   matchSkipBtn:       { paddingVertical: 12, alignItems: 'center' },
-  matchSkipTxt:       { color: '#444', fontSize: 14, fontWeight: '700' },
+  matchSkipTxt:       { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '700' },
 
   // Chat
   connHeader:    { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12,
@@ -2098,7 +2081,7 @@ const st = StyleSheet.create({
   msgRow:        { flexDirection: 'row' },
   msgRowMine:    { justifyContent: 'flex-end' },
   bubble:        { maxWidth: width * 0.72, borderRadius: 18, padding: 12 },
-  bubbleMine:    { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
+  bubbleMine:    { backgroundColor: BOND_PINK, borderBottomRightRadius: 4 },
   bubbleOther:   { backgroundColor: '#0e1016', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e2028' },
   msgTxt:        { color: '#fff', fontSize: 14, lineHeight: 20 },
   translated:    { color: 'rgba(255,255,255,0.3)', fontSize: 9, marginTop: 2 },
@@ -2113,31 +2096,47 @@ const st = StyleSheet.create({
   signalBadge:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 16, borderWidth: 1,
                      paddingHorizontal: 14, paddingVertical: 8, marginBottom: 16 },
   signalBadgeTxt:  { fontSize: 12, fontWeight: '800' },
-  signalUpgradeBtn:{ marginBottom: 12, backgroundColor: '#6C47FF18', borderRadius: 16, borderWidth: 1, borderColor: '#6C47FF33',
+  signalUpgradeBtn:{ marginBottom: 12, backgroundColor: BOND_PINK + '18', borderRadius: 16, borderWidth: 1, borderColor: BOND_PINK + '33',
                      paddingHorizontal: 18, paddingVertical: 10 },
-  signalUpgradeTxt:{ color: '#6C47FF', fontSize: 13, fontWeight: '800' },
+  signalUpgradeTxt:{ color: BOND_PINK, fontSize: 13, fontWeight: '800' },
 });
 
 // ─── People tab ───────────────────────────────────────────────────────────────
 function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
-  const [activeChat,     setActiveChat]     = useState(null);
-  const [chatMessages,   setChatMessages]   = useState([]);
-  const [chatText,       setChatText]       = useState('');
-  const [online,         setOnline]         = useState({});
+  const [activeChat,      setActiveChat]      = useState(null);
+  const [chatMessages,    setChatMessages]    = useState([]);
+  const [chatText,        setChatText]        = useState('');
+  const [online,          setOnline]          = useState({});
   const [showBondProfile, setShowBondProfile] = useState(false);
-  const chatListRef    = useRef(null);
+  const [newMatches,      setNewMatches]      = useState([]);
+  const [apiConnections,  setApiConnections]  = useState([]);
+  const chatListRef = useRef(null);
   const socket = getSocket();
 
   useEffect(() => {
     socket.on('user_list', users => {
       const map = {};
-      users.forEach(u => { if (u.userId) map[u.userId] = true; });
+      users.forEach(u => { if (u.userId) map[String(u.userId)] = u; });
       setOnline(map);
     });
     if (socket.connected) socket.emit('get_users');
     else socket.once('connect', () => socket.emit('get_users'));
     return () => socket.off('user_list');
   }, []);
+
+  useEffect(() => { loadApiData(); }, []);
+
+  async function loadApiData() {
+    try {
+      const headers = await authHeader();
+      const [dailyRes, confRes] = await Promise.allSettled([
+        axios.get(`${SERVER_URL}/api/matches/daily`, { headers, timeout: 8000 }),
+        axios.get(`${SERVER_URL}/api/matches`,       { headers, timeout: 8000 }),
+      ]);
+      if (dailyRes.status === 'fulfilled') setNewMatches(dailyRes.value.data || []);
+      if (confRes.status  === 'fulfilled') setApiConnections(confRes.value.data || []);
+    } catch {}
+  }
 
   useEffect(() => {
     if (!activeChat) return;
@@ -2209,7 +2208,7 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
             </View>
             <View>
               <Text style={pe.chatHdrName}>{name}</Text>
-              <Text style={pe.chatHdrSub}>🌐 Bond Match  ›</Text>
+              <Text style={pe.chatHdrSub}>Bond Match  ›</Text>
             </View>
           </TouchableOpacity>
 
@@ -2224,9 +2223,11 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
           contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1, justifyContent: chatMessages.length === 0 ? 'center' : 'flex-start' }}
           ListEmptyComponent={
             <View style={pe.chatEmpty}>
-              <Text style={{ fontSize: 44 }}>🌐</Text>
+              <View style={pe.chatEmptyOrb}>
+                <WorldMark size={32} color="#fff" bondColor={BOND_PINK} />
+              </View>
               <Text style={pe.chatEmptyTitle}>You're bonded!</Text>
-              <Text style={pe.chatEmptySub}>Say hello to {name} 👋</Text>
+              <Text style={pe.chatEmptySub}>Say hello to {name}</Text>
             </View>
           }
           renderItem={({ item, index }) => {
@@ -2238,17 +2239,14 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
                 <Animated.View style={[pe.swipeActions, { transform: [{ scale }] }]}>
                   <TouchableOpacity style={[pe.swipeAction, pe.swipeDelete]}
                     onPress={() => { swipeRef.current?.close(); deleteMessage(index); }} activeOpacity={0.8}>
-                    <Text style={pe.swipeActionIcon}>🗑</Text>
                     <Text style={pe.swipeActionTxt}>Delete</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[pe.swipeAction, pe.swipeFlag]}
                     onPress={() => { swipeRef.current?.close(); Alert.alert('Message flagged', 'Thanks for letting us know.'); }} activeOpacity={0.8}>
-                    <Text style={pe.swipeActionIcon}>🚩</Text>
                     <Text style={pe.swipeActionTxt}>Flag</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[pe.swipeAction, pe.swipeReport]}
                     onPress={() => { swipeRef.current?.close(); Alert.alert('Report sent', 'Our team will review this message.'); }} activeOpacity={0.8}>
-                    <Text style={pe.swipeActionIcon}>🚫</Text>
                     <Text style={pe.swipeActionTxt}>Report</Text>
                   </TouchableOpacity>
                 </Animated.View>
@@ -2279,7 +2277,7 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
               onSubmitEditing={sendChatMsg}
               multiline
             />
-            <TouchableOpacity style={[pe.sendBtn, chatText.trim() && { backgroundColor: '#6C47FF' }]}
+            <TouchableOpacity style={[pe.sendBtn, chatText.trim() && { backgroundColor: BOND_PINK }]}
               onPress={sendChatMsg} activeOpacity={0.8}>
               <Text style={pe.sendIcon}>➤</Text>
             </TouchableOpacity>
@@ -2301,30 +2299,30 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
             <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
               {/* Avatar hero */}
               <LinearGradient
-                colors={[mu.avatarColor ? mu.avatarColor + '44' : '#6C47FF44', '#050507']}
+                colors={[mu.avatarColor ? mu.avatarColor + '44' : BOND_PINK + '44', '#050507']}
                 style={{ alignItems: 'center', paddingVertical: 36, gap: 12 }}
               >
                 <Avatar photo_url={mu.photo_url} name={name} size={110} />
                 <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900' }}>{name}{mu.age ? `, ${mu.age}` : ''}</Text>
-                <Text style={{ color: '#555', fontSize: 13 }}>{mu.username}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>{mu.username}</Text>
                 {mu.flag || mu.country ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     {mu.flag && <Text style={{ fontSize: 22 }}>{mu.flag}</Text>}
-                    {mu.country && <Text style={{ color: '#777', fontSize: 15, fontWeight: '700' }}>{mu.country}</Text>}
+                    {mu.country && <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 15, fontWeight: '700' }}>{mu.country}</Text>}
                   </View>
                 ) : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8,
                   backgroundColor: '#57f28715', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5 }}>
                   <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' }} />
-                  <Text style={{ color: '#57f287', fontSize: 12, fontWeight: '700' }}>🌐 Bond Match</Text>
+                  <Text style={{ color: '#57f287', fontSize: 12, fontWeight: '700' }}>Bond Match</Text>
                 </View>
               </LinearGradient>
 
               {/* Bio */}
               {mu.bio ? (
                 <View style={{ marginHorizontal: 20, marginTop: 20 }}>
-                  <Text style={{ color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 }}>ABOUT</Text>
-                  <Text style={{ color: '#aaa', fontSize: 14, lineHeight: 22 }}>{mu.bio}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 8 }}>ABOUT</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 22 }}>{mu.bio}</Text>
                 </View>
               ) : null}
 
@@ -2332,15 +2330,15 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
               {mu.tagline ? (
                 <View style={{ marginHorizontal: 20, marginTop: 16, backgroundColor: '#111318',
                   borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e2028' }}>
-                  <Text style={{ color: '#666', fontSize: 18 }}>"</Text>
-                  <Text style={{ color: '#aaa', fontSize: 14, fontStyle: 'italic', lineHeight: 22 }}>{mu.tagline}</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 18 }}>"</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontStyle: 'italic', lineHeight: 22 }}>{mu.tagline}</Text>
                 </View>
               ) : null}
 
               {/* Interests */}
               {mu.interests?.length > 0 ? (
                 <View style={{ marginHorizontal: 20, marginTop: 20 }}>
-                  <Text style={{ color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12 }}>INTERESTS</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 12 }}>INTERESTS</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                     {mu.interests.map((tag, i) => (
                       <View key={i} style={{ backgroundColor: '#111318', borderRadius: 20,
@@ -2355,7 +2353,7 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
               {/* World Footprint */}
               {mu.trail?.length > 0 ? (
                 <View style={{ marginHorizontal: 20, marginTop: 24 }}>
-                  <Text style={{ color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 14 }}>WORLD FOOTPRINT</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 14 }}>WORLD FOOTPRINT</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {mu.trail.map((flag, i) => (
                       <React.Fragment key={i}>
@@ -2379,65 +2377,154 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
   }
 
   // ── Message Center (inbox) ──────────────────────────────────────────────────
+  const allConversations = [
+    ...bondMatches.map(m => ({ _type: 'live', ...m })),
+    ...apiConnections.map(c => ({ _type: 'api', ...c })),
+  ];
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       {/* Header */}
       <View style={pe.inboxHdr}>
-        <Text style={pe.inboxTitle}>Messages</Text>
-        {bondMatches.length > 0 && (
+        <Text style={pe.inboxTitle}>People</Text>
+        {allConversations.length > 0 && (
           <View style={pe.inboxBadge}>
-            <Text style={pe.inboxBadgeTxt}>{bondMatches.length}</Text>
+            <Text style={pe.inboxBadgeTxt}>{allConversations.length}</Text>
           </View>
         )}
       </View>
 
-      {bondMatches.length === 0 ? (
+      {/* New Matches strip */}
+      {newMatches.length > 0 && (
+        <View>
+          <Text style={pe.matchesLabel}>New Bonds</Text>
+          <FlatList
+            data={newMatches}
+            horizontal
+            keyExtractor={item => String(item.id)}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={pe.matchStrip}
+            renderItem={({ item }) => {
+              const name    = item.display_name || 'Someone';
+              const avatarC = stringToColor(name);
+              const isOnline = online[item.matched_user_id || item.user_id];
+              return (
+                <TouchableOpacity
+                  style={pe.matchBubble}
+                  onPress={() => {
+                    const uid = String(item.matched_user_id || item.user_id);
+                    navigation.navigate('Chat', {
+                      otherUser: {
+                        userId: uid,
+                        username: item.display_name,
+                        display_name: item.display_name,
+                        photo_url: item.photo_url,
+                        country: item.country,
+                        socketId: online[uid]?.socketId,
+                      },
+                      currentUser: null,
+                      matchId: item.id,
+                      compatibilityScore: item.compatibility_score,
+                    });
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ position: 'relative' }}>
+                    {item.photo_url ? (
+                      <Image source={{ uri: item.photo_url }} style={pe.matchAvatar} />
+                    ) : (
+                      <LinearGradient colors={[avatarC, avatarC + '88']} style={pe.matchAvatar}>
+                        <Text style={pe.matchInitial}>{name[0]?.toUpperCase()}</Text>
+                      </LinearGradient>
+                    )}
+                    {isOnline && <View style={pe.matchOnlineDot} />}
+                  </View>
+                  <Text style={pe.matchName} numberOfLines={1}>{name.split(' ')[0]}</Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
+      )}
+
+      <Text style={pe.messagesLabel}>Messages</Text>
+
+      {allConversations.length === 0 ? (
         /* ── Empty state ── */
         <View style={pe.emptyWrap}>
-          <Text style={{ fontSize: 54 }}>💬</Text>
-          <Text style={pe.emptyTitle}>No messages yet</Text>
-          <Text style={pe.emptySub}>
-            Go to the Random tab, bond with someone,{'\n'}and your chat will appear here.
-          </Text>
-          <View style={pe.emptyArrow}>
-            <Text style={pe.emptyArrowTxt}>🌀  Try Random</Text>
+          <View style={pe.emptyIcon}>
+            <View style={pe.emptyBubble1} />
+            <View style={pe.emptyBubble2} />
           </View>
+          <Text style={pe.emptyTitle}>No bonds yet</Text>
+          <Text style={pe.emptySub}>
+            Swipe on Connect to bond with people worldwide.{'\n'}Your conversations will appear here.
+          </Text>
         </View>
       ) : (
         /* ── Conversation list ── */
         <FlatList
-          data={bondMatches}
-          keyExtractor={m => m.roomKey}
+          data={allConversations}
+          keyExtractor={m => m._type === 'live' ? m.roomKey : `api-${m.id}`}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: 40 }}
           ItemSeparatorComponent={() => <View style={pe.divider} />}
           renderItem={({ item: m }) => {
-            const mu       = m.matchedUser || {};
-            const name     = mu.display_name || mu.username || 'Bond';
-            const isOnline = online[mu.user_id];
-            const lastMsg  = m.messages?.length > 0 ? m.messages[m.messages.length - 1] : null;
-            const preview  = lastMsg ? lastMsg.text : 'Say hello to your new bond 👋';
-            const isUnread = !lastMsg;
-            const ts       = m.ts ? new Date(m.ts) : null;
-            const timeStr  = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            let mu, name, isOnline, preview, isUnread, timeStr, handlePress;
+
+            if (m._type === 'live') {
+              mu       = m.matchedUser || {};
+              name     = mu.display_name || mu.username || 'Bond';
+              isOnline = !!online[String(mu.user_id)];
+              const lastMsg = m.messages?.length > 0 ? m.messages[m.messages.length - 1] : null;
+              preview  = lastMsg ? lastMsg.text : 'Start the conversation';
+              isUnread = !lastMsg;
+              const ts = m.ts ? new Date(m.ts) : null;
+              timeStr  = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+              handlePress = () => openChat(m);
+            } else {
+              const uid = String(m.matched_user_id || m.user_id);
+              const onlineUser = online[uid];
+              mu       = { photo_url: m.photo_url, user_id: uid };
+              name     = m.display_name || 'Someone';
+              isOnline = !!onlineUser;
+              preview  = isOnline ? 'Online now · Say hello' : 'Start the conversation';
+              isUnread = true;
+              timeStr  = '';
+              handlePress = () => {
+                navigation.navigate('Chat', {
+                  otherUser: {
+                    userId: uid,
+                    username: name,
+                    display_name: name,
+                    photo_url: m.photo_url,
+                    country: m.country,
+                    socketId: onlineUser?.socketId,
+                  },
+                  currentUser: null,
+                  matchId: m.id,
+                  compatibilityScore: m.compatibility_score,
+                });
+              };
+            }
 
             const threadRef = React.createRef();
             const renderThreadActions = () => (
               <View style={pe.threadSwipeActions}>
-                <TouchableOpacity style={[pe.threadSwipeAction, pe.threadSwipeDelete]}
-                  onPress={() => { threadRef.current?.close(); deleteConversation(m.roomKey); }} activeOpacity={0.8}>
-                  <Text style={pe.swipeActionIcon}>🗑</Text>
-                  <Text style={pe.threadSwipeActionTxt}>Delete</Text>
-                </TouchableOpacity>
+                {m._type === 'live' && (
+                  <TouchableOpacity style={[pe.threadSwipeAction, pe.threadSwipeDelete]}
+                    onPress={() => { threadRef.current?.close(); deleteConversation(m.roomKey); }} activeOpacity={0.8}>
+                    <Text style={pe.threadSwipeActionTxt}>Delete</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={[pe.threadSwipeAction, pe.threadSwipeReport]}
                   onPress={() => { threadRef.current?.close(); Alert.alert('Reported', 'Thanks for keeping WorldBond safe.'); }} activeOpacity={0.8}>
-                  <Text style={pe.swipeActionIcon}>🚫</Text>
                   <Text style={pe.threadSwipeActionTxt}>Report</Text>
                 </TouchableOpacity>
               </View>
             );
             return (
               <Swipeable ref={threadRef} renderRightActions={renderThreadActions} overshootRight={false} friction={2}>
-                <TouchableOpacity style={pe.thread} onPress={() => openChat(m)} activeOpacity={0.8}>
+                <TouchableOpacity style={pe.thread} onPress={handlePress} activeOpacity={0.8}>
                   {/* Avatar + online */}
                   <View style={{ position: 'relative', marginRight: 14 }}>
                     <Avatar photo_url={mu.photo_url} name={name} size={54} />
@@ -2468,11 +2555,21 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
   );
 }
 const pe = StyleSheet.create({
+  // ── New Matches strip ──
+  matchesLabel:     { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 20, marginBottom: 12 },
+  matchStrip:       { paddingHorizontal: 20, paddingBottom: 4, gap: 20 },
+  matchBubble:      { alignItems: 'center', width: 64 },
+  matchAvatar:      { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: BOND_PINK },
+  matchInitial:     { color: '#fff', fontSize: 24, fontWeight: '800' },
+  matchName:        { color: '#aaa', fontSize: 10, fontWeight: '600', textAlign: 'center', marginTop: 5 },
+  matchOnlineDot:   { position: 'absolute', bottom: 1, right: 1, width: 13, height: 13, borderRadius: 7, backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000' },
+  messagesLabel:    { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 0.3, paddingHorizontal: 20, marginTop: 20, marginBottom: 4 },
+
   // ── Inbox header ──
   inboxHdr:         { flexDirection: 'row', alignItems: 'center', gap: 10,
                       paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
   inboxTitle:       { color: '#fff', fontSize: 22, fontWeight: '900', flex: 1 },
-  inboxBadge:       { backgroundColor: '#6C47FF', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 },
+  inboxBadge:       { backgroundColor: BOND_PINK, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 },
   inboxBadgeTxt:    { color: '#fff', fontSize: 12, fontWeight: '900' },
 
   // ── Thread rows ──
@@ -2480,19 +2577,20 @@ const pe = StyleSheet.create({
   threadOnlineDot:  { position: 'absolute', bottom: 0, right: 0, width: 13, height: 13, borderRadius: 7,
                       backgroundColor: '#57f287', borderWidth: 2.5, borderColor: '#000' },
   threadName:       { color: '#fff', fontSize: 16, fontWeight: '800', flex: 1 },
-  threadTime:       { color: '#333', fontSize: 11, fontWeight: '600' },
-  threadPreview:    { color: '#444', fontSize: 13, lineHeight: 18 },
-  threadPreviewUnread: { color: '#6C47FF', fontWeight: '700' },
-  threadNewBadge:   { backgroundColor: '#6C47FF', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 10 },
+  threadTime:       { color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '600' },
+  threadPreview:    { color: 'rgba(255,255,255,0.35)', fontSize: 13, lineHeight: 18 },
+  threadPreviewUnread: { color: BOND_PINK, fontWeight: '700' },
+  threadNewBadge:   { backgroundColor: BOND_PINK, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 10 },
   threadNewTxt:     { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   divider:          { height: 1, backgroundColor: '#0e1016', marginLeft: 88 },
 
   // ── Empty state ──
   emptyWrap:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32, paddingBottom: 60 },
+  emptyIcon:        { width: 64, height: 52, position: 'relative', marginBottom: 4 },
+  emptyBubble1:     { position: 'absolute', left: 0, bottom: 0, width: 42, height: 36, borderRadius: 18, borderBottomLeftRadius: 4, borderWidth: 2, borderColor: BOND_PINK + '60', backgroundColor: BOND_PINK + '12' },
+  emptyBubble2:     { position: 'absolute', right: 0, top: 0, width: 34, height: 28, borderRadius: 14, borderBottomRightRadius: 4, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.05)' },
   emptyTitle:       { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' },
-  emptySub:         { color: '#444', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  emptyArrow:       { marginTop: 8, backgroundColor: '#6C47FF18', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 12, borderWidth: 1, borderColor: '#6C47FF44' },
-  emptyArrowTxt:    { color: '#6C47FF', fontSize: 14, fontWeight: '800' },
+  emptySub:         { color: 'rgba(255,255,255,0.4)', fontSize: 14, textAlign: 'center', lineHeight: 22 },
 
   // ── Full-screen chat ──
   chatHdr:          { flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -2504,12 +2602,13 @@ const pe = StyleSheet.create({
   chatOnlineDot:    { position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, borderRadius: 6,
                       backgroundColor: '#57f287', borderWidth: 2, borderColor: '#000' },
   chatHdrName:      { color: '#fff', fontSize: 16, fontWeight: '800' },
-  chatHdrSub:       { color: '#444', fontSize: 11, marginTop: 1 },
+  chatHdrSub:       { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 1 },
   chatEmpty:        { alignItems: 'center', gap: 10 },
   chatEmptyTitle:   { color: '#fff', fontSize: 18, fontWeight: '900' },
-  chatEmptySub:     { color: '#555', fontSize: 14 },
+  chatEmptySub:     { color: 'rgba(255,255,255,0.4)', fontSize: 14 },
+  chatEmptyOrb:     { width: 68, height: 68, borderRadius: 34, backgroundColor: BOND_PINK + '15', borderWidth: 1, borderColor: BOND_PINK + '35', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   bubble:           { maxWidth: '78%', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 11 },
-  bubbleMe:         { backgroundColor: '#6C47FF', borderBottomRightRadius: 4 },
+  bubbleMe:         { backgroundColor: BOND_PINK, borderBottomRightRadius: 4 },
   bubbleThem:       { backgroundColor: '#111318', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#1e2028' },
   bubbleTxt:        { fontSize: 15, lineHeight: 21 },
   bubbleTxtMe:      { color: '#fff' },
@@ -2531,8 +2630,7 @@ const pe = StyleSheet.create({
   swipeDelete:        { backgroundColor: '#e5393520', borderWidth: 1, borderColor: '#e5393540' },
   swipeFlag:          { backgroundColor: '#FFB70020', borderWidth: 1, borderColor: '#FFB70040' },
   swipeReport:        { backgroundColor: '#55555520', borderWidth: 1, borderColor: '#55555540' },
-  swipeActionIcon:    { fontSize: 18 },
-  swipeActionTxt:     { color: '#888', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
+  swipeActionTxt:     { color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
 
   // ── Swipe-to-reveal (inbox threads) ──
   threadSwipeActions: { flexDirection: 'row', alignItems: 'stretch' },
@@ -2543,7 +2641,7 @@ const pe = StyleSheet.create({
 });
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
-export default function DiscoverScreen({ navigation, user }) {
+export default function DiscoverScreen({ navigation, user, route }) {
   const { colors } = useTheme();
   const [activeTab,   setActiveTab]   = useState('icebreaker');
   const [bondMatches, setBondMatches] = useState([]);
@@ -2553,6 +2651,13 @@ export default function DiscoverScreen({ navigation, user }) {
   useEffect(() => {
     Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, []);
+
+  useEffect(() => {
+    const paramTab = route?.params?.tab;
+    if (paramTab && TABS.find(t => t.id === paramTab)) {
+      switchTab(paramTab);
+    }
+  }, [route?.params?.tab]);
 
   function switchTab(id) {
     const idx = TABS.findIndex(t => t.id === id);
@@ -2610,11 +2715,11 @@ const styles = StyleSheet.create({
 
   header:        { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
   title:         { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  subtitle:      { color: '#444', fontSize: 13, marginTop: 3 },
+  subtitle:      { color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 3 },
 
   tabBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1e2028', position: 'relative' },
   tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  tabLabel:      { color: '#666', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  tabLabel:      { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   tabLabelActive:{ color: '#fff', fontWeight: '900' },
-  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: '#6C47FF', borderRadius: 2 },
+  tabIndicator:  { position: 'absolute', bottom: 0, height: 2, backgroundColor: BOND_PINK, borderRadius: 2 },
 });

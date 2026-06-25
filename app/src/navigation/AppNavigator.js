@@ -155,8 +155,8 @@ export default function AppNavigator({ user, onLogout }) {
             </Stack.Screen>
 
             {/* Live */}
-            <Stack.Screen name="Live"      component={LiveScreen}      options={{ presentation: 'fullScreenModal' }} />
-            <Stack.Screen name="LiveWatch" component={LiveWatchScreen} options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="Live"      component={LiveScreen}      options={{ presentation: 'modal', gestureEnabled: false }} />
+            <Stack.Screen name="LiveWatch" component={LiveWatchScreen} options={{ presentation: 'modal',           gestureEnabled: false }} />
 
             {/* Settings sub-screens */}
             <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />

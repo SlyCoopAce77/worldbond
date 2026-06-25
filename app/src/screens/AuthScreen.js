@@ -67,7 +67,7 @@ export default function AuthScreen({ onLogin }) {
     case SCREENS.LOADING:
       return (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#6C47FF" />
+          <ActivityIndicator size="large" color="#FF0080" />
         </View>
       );
 

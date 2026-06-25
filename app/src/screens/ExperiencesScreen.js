@@ -11,6 +11,7 @@ import { authHeader } from '../utils/apiUtils';
 import { CONNECTION_TYPES } from '../utils/constants';
 
 const { width } = Dimensions.get('window');
+const BOND_PINK = '#FF0080';
 
 const CATEGORIES = [
   { key: 'food',      label: 'Food',      emoji: '🍜' },
@@ -41,11 +42,11 @@ function FilterChip({ ct, active, onPress }) {
       style={[
         fc.chip,
         active && !isAll && { backgroundColor: ct.color + '20', borderColor: ct.color + '55' },
-        active && isAll  && { backgroundColor: '#6C47FF20', borderColor: '#6C47FF55' },
+        active && isAll  && { backgroundColor: BOND_PINK + '20', borderColor: BOND_PINK + '55' },
       ]}
     >
       {ct && <Text style={{ fontSize: 14 }}>{ct.emoji}</Text>}
-      <Text style={[fc.text, active && { color: ct ? ct.color : '#6C47FF' }]}>
+      <Text style={[fc.text, active && { color: ct ? ct.color : BOND_PINK }]}>
         {ct ? ct.label : 'All'}
       </Text>
     </TouchableOpacity>
@@ -257,7 +258,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 onPress={() => update('is_global', !form.is_global)}
               >
                 <Text style={cm.globalIcon}>{form.is_global ? '🌍' : '📍'}</Text>
-                <Text style={[cm.globalText, form.is_global && { color: '#6C47FF' }]}>
+                <Text style={[cm.globalText, form.is_global && { color: BOND_PINK }]}>
                   {form.is_global ? 'Global — visible to anyone worldwide' : 'Local — visible to people near you'}
                 </Text>
               </TouchableOpacity>
@@ -270,7 +271,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={form.connection_type ? [ct.color, ct.color + 'bb'] : ['#6C47FF', '#5533DD']}
+                  colors={form.connection_type ? [ct.color, ct.color + 'bb'] : [BOND_PINK, '#CC0060']}
                   style={cm.submitGrad}
                 >
                   <Text style={cm.submitText}>{loading ? 'Posting…' : 'Post Experience 🌍'}</Text>
@@ -297,10 +298,10 @@ const cm = StyleSheet.create({
   typeText:     { color: '#555', fontSize: 12, fontWeight: '700' },
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   catChip:      { width: (width - 48 - 20) / 3, backgroundColor: '#16181C', borderRadius: 16, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#2F3336' },
-  catChipActive:{ backgroundColor: '#6C47FF22', borderColor: '#6C47FF55' },
+  catChipActive:{ backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '55' },
   catLabel:     { color: '#555', fontSize: 11, fontWeight: '700' },
   globalBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#16181C', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
-  globalBtnActive:{ backgroundColor: '#6C47FF18', borderColor: '#6C47FF40' },
+  globalBtnActive:{ backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '40' },
   globalIcon:   { fontSize: 20 },
   globalText:   { color: '#555', fontSize: 13, fontWeight: '600', flex: 1 },
   submitWrap:   { borderRadius: 16, overflow: 'hidden' },
@@ -359,7 +360,7 @@ export default function ExperiencesScreen({ navigation, user }) {
           )}
         </View>
         <TouchableOpacity style={styles.postBtn} onPress={() => setShowCreate(true)}>
-          <LinearGradient colors={['#6C47FF', '#5533DD']} style={styles.postGrad}>
+          <LinearGradient colors={[BOND_PINK, '#CC0060']} style={styles.postGrad}>
             <Text style={styles.postText}>+ Post</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -425,8 +426,8 @@ const styles = StyleSheet.create({
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30, marginTop: -2 },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:        { color: '#fff', fontSize: 22, fontWeight: '900' },
-  countPill:    { backgroundColor: '#6C47FF22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#6C47FF40' },
-  countText:    { color: '#6C47FF', fontSize: 12, fontWeight: '800' },
+  countPill:    { backgroundColor: BOND_PINK + '22', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: BOND_PINK + '40' },
+  countText:    { color: BOND_PINK, fontSize: 12, fontWeight: '800' },
   postBtn:      { borderRadius: 14, overflow: 'hidden' },
   postGrad:     { paddingHorizontal: 16, paddingVertical: 9 },
   postText:     { color: '#fff', fontSize: 14, fontWeight: '800' },

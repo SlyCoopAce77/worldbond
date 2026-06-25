@@ -8,6 +8,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import axios from 'axios';
 import { SERVER_URL } from '../../services/socket';
 
+const BOND_PINK = '#FF0080';
+
 export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
   const [email,   setEmail]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
             <View style={styles.iconWrap}>
-              <LinearGradient colors={['#6C47FF30', '#6C47FF10']} style={styles.iconBg}>
+              <LinearGradient colors={[BOND_PINK + '30', BOND_PINK + '10']} style={styles.iconBg}>
                 <Text style={styles.icon}>🔑</Text>
               </LinearGradient>
             </View>
@@ -91,7 +93,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
                   activeOpacity={0.87}
                 >
                   <LinearGradient
-                    colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                    colors={[BOND_PINK, '#CC0060']}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={styles.submitGrad}
                   >
@@ -139,7 +141,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
                     </View>
                   ) : (
                     <LinearGradient
-                      colors={['#6C47FF', '#6C47FF', '#5533DD']}
+                      colors={[BOND_PINK, '#CC0060']}
                       start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                       style={styles.submitGrad}
                     >
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
 
   iconWrap: { alignItems: 'center', marginBottom: 24 },
-  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#6C47FF40' },
+  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BOND_PINK + '40' },
   icon:     { fontSize: 36 },
 
   header:   { marginBottom: 28, alignItems: 'center' },
@@ -177,13 +179,13 @@ const styles = StyleSheet.create({
   errorIcon:   { fontSize: 16 },
   errorText:   { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
-  form:        { gap: 20, marginBottom: 8 },
-  fieldGroup:  { gap: 8 },
-  label:       { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  form:             { gap: 20, marginBottom: 8 },
+  fieldGroup:       { gap: 8 },
+  label:            { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   inputWrap:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputWrapFocused: { borderColor: '#6C47FF40' },
-  inputIcon:   { fontSize: 16, marginRight: 10 },
-  input:       { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
+  inputWrapFocused: { borderColor: BOND_PINK + '40' },
+  inputIcon:        { fontSize: 16, marginRight: 10 },
+  input:            { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
 
   submitBtn:    { borderRadius: 18, overflow: 'hidden', marginTop: 24 },
   submitBtnOff: { opacity: 0.45 },
@@ -193,8 +195,8 @@ const styles = StyleSheet.create({
   successCard:  { backgroundColor: '#16181C', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#2F3336', marginBottom: 8 },
   successIcon:  { fontSize: 40, marginBottom: 4 },
   successTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  successSub:   { color: '#666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  successSub:   { color: '#666666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   resendBtn:  { paddingVertical: 16, alignItems: 'center' },
-  resendText: { color: '#6C47FF', fontSize: 14, fontWeight: '600' },
+  resendText: { color: BOND_PINK, fontSize: 14, fontWeight: '600' },
 });

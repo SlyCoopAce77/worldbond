@@ -15,31 +15,31 @@ const { width } = Dimensions.get('window');
 // color field is used by the GiftBurst animation in live screens.
 export const GIFTS = [
   // ── Starter — connection openers ──────────────────────────────────────────
-  { id: 'world_hello',  name: 'World Hello',      tagline: 'Open a bond',                tier: 'starter',  coins: 5,      color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
-  { id: 'bond_shake',   name: 'Bond Shake',        tagline: 'Seal the connection',        tier: 'starter',  coins: 15,     color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
-  { id: 'postcard',     name: 'Postcard',           tagline: 'Sent from your world',       tier: 'starter',  coins: 30,     color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
-  { id: 'map_pin',      name: 'Map Pin',            tagline: 'You were here',              tier: 'starter',  coins: 50,     color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
+  { id: 'world_hello',  name: 'World Hello',      tagline: 'Open a bond',                tier: 'starter',  coins: 10,     color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
+  { id: 'bond_shake',   name: 'Bond Shake',        tagline: 'Seal the connection',        tier: 'starter',  coins: 25,     color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
+  { id: 'postcard',     name: 'Postcard',           tagline: 'Sent from your world',       tier: 'starter',  coins: 50,     color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
+  { id: 'map_pin',      name: 'Map Pin',            tagline: 'You were here',              tier: 'starter',  coins: 100,    color: '#4ade80', grad: ['#1b5e20', '#2e7d32'] },
 
   // ── Explorer — travel prestige ─────────────────────────────────────────────
-  { id: 'passport',     name: 'Passport',           tagline: 'Enter their world',          tier: 'explorer', coins: 100,    color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
-  { id: 'world_map',    name: 'World Map',           tagline: 'Chart new territory',        tier: 'explorer', coins: 200,    color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
-  { id: 'first_class',  name: 'First Class',         tagline: 'Upgrade their stream',       tier: 'explorer', coins: 350,    color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
-  { id: 'globe_spin',   name: 'Globe Spin',          tagline: 'The world is watching',      tier: 'explorer', coins: 500,    color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
+  { id: 'passport',     name: 'Passport',           tagline: 'Enter their world',          tier: 'explorer', coins: 200,    color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
+  { id: 'world_map',    name: 'World Map',           tagline: 'Chart new territory',        tier: 'explorer', coins: 500,    color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
+  { id: 'first_class',  name: 'First Class',         tagline: 'Upgrade their stream',       tier: 'explorer', coins: 1000,   color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
+  { id: 'globe_spin',   name: 'Globe Spin',          tagline: 'The world is watching',      tier: 'explorer', coins: 1500,   color: '#60a5fa', grad: ['#0d47a1', '#1565c0'] },
 
   // ── Voyager — cultural ceremony ────────────────────────────────────────────
-  { id: 'heritage',     name: 'Heritage',            tagline: 'Honor their culture',        tier: 'voyager',  coins: 750,    color: '#c084fc', grad: ['#4a148c', '#6a1b9a'] },
-  { id: 'culture_crown',name: 'Culture Crown',       tagline: 'Crowned by the world',       tier: 'voyager',  coins: 1000,   color: '#c084fc', grad: ['#4a148c', '#6a1b9a'] },
-  { id: 'embassy_seal', name: 'Embassy Seal',        tagline: 'Official recognition',       tier: 'voyager',  coins: 1500,   color: '#c084fc', grad: ['#4a148c', '#6a1b9a'] },
+  { id: 'heritage',     name: 'Heritage',            tagline: 'Honor their culture',        tier: 'voyager',  coins: 2500,   color: '#c084fc', grad: ['#4a148c', '#6a1b9a'] },
+  { id: 'culture_crown',name: 'Culture Crown',       tagline: 'Crowned by the world',       tier: 'voyager',  coins: 4000,   color: '#c084fc', grad: ['#4a148c', '#6a1b9a'] },
+  { id: 'embassy_seal', name: 'Embassy Seal',        tagline: 'Official recognition',       tier: 'voyager',  coins: 6000,   color: '#c084fc', grad: ['#4a148c', '#6a1b9a'] },
 
   // ── Elite — WorldBond ceremonies ───────────────────────────────────────────
-  { id: 'bond_satellite',   name: 'Bond Satellite',   tagline: 'Connected from orbit',     tier: 'elite',    coins: 2500,   color: '#FFB700', grad: ['#0a0e2e', '#283593'] },
-  { id: 'world_ambassador', name: 'World Ambassador', tagline: 'Highest diplomatic honor',  tier: 'elite',    coins: 5000,   color: '#FFB700', grad: ['#7b4f00', '#c8860a'] },
-  { id: 'bond_atlas',       name: 'Bond Atlas',       tagline: 'Holding the whole world',   tier: 'elite',    coins: 8000,   color: '#FFB700', grad: ['#004d40', '#00897b'] },
+  { id: 'bond_satellite',   name: 'Bond Satellite',   tagline: 'Connected from orbit',     tier: 'elite',    coins: 10000,  color: '#FFB700', grad: ['#0a0e2e', '#283593'] },
+  { id: 'world_ambassador', name: 'World Ambassador', tagline: 'Highest diplomatic honor',  tier: 'elite',    coins: 20000,  color: '#FFB700', grad: ['#7b4f00', '#c8860a'] },
+  { id: 'bond_atlas',       name: 'Bond Atlas',       tagline: 'Holding the whole world',   tier: 'elite',    coins: 35000,  color: '#FFB700', grad: ['#004d40', '#00897b'] },
 
   // ── Legend — once-in-a-stream moments ─────────────────────────────────────
-  { id: 'bond_sovereign',   name: 'Bond Sovereign',   tagline: 'Crown them before the world',  tier: 'legend', coins: 15000,  color: '#FF0080', grad: ['#7f0000', '#b71c1c'] },
-  { id: 'planet_bond',      name: 'Planet Bond',      tagline: 'They have their own gravity',  tier: 'legend', coins: 30000,  color: '#FF0080', grad: ['#1a0050', '#6a1b9a'] },
-  { id: 'bond_eternal',     name: 'Bond Eternal',     tagline: 'This bond lasts forever',      tier: 'legend', coins: 100000, color: '#FF0080', grad: ['#000000', '#0d0d1f'] },
+  { id: 'bond_sovereign',   name: 'Bond Sovereign',   tagline: 'Crown them before the world',  tier: 'legend', coins: 50000,  color: '#FF0080', grad: ['#7f0000', '#b71c1c'] },
+  { id: 'planet_bond',      name: 'Planet Bond',      tagline: 'They have their own gravity',  tier: 'legend', coins: 100000, color: '#FF0080', grad: ['#1a0050', '#6a1b9a'] },
+  { id: 'bond_eternal',     name: 'Bond Eternal',     tagline: 'This bond lasts forever',      tier: 'legend', coins: 250000, color: '#FF0080', grad: ['#000000', '#0d0d1f'] },
 ];
 
 const TIERS = [
