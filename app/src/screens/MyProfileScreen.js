@@ -654,14 +654,30 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             <Text style={s.editBtnTxt}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.settingsBtn} onPress={() => navigation.navigate('Settings')}>
-            <Text style={{ fontSize: 18 }}>⚙️</Text>
+            <View style={s.slidersIcon}>
+              <View style={s.sliderRow}>
+                <View style={s.sliderTrack} />
+                <View style={s.sliderKnob} />
+                <View style={[s.sliderTrack, { flex: 0.5 }]} />
+              </View>
+              <View style={s.sliderRow}>
+                <View style={[s.sliderTrack, { flex: 0.5 }]} />
+                <View style={s.sliderKnob} />
+                <View style={s.sliderTrack} />
+              </View>
+              <View style={s.sliderRow}>
+                <View style={s.sliderTrack} />
+                <View style={s.sliderKnob} />
+                <View style={[s.sliderTrack, { flex: 0.3 }]} />
+              </View>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ── Tab bar ── */}
       <View style={s.tabBar}>
-        {[{ key: 'profile', label: '👤 Profile' }, { key: 'culture', label: '🌍 My World' }].map(t => (
+        {[{ key: 'profile', label: 'Profile' }, { key: 'culture', label: 'My World' }].map(t => (
           <TouchableOpacity key={t.key} style={[s.tab, tab === t.key && s.tabActive]} onPress={() => setTab(t.key)}>
             <Text style={[s.tabTxt, tab === t.key && s.tabTxtActive]}>{t.label}</Text>
           </TouchableOpacity>
@@ -1098,6 +1114,10 @@ const s = StyleSheet.create({
   editBtn:       { backgroundColor: BOND_PINK + '18', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: BOND_PINK + '40' },
   editBtnTxt:    { color: BOND_PINK, fontSize: 13, fontWeight: '800' },
   settingsBtn:   { width: 40, height: 40, borderRadius: 14, backgroundColor: GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  slidersIcon:   { gap: 4, width: 20 },
+  sliderRow:     { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  sliderTrack:   { flex: 1, height: 1.5, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 1 },
+  sliderKnob:    { width: 5, height: 5, borderRadius: 3, backgroundColor: '#fff' },
 
   tabBar:      { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)', marginHorizontal: 20, marginBottom: 2 },
   tab:         { flex: 1, paddingVertical: 13, alignItems: 'center' },

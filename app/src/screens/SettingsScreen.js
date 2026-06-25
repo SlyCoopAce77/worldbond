@@ -9,39 +9,50 @@ import axios from 'axios';
 import { getAccessToken, logout } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { useBondPass } from '../context/PremiumContext';
-
-const BOND_PINK = '#FF0080';
 import { useTheme } from '../context/ThemeContext';
 
+const BOND_PINK    = '#FF0080';
 const SETTINGS_KEY = 'bond_settings';
 
 const DEFAULTS = {
   showInDiscovery:   true,
-  showOnlineStatus:  true,
   readReceipts:      true,
+  autoBondApproval:  true,
   notifMatches:      true,
   notifMessages:     true,
   notifBondRequests: true,
   notifEvents:       true,
-  notifCalls:        true,
+  notifSounds:       true,
   emailDigest:       false,
   autoTranslate:     true,
   safeSearch:        true,
-  whoCanMessage:     'everyone',
+  haptics:           true,
 };
 
-function Section({ title }) {
-  const { colors } = useTheme();
-  return <Text style={[s.sectionHeader, { color: colors.textMuted }]}>{title}</Text>;
+// ─── Shared sub-components ────────────────────────────────────────────────────
+
+function Section({ title, colors }) {
+  return (
+    <Text style={[s.sectionHeader, { color: colors.textMuted }]}>{title}</Text>
+  );
 }
 
-function ToggleRow({ icon, label, sublabel, value, onToggle, disabled }) {
-  const { colors } = useTheme();
+function IconBadge({ sym, colors, danger }) {
+  return (
+    <View style={[s.rowIcon, {
+      backgroundColor: danger ? '#e5393518' : colors.accentFaint,
+    }]}>
+      <Text style={[s.rowIconSym, { color: danger ? '#e53935' : colors.accent }]}>
+        {sym}
+      </Text>
+    </View>
+  );
+}
+
+function ToggleRow({ sym, label, sublabel, value, onToggle, disabled, colors }) {
   return (
     <View style={[s.row, { borderColor: colors.border }]}>
-      <View style={[s.rowIcon, { backgroundColor: colors.accentFaint }]}>
-        <Text style={{ fontSize: 18 }}>{icon}</Text>
-      </View>
+      <IconBadge sym={sym} colors={colors} />
       <View style={{ flex: 1 }}>
         <Text style={[s.rowLabel, { color: colors.text }]}>{label}</Text>
         {sublabel ? <Text style={[s.rowSub, { color: colors.textMuted }]}>{sublabel}</Text> : null}
@@ -58,25 +69,21 @@ function ToggleRow({ icon, label, sublabel, value, onToggle, disabled }) {
   );
 }
 
-function NavRow({ icon, label, sublabel, value, onPress, danger }) {
-  const { colors } = useTheme();
+function NavRow({ sym, label, sublabel, value, onPress, danger, colors }) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.7}>
-      <View style={[s.rowIcon, { backgroundColor: danger ? '#e5393518' : colors.accentFaint }]}>
-        <Text style={{ fontSize: 18 }}>{icon}</Text>
-      </View>
+      <IconBadge sym={sym} colors={colors} danger={danger} />
       <View style={{ flex: 1 }}>
         <Text style={[s.rowLabel, { color: danger ? '#e53935' : colors.text }]}>{label}</Text>
         {sublabel ? <Text style={[s.rowSub, { color: colors.textMuted }]}>{sublabel}</Text> : null}
       </View>
-      {value ? <Text style={s.rowValue}>{value}</Text> : null}
+      {value ? <Text style={[s.rowValue, { color: colors.accent }]}>{value}</Text> : null}
       <Text style={[s.chevron, { color: danger ? '#e53935' : colors.textMuted }]}>›</Text>
     </TouchableOpacity>
   );
 }
 
-function RadioGroup({ label, options, value, onChange }) {
-  const { colors } = useTheme();
+function RadioGroup({ label, options, value, onChange, colors }) {
   return (
     <View style={s.radioGroup}>
       <Text style={[s.radioLabel, { color: colors.text }]}>{label}</Text>
@@ -84,12 +91,18 @@ function RadioGroup({ label, options, value, onChange }) {
         {options.map(opt => (
           <TouchableOpacity
             key={opt.value}
-            style={[s.radioBtn, { backgroundColor: colors.bg, borderColor: colors.border },
-              value === opt.value && { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' }]}
+            style={[
+              s.radioBtn,
+              { backgroundColor: colors.inputBg, borderColor: colors.border },
+              value === opt.value && { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' },
+            ]}
             onPress={() => onChange(opt.value)}
           >
-            <Text style={[s.radioBtnText, { color: colors.textMuted },
-              value === opt.value && { color: BOND_PINK }]}>
+            <Text style={[
+              s.radioBtnText,
+              { color: colors.textMuted },
+              value === opt.value && { color: BOND_PINK, fontWeight: '800' },
+            ]}>
               {opt.label}
             </Text>
           </TouchableOpacity>
@@ -99,24 +112,27 @@ function RadioGroup({ label, options, value, onChange }) {
   );
 }
 
-function Card({ children }) {
-  const { colors } = useTheme();
-  return <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>{children}</View>;
+function Card({ children, colors }) {
+  return (
+    <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {children}
+    </View>
+  );
 }
 
-function Divider() {
-  const { colors } = useTheme();
+function Divider({ colors }) {
   return <View style={[s.divider, { backgroundColor: colors.border }]} />;
 }
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function SettingsScreen({ navigation, onLogout }) {
   const { hasBondPass } = useBondPass();
-  const { colors, isDark, toggleTheme } = useTheme();
-  const [settings, setSettings] = useState(DEFAULTS);
-  const [saving, setSaving]     = useState(false);
-  const [profile, setProfile]   = useState(null);
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { colors }      = useTheme();
+  const [settings, setSettings]     = useState(DEFAULTS);
+  const [saving,   setSaving]       = useState(false);
+  const [profile,  setProfile]      = useState(null);
+  const fadeAnim                    = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     async function load() {
@@ -154,7 +170,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
   function confirmDelete() {
     Alert.alert(
       'Delete Account',
-      'This permanently deletes your profile, matches, messages, and all data. This cannot be undone.',
+      'This permanently deletes your profile, bonds, messages, and all data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -183,7 +199,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
   function confirmClearHistory() {
     Alert.alert(
       'Clear Chat History',
-      'This removes all your local message history. Messages on other devices are not affected.',
+      'Removes all local message history. Messages on other devices are not affected.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -213,6 +229,8 @@ export default function SettingsScreen({ navigation, onLogout }) {
 
   return (
     <SafeAreaView style={[s.container, { backgroundColor: colors.bg }]}>
+
+      {/* ── Header ── */}
       <View style={[s.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={[s.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -237,225 +255,248 @@ export default function SettingsScreen({ navigation, onLogout }) {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Appearance ───────────────────────────────────────── */}
-        <Section title="Appearance" />
-        <Card>
-          <ToggleRow
-            icon="🌙"
-            label="Dark Mode"
-            sublabel="Always on"
-            value={true}
-            onToggle={() => {}}
-          />
-        </Card>
-
-        {/* ── Account ──────────────────────────────────────────── */}
-        <Section title="Account" />
-        <Card>
+        {/* ── Account ── */}
+        <Section title="Account" colors={colors} />
+        <Card colors={colors}>
           <NavRow
-            icon="👤"
+            sym="P"
             label="Edit Profile"
-            sublabel={profile?.display_name || 'Tap to edit your profile'}
+            sublabel={profile?.display_name || 'Tap to update your profile'}
             onPress={() => navigation.navigate('Me')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="✉️"
+            sym="@"
             label="Email"
             sublabel={email}
             onPress={() => Alert.alert('Change Email', 'Email change is coming soon.')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="🔑"
+            sym="*"
             label="Change Password"
             onPress={() => navigation.navigate('ChangePassword', { email: profile?.email || '' })}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="⭐"
+            sym="S"
             label="Subscription"
             value={hasBondPass ? 'Bond Pass' : 'Free'}
             onPress={() => navigation.navigate('Subscription')}
+            colors={colors}
           />
         </Card>
 
-        {/* ── Privacy ──────────────────────────────────────────── */}
-        <Section title="Privacy" />
-        <Card>
+        {/* ── Privacy ── */}
+        <Section title="Privacy" colors={colors} />
+        <Card colors={colors}>
           <ToggleRow
-            icon="🔍"
+            sym="·"
             label="Show Me in Discovery"
-            sublabel="Others can find you on the Discover tab"
+            sublabel="Others can find you on the Connect tab"
             value={settings.showInDiscovery}
             onToggle={() => toggle('showInDiscovery')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="🟢"
-            label="Show Online Status"
-            sublabel="Let others see when you're active"
-            value={settings.showOnlineStatus}
-            onToggle={() => toggle('showOnlineStatus')}
-          />
-          <Divider />
-          <ToggleRow
-            icon="👁️"
+            sym="R"
             label="Read Receipts"
             sublabel="Show when you've read messages"
             value={settings.readReceipts}
             onToggle={() => toggle('readReceipts')}
+            colors={colors}
           />
-          <Divider />
-          <RadioGroup
-            label="Who can message me"
-            options={[
-              { value: 'everyone', label: 'Everyone' },
-              { value: 'bonds',    label: 'Bonds only' },
-              { value: 'nobody',   label: 'Nobody' },
-            ]}
-            value={settings.whoCanMessage}
-            onChange={val => setRadio('whoCanMessage', val)}
+          <Divider colors={colors} />
+          <ToggleRow
+            sym="+"
+            label="Auto-Accept Bonds"
+            sublabel="Bonds form instantly — turn off to review first"
+            value={settings.autoBondApproval}
+            onToggle={() => toggle('autoBondApproval')}
+            colors={colors}
+          />
+          <Divider colors={colors} />
+          <NavRow
+            sym="×"
+            label="Blocked Users"
+            sublabel="Manage your block list"
+            onPress={() => Alert.alert('Blocked Users', 'Block list management coming soon.')}
+            colors={colors}
           />
         </Card>
 
-        {/* ── Notifications ────────────────────────────────────── */}
-        <Section title="Notifications" />
-        <Card>
+        {/* ── Notifications ── */}
+        <Section title="Notifications" colors={colors} />
+        <Card colors={colors}>
           <ToggleRow
-            icon="✨"
+            sym="B"
             label="New Bonds"
             sublabel="When someone bonds with you"
             value={settings.notifMatches}
             onToggle={() => toggle('notifMatches')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="💬"
+            sym="→"
             label="Messages"
             sublabel="New direct messages"
             value={settings.notifMessages}
             onToggle={() => toggle('notifMessages')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="🤝"
+            sym="+"
             label="Bond Requests"
             sublabel="When someone wants to connect"
             value={settings.notifBondRequests}
             onToggle={() => toggle('notifBondRequests')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="🎉"
+            sym="E"
             label="Events Nearby"
             sublabel="New events matching your interests"
             value={settings.notifEvents}
             onToggle={() => toggle('notifEvents')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="📞"
-            label="Incoming Calls"
-            value={settings.notifCalls}
-            onToggle={() => toggle('notifCalls')}
+            sym="♪"
+            label="Notification Sounds"
+            sublabel="Play sounds for incoming alerts"
+            value={settings.notifSounds}
+            onToggle={() => toggle('notifSounds')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="📧"
+            sym="@"
             label="Weekly Email Digest"
-            sublabel="Summary of your activity"
+            sublabel="Summary of your weekly activity"
             value={settings.emailDigest}
             onToggle={() => toggle('emailDigest')}
+            colors={colors}
           />
         </Card>
 
-        {/* ── Discovery ────────────────────────────────────────── */}
-        <Section title="Discovery & Chat" />
-        <Card>
+        {/* ── Accessibility ── */}
+        <Section title="Accessibility" colors={colors} />
+        <Card colors={colors}>
           <ToggleRow
-            icon="🌐"
+            sym="~"
+            label="Haptic Feedback"
+            sublabel="Vibration on taps and interactions"
+            value={settings.haptics}
+            onToggle={() => toggle('haptics')}
+            colors={colors}
+          />
+        </Card>
+
+        {/* ── Discovery & Chat ── */}
+        <Section title="Discovery & Chat" colors={colors} />
+        <Card colors={colors}>
+          <ToggleRow
+            sym="T"
             label="Auto-Translate Messages"
             sublabel="Translate incoming messages to your language"
             value={settings.autoTranslate}
             onToggle={() => toggle('autoTranslate')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <ToggleRow
-            icon="🛡️"
+            sym="S"
             label="Safe Search"
             sublabel="Filter inappropriate content"
             value={settings.safeSearch}
             onToggle={() => toggle('safeSearch')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="🚫"
+            sym="×"
             label="Blocked Users"
             sublabel="Manage your block list"
             onPress={() => Alert.alert('Blocked Users', 'Block list management coming soon.')}
+            colors={colors}
           />
         </Card>
 
-        {/* ── Support ──────────────────────────────────────────── */}
-        <Section title="Support" />
-        <Card>
+        {/* ── Support ── */}
+        <Section title="Support" colors={colors} />
+        <Card colors={colors}>
           <NavRow
-            icon="❓"
+            sym="?"
             label="Help Center"
             onPress={() => Linking.openURL('mailto:support@bond.app?subject=Help')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="🐛"
+            sym="!"
             label="Report a Bug"
             onPress={() => Linking.openURL('mailto:support@bond.app?subject=Bug Report')}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="📄"
+            sym="T"
             label="Terms of Service"
             onPress={() => navigation.navigate('Legal', { type: 'terms' })}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="🔒"
+            sym="P"
             label="Privacy Policy"
             onPress={() => navigation.navigate('Legal', { type: 'privacy' })}
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="ℹ️"
+            sym="v"
             label="App Version"
             value="1.0.0"
             onPress={() => {}}
+            colors={colors}
           />
         </Card>
 
-        {/* ── Danger zone ──────────────────────────────────────── */}
-        <Section title="Danger Zone" />
-        <Card>
+        {/* ── Danger Zone ── */}
+        <Section title="Danger Zone" colors={colors} />
+        <Card colors={colors}>
           <NavRow
-            icon="🗑️"
+            sym="C"
             label="Clear Chat History"
             sublabel="Remove local message data"
             onPress={confirmClearHistory}
             danger
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="🚪"
+            sym="→"
             label="Sign Out"
             onPress={handleLogout}
             danger
+            colors={colors}
           />
-          <Divider />
+          <Divider colors={colors} />
           <NavRow
-            icon="⚠️"
+            sym="!"
             label="Delete Account"
             sublabel="Permanently remove all your data"
             onPress={confirmDelete}
             danger
+            colors={colors}
           />
         </Card>
 
@@ -465,28 +506,38 @@ export default function SettingsScreen({ navigation, onLogout }) {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container:    { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1 },
-  backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1 },
+
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                  paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1 },
+  backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 12, borderWidth: 1 },
   backIcon:     { fontSize: 26, lineHeight: 30 },
   headerTitle:  { fontSize: 20, fontWeight: '900' },
 
-  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: BOND_PINK + '15', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BOND_PINK + '30' },
+  savingBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  backgroundColor: BOND_PINK + '15', paddingVertical: 8,
+                  borderBottomWidth: 1, borderBottomColor: BOND_PINK + '30' },
   savingText:   { color: BOND_PINK, fontSize: 13, fontWeight: '600' },
 
   scroll:       { paddingHorizontal: 16, paddingTop: 8, gap: 8 },
 
-  sectionHeader:{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 16, marginBottom: 6, marginLeft: 4 },
+  sectionHeader:{ fontSize: 11, fontWeight: '800', textTransform: 'uppercase',
+                  letterSpacing: 1.2, marginTop: 16, marginBottom: 6, marginLeft: 4 },
 
   card:         { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
   divider:      { height: 1, marginHorizontal: 16 },
 
-  row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 14 },
-  rowIcon:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  row:          { flexDirection: 'row', alignItems: 'center',
+                  paddingHorizontal: 16, paddingVertical: 14, gap: 14 },
+  rowIcon:      { width: 36, height: 36, borderRadius: 10,
+                  alignItems: 'center', justifyContent: 'center' },
+  rowIconSym:   { fontSize: 14, fontWeight: '900' },
   rowLabel:     { fontSize: 15, fontWeight: '600' },
-  rowSub:       { fontSize: 12, marginTop: 2 },
-  rowValue:     { color: BOND_PINK, fontSize: 13, fontWeight: '700' },
+  rowSub:       { fontSize: 12, marginTop: 2, lineHeight: 17 },
+  rowValue:     { fontSize: 13, fontWeight: '700' },
   chevron:      { fontSize: 22, fontWeight: '300' },
 
   radioGroup:   { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },

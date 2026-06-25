@@ -190,13 +190,13 @@ function IcebreakerTab({ user, navigation }) {
         <View style={tab.questionTop}>
           <View style={tab.questionBadge}>
             <View style={tab.questionDot} />
-            <Text style={tab.questionBadgeText}>🔥 Daily Question</Text>
+            <Text style={tab.questionBadgeText}>Daily Question</Text>
           </View>
-          <Text style={tab.responseCount}>{responses.length} answered 🌍</Text>
+          <Text style={tab.responseCount}>{responses.length} answered</Text>
         </View>
         <Text style={tab.questionText}>"{question || 'Loading today\'s question…'}"</Text>
         <View style={tab.questionFooter}>
-          <Text style={tab.questionFooterTxt}>🕛 New question drops at midnight UTC</Text>
+          <Text style={tab.questionFooterTxt}>New question drops at midnight UTC</Text>
         </View>
       </LinearGradient>
 
@@ -221,7 +221,7 @@ function IcebreakerTab({ user, navigation }) {
               activeOpacity={0.85}
             >
               <LinearGradient colors={[BOND_PINK, '#CC0060']} style={tab.submitGrad}>
-                <Text style={tab.submitText}>Share with the World 🌍</Text>
+                <Text style={tab.submitText}>Share with the World</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1038,7 +1038,7 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
           <Text style={pv.nextTxt}>Next  →</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[pv.bondBtn, { shadowColor: sig.avatarColor }]} onPress={onBond} activeOpacity={0.85}>
-          <Text style={pv.bondTxt}>🌐  Bond</Text>
+          <Text style={pv.bondTxt}>Bond</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -1516,7 +1516,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           <Text style={fp2.nextTxt}>Next  →</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[fp2.bondBtn, { shadowColor: sig.avatarColor }]} onPress={doConnect} activeOpacity={0.82}>
-          <Text style={fp2.bondTxt}>🌐  Bond</Text>
+          <Text style={fp2.bondTxt}>Bond</Text>
         </TouchableOpacity>
       </View>}
 
@@ -1812,13 +1812,13 @@ const fp2 = StyleSheet.create({
 
   // World Footprint Trail — the hero unique element
   trailWrap:    { alignSelf: 'stretch', marginTop: 18, marginBottom: 4 },
-  trailLabel:   { color: '#555', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 },
+  trailLabel:   { color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 14 },
   trail:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  trailNode:    { width: 52, height: 52, borderRadius: 26, backgroundColor: '#111318', borderWidth: 1, borderColor: '#1e2028', alignItems: 'center', justifyContent: 'center' },
+  trailNode:    { width: 52, height: 52, borderRadius: 26, backgroundColor: '#161820', borderWidth: 1.5, borderColor: '#353744', alignItems: 'center', justifyContent: 'center' },
   trailFlag:    { fontSize: 26 },
   trailConnector:{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 4 },
-  trailDot:     { width: 3, height: 3, borderRadius: 2, backgroundColor: '#2a2c34' },
-  trailLine:    { width: 16, height: 1, backgroundColor: '#1e2028' },
+  trailDot:     { width: 4, height: 4, borderRadius: 2, backgroundColor: '#444655' },
+  trailLine:    { width: 16, height: 1.5, backgroundColor: '#353744' },
 
   tagline:      { color: '#777', fontSize: 14, fontStyle: 'italic', textAlign: 'center', lineHeight: 22, marginTop: 8, paddingHorizontal: 20 },
   profileHint:  { marginTop: 10, paddingVertical: 6, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#2a2c3a' },
@@ -1905,27 +1905,27 @@ const pv = StyleSheet.create({
 
   // Sections
   section:     { paddingHorizontal: 20, marginTop: 24 },
-  sectionLabel:{ color: '#2a2c34', fontSize: 9, fontWeight: '900', letterSpacing: 1.8, marginBottom: 12 },
-  bioTxt:      { color: '#888', fontSize: 15, lineHeight: 24 },
+  sectionLabel:{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '900', letterSpacing: 1.8, marginBottom: 12 },
+  bioTxt:      { color: 'rgba(255,255,255,0.6)', fontSize: 15, lineHeight: 24 },
 
   taglineBox:  { marginHorizontal: 20, marginTop: 20, padding: 18, backgroundColor: '#0a0b10',
-                 borderRadius: 18, borderWidth: 1, borderColor: '#1a1b22' },
-  taglineTxt:  { color: '#444', fontSize: 15, fontStyle: 'italic', lineHeight: 24, textAlign: 'center' },
+                 borderRadius: 18, borderWidth: 1, borderColor: '#252730' },
+  taglineTxt:  { color: 'rgba(255,255,255,0.5)', fontSize: 15, fontStyle: 'italic', lineHeight: 24, textAlign: 'center' },
 
   // Interests
   tagsRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag:         { backgroundColor: '#111318', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
-                 borderWidth: 1, borderColor: '#1e2028' },
-  tagTxt:      { color: '#666', fontSize: 13, fontWeight: '700' },
+                 borderWidth: 1, borderColor: '#2a2c3a' },
+  tagTxt:      { color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: '700' },
 
   // World Footprint
   trail:       { flexDirection: 'row', alignItems: 'center' },
-  trailNode:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#111318',
-                 borderWidth: 1, borderColor: '#1e2028', alignItems: 'center', justifyContent: 'center' },
+  trailNode:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#161820',
+                 borderWidth: 1.5, borderColor: '#353744', alignItems: 'center', justifyContent: 'center' },
   trailFlag:   { fontSize: 28 },
   trailConnector: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 5 },
-  trailDot:    { width: 3, height: 3, borderRadius: 2, backgroundColor: '#2a2c34' },
-  trailLine:   { width: 18, height: 1, backgroundColor: '#1e2028' },
+  trailDot:    { width: 4, height: 4, borderRadius: 2, backgroundColor: '#444655' },
+  trailLine:   { width: 18, height: 1.5, backgroundColor: '#353744' },
 
   // Action buttons
   actions:     { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12,
