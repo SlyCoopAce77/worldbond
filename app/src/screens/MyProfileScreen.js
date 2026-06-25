@@ -16,25 +16,8 @@ import { SERVER_URL } from '../services/socket';
 import { useTheme } from '../context/ThemeContext';
 import { getCountryFlag } from '../utils/countryUtils';
 import { stringToColor } from '../utils/apiUtils';
-import { CONNECTION_TYPES } from '../utils/constants';
-
 const { width } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
-
-const LANGUAGES = [
-  { code: 'en', flag: '🇺🇸', label: 'English'    },
-  { code: 'ja', flag: '🇯🇵', label: 'Japanese'   },
-  { code: 'es', flag: '🇪🇸', label: 'Spanish'    },
-  { code: 'ko', flag: '🇰🇷', label: 'Korean'     },
-  { code: 'zh', flag: '🇨🇳', label: 'Chinese'    },
-  { code: 'fr', flag: '🇫🇷', label: 'French'     },
-  { code: 'de', flag: '🇩🇪', label: 'German'     },
-  { code: 'pt', flag: '🇧🇷', label: 'Portuguese' },
-  { code: 'th', flag: '🇹🇭', label: 'Thai'       },
-  { code: 'ar', flag: '🇸🇦', label: 'Arabic'     },
-  { code: 'hi', flag: '🇮🇳', label: 'Hindi'      },
-  { code: 'id', flag: '🇮🇩', label: 'Indonesian' },
-];
 
 const STREAM_REGIONS = [
   { id: 'all',      label: 'All'          },
@@ -209,23 +192,12 @@ function EditModal({ visible, profile, onSave, onClose }) {
         age:              profile.age ? String(profile.age) : '',
         city:             profile.city || '',
         tagline:          profile.tagline || '',
-        language:         profile.language || 'en',
         bond_style:       profile.bond_style || '',
         vibe_tags:        profile.vibe_tags || [],
-        connection_types: profile.connection_types || [],
         interests:        profile.interests || [],
       });
     }
   }, [profile, visible]);
-
-  function toggleType(key) {
-    setForm(f => ({
-      ...f,
-      connection_types: f.connection_types.includes(key)
-        ? f.connection_types.filter(k => k !== key)
-        : [...f.connection_types, key],
-    }));
-  }
 
   function toggleVibe(tag) {
     setForm(f => {
@@ -261,7 +233,6 @@ function EditModal({ visible, profile, onSave, onClose }) {
     form.tagline?.trim(),
     form.bond_style,
     (form.vibe_tags || []).length > 0,
-    (form.connection_types || []).length > 0,
     (form.interests || []).length > 0,
   ];
   const formPct = Math.round(completionChecks.filter(Boolean).length / completionChecks.length * 100);
@@ -347,23 +318,6 @@ function EditModal({ visible, profile, onSave, onClose }) {
               <Text style={em.charCount}>{(form.tagline || '').length}/50</Text>
             </View>
 
-            {/* Language */}
-            <View style={em.group}>
-              <Text style={em.label}>Language</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                {LANGUAGES.map(l => (
-                  <TouchableOpacity
-                    key={l.code}
-                    style={[em.chip, form.language === l.code && em.chipOn]}
-                    onPress={() => setForm(f => ({ ...f, language: l.code }))}
-                  >
-                    <Text>{l.flag}</Text>
-                    <Text style={[em.chipText, form.language === l.code && { color: BOND_PINK, fontWeight: '700' }]}>{l.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
             {/* Bond Style */}
             <View style={em.group}>
               <View style={em.labelRow}>
@@ -411,27 +365,6 @@ function EditModal({ visible, profile, onSave, onClose }) {
                       activeOpacity={0.8}
                     >
                       <Text style={[em.chipText, on && { color: BOND_PINK, fontWeight: '700' }]}>{tag}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            {/* Here For */}
-            <View style={em.group}>
-              <Text style={em.label}>Here For</Text>
-              <View style={em.ctGrid}>
-                {CONNECTION_TYPES.map(ct => {
-                  const on = form.connection_types?.includes(ct.key);
-                  return (
-                    <TouchableOpacity
-                      key={ct.key}
-                      style={[em.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]}
-                      onPress={() => toggleType(ct.key)}
-                    >
-                      <Text style={{ fontSize: 18 }}>{ct.emoji}</Text>
-                      <Text style={[em.ctLabel, on && { color: ct.color }]}>{ct.label}</Text>
-                      {on && <Text style={{ fontSize: 11, fontWeight: '800', color: ct.color, marginLeft: 'auto' }}>✓</Text>}
                     </TouchableOpacity>
                   );
                 })}
@@ -500,9 +433,6 @@ const em = StyleSheet.create({
   radioOuter:    { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: '#555', alignItems: 'center', justifyContent: 'center' },
   radioOuterOn:  { borderColor: BOND_PINK },
   radioDot:      { width: 9, height: 9, borderRadius: 5, backgroundColor: BOND_PINK },
-  ctGrid:        { gap: 10 },
-  ctCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2a2a2a' },
-  ctLabel:       { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '700' },
 });
 
 // ─── ImpressionCard ───────────────────────────────────────────────────────────
