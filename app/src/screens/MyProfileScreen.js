@@ -209,7 +209,6 @@ function EditModal({ visible, profile, onSave, onClose }) {
         age:              profile.age ? String(profile.age) : '',
         city:             profile.city || '',
         tagline:          profile.tagline || '',
-        bio:              profile.bio || '',
         language:         profile.language || 'en',
         bond_style:       profile.bond_style || '',
         vibe_tags:        profile.vibe_tags || [],
@@ -260,7 +259,6 @@ function EditModal({ visible, profile, onSave, onClose }) {
     form.age,
     form.city?.trim(),
     form.tagline?.trim(),
-    form.bio?.trim(),
     form.bond_style,
     (form.vibe_tags || []).length > 0,
     (form.connection_types || []).length > 0,
@@ -347,25 +345,6 @@ function EditModal({ visible, profile, onSave, onClose }) {
                 maxLength={50}
               />
               <Text style={em.charCount}>{(form.tagline || '').length}/50</Text>
-            </View>
-
-            {/* Bio */}
-            <View style={em.group}>
-              <View style={em.labelRow}>
-                <Text style={em.label}>Bio</Text>
-                <Text style={em.sublabel}>(optional)</Text>
-              </View>
-              <TextInput
-                style={[em.input, { minHeight: 90 }]}
-                value={form.bio}
-                onChangeText={t => setForm(f => ({ ...f, bio: t }))}
-                placeholder="What makes you interesting?"
-                placeholderTextColor="rgba(255,255,255,0.2)"
-                multiline
-                maxLength={200}
-                textAlignVertical="top"
-              />
-              <Text style={em.charCount}>{(form.bio || '').length}/200</Text>
             </View>
 
             {/* Language */}
@@ -595,6 +574,50 @@ const ie = StyleSheet.create({
   saveTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
 
+// ─── BioEditModal ─────────────────────────────────────────────────────────────
+function BioEditModal({ visible, currentBio, onSave, onClose }) {
+  const [text, setText] = useState('');
+  useEffect(() => { if (visible) setText(currentBio || ''); }, [visible, currentBio]);
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
+        <View style={be.sheet}>
+          <View style={be.handle} />
+          <Text style={be.title}>Bio</Text>
+          <TextInput
+            style={be.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="What makes you interesting?"
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            multiline
+            maxLength={200}
+            autoFocus
+            textAlignVertical="top"
+          />
+          <Text style={be.count}>{text.length}/200</Text>
+          <TouchableOpacity
+            style={be.saveBtn}
+            onPress={() => { onSave(text.trim()); onClose(); }}
+          >
+            <Text style={be.saveTxt}>Save</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+const be = StyleSheet.create({
+  sheet:   { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14, paddingBottom: 40 },
+  handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  title:   { color: '#fff', fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  input:   { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 110, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2a2a2a', lineHeight: 23 },
+  count:   { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'right' },
+  saveBtn: { backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  saveTxt: { color: '#fff', fontSize: 16, fontWeight: '800' },
+});
+
 // ─── PassportSection ──────────────────────────────────────────────────────────
 function PassportSection({ bondCount, countries, onViewAll }) {
   const flags = countries.slice(0, 8);
@@ -710,6 +733,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const [filterOpen,   setFilterOpen]  = useState(null);
   const [impressions,     setImpressions]     = useState({ give: '', draw: '', moment: '' });
   const [editingImp,      setEditingImp]      = useState(null);
+  const [showBioEdit,     setShowBioEdit]     = useState(false);
 
   const fadeAnim  = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -967,7 +991,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           </View>
 
           {/* ── Bio ── */}
-          <TouchableOpacity style={s.bioWrap} onPress={() => setShowEdit(true)} activeOpacity={0.7}>
+          <TouchableOpacity style={s.bioWrap} onPress={() => setShowBioEdit(true)} activeOpacity={0.7}>
             {profile?.bio
               ? <Text style={s.bioText}>{profile.bio}</Text>
               : <Text style={s.bioPlaceholder}>Add a bio</Text>}
@@ -1310,6 +1334,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       })()}
 
       <EditModal visible={showEdit} profile={profile} onSave={saveProfile} onClose={() => setShowEdit(false)} />
+
+      <BioEditModal
+        visible={showBioEdit}
+        currentBio={profile?.bio}
+        onSave={bio => saveProfile({ bio })}
+        onClose={() => setShowBioEdit(false)}
+      />
 
       <ImpressionEditModal
         visible={!!editingImp}
