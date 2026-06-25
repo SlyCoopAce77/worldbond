@@ -81,11 +81,40 @@ const UNLOCK_GATES = [
   { threshold: 10, label: 'Leaderboard', icon: '🏆' },
 ];
 
+const VIBE_TAGS = [
+  'Deep Talks', 'Travel Plans', 'Language Swap', 'Night Owl',
+  'Music Heads', 'Daily Bond', 'Foodie', 'Creator',
+  'Adventure', 'Book Club', 'Gamer', 'Fitness',
+];
+
+const BOND_STYLES = [
+  { key: 'open_book',   label: 'Open Book',    desc: 'You share freely and love transparency' },
+  { key: 'observer',    label: 'Observer',      desc: 'You listen first, then open up slowly' },
+  { key: 'hype_person', label: 'Hype Person',   desc: 'You bring energy and lift everyone up' },
+  { key: 'philosopher', label: 'Philosopher',   desc: 'You go deep on ideas and big questions' },
+  { key: 'adventurer',  label: 'Adventurer',    desc: 'You push for new experiences constantly' },
+];
+
+const INTERESTS = [
+  'Sports', 'Tech', 'Art', 'Music', 'Food', 'Travel',
+  'Gaming', 'Fitness', 'Fashion', 'Anime', 'Film', 'Science',
+  'Business', 'Politics', 'Spirituality', 'Nature',
+];
+
 function completionPct(profile) {
-  const fields = ['photo_url', 'voice_note_url', 'bio', 'age', 'city'];
-  const filled = fields.filter(f => profile?.[f]).length;
-  const hasTypes = (profile?.connection_types || []).length > 0;
-  return Math.round(((filled + (hasTypes ? 1 : 0)) / (fields.length + 1)) * 100);
+  const checks = [
+    profile?.photo_url,
+    profile?.voice_note_url,
+    profile?.bio,
+    profile?.age,
+    profile?.city,
+    profile?.tagline,
+    profile?.bond_style,
+    (profile?.connection_types || []).length > 0,
+    (profile?.vibe_tags || []).length > 0,
+    (profile?.interests || []).length > 0,
+  ];
+  return Math.round(checks.filter(Boolean).length / checks.length * 100);
 }
 
 // ─── VoiceNotePlayer ──────────────────────────────────────────────────────────
@@ -179,9 +208,13 @@ function EditModal({ visible, profile, onSave, onClose }) {
         display_name:     profile.display_name || '',
         age:              profile.age ? String(profile.age) : '',
         city:             profile.city || '',
+        tagline:          profile.tagline || '',
         bio:              profile.bio || '',
         language:         profile.language || 'en',
+        bond_style:       profile.bond_style || '',
+        vibe_tags:        profile.vibe_tags || [],
         connection_types: profile.connection_types || [],
+        interests:        profile.interests || [],
       });
     }
   }, [profile, visible]);
@@ -195,6 +228,22 @@ function EditModal({ visible, profile, onSave, onClose }) {
     }));
   }
 
+  function toggleVibe(tag) {
+    setForm(f => {
+      const cur = f.vibe_tags || [];
+      if (cur.includes(tag)) return { ...f, vibe_tags: cur.filter(t => t !== tag) };
+      if (cur.length >= 5) return f;
+      return { ...f, vibe_tags: [...cur, tag] };
+    });
+  }
+
+  function toggleInterest(tag) {
+    setForm(f => {
+      const cur = f.interests || [];
+      return { ...f, interests: cur.includes(tag) ? cur.filter(t => t !== tag) : [...cur, tag] };
+    });
+  }
+
   async function save() {
     if (!form.display_name?.trim()) return Alert.alert('Required', 'Display name cannot be empty');
     setSaving(true);
@@ -206,9 +255,24 @@ function EditModal({ visible, profile, onSave, onClose }) {
     } finally { setSaving(false); }
   }
 
+  const completionChecks = [
+    form.display_name?.trim(),
+    form.age,
+    form.city?.trim(),
+    form.tagline?.trim(),
+    form.bio?.trim(),
+    form.bond_style,
+    (form.vibe_tags || []).length > 0,
+    (form.connection_types || []).length > 0,
+    (form.interests || []).length > 0,
+  ];
+  const formPct = Math.round(completionChecks.filter(Boolean).length / completionChecks.length * 100);
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={em.container}>
+
+        {/* Header */}
         <View style={em.header}>
           <TouchableOpacity onPress={onClose}><Text style={em.cancel}>Cancel</Text></TouchableOpacity>
           <Text style={em.title}>Edit Profile</Text>
@@ -216,45 +280,176 @@ function EditModal({ visible, profile, onSave, onClose }) {
             {saving ? <ActivityIndicator color={BOND_PINK} /> : <Text style={em.save}>Save</Text>}
           </TouchableOpacity>
         </View>
+
+        {/* Profile strength bar */}
+        <View style={em.strengthWrap}>
+          <View style={em.strengthRow}>
+            <Text style={em.strengthLabel}>Profile strength</Text>
+            <Text style={em.strengthPct}>{formPct}%</Text>
+          </View>
+          <View style={em.strengthTrack}>
+            <View style={[em.strengthFill, { width: `${formPct}%` }]} />
+          </View>
+        </View>
+
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={em.body} showsVerticalScrollIndicator={false}>
+
+            {/* Display Name */}
             <View style={em.group}>
               <Text style={em.label}>Display Name</Text>
-              <TextInput style={em.input} value={form.display_name} onChangeText={t => setForm(f => ({ ...f, display_name: t }))} maxLength={30} placeholderTextColor="#555" />
+              <TextInput
+                style={em.input}
+                value={form.display_name}
+                onChangeText={t => setForm(f => ({ ...f, display_name: t }))}
+                maxLength={30}
+                placeholderTextColor="rgba(255,255,255,0.2)"
+              />
             </View>
+
+            {/* Age + City */}
             <View style={em.row}>
               <View style={[em.group, { flex: 1 }]}>
                 <Text style={em.label}>Age</Text>
-                <TextInput style={em.input} value={form.age} onChangeText={t => setForm(f => ({ ...f, age: t }))} keyboardType="number-pad" maxLength={3} placeholderTextColor="#555" />
+                <TextInput
+                  style={em.input}
+                  value={form.age}
+                  onChangeText={t => setForm(f => ({ ...f, age: t }))}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  placeholderTextColor="rgba(255,255,255,0.2)"
+                />
               </View>
               <View style={[em.group, { flex: 2 }]}>
                 <Text style={em.label}>City</Text>
-                <TextInput style={em.input} value={form.city} onChangeText={t => setForm(f => ({ ...f, city: t }))} placeholder="Your city" placeholderTextColor="#555" />
+                <TextInput
+                  style={em.input}
+                  value={form.city}
+                  onChangeText={t => setForm(f => ({ ...f, city: t }))}
+                  placeholder="Your city"
+                  placeholderTextColor="rgba(255,255,255,0.2)"
+                />
               </View>
             </View>
+
+            {/* Tagline */}
             <View style={em.group}>
-              <Text style={em.label}>Bio <Text style={{ color: '#555', fontWeight: '400' }}>(optional)</Text></Text>
-              <TextInput style={[em.input, { minHeight: 90 }]} value={form.bio} onChangeText={t => setForm(f => ({ ...f, bio: t }))} placeholder="What makes you interesting?" placeholderTextColor="#555" multiline maxLength={200} textAlignVertical="top" />
-              <Text style={{ color: '#555', fontSize: 11, textAlign: 'right' }}>{(form.bio || '').length}/200</Text>
+              <View style={em.labelRow}>
+                <Text style={em.label}>Tagline</Text>
+                <Text style={em.sublabel}>One punchy line — shows everywhere your name does</Text>
+              </View>
+              <TextInput
+                style={em.input}
+                value={form.tagline}
+                onChangeText={t => setForm(f => ({ ...f, tagline: t }))}
+                placeholder="e.g. Deep talks at 2am preferred"
+                placeholderTextColor="rgba(255,255,255,0.2)"
+                maxLength={50}
+              />
+              <Text style={em.charCount}>{(form.tagline || '').length}/50</Text>
             </View>
+
+            {/* Bio */}
+            <View style={em.group}>
+              <View style={em.labelRow}>
+                <Text style={em.label}>Bio</Text>
+                <Text style={em.sublabel}>(optional)</Text>
+              </View>
+              <TextInput
+                style={[em.input, { minHeight: 90 }]}
+                value={form.bio}
+                onChangeText={t => setForm(f => ({ ...f, bio: t }))}
+                placeholder="What makes you interesting?"
+                placeholderTextColor="rgba(255,255,255,0.2)"
+                multiline
+                maxLength={200}
+                textAlignVertical="top"
+              />
+              <Text style={em.charCount}>{(form.bio || '').length}/200</Text>
+            </View>
+
+            {/* Language */}
             <View style={em.group}>
               <Text style={em.label}>Language</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {LANGUAGES.map(l => (
-                  <TouchableOpacity key={l.code} style={[em.chip, form.language === l.code && em.chipOn]} onPress={() => setForm(f => ({ ...f, language: l.code }))}>
+                  <TouchableOpacity
+                    key={l.code}
+                    style={[em.chip, form.language === l.code && em.chipOn]}
+                    onPress={() => setForm(f => ({ ...f, language: l.code }))}
+                  >
                     <Text>{l.flag}</Text>
                     <Text style={[em.chipText, form.language === l.code && { color: BOND_PINK, fontWeight: '700' }]}>{l.label}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
+
+            {/* Bond Style */}
+            <View style={em.group}>
+              <View style={em.labelRow}>
+                <Text style={em.label}>Bond Style</Text>
+                <Text style={em.sublabel}>How you naturally connect</Text>
+              </View>
+              <View style={em.styleGrid}>
+                {BOND_STYLES.map(bs => {
+                  const on = form.bond_style === bs.key;
+                  return (
+                    <TouchableOpacity
+                      key={bs.key}
+                      style={[em.styleCard, on && em.styleCardOn]}
+                      onPress={() => setForm(f => ({ ...f, bond_style: bs.key }))}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[em.styleLabel, on && { color: BOND_PINK }]}>{bs.label}</Text>
+                        <Text style={em.styleDesc}>{bs.desc}</Text>
+                      </View>
+                      <View style={[em.radioOuter, on && em.radioOuterOn]}>
+                        {on && <View style={em.radioDot} />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Vibe Tags */}
+            <View style={em.group}>
+              <View style={em.labelRow}>
+                <Text style={em.label}>Vibe Tags</Text>
+                <Text style={em.sublabel}>Pick up to 5 · {(form.vibe_tags || []).length}/5 selected</Text>
+              </View>
+              <View style={em.chipWrap}>
+                {VIBE_TAGS.map(tag => {
+                  const on    = (form.vibe_tags || []).includes(tag);
+                  const maxed = (form.vibe_tags || []).length >= 5 && !on;
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[em.chip, on && em.chipOn, maxed && em.chipDim]}
+                      onPress={() => toggleVibe(tag)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[em.chipText, on && { color: BOND_PINK, fontWeight: '700' }]}>{tag}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Here For */}
             <View style={em.group}>
               <Text style={em.label}>Here For</Text>
               <View style={em.ctGrid}>
                 {CONNECTION_TYPES.map(ct => {
                   const on = form.connection_types?.includes(ct.key);
                   return (
-                    <TouchableOpacity key={ct.key} style={[em.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]} onPress={() => toggleType(ct.key)}>
+                    <TouchableOpacity
+                      key={ct.key}
+                      style={[em.ctCard, on && { borderColor: ct.color, backgroundColor: ct.color + '15' }]}
+                      onPress={() => toggleType(ct.key)}
+                    >
                       <Text style={{ fontSize: 18 }}>{ct.emoji}</Text>
                       <Text style={[em.ctLabel, on && { color: ct.color }]}>{ct.label}</Text>
                       {on && <Text style={{ fontSize: 11, fontWeight: '800', color: ct.color, marginLeft: 'auto' }}>✓</Text>}
@@ -263,6 +458,30 @@ function EditModal({ visible, profile, onSave, onClose }) {
                 })}
               </View>
             </View>
+
+            {/* Interests */}
+            <View style={em.group}>
+              <View style={em.labelRow}>
+                <Text style={em.label}>Interests</Text>
+                <Text style={em.sublabel}>Shown under your bio · feeds Discovery</Text>
+              </View>
+              <View style={em.chipWrap}>
+                {INTERESTS.map(tag => {
+                  const on = (form.interests || []).includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[em.chip, on && em.chipOn]}
+                      onPress={() => toggleInterest(tag)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[em.chipText, on && { color: BOND_PINK, fontWeight: '700' }]}>{tag}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -270,22 +489,41 @@ function EditModal({ visible, profile, onSave, onClose }) {
   );
 }
 const em = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#2F3336' },
-  cancel:    { color: '#555', fontSize: 16, fontWeight: '600' },
-  title:     { color: '#fff', fontSize: 18, fontWeight: '900' },
-  save:      { color: BOND_PINK, fontSize: 16, fontWeight: '800' },
-  body:      { padding: 20, gap: 22, paddingBottom: 60 },
-  row:       { flexDirection: 'row', gap: 12 },
-  group:     { gap: 8 },
-  label:     { color: '#555', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
-  input:     { backgroundColor: '#16181C', color: '#fff', fontSize: 15, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2F3336' },
-  chip:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  chipOn:    { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' },
-  chipText:  { color: '#666', fontSize: 13, fontWeight: '600' },
-  ctGrid:    { gap: 10 },
-  ctCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336' },
-  ctLabel:   { color: '#666', fontSize: 14, fontWeight: '700' },
+  container:     { flex: 1, backgroundColor: '#000' },
+  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#1e1e1e' },
+  cancel:        { color: 'rgba(255,255,255,0.4)', fontSize: 16, fontWeight: '600' },
+  title:         { color: '#fff', fontSize: 18, fontWeight: '900' },
+  save:          { color: BOND_PINK, fontSize: 16, fontWeight: '800' },
+  strengthWrap:  { paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1e1e1e', gap: 6 },
+  strengthRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  strengthLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  strengthPct:   { color: BOND_PINK, fontSize: 11, fontWeight: '800' },
+  strengthTrack: { height: 3, backgroundColor: '#1e1e1e', borderRadius: 2, overflow: 'hidden' },
+  strengthFill:  { height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
+  body:          { padding: 20, gap: 24, paddingBottom: 60 },
+  row:           { flexDirection: 'row', gap: 12 },
+  group:         { gap: 8 },
+  labelRow:      { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  label:         { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  sublabel:      { color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '500' },
+  charCount:     { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'right' },
+  input:         { backgroundColor: '#16181C', color: '#fff', fontSize: 15, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#2a2a2a' },
+  chipWrap:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:          { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2a2a2a' },
+  chipOn:        { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' },
+  chipDim:       { opacity: 0.35 },
+  chipText:      { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '600' },
+  styleGrid:     { gap: 8 },
+  styleCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2a2a2a' },
+  styleCardOn:   { borderColor: BOND_PINK + '60', backgroundColor: BOND_PINK + '10' },
+  styleLabel:    { color: '#fff', fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  styleDesc:     { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '500' },
+  radioOuter:    { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: '#555', alignItems: 'center', justifyContent: 'center' },
+  radioOuterOn:  { borderColor: BOND_PINK },
+  radioDot:      { width: 9, height: 9, borderRadius: 5, backgroundColor: BOND_PINK },
+  ctGrid:        { gap: 10 },
+  ctCard:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2a2a2a' },
+  ctLabel:       { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '700' },
 });
 
 // ─── ImpressionCard ───────────────────────────────────────────────────────────
@@ -860,13 +1098,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
           {/* ── Bond Wallet ── */}
           <View style={s.section}>
-            <Text style={s.sectionLabel}>🪙 Bond Wallet</Text>
+            <Text style={s.sectionLabel}>Bond Wallet</Text>
             <TouchableOpacity style={s.walletCard} onPress={() => navigation.navigate('Wallet')} activeOpacity={0.85}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={s.walletTitle}>Bond Coins & Earnings</Text>
                 <Text style={s.walletSub}>View gifts, stamps, and cash out</Text>
               </View>
-              <Text style={s.walletArrow}>🪙→</Text>
+              <Text style={s.walletArrow}>→</Text>
             </TouchableOpacity>
           </View>
 
