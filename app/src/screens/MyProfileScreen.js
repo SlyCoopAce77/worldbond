@@ -14,7 +14,7 @@ import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { useTheme } from '../context/ThemeContext';
-import { useWallet } from '../context/WalletContext';
+import { useWallet, BOND_MONUMENTS } from '../context/WalletContext';
 import { getCountryFlag } from '../utils/countryUtils';
 import { stringToColor } from '../utils/apiUtils';
 const { width } = Dimensions.get('window');
@@ -550,20 +550,98 @@ const be = StyleSheet.create({
 });
 
 // ─── PassportSection ──────────────────────────────────────────────────────────
-function PassportSection({ bondCount, countries, onViewAll }) {
-  const flags = countries.slice(0, 8);
-  const extra = Math.max(0, countries.length - 8);
+const STAMP_ROTATIONS = [-6, -3, 0, 3, 6];
+
+function PassportSection({ bondCount, countries, myStamps, myMonuments, onViewAll }) {
+  const allUnlocked = bondCount >= 10;
+
+  // ── Unlocked: real passport view ─────────────────────────────────────────
+  if (allUnlocked) {
+    const heldMonuments = myMonuments
+      .map(id => BOND_MONUMENTS.find(m => m.id === id))
+      .filter(Boolean);
+    const hasAnything = myStamps.length > 0 || heldMonuments.length > 0;
+
+    return (
+      <View style={ps.passport}>
+
+        {/* Passport header */}
+        <View style={ps.phRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={ps.phTitle}>WORLD PASSPORT</Text>
+            <Text style={ps.phIssued}>Issued by WorldBond</Text>
+          </View>
+          <View style={ps.phSeal}>
+            <View style={ps.phSealRing}>
+              <Text style={ps.phSealTxt}>BOND</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={ps.phDivider} />
+
+        {/* Country Stamps */}
+        {myStamps.length > 0 && (
+          <View style={ps.phBlock}>
+            <Text style={ps.phSectionLabel}>Country Stamps</Text>
+            <View style={ps.stampGrid}>
+              {myStamps.map((flag, i) => (
+                <View
+                  key={flag}
+                  style={[ps.stampOuter, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}
+                >
+                  <View style={ps.stampInner}>
+                    <Text style={ps.stampFlag}>{flag}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Monument badges */}
+        {heldMonuments.length > 0 && (
+          <View style={ps.phBlock}>
+            <Text style={ps.phSectionLabel}>Monuments</Text>
+            <View style={ps.monumentList}>
+              {heldMonuments.map(m => (
+                <View key={m.id} style={ps.monumentBadge}>
+                  <Text style={ps.monumentIcon}>{m.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ps.monumentName}>{m.name}</Text>
+                    <Text style={ps.monumentLoc}>{m.country}  {m.location}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Empty state */}
+        {!hasAnything && (
+          <View style={ps.phEmpty}>
+            <Text style={ps.phEmptyTitle}>No seals yet</Text>
+            <Text style={ps.phEmptyDesc}>
+              Win a country stamp or monument challenge to leave your mark
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  // ── Pre-unlock: progress view ─────────────────────────────────────────────
+  const flags    = countries.slice(0, 8);
+  const extra    = Math.max(0, countries.length - 8);
   const nextGate = UNLOCK_GATES.find(g => bondCount < g.threshold);
   const progress = nextGate ? Math.min(bondCount / nextGate.threshold, 1) : 1;
 
   return (
     <View style={ps.card}>
-      <View style={ps.header}>
+      <View style={ps.cardHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={ps.title}>World Passport</Text>
-          <Text style={ps.sub}>
-            {countries.length} {countries.length === 1 ? 'country' : 'countries'} bonded
-          </Text>
+          <Text style={ps.cardTitle}>World Passport</Text>
+          <Text style={ps.cardSub}>{countries.length} {countries.length === 1 ? 'country' : 'countries'} bonded</Text>
         </View>
         <TouchableOpacity onPress={onViewAll} style={ps.viewAllBtn}>
           <Text style={ps.viewAllTxt}>View All</Text>
@@ -573,18 +651,18 @@ function PassportSection({ bondCount, countries, onViewAll }) {
       {countries.length > 0 ? (
         <View style={ps.flagGrid}>
           {flags.map((country, i) => (
-            <View key={i} style={ps.chip}>
-              <Text style={ps.chipFlag}>{getCountryFlag(country)}</Text>
+            <View key={i} style={ps.flagChip}>
+              <Text style={ps.flagChipTxt}>{getCountryFlag(country)}</Text>
             </View>
           ))}
           {extra > 0 && (
-            <View style={[ps.chip, ps.extraChip]}>
-              <Text style={ps.extraTxt}>+{extra}</Text>
+            <View style={[ps.flagChip, ps.flagChipExtra]}>
+              <Text style={ps.flagChipExtraTxt}>+{extra}</Text>
             </View>
           )}
         </View>
       ) : (
-        <Text style={ps.emptyTxt}>Bond with someone to earn your first stamp</Text>
+        <Text style={ps.emptyTxt}>Bond with someone to earn your first country</Text>
       )}
 
       {nextGate && (
@@ -593,19 +671,19 @@ function PassportSection({ bondCount, countries, onViewAll }) {
             <Animated.View style={[ps.progressFill, { width: `${progress * 100}%` }]} />
           </View>
           <Text style={ps.progressLabel}>
-            {nextGate.icon}  {nextGate.threshold - bondCount} more bond{nextGate.threshold - bondCount !== 1 ? 's' : ''} to unlock {nextGate.label}
+            {nextGate.threshold - bondCount} more bond{nextGate.threshold - bondCount !== 1 ? 's' : ''} to unlock {nextGate.label}
           </Text>
         </View>
       )}
 
       <View style={ps.gatesRow}>
         {UNLOCK_GATES.map((gate, i) => {
-          const unlocked = bondCount >= gate.threshold;
+          const on = bondCount >= gate.threshold;
           return (
-            <View key={i} style={[ps.gate, unlocked && ps.gateOn]}>
+            <View key={i} style={[ps.gate, on && ps.gateOn]}>
               <Text style={ps.gateIcon}>{gate.icon}</Text>
-              <Text style={[ps.gateLabel, unlocked && ps.gateLabelOn]} numberOfLines={1}>{gate.label}</Text>
-              {unlocked
+              <Text style={[ps.gateLabel, on && ps.gateLabelOn]} numberOfLines={1}>{gate.label}</Text>
+              {on
                 ? <Text style={ps.gateCheck}>✓</Text>
                 : <Text style={ps.gateThreshold}>{gate.threshold}</Text>}
             </View>
@@ -616,30 +694,57 @@ function PassportSection({ bondCount, countries, onViewAll }) {
   );
 }
 const ps = StyleSheet.create({
-  card:         { backgroundColor: '#0d0d0d', borderRadius: 22, padding: 18, gap: 16, borderWidth: 1, borderColor: BOND_PINK + '25', marginHorizontal: 20 },
-  header:       { flexDirection: 'row', alignItems: 'center' },
-  title:        { color: '#fff', fontSize: 17, fontWeight: '900' },
-  sub:          { color: BOND_PINK, fontSize: 12, marginTop: 2, fontWeight: '600' },
-  viewAllBtn:   { backgroundColor: BOND_PINK + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: BOND_PINK + '40' },
-  viewAllTxt:   { color: BOND_PINK, fontSize: 12, fontWeight: '700' },
-  flagGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:         { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: BOND_PINK + '25', alignItems: 'center', justifyContent: 'center' },
-  chipFlag:     { fontSize: 24 },
-  extraChip:    { backgroundColor: BOND_PINK + '15' },
-  extraTxt:     { color: BOND_PINK, fontSize: 13, fontWeight: '800' },
-  emptyTxt:     { color: '#444', fontSize: 13, lineHeight: 19 },
-  progressWrap: { gap: 6 },
-  progressTrack:{ height: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
-  progressLabel:{ color: '#555', fontSize: 12 },
-  gatesRow:     { flexDirection: 'row', gap: 8 },
-  gate:         { flex: 1, alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  gateOn:       { backgroundColor: BOND_PINK + '12', borderColor: BOND_PINK + '35' },
-  gateIcon:     { fontSize: 16 },
-  gateLabel:    { color: '#444', fontSize: 9, fontWeight: '700', textAlign: 'center' },
-  gateLabelOn:  { color: BOND_PINK },
-  gateCheck:    { color: BOND_PINK, fontSize: 10, fontWeight: '900' },
-  gateThreshold:{ color: '#333', fontSize: 9, fontWeight: '700' },
+  // ── Pre-unlock card ────────────────────────────────────────────────────────
+  card:             { backgroundColor: '#0d0d0d', borderRadius: 22, padding: 18, gap: 16, borderWidth: 1, borderColor: BOND_PINK + '25', marginHorizontal: 20 },
+  cardHeader:       { flexDirection: 'row', alignItems: 'center' },
+  cardTitle:        { color: '#fff', fontSize: 17, fontWeight: '900' },
+  cardSub:          { color: BOND_PINK, fontSize: 12, marginTop: 2, fontWeight: '600' },
+  viewAllBtn:       { backgroundColor: BOND_PINK + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: BOND_PINK + '40' },
+  viewAllTxt:       { color: BOND_PINK, fontSize: 12, fontWeight: '700' },
+  flagGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  flagChip:         { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: BOND_PINK + '25', alignItems: 'center', justifyContent: 'center' },
+  flagChipTxt:      { fontSize: 24 },
+  flagChipExtra:    { backgroundColor: BOND_PINK + '15' },
+  flagChipExtraTxt: { color: BOND_PINK, fontSize: 13, fontWeight: '800' },
+  emptyTxt:         { color: 'rgba(255,255,255,0.25)', fontSize: 13, lineHeight: 19 },
+  progressWrap:     { gap: 6 },
+  progressTrack:    { height: 4, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' },
+  progressFill:     { height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
+  progressLabel:    { color: 'rgba(255,255,255,0.35)', fontSize: 12 },
+  gatesRow:         { flexDirection: 'row', gap: 8 },
+  gate:             { flex: 1, alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  gateOn:           { backgroundColor: BOND_PINK + '12', borderColor: BOND_PINK + '35' },
+  gateIcon:         { fontSize: 16 },
+  gateLabel:        { color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  gateLabelOn:      { color: BOND_PINK },
+  gateCheck:        { color: BOND_PINK, fontSize: 10, fontWeight: '900' },
+  gateThreshold:    { color: 'rgba(255,255,255,0.2)', fontSize: 9, fontWeight: '700' },
+  // ── Unlocked passport ─────────────────────────────────────────────────────
+  passport:         { backgroundColor: '#0a0c12', borderRadius: 22, padding: 20, gap: 20, borderWidth: 1.5, borderColor: BOND_PINK + '40', marginHorizontal: 20 },
+  phRow:            { flexDirection: 'row', alignItems: 'center' },
+  phTitle:          { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase' },
+  phIssued:         { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 3, fontWeight: '500', letterSpacing: 0.5 },
+  phSeal:           { alignItems: 'center', justifyContent: 'center' },
+  phSealRing:       { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: BOND_PINK + '80', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '10' },
+  phSealTxt:        { color: BOND_PINK, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  phDivider:        { height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
+  phBlock:          { gap: 12 },
+  phSectionLabel:   { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
+  // Country stamps
+  stampGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  stampOuter:       { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: BOND_PINK + '70', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '08' },
+  stampInner:       { width: 60, height: 60, borderRadius: 30, borderWidth: 1, borderColor: BOND_PINK + '35', alignItems: 'center', justifyContent: 'center' },
+  stampFlag:        { fontSize: 34 },
+  // Monument badges
+  monumentList:     { gap: 10 },
+  monumentBadge:    { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  monumentIcon:     { fontSize: 28 },
+  monumentName:     { color: '#fff', fontSize: 14, fontWeight: '800' },
+  monumentLoc:      { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
+  // Empty state
+  phEmpty:          { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  phEmptyTitle:     { color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: '700' },
+  phEmptyDesc:      { color: 'rgba(255,255,255,0.25)', fontSize: 13, textAlign: 'center', lineHeight: 19 },
 });
 
 // ─── MyProfileScreen ──────────────────────────────────────────────────────────
@@ -948,6 +1053,8 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           <PassportSection
             bondCount={matchCount}
             countries={flagsPlanted}
+            myStamps={myStamps}
+            myMonuments={myMonuments}
             onViewAll={() => navigation.navigate('CountryStampChallenge', {
               stamp: flagsPlanted.length > 0 ? { flag: getCountryFlag(flagsPlanted[0]) } : {},
             })}
