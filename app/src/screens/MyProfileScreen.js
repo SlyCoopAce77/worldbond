@@ -1064,7 +1064,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
           {/* ── Bond Pass ── */}
           <View style={s.section}>
-            <Text style={s.sectionLabel}>⚡ Bond Pass</Text>
+            <Text style={s.sectionLabel}>Bond Pass</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85} style={s.passCard}>
               <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.passInner}>
                 <View style={{ flex: 1 }}>
