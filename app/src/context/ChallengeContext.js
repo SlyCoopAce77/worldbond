@@ -18,9 +18,36 @@ export const POINT_RATES = {
   votes:     75,   // 75 pts per community vote (once per user per contest)
 };
 
-export const ENTRY_FEE    = 250;  // Bond Coins burned to initiate a challenge
-export const CHALLENGE_MS = 7 * 86400000;   // 7 days in ms
-export const COOLDOWN_MS  = 30 * 86400000;  // 30-day cooldown between challenges
+export const ENTRY_FEE       = 250;             // Bond Coins burned to initiate a challenge
+export const FEATURED_FEE   = 125;             // 50% off for the featured stamp
+export const CHALLENGE_MS   = 7  * 86400000;   // 7 days per challenge window
+export const COOLDOWN_MS    = 30 * 86400000;   // 30-day cooldown after a challenge resolves
+export const INACTIVE_DROP_MS = 30 * 86400000; // holder drops stamp after 30 days no activity
+
+// Weekly rotation pool — cycles every 7 days deterministically (no server needed)
+export const STAMP_ROTATION = [
+  '🇺🇸','🇯🇵','🇧🇷','🇰🇷','🇬🇧','🇳🇬',
+  '🇫🇷','🇩🇪','🇮🇳','🇲🇽','🇨🇦','🇦🇺',
+  '🇿🇦','🇸🇦','🇹🇷','🇦🇷','🇵🇭','🇮🇩',
+  '🇮🇹','🇪🇸','🇨🇴','🇬🇭','🇵🇰','🇧🇩',
+];
+
+export function getFeaturedFlag() {
+  const week = Math.floor(Date.now() / (7 * 86400000));
+  return STAMP_ROTATION[week % STAMP_ROTATION.length];
+}
+
+export function getNextFeaturedFlag() {
+  const week = Math.floor(Date.now() / (7 * 86400000)) + 1;
+  return STAMP_ROTATION[week % STAMP_ROTATION.length];
+}
+
+// Returns true when holder exists but hasn't been active for INACTIVE_DROP_MS
+export function isStampDropped(stamp) {
+  if (!stamp?.holder) return false;
+  const lastActive = stamp.lastActivity ?? stamp.since ?? 0;
+  return Date.now() - lastActive > INACTIVE_DROP_MS;
+}
 
 // ── Demo seed challenges ──────────────────────────────────────────────────────
 const NOW = Date.now();

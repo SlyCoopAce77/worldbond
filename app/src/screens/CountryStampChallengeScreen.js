@@ -6,7 +6,10 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useBondPass } from '../context/PremiumContext';
-import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE } from '../context/ChallengeContext';
+import {
+  useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE, FEATURED_FEE,
+  getFeaturedFlag, getNextFeaturedFlag, isStampDropped,
+} from '../context/ChallengeContext';
 import { getFlagName } from '../utils/countryUtils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -299,7 +302,11 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
   const myUsername   = currentUser?.username || 'you';
   const flag         = stamp?.flag;
   const countryName  = flag ? getFlagName(flag) : '';
-  const isUnclaimed  = !stamp?.holder;
+  const isDropped    = isStampDropped(stamp);
+  const isUnclaimed  = !stamp?.holder || isDropped;
+  const isFeatured   = flag === getFeaturedFlag();
+  const nextFeatured = getNextFeaturedFlag();
+  const effectiveFee = isFeatured ? FEATURED_FEE : ENTRY_FEE;
 
   const activeChallenge = flag ? getActiveStampChallenge(flag)  : null;
   const cooldownUntil   = flag ? getStampCooldown(flag)         : null;
@@ -328,13 +335,16 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
 
   function handleInitiate() {
     if (!canContrib || !stamp?.holder) return;
+    const feeNote = isFeatured
+      ? `Burns ${effectiveFee} Bond Coins (50% off — featured this week).`
+      : `Burns ${effectiveFee} Bond Coins.`;
     Alert.alert(
       'Start Stamp Challenge',
-      `Challenge @${stamp.holder} for the ${countryName} stamp?\n\nBurns ${ENTRY_FEE} Bond Coins. The holder earns +3% royalty from all ${countryName} streams — win a 7-day contest to take it.`,
+      `Challenge @${stamp.holder} for the ${countryName} stamp?\n\n${feeNote} Win a 7-day contest to take it.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: `Start — ${ENTRY_FEE} Coins`,
+          text: `Start — ${effectiveFee} Coins`,
           style: 'destructive',
           onPress: () => {
             const res = initiateStampChallenge(flag, myUsername, stamp.holder);
@@ -388,13 +398,32 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
       >
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
+          {/* ── Featured banner ── */}
+          {isFeatured && (
+            <LinearGradient colors={['#2a0018', '#1a0010']} style={s.featuredBanner}>
+              <View style={s.featuredBannerRow}>
+                <View style={s.featuredPill}><Text style={s.featuredPillTxt}>FEATURED THIS WEEK</Text></View>
+                <Text style={s.featuredBannerDesc}>
+                  50% off entry fee · next up {nextFeatured} Sunday
+                </Text>
+              </View>
+            </LinearGradient>
+          )}
+
           {/* ── Country stamp hero ── */}
           <LinearGradient colors={['#001a2e', '#001018', '#08090d']} style={s.hero}>
             <LinearGradient colors={['#4fc3f7', '#0288d1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.blueBar} />
             <Text style={s.heroFlag}>{flag}</Text>
             <Text style={s.heroName}>{countryName}</Text>
             <Text style={s.heroSub}>Country Stamp · 1 of 195 · +3% royalty</Text>
-            {stamp.holder && !activeChallenge && !isUnclaimed && (
+            {isDropped && (
+              <View style={[s.holderRow, { borderColor: '#ff6b0030' }]}>
+                <Text style={[s.holderLabel, { color: '#ff6b00' }]}>DROPPED</Text>
+                <Text style={s.holderName}>@{stamp.holder} went inactive</Text>
+                <Text style={s.holderCoins}>30+ days no activity — free to claim</Text>
+              </View>
+            )}
+            {stamp.holder && !isDropped && !activeChallenge && !isUnclaimed && (
               <View style={s.holderRow}>
                 <Text style={s.holderLabel}>HELD BY</Text>
                 <Text style={s.holderName}>@{stamp.holder}</Text>
@@ -408,19 +437,28 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
             <FreeGate navigation={navigation} />
 
           ) : isUnclaimed ? (
-            /* ── Unclaimed ── */
+            /* ── Unclaimed or Dropped ── */
             <View style={s.section}>
               <View style={s.card}>
-                <View style={s.cardBadge}><Text style={s.cardBadgeTxt}>UNCLAIMED</Text></View>
-                <Text style={s.cardTitle}>Unclaimed Country Stamp</Text>
+                <View style={[s.cardBadge, isDropped && { backgroundColor: '#ff6b0018', borderColor: '#ff6b0040' }]}>
+                  <Text style={[s.cardBadgeTxt, isDropped && { color: '#ff6b00' }]}>
+                    {isDropped ? 'DROPPED' : 'UNCLAIMED'}
+                  </Text>
+                </View>
+                <Text style={s.cardTitle}>
+                  {isDropped ? `${countryName} Stamp — Up for Grabs` : `Unclaimed Country Stamp`}
+                </Text>
                 <Text style={s.cardSub}>
-                  Be the first to own the {countryName} stamp and earn +3% royalty on every gift sent during streams from {countryName}.
+                  {isDropped
+                    ? `@${stamp.holder} held this stamp but went inactive for 30+ days. It's now free to claim — no coins required.`
+                    : `Be the first to own the ${countryName} stamp and earn +3% royalty on every gift sent during streams from ${countryName}.`
+                  }
                 </Text>
                 {canContrib ? (
                   <TouchableOpacity
                     style={s.primaryBtn}
                     onPress={() => Alert.alert(
-                      'Claim Stamp',
+                      isDropped ? 'Claim Dropped Stamp' : 'Claim Stamp',
                       `Claim the ${countryName} stamp?\n\nYou'll earn +3% royalty on all gifts sent during ${countryName} streams.`,
                       [
                         { text: 'Cancel', style: 'cancel' },
@@ -540,9 +578,16 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
                   <Text style={s.cardSub}>
                     @{stamp.holder} holds this stamp and earns +3% royalty on every gift sent during {countryName} streams. Win a 7-day contest to claim it.
                   </Text>
+                  {isFeatured && (
+                    <View style={s.featuredDiscount}>
+                      <Text style={s.featuredDiscountTxt}>
+                        Featured this week — entry fee halved to {FEATURED_FEE} coins
+                      </Text>
+                    </View>
+                  )}
                   <View style={s.rulesList}>
                     {[
-                      `Entry fee: ${ENTRY_FEE} Bond Coins (burned)`,
+                      `Entry fee: ${effectiveFee} Bond Coins${isFeatured ? ` (50% off, was ${ENTRY_FEE})` : ' (burned)'}`,
                       'Contest: 7 days of multi-dimension scoring',
                       'Spam-protected: daily caps per contribution type',
                       '30-day cooldown between challenges',
@@ -555,7 +600,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
                   </View>
                   <TouchableOpacity style={s.primaryBtn} onPress={handleInitiate} activeOpacity={0.88}>
                     <LinearGradient colors={['#ef4444', '#b91c1c']} style={s.primaryGrad}>
-                      <Text style={[s.primaryTxt, { color: '#fff' }]}>INITIATE CHALLENGE — {ENTRY_FEE} COINS</Text>
+                      <Text style={[s.primaryTxt, { color: '#fff' }]}>INITIATE CHALLENGE — {effectiveFee} COINS</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
@@ -650,4 +695,15 @@ const s = StyleSheet.create({
   progressBg:     { flex: 1, height: 6, backgroundColor: '#4fc3f730', borderRadius: 3, overflow: 'hidden' },
   progressFill:   { height: '100%', backgroundColor: '#ef4444', borderRadius: 3 },
   leadingTxt:     { color: 'rgba(255,255,255,0.45)', fontSize: 11, textAlign: 'center' },
+
+  // Featured banner (top of screen)
+  featuredBanner:     { paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FF008025' },
+  featuredBannerRow:  { gap: 6 },
+  featuredPill:       { alignSelf: 'flex-start', backgroundColor: '#FF0080', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 3 },
+  featuredPillTxt:    { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  featuredBannerDesc: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
+
+  // Featured discount callout inside challenge card
+  featuredDiscount:    { backgroundColor: '#FF008015', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#FF008030' },
+  featuredDiscountTxt: { color: '#FF0080', fontSize: 12, fontWeight: '700' },
 });

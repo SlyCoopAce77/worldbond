@@ -17,14 +17,37 @@ export function usdToCoins(usd) {
 }
 
 // ─── Country Stamps — 1-of-1 per country ─────────────────────────────────────
-// Holder earns 3% passive royalty on all gifts sent to streamers from their country
+// Holder earns 3% passive royalty on all gifts sent to streamers from their country.
+// lastActivity tracks when the holder last contributed — if > 30 days ago, stamp is DROPPED.
+const _D = Date.now();
 export const DEMO_STAMPS = {
-  '🇺🇸': { holder: 'DeShawn_ATL',   coinsEarned: 14200, since: Date.now() - 86400000 * 12 },
-  '🇯🇵': { holder: 'Yuki_Tokyo',    coinsEarned: 9800,  since: Date.now() - 86400000 * 5  },
-  '🇧🇷': { holder: 'Lucas_SP',      coinsEarned: 7600,  since: Date.now() - 86400000 * 3  },
-  '🇰🇷': { holder: 'JiMin_Seoul',   coinsEarned: 21000, since: Date.now() - 86400000 * 20 },
-  '🇬🇧': { holder: 'Sarah_London',  coinsEarned: 5400,  since: Date.now() - 86400000 * 8  },
-  '🇳🇬': { holder: 'Amara_Lagos',   coinsEarned: 8100,  since: Date.now() - 86400000 * 6  },
+  // ── Active holders ──────────────────────────────────────────────────────────
+  '🇺🇸': { holder: 'DeShawn_ATL',   coinsEarned: 14200, since: _D - 86400000 * 12, lastActivity: _D - 86400000 * 12 },
+  '🇯🇵': { holder: 'Yuki_Tokyo',    coinsEarned: 9800,  since: _D - 86400000 * 5,  lastActivity: _D - 86400000 * 5  },
+  '🇧🇷': { holder: 'Lucas_SP',      coinsEarned: 7600,  since: _D - 86400000 * 3,  lastActivity: _D - 86400000 * 3  },
+  '🇰🇷': { holder: 'JiMin_Seoul',   coinsEarned: 21000, since: _D - 86400000 * 20, lastActivity: _D - 86400000 * 20 },
+  '🇬🇧': { holder: 'Sarah_London',  coinsEarned: 5400,  since: _D - 86400000 * 8,  lastActivity: _D - 86400000 * 8  },
+  '🇳🇬': { holder: 'Amara_Lagos',   coinsEarned: 8100,  since: _D - 86400000 * 6,  lastActivity: _D - 86400000 * 6  },
+  '🇲🇽': { holder: 'Carlos_CDMX',   coinsEarned: 6300,  since: _D - 86400000 * 14, lastActivity: _D - 86400000 * 14 },
+  '🇦🇺': { holder: 'Kai_Sydney',    coinsEarned: 4700,  since: _D - 86400000 * 9,  lastActivity: _D - 86400000 * 9  },
+  '🇹🇷': { holder: 'Zeynep_IST',   coinsEarned: 3900,  since: _D - 86400000 * 11, lastActivity: _D - 86400000 * 11 },
+  '🇮🇩': { holder: 'Budi_Jakarta',  coinsEarned: 5100,  since: _D - 86400000 * 7,  lastActivity: _D - 86400000 * 7  },
+  // ── Dropped — holder went inactive (> 30 days no activity) ─────────────────
+  '🇩🇪': { holder: 'Hans_Berlin',   coinsEarned: 2800,  since: _D - 86400000 * 38, lastActivity: _D - 86400000 * 35 },
+  '🇦🇷': { holder: 'Mateo_BA',      coinsEarned: 1900,  since: _D - 86400000 * 45, lastActivity: _D - 86400000 * 33 },
+  // ── Unclaimed ───────────────────────────────────────────────────────────────
+  '🇫🇷': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇮🇳': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇨🇦': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇿🇦': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇸🇦': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇵🇭': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇮🇹': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇪🇸': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇨🇴': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇬🇭': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇵🇰': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
+  '🇧🇩': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
 };
 
 // ─── Bond Monuments — 1-of-1 per famous world location ───────────────────────

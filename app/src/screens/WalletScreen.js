@@ -10,6 +10,7 @@ import {
   useWallet, coinsToUSD,
   DEMO_TOP_CREATORS, BOND_MONUMENTS,
 } from '../context/WalletContext';
+import { getFeaturedFlag, isStampDropped, getNextFeaturedFlag } from '../context/ChallengeContext';
 
 const BOND_PINK   = '#FF0080';
 const BOND_GOLD   = '#FFB700';
@@ -413,44 +414,92 @@ export default function WalletScreen({ navigation, route }) {
         {activeTab === 'Footprints' && (
           <View style={s.list}>
 
-            <View style={s.fpSection}>
-              <Text style={s.fpSectionTitle}>🌍 Country Stamps</Text>
-              <Text style={s.fpSectionSub}>
-                1-of-1 per country · 195 worldwide · earn +3% royalty on all gifts to your country's streamers
-              </Text>
-            </View>
-
-            {Object.entries(stamps).map(([flag, stamp]) => {
-              const isMine    = myStamps.includes(flag);
-              const unclaimed = !stamp.holder;
+            {(() => {
+              const featuredFlag = getFeaturedFlag();
+              const nextFlag     = getNextFeaturedFlag();
               return (
-                <View key={flag} style={[s.fpRow, isMine && s.fpRowMine]}>
-                  <Text style={s.fpIcon}>{flag}</Text>
-                  <View style={{ flex: 1 }}>
-                    {stamp.holder
-                      ? <Text style={s.fpHolder}>@{stamp.holder}</Text>
-                      : <Text style={[s.fpHolder, { color: '#4ade80' }]}>Unclaimed — tap to claim!</Text>
-                    }
-                    {isMine && (
-                      <CoinRow amount={`${stamp.coinsEarned.toLocaleString()} earned`} textStyle={s.fpEarned} size={13} />
-                    )}
-                  </View>
-                  {isMine
-                    ? <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>
-                    : (
-                      <TouchableOpacity
-                        style={unclaimed ? s.claimBtn : s.challengeBtn}
-                        onPress={() => navigation.navigate('CountryStampChallenge', { stamp: { flag, ...stamp }, currentUser })}
-                      >
-                        <Text style={unclaimed ? s.claimBtnTxt : s.challengeBtnTxt}>
-                          {unclaimed ? 'Claim' : 'Challenge'}
+                <>
+                  <LinearGradient
+                    colors={['#1a0a2e', '#0d0820']}
+                    style={s.featuredBanner}
+                  >
+                    <View style={s.featuredRow}>
+                      <Text style={s.featuredFlag}>{featuredFlag}</Text>
+                      <View style={{ flex: 1 }}>
+                        <View style={s.featuredLabelRow}>
+                          <View style={s.featuredPill}><Text style={s.featuredPillTxt}>FEATURED THIS WEEK</Text></View>
+                        </View>
+                        <Text style={s.featuredDesc}>
+                          Challenge or claim {featuredFlag} for{' '}
+                          <Text style={{ color: BOND_PINK, fontWeight: '800' }}>50% off</Text>
+                          {' '}the entry fee · resets Sunday
                         </Text>
-                      </TouchableOpacity>
-                    )
-                  }
-                </View>
+                        <Text style={s.featuredNext}>Next up: {nextFlag}</Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+
+                  <View style={s.fpSection}>
+                    <Text style={s.fpSectionTitle}>Country Stamps</Text>
+                    <Text style={s.fpSectionSub}>
+                      1-of-1 per country · earn +3% royalty on all gifts to your country's streamers · holders drop after 30 days inactive
+                    </Text>
+                  </View>
+
+                  {Object.entries(stamps).map(([flag, stamp]) => {
+                    const isMine    = myStamps.includes(flag);
+                    const unclaimed = !stamp.holder;
+                    const dropped   = isStampDropped(stamp);
+                    const featured  = flag === featuredFlag;
+                    return (
+                      <View
+                        key={flag}
+                        style={[
+                          s.fpRow,
+                          isMine    && s.fpRowMine,
+                          featured  && s.fpRowFeatured,
+                          dropped   && s.fpRowDropped,
+                        ]}
+                      >
+                        <Text style={s.fpIcon}>{flag}</Text>
+                        <View style={{ flex: 1 }}>
+                          {dropped ? (
+                            <>
+                              <Text style={s.droppedLabel}>DROPPED</Text>
+                              <Text style={[s.fpHolderName, { marginTop: 0 }]}>@{stamp.holder} went inactive</Text>
+                            </>
+                          ) : unclaimed ? (
+                            <Text style={[s.fpHolder, { color: '#4ade80' }]}>Unclaimed</Text>
+                          ) : (
+                            <Text style={s.fpHolder}>@{stamp.holder}</Text>
+                          )}
+                          {isMine && (
+                            <CoinRow amount={`${stamp.coinsEarned.toLocaleString()} earned`} textStyle={s.fpEarned} size={13} />
+                          )}
+                          {featured && !isMine && (
+                            <Text style={s.featuredRowHint}>50% off entry fee this week</Text>
+                          )}
+                        </View>
+                        {featured && <View style={s.featuredDot}><Text style={s.featuredDotTxt}>HOT</Text></View>}
+                        {isMine
+                          ? <View style={s.mineBadge}><Text style={s.mineBadgeTxt}>Yours</Text></View>
+                          : (
+                            <TouchableOpacity
+                              style={dropped || unclaimed ? s.claimBtn : s.challengeBtn}
+                              onPress={() => navigation.navigate('CountryStampChallenge', { stamp: { flag, ...stamp }, currentUser })}
+                            >
+                              <Text style={dropped || unclaimed ? s.claimBtnTxt : s.challengeBtnTxt}>
+                                {dropped ? 'Claim Free' : unclaimed ? 'Claim' : 'Challenge'}
+                              </Text>
+                            </TouchableOpacity>
+                          )
+                        }
+                      </View>
+                    );
+                  })}
+                </>
               );
-            })}
+            })()}
 
             <View style={[s.fpSection, { marginTop: 20 }]}>
               <Text style={s.fpSectionTitle}>🏛️ Bond Monuments</Text>
@@ -586,15 +635,31 @@ const s = StyleSheet.create({
   fpSectionSub:   { color: '#555555', fontSize: 12, lineHeight: 18 },
   fpRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0f1116', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#1e2028' },
   fpRowMine:      { borderColor: BOND_PINK + '40', backgroundColor: BOND_PINK + '08' },
+  fpRowFeatured:  { borderColor: BOND_PINK + '55', backgroundColor: BOND_PINK + '06' },
+  fpRowDropped:   { borderColor: '#ff6b0040', backgroundColor: '#ff6b0008' },
   fpIcon:         { fontSize: 26 },
   fpHolder:       { color: '#fff', fontSize: 13, fontWeight: '700' },
   fpHolderName:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 2 },
   fpSub:          { color: '#555555', fontSize: 11, marginTop: 1 },
   fpEarned:       { color: BOND_GOLD, fontSize: 12, marginTop: 2 },
+  droppedLabel:   { color: '#ff6b00', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  featuredRowHint:{ color: BOND_PINK, fontSize: 10, fontWeight: '700', marginTop: 2 },
+  featuredDot:    { backgroundColor: BOND_PINK, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginRight: 4 },
+  featuredDotTxt: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   mineBadge:      { backgroundColor: BOND_PINK + '20', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: BOND_PINK + '40' },
   mineBadgeTxt:   { color: BOND_PINK, fontSize: 11, fontWeight: '800' },
   claimBtn:       { backgroundColor: '#4ade8022', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: '#4ade8055' },
   claimBtnTxt:    { color: '#4ade80', fontSize: 12, fontWeight: '800' },
   challengeBtn:   { backgroundColor: BOND_GOLD + '18', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: BOND_GOLD + '44' },
   challengeBtnTxt:{ color: BOND_GOLD, fontSize: 11, fontWeight: '700' },
+
+  // Featured banner
+  featuredBanner:   { borderRadius: 16, padding: 16, marginBottom: 4, borderWidth: 1, borderColor: BOND_PINK + '30' },
+  featuredRow:      { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  featuredFlag:     { fontSize: 38 },
+  featuredLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  featuredPill:     { backgroundColor: BOND_PINK, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  featuredPillTxt:  { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 1.5 },
+  featuredDesc:     { color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 17 },
+  featuredNext:     { color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 4 },
 });
