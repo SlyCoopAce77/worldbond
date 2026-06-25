@@ -9,15 +9,18 @@ import { useBondPass } from '../context/PremiumContext';
 import {
   useWallet, coinsToUSD,
   DEMO_TOP_CREATORS, BOND_MONUMENTS,
+  getPayoutCooldownMs, getPayoutCooldownDays,
 } from '../context/WalletContext';
 import { getFeaturedFlag, isStampDropped, getNextFeaturedFlag } from '../context/ChallengeContext';
 
 const BOND_PINK   = '#FF0080';
 const BOND_GOLD   = '#FFB700';
 
-const BASE_PAYOUT = 0.70;
-const PASS_PAYOUT = 0.75;
-const MIN_PAYOUT_COINS = 5000;
+const BASE_PAYOUT      = 0.70;
+const PASS_PAYOUT      = 0.75;
+const MIN_PAYOUT_COINS = 2500;
+// Top creator threshold: roughly #3 monthly creator earnings
+const TOP_CREATOR_COINS_THRESHOLD = 40000;
 
 const TABS = ['Earnings', 'Spending', 'Creators', 'Footprints'];
 
@@ -153,23 +156,70 @@ const pod = StyleSheet.create({
   plinthBonus:{ color: 'rgba(255,255,255,0.75)', fontSize: 10 },
 });
 
+// ── CooldownTierBadge ─────────────────────────────────────────────────────────
+function CooldownTierBadge({ hasBondPass, isTopCreator }) {
+  const tiers = [
+    { label: 'Standard',    days: 30, active: !hasBondPass && !isTopCreator, color: 'rgba(255,255,255,0.7)' },
+    { label: 'Bond Pass',   days: 14, active: hasBondPass && !isTopCreator,  color: BOND_PINK },
+    { label: 'Top Creator', days: 7,  active: isTopCreator,                  color: BOND_GOLD },
+  ];
+  return (
+    <View style={ct.wrap}>
+      <Text style={ct.header}>Payout cooldown tier</Text>
+      <View style={ct.row}>
+        {tiers.map(tier => (
+          <View
+            key={tier.label}
+            style={[
+              ct.tier,
+              tier.active && { borderColor: tier.color + '55', backgroundColor: tier.color + '10' },
+            ]}
+          >
+            <Text style={[ct.days, { color: tier.active ? tier.color : 'rgba(255,255,255,0.18)' }]}>
+              {tier.days}d
+            </Text>
+            <Text style={[ct.tierLabel, { color: tier.active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.18)' }]}>
+              {tier.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+const ct = StyleSheet.create({
+  wrap:     { gap: 8 },
+  header:   { color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
+  row:      { flexDirection: 'row', gap: 8 },
+  tier:     { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.03)', gap: 4 },
+  days:     { fontSize: 17, fontWeight: '900' },
+  tierLabel:{ fontSize: 10, fontWeight: '700', textAlign: 'center' },
+});
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function WalletScreen({ navigation, route }) {
   const currentUser     = route?.params?.currentUser || null;
   const { hasBondPass } = useBondPass();
   const {
     balance, transactions, myStamps, myMonuments, monthlyEarned,
-    stamps, earnCoins,
+    stamps, earnCoins, lastPayoutTs, recordPayout,
   } = useWallet();
 
   const [activeTab,  setActiveTab]  = useState('Earnings');
   const [idVerified, setIdVerified] = useState(false);
 
-  const payoutRate   = hasBondPass ? PASS_PAYOUT : BASE_PAYOUT;
-  const availableUSD = coinsToUSD(Math.floor(balance * payoutRate));
-  const earned       = transactions.filter(t => t.type === 'earn');
-  const spends       = transactions.filter(t => t.type === 'spend');
-  const totalEarned  = earned.reduce((sum, t) => sum + t.amount, 0);
+  const payoutRate    = hasBondPass ? PASS_PAYOUT : BASE_PAYOUT;
+  const availableUSD  = coinsToUSD(Math.floor(balance * payoutRate));
+  const earned        = transactions.filter(t => t.type === 'earn');
+  const spends        = transactions.filter(t => t.type === 'spend');
+  const totalEarned   = earned.reduce((sum, t) => sum + t.amount, 0);
+
+  const isTopCreator   = monthlyEarned >= TOP_CREATOR_COINS_THRESHOLD;
+  const cooldownMs     = getPayoutCooldownMs(hasBondPass, isTopCreator);
+  const cooldownDays   = getPayoutCooldownDays(hasBondPass, isTopCreator);
+  const elapsed        = lastPayoutTs ? Date.now() - lastPayoutTs : Infinity;
+  const cooldownMet    = elapsed >= cooldownMs;
+  const daysUntilNext  = cooldownMet ? 0 : Math.ceil((cooldownMs - elapsed) / 86400000);
 
   const reqs = [
     { id: 'age',     label: 'Account 30+ days old', met: true },
@@ -186,7 +236,13 @@ export default function WalletScreen({ navigation, route }) {
       ),
     },
     { id: 'min',      label: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins`, met: balance >= MIN_PAYOUT_COINS },
-    { id: 'cooldown', label: 'No payout in last 30 days', met: true },
+    {
+      id: 'cooldown',
+      label: cooldownMet
+        ? `No payout in last ${cooldownDays} days`
+        : `${daysUntilNext} day${daysUntilNext !== 1 ? 's' : ''} until next payout`,
+      met: cooldownMet,
+    },
   ];
   const allReqsMet = reqs.every(r => r.met);
 
@@ -205,10 +261,16 @@ export default function WalletScreen({ navigation, route }) {
     if (!allReqsMet) return;
     Alert.alert(
       'Request Payout',
-      `You'll receive $${availableUSD} USD (${Math.round(payoutRate * 100)}% of ${balance.toLocaleString()} BC).\n\nWorldBond keeps ${Math.round((1 - payoutRate) * 100)}% to cover platform costs and payment processing.\n\nPayout via PayPal or bank transfer within 3–5 business days.`,
+      `You'll receive $${availableUSD} USD (${Math.round(payoutRate * 100)}% of ${balance.toLocaleString()} BC).\n\nWorldBond keeps ${Math.round((1 - payoutRate) * 100)}% to cover platform costs and payment processing.\n\nNext payout available in ${cooldownDays} days.\n\nPayout via PayPal or bank transfer within 3–5 business days.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: () => Alert.alert('Payout Requested ✓', "You'll receive your funds within 3–5 business days.") },
+        {
+          text: 'Confirm',
+          onPress: () => {
+            recordPayout();
+            Alert.alert('Payout Requested', "You'll receive your funds within 3–5 business days.");
+          },
+        },
       ]
     );
   }
@@ -243,7 +305,7 @@ export default function WalletScreen({ navigation, route }) {
         {/* ── Bond Pass payout notice ── */}
         {!hasBondPass && (
           <TouchableOpacity style={s.passNudge} onPress={() => navigation.navigate('Subscription')} activeOpacity={0.85}>
-            <Text style={s.passNudgeText}>⚡ Get Bond Pass for 80% payout rate →</Text>
+            <Text style={s.passNudgeText}>Bond Pass — 75% payout rate + 14-day cooldown →</Text>
           </TouchableOpacity>
         )}
 
@@ -263,6 +325,8 @@ export default function WalletScreen({ navigation, route }) {
             </View>
           </View>
 
+          <CooldownTierBadge hasBondPass={hasBondPass} isTopCreator={isTopCreator} />
+
           <PayoutRequirements reqs={reqs} />
 
           <TouchableOpacity
@@ -276,13 +340,13 @@ export default function WalletScreen({ navigation, route }) {
               style={s.payoutBtnGrad}
             >
               <Text style={[s.payoutBtnTxt, !allReqsMet && { color: 'rgba(255,255,255,0.3)' }]}>
-                {allReqsMet ? '💸 Request Payout' : 'Complete requirements to unlock'}
+                {allReqsMet ? 'Request Payout' : 'Complete requirements to unlock'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <Text style={s.payoutNote}>
-            30-day cooldown between payouts · 1 account per identity · earnings from verified sources only
+            {cooldownDays}-day cooldown · 1 account per identity · earnings from verified sources only
           </Text>
         </View>
 
@@ -395,7 +459,7 @@ export default function WalletScreen({ navigation, route }) {
                 { label: 'TikTok LIVE',           pct: '50%', color: '#555555', you: false },
                 { label: 'YouTube SuperChat',     pct: '70%', color: '#888888', you: false },
                 { label: 'Twitch Bits',           pct: '71%', color: '#888888', you: false },
-                { label: 'WorldBond Standard',    pct: '50%', color: BOND_PINK,  you: true  },
+                { label: 'WorldBond Standard',    pct: '70%', color: BOND_PINK,  you: true  },
                 { label: 'WorldBond Bond Pass',   pct: '75%', color: BOND_PINK,  you: true  },
                 { label: '🥇 Top Creator',        pct: '85%', color: '#ffd700', you: true  },
                 { label: '+ Stamp Royalty',       pct: '+3%', color: '#4ade80', you: true  },

@@ -16,6 +16,26 @@ export function usdToCoins(usd) {
   return Math.ceil(usd * COINS_PER_DOLLAR);
 }
 
+// ─── Payout Cooldown Tiers ────────────────────────────────────────────────────
+// Standard: 30 days  |  Bond Pass: 14 days  |  Top Creator (#1–3): 7 days
+export const PAYOUT_COOLDOWNS = {
+  standard:    30 * 86400000,
+  bond_pass:   14 * 86400000,
+  top_creator:  7 * 86400000,
+};
+
+export function getPayoutCooldownMs(hasBondPass, isTopCreator) {
+  if (isTopCreator) return PAYOUT_COOLDOWNS.top_creator;
+  if (hasBondPass)  return PAYOUT_COOLDOWNS.bond_pass;
+  return PAYOUT_COOLDOWNS.standard;
+}
+
+export function getPayoutCooldownDays(hasBondPass, isTopCreator) {
+  if (isTopCreator) return 7;
+  if (hasBondPass)  return 14;
+  return 30;
+}
+
 // ─── Country Stamps — 1-of-1 per country ─────────────────────────────────────
 // Holder earns 3% passive royalty on all gifts sent to streamers from their country.
 // lastActivity tracks when the holder last contributed — if > 30 days ago, stamp is DROPPED.
@@ -139,9 +159,10 @@ export function WalletProvider({ children }) {
   const [balance,      setBalance]      = useState(0);
   const [spent,        setSpent]        = useState(0);
   const [transactions, setTransactions] = useState([]);
-  const [stamps,       setStamps]       = useState({});
-  const [myStamps,     setMyStamps]     = useState([]);
-  const [myMonuments,  setMyMonuments]  = useState([]);
+  const [stamps,        setStamps]        = useState({});
+  const [myStamps,      setMyStamps]      = useState([]);
+  const [myMonuments,   setMyMonuments]   = useState([]);
+  const [lastPayoutTs,  setLastPayoutTs]  = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -155,33 +176,35 @@ export function WalletProvider({ children }) {
         setTransactions(w.transactions ?? []);
         setMyStamps(w.myStamps ?? []);
         setMyMonuments(w.myMonuments ?? []);
+        setLastPayoutTs(w.lastPayoutTs ?? null);
       }
       const saved = stampsRaw ? JSON.parse(stampsRaw) : {};
       setStamps({ ...DEMO_STAMPS, ...saved });
     });
   }, []);
 
-  const persist = useCallback((bal, sp, txs, ms, mm) => {
+  const persist = useCallback((bal, sp, txs, ms, mm, lp) => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
-      balance: bal, spent: sp, transactions: txs, myStamps: ms, myMonuments: mm,
+      balance: bal, spent: sp, transactions: txs,
+      myStamps: ms, myMonuments: mm, lastPayoutTs: lp,
     }));
   }, []);
 
   // Mirror all wallet state into a ref so functional updaters always read
   // the latest values — prevents stale closures in earnCoins/claimStamp/claimMonument.
-  const stateRef = useRef({ balance, spent, transactions, myStamps, myMonuments });
+  const stateRef = useRef({ balance, spent, transactions, myStamps, myMonuments, lastPayoutTs });
   useEffect(() => {
-    stateRef.current = { balance, spent, transactions, myStamps, myMonuments };
-  }, [balance, spent, transactions, myStamps, myMonuments]);
+    stateRef.current = { balance, spent, transactions, myStamps, myMonuments, lastPayoutTs };
+  }, [balance, spent, transactions, myStamps, myMonuments, lastPayoutTs]);
 
   function earnCoins(amount, source, meta = {}) {
     const tx = { id: Date.now(), type: 'earn', amount, source, ...meta, ts: Date.now() };
     setBalance(b => {
       const nb = b + amount;
-      const { spent: sp, myStamps: ms, myMonuments: mm } = stateRef.current;
+      const { spent: sp, myStamps: ms, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
       setTransactions(prev => {
         const nt = [tx, ...prev].slice(0, 200);
-        persist(nb, sp, nt, ms, mm);
+        persist(nb, sp, nt, ms, mm, lp);
         return nt;
       });
       return nb;
@@ -192,12 +215,12 @@ export function WalletProvider({ children }) {
     const tx = { id: Date.now(), type: 'spend', amount, source, ...meta, ts: Date.now() };
     setBalance(b => {
       const nb = Math.max(0, b - amount);
-      const { myStamps: ms, myMonuments: mm } = stateRef.current;
+      const { myStamps: ms, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
       setSpent(s => {
         const ns = s + amount;
         setTransactions(prev => {
           const nt = [tx, ...prev].slice(0, 200);
-          persist(nb, ns, nt, ms, mm);
+          persist(nb, ns, nt, ms, mm, lp);
           return nt;
         });
         return ns;
@@ -216,8 +239,8 @@ export function WalletProvider({ children }) {
     });
     setMyStamps(prev => {
       const next = prev.includes(countryFlag) ? prev : [...prev, countryFlag];
-      const { balance: b, spent: sp, transactions: txs, myMonuments: mm } = stateRef.current;
-      persist(b, sp, txs, next, mm);
+      const { balance: b, spent: sp, transactions: txs, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
+      persist(b, sp, txs, next, mm, lp);
       return next;
     });
   }
@@ -225,10 +248,17 @@ export function WalletProvider({ children }) {
   function claimMonument(monumentId) {
     setMyMonuments(prev => {
       const next = prev.includes(monumentId) ? prev : [...prev, monumentId];
-      const { balance: b, spent: sp, transactions: txs, myStamps: ms } = stateRef.current;
-      persist(b, sp, txs, ms, next);
+      const { balance: b, spent: sp, transactions: txs, myStamps: ms, lastPayoutTs: lp } = stateRef.current;
+      persist(b, sp, txs, ms, next, lp);
       return next;
     });
+  }
+
+  function recordPayout() {
+    const now = Date.now();
+    setLastPayoutTs(now);
+    const { balance: b, spent: sp, transactions: txs, myStamps: ms, myMonuments: mm } = stateRef.current;
+    persist(b, sp, txs, ms, mm, now);
   }
 
   function applyStampRoyalty(giftCoins, recipientCountry) {
@@ -252,8 +282,8 @@ export function WalletProvider({ children }) {
   return (
     <WalletContext.Provider value={{
       balance, spent, transactions, stamps, myStamps, myMonuments,
-      totalEarned, monthlyEarned,
-      earnCoins, spendCoins, claimStamp, claimMonument, applyStampRoyalty,
+      totalEarned, monthlyEarned, lastPayoutTs,
+      earnCoins, spendCoins, claimStamp, claimMonument, applyStampRoyalty, recordPayout,
     }}>
       {children}
     </WalletContext.Provider>
