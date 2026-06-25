@@ -2,22 +2,18 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Image, FlatList, RefreshControl,
-  ActivityIndicator, Animated, Dimensions,
+  Animated, Dimensions,
 } from 'react-native';
 import { WorldMark } from '../components/BondLogo';
 import LinearGradient from 'react-native-linear-gradient';
-import axios from 'axios';
 import { getSocket } from '../services/socket';
-import { getAccessToken } from '../services/authApi';
 import { stringToColor } from '../utils/apiUtils';
-import { SERVER_URL } from '../services/socket';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
 import { DEMO_STAMPS, BOND_MONUMENTS } from '../context/WalletContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
-const CARD_W    = 160;
 const BOND_PINK = '#FF0080';
 
 // ─── Static star field ────────────────────────────────────────────────────────
@@ -370,64 +366,6 @@ const mte = StyleSheet.create({
   btnTxt:         { fontSize: 12, fontWeight: '800' },
 });
 
-// ─── MatchCard ────────────────────────────────────────────────────────────────
-function compatColor(score) {
-  return score >= 75 ? '#57f287' : score >= 50 ? '#fee75c' : '#f04747';
-}
-
-function MatchCard({ match, onPress, index }) {
-  const score   = Math.round(match.compatibility_score || 0);
-  const color   = compatColor(score);
-  const name    = match.display_name || 'Someone';
-  const avatarC = stringToColor(name);
-  const slide   = useRef(new Animated.Value(40)).current;
-  const fade    = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade,  { toValue: 1, duration: 400, delay: index * 80, useNativeDriver: true }),
-      Animated.spring(slide, { toValue: 0, friction: 8, tension: 50, delay: index * 80, useNativeDriver: true }),
-    ]).start();
-  }, []);
-  return (
-    <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
-      <TouchableOpacity style={mc.card} onPress={onPress} activeOpacity={0.88}>
-        {match.photo_url
-          ? <Image source={{ uri: match.photo_url }} style={mc.photo} />
-          : <LinearGradient colors={[avatarC, avatarC + '88']} style={mc.photo}>
-              <Text style={mc.initials}>{name[0]?.toUpperCase()}</Text>
-            </LinearGradient>}
-        <LinearGradient colors={['transparent', 'transparent', '#000000cc']} style={mc.overlay} />
-        <View style={[mc.score, { borderColor: color + '88', backgroundColor: '#000000aa' }]}>
-          <Text style={[mc.scoreTxt, { color }]}>{score}%</Text>
-        </View>
-        <View style={mc.mark}>
-          <WorldMark size={24} color="#ffffff" bondColor={BOND_PINK} />
-        </View>
-        <View style={mc.info}>
-          <View style={mc.nameRow}>
-            {match.country ? <Text style={mc.flag}>{getCountryFlag(match.country)}</Text> : null}
-            <Text style={mc.name} numberOfLines={1}>{name}{match.age ? `, ${match.age}` : ''}</Text>
-          </View>
-          <Text style={mc.loc} numberOfLines={1}>{[match.city, match.country].filter(Boolean).join(', ')}</Text>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-const mc = StyleSheet.create({
-  card:     { width: CARD_W, height: 230, borderRadius: 22, overflow: 'hidden', marginRight: 12, backgroundColor: '#1C1F23' },
-  photo:    { position: 'absolute', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  initials: { color: '#fff', fontSize: 52, fontWeight: '800', opacity: 0.8 },
-  overlay:  { position: 'absolute', width: '100%', height: '100%' },
-  score:    { position: 'absolute', top: 10, left: 10, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
-  scoreTxt: { fontSize: 12, fontWeight: '800' },
-  mark:     { position: 'absolute', top: 8, right: 8, width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000066' },
-  info:     { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, gap: 2 },
-  nameRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  flag:     { fontSize: 14 },
-  name:     { color: '#fff', fontSize: 15, fontWeight: '800', flex: 1 },
-  loc:      { color: '#ffffff99', fontSize: 11 },
-});
 
 // ─── StoryRing ────────────────────────────────────────────────────────────────
 function StoryRing({ user: u, onPress }) {
@@ -570,43 +508,26 @@ export default function HomeScreen({ navigation, user }) {
   const socket = getSocket();
 
   const [onlineUsers,  setOnlineUsers]  = useState([]);
-  const [dailyMatches, setDailyMatches] = useState([]);
   const [icebreaker,   setIcebreaker]   = useState({ question: '', responseCount: 0 });
   const [liveStreams,  setLiveStreams]   = useState([]);
-  const [loadingM,     setLoadingM]     = useState(true);
   const [refreshing,   setRefreshing]   = useState(false);
 
   const scrollY     = useRef(new Animated.Value(0)).current;
   const hdrOpacity  = scrollY.interpolate({ inputRange: [0, 80],  outputRange: [0, 1], extrapolate: 'clamp' });
   const heroScale   = scrollY.interpolate({ inputRange: [0, 140], outputRange: [1, 0.94], extrapolate: 'clamp' });
   const heroOpacity = scrollY.interpolate({ inputRange: [0, 140], outputRange: [1, 0],   extrapolate: 'clamp' });
-  const sectAnim    = useRef([...Array(8)].map(() => new Animated.Value(0))).current;
+  const sectAnim    = useRef([...Array(7)].map(() => new Animated.Value(0))).current;
 
   const heroStats = [
-    { value: onlineUsers.length > 0 ? onlineUsers.length.toLocaleString() : '—', label: 'ONLINE',     color: '#57f287' },
-    { value: liveStreams.length  > 0 ? liveStreams.length.toString()       : '—', label: 'LIVE',       color: '#ef4444' },
-    { value: dailyMatches.length > 0 ? dailyMatches.length.toString()     : '—', label: 'BOND PICKS', color: BOND_PINK },
+    { value: onlineUsers.length > 0 ? onlineUsers.length.toLocaleString() : '—', label: 'ONLINE', color: '#57f287' },
+    { value: liveStreams.length  > 0 ? liveStreams.length.toString()       : '—', label: 'LIVE',   color: '#ef4444' },
   ];
 
-  const fetchBondData = useCallback(async () => {
-    try {
-      const token = await getAccessToken();
-      if (!token) { setLoadingM(false); return; }
-      const [res] = await Promise.allSettled([
-        axios.get(`${SERVER_URL}/api/matches/daily`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 8000,
-        }),
-      ]);
-      if (res.status === 'fulfilled') setDailyMatches(res.value.data.slice(0, 5));
-    } catch {}
-    finally {
-      setLoadingM(false);
-      Animated.stagger(100, sectAnim.map(a =>
-        Animated.spring(a, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true })
-      )).start();
-    }
-  }, [user?.country]);
+  const runEntryAnim = useCallback(() => {
+    Animated.stagger(100, sectAnim.map(a =>
+      Animated.spring(a, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true })
+    )).start();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -632,7 +553,7 @@ export default function HomeScreen({ navigation, user }) {
     socket.on('incoming_call',   onCall);
     socket.on('live_streams',    onLive);
     socket.emit('get_live_streams');
-    fetchBondData();
+    runEntryAnim();
 
     return () => {
       socket.off('connect',        reg);
@@ -641,7 +562,7 @@ export default function HomeScreen({ navigation, user }) {
       socket.off('incoming_call',  onCall);
       socket.off('live_streams',   onLive);
     };
-  }, [fetchBondData]);
+  }, [runEntryAnim]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -650,17 +571,7 @@ export default function HomeScreen({ navigation, user }) {
       socket.emit('get_icebreaker');
       socket.emit('get_live_streams');
     }
-    await fetchBondData();
     setRefreshing(false);
-  }
-
-  function openMatchProfile(match) {
-    navigation.navigate('Profile', {
-      profileUser: { username: match.display_name, country: match.country, language: match.language, socials: {} },
-      bondUserId: match.matched_user_id,
-      compatibilityScore: match.compatibility_score,
-      scoreBreakdown: match.score_breakdown,
-    });
   }
 
   const firstName   = (user?.display_name || user?.username || 'Bond').split(' ')[0];
@@ -830,50 +741,9 @@ export default function HomeScreen({ navigation, user }) {
           />
         </Animated.View>
 
-        {/* ── Daily Bond Matches ── */}
-        <Animated.View style={[s.section, sect(4)]}>
-          <SectionHead
-            title="Your Bond Matches"
-            sub={dailyMatches.length ? `${dailyMatches.length} curated for you today` : 'Updated every day'}
-            action={dailyMatches.length ? 'See All' : null}
-            onAction={() => navigation.navigate('Discover', { tab: 'people' })}
-          />
-          {loadingM ? (
-            <View style={s.loadRow}>
-              <ActivityIndicator color={BOND_PINK} />
-              <Text style={s.loadTxt}>Finding your matches…</Text>
-            </View>
-          ) : dailyMatches.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
-              {dailyMatches.map((m, i) => (
-                <MatchCard key={m.id} match={m} index={i} onPress={() => openMatchProfile(m)} />
-              ))}
-              <TouchableOpacity style={s.moreCard} onPress={() => navigation.navigate('Discover', { tab: 'people' })}>
-                <Text style={[s.moreArrow, { color: BOND_PINK }]}>→</Text>
-                <Text style={s.moreLbl}>See{'\n'}All</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          ) : (
-            <LinearGradient colors={['#130d24', '#0d0820']} style={s.emptyCard}>
-              <View style={s.emptyRow}>
-                <Text style={{ fontSize: 32 }}>✨</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.emptyTitle}>No matches yet</Text>
-                  <Text style={s.emptySub}>Complete your profile to unlock your daily bond matches.</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => navigation.navigate('Me')}>
-                <LinearGradient colors={[BOND_PINK, BOND_PINK + 'bb']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.emptyBtn}>
-                  <Text style={s.emptyBtnTxt}>Complete Profile →</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </LinearGradient>
-          )}
-        </Animated.View>
-
         {/* ── Live Now — only renders when streams are active ── */}
         {liveStreams.length > 0 && (
-          <Animated.View style={[s.section, sect(5)]}>
+          <Animated.View style={[s.section, sect(4)]}>
             <SectionHead
               title="🔴 Live Now"
               sub={`${liveStreams.length} stream${liveStreams.length > 1 ? 's' : ''} happening`}
@@ -908,7 +778,7 @@ export default function HomeScreen({ navigation, user }) {
 
         {/* ── Online Now ── */}
         {onlineUsers.length > 0 && (
-          <Animated.View style={[s.section, sect(6)]}>
+          <Animated.View style={[s.section, sect(5)]}>
             <SectionHead
               title="Online Now"
               sub={`${onlineUsers.length} people around the world`}
@@ -926,7 +796,7 @@ export default function HomeScreen({ navigation, user }) {
 
         {/* ── Bond Streak — visible to all users ── */}
         {streak > 0 && streakTier && (
-          <Animated.View style={[s.section, sect(7)]}>
+          <Animated.View style={[s.section, sect(6)]}>
             <SectionHead
               title="Your Bond Heat"
               sub="1-of-1 footprint — unique to your journey"
@@ -994,20 +864,6 @@ const s = StyleSheet.create({
 
   scroll:  { paddingBottom: 60, gap: 28 },
   section: { paddingHorizontal: 20 },
-
-  // Match cards
-  loadRow:   { alignItems: 'center', paddingVertical: 40, gap: 12, flexDirection: 'row', justifyContent: 'center' },
-  loadTxt:   { color: '#555', fontSize: 13 },
-  moreCard:  { width: 80, height: 230, backgroundColor: '#13132a', borderRadius: 22, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#2F3336', borderStyle: 'dashed' },
-  moreArrow: { fontSize: 28, fontWeight: '300' },
-  moreLbl:   { color: '#555', fontSize: 12, textAlign: 'center', lineHeight: 18 },
-
-  emptyCard:    { borderRadius: 22, padding: 20, gap: 16, borderWidth: 1, borderColor: BOND_PINK + '20' },
-  emptyRow:     { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  emptyTitle:   { color: '#fff', fontSize: 16, fontWeight: '800' },
-  emptySub:     { color: '#555', fontSize: 13, lineHeight: 19, marginTop: 3 },
-  emptyBtn:     { borderRadius: 14, paddingVertical: 13, alignItems: 'center' },
-  emptyBtnTxt:  { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Live now
   liveCard:        { width: 130, borderRadius: 18, overflow: 'hidden' },
