@@ -14,6 +14,7 @@ import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { useTheme } from '../context/ThemeContext';
+import { useWallet } from '../context/WalletContext';
 import { getCountryFlag } from '../utils/countryUtils';
 import { stringToColor } from '../utils/apiUtils';
 const { width } = Dimensions.get('window');
@@ -644,11 +645,11 @@ const ps = StyleSheet.create({
 // ─── MyProfileScreen ──────────────────────────────────────────────────────────
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { colors } = useTheme();
+  const { myStamps, myMonuments } = useWallet();
   const socket = getSocket();
 
   const [profile,         setProfile]         = useState(null);
   const [loading,         setLoading]         = useState(true);
-  const [myExps,          setMyExps]          = useState([]);
   const [matchCount,      setMatchCount]      = useState(0);
   const [flagsPlanted,    setFlagsPlanted]    = useState([]);
   const [showEdit,        setShowEdit]        = useState(false);
@@ -673,13 +674,11 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
       const token = await getAccessToken();
       if (!token) { setLoading(false); return; }
       const headers = { Authorization: `Bearer ${token}` };
-      const [pRes, eRes, mRes] = await Promise.allSettled([
-        axios.get(`${SERVER_URL}/api/profiles/me`,      { headers, timeout: 8000 }),
-        axios.get(`${SERVER_URL}/api/experiences/mine`, { headers, timeout: 8000 }),
-        axios.get(`${SERVER_URL}/api/matches`,          { headers, timeout: 8000 }),
+      const [pRes, mRes] = await Promise.allSettled([
+        axios.get(`${SERVER_URL}/api/profiles/me`, { headers, timeout: 8000 }),
+        axios.get(`${SERVER_URL}/api/matches`,      { headers, timeout: 8000 }),
       ]);
       if (pRes.status === 'fulfilled') setProfile(pRes.value.data);
-      if (eRes.status === 'fulfilled') setMyExps(eRes.value.data);
       if (mRes.status === 'fulfilled') setMatchCount(mRes.value.data.length);
 
       const raw    = await AsyncStorage.getItem('bond_saved_countries');
@@ -935,13 +934,13 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </View>
             <Text style={s.statDot}>·</Text>
             <View style={s.stat}>
-              <Text style={s.statNum}>{flagsPlanted.length ?? '—'}</Text>
-              <Text style={s.statLabel}> Countries</Text>
+              <Text style={s.statNum}>{myStamps.length}</Text>
+              <Text style={s.statLabel}> Stamps</Text>
             </View>
             <Text style={s.statDot}>·</Text>
             <View style={s.stat}>
-              <Text style={s.statNum}>{myExps.length ?? '—'}</Text>
-              <Text style={s.statLabel}> Footprints</Text>
+              <Text style={s.statNum}>{myMonuments.length}</Text>
+              <Text style={s.statLabel}> Monuments</Text>
             </View>
           </View>
 
