@@ -264,7 +264,7 @@ function Leaderboard({ streams }) {
     <View style={lb.wrap}>
       <View style={lb.headingRow}>
         <Text style={lb.heading}>Top Streamers</Text>
-        <Text style={lb.headingSub}>Ranked by Bond Heat</Text>
+        <Text style={lb.headingSub}>Ranked by viewers and gifts</Text>
       </View>
 
       {topStreamers.length > 0
@@ -278,7 +278,7 @@ function Leaderboard({ streams }) {
                   <Text style={lb.avatarTxt}>{(st.hostName || '?')[0].toUpperCase()}</Text>
                 </View>
                 <View style={lb.info}>
-                  <Text style={lb.name}>{flag ? `${flag}  ` : ''}{st.hostName}</Text>
+                  <Text style={lb.name}>{flag ? `${flag} ` : ''}{st.hostName}</Text>
                   <HeatBar heat={bondHeat(st)} />
                 </View>
                 <View style={lb.viewerPill}>
@@ -350,9 +350,10 @@ export default function LiveHubScreen({ navigation, user }) {
     socket.on('challenge_progress', setChallengeProgress);
 
     return () => {
+      socket.off('connect',            fetchAll);
       socket.off('live_streams',       setStreams);
-      socket.off('yearly_challenge');
-      socket.off('challenge_progress');
+      socket.off('yearly_challenge',   setChallenge);
+      socket.off('challenge_progress', setChallengeProgress);
     };
   }, []);
 
@@ -403,11 +404,11 @@ export default function LiveHubScreen({ navigation, user }) {
 }
 
 const s = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#07080f' },
+  container:  { flex: 1, backgroundColor: '#08090d' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  liveDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: '#e53935' },
+  liveDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: BOND_PINK },
   title:      { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-  countPill:  { backgroundColor: '#e5393515', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#e5393528' },
-  countTxt:   { color: '#e57373', fontSize: 12, fontWeight: '800' },
+  countPill:  { backgroundColor: BOND_PINK + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: BOND_PINK + '28' },
+  countTxt:   { color: BOND_PINK, fontSize: 12, fontWeight: '800' },
 });

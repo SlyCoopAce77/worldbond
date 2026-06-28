@@ -14,7 +14,8 @@ import { getSocket } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { useTheme } from '../context/ThemeContext';
-import { useWallet, BOND_MONUMENTS } from '../context/WalletContext';
+import { useWallet, BOND_MONUMENTS, STAMP_CAP, MONUMENT_CAP } from '../context/WalletContext';
+import { useBondPass } from '../context/PremiumContext';
 import { getCountryFlag } from '../utils/countryUtils';
 import { stringToColor } from '../utils/apiUtils';
 const { width } = Dimensions.get('window');
@@ -53,16 +54,16 @@ const STREAM_REGION_CODES = {
 };
 
 const IMPRESSION_PROMPTS = [
-  { key: 'give',   icon: '🌍', prompt: 'One thing my country gave the world…'            },
-  { key: 'draw',   icon: '🤝', prompt: 'What draws me to meeting new people…'            },
-  { key: 'moment', icon: '👣', prompt: 'The moment that left the biggest footprint on me…' },
+  { key: 'give',   color: '#4fc3f7', prompt: 'One thing my country gave the world…'            },
+  { key: 'draw',   color: '#81c784', prompt: 'What draws me to meeting new people…'            },
+  { key: 'moment', color: '#ffb74d', prompt: 'The moment that left the biggest footprint on me…' },
 ];
 
 const UNLOCK_GATES = [
-  { threshold: 1,  label: 'Photos',      icon: '📸' },
-  { threshold: 3,  label: 'Live Stream', icon: '📡' },
-  { threshold: 5,  label: 'Groups',      icon: '👥' },
-  { threshold: 10, label: 'Leaderboard', icon: '🏆' },
+  { threshold: 1,  label: 'Photos'      },
+  { threshold: 3,  label: 'Live Stream' },
+  { threshold: 5,  label: 'Groups'      },
+  { threshold: 10, label: 'Leaderboard' },
 ];
 
 const VIBE_TAGS = [
@@ -159,7 +160,14 @@ function VoiceNotePlayer({ url }) {
         <ActivityIndicator color={BOND_PINK} size="small" />
       ) : (
         <View style={[vn.btn, playing && vn.btnActive]}>
-          <Text style={vn.btnIcon}>{playing ? '⏸' : '▶'}</Text>
+          {playing ? (
+            <View style={vn.pauseIcon}>
+              <View style={vn.pauseBar} />
+              <View style={vn.pauseBar} />
+            </View>
+          ) : (
+            <View style={vn.playIcon} />
+          )}
         </View>
       )}
       <View style={vn.waveform}>
@@ -175,7 +183,9 @@ const vn = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', backgroundColor: BOND_PINK + '12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: BOND_PINK + '30' },
   btn:       { width: 42, height: 42, borderRadius: 21, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
   btnActive: { backgroundColor: '#CC0060' },
-  btnIcon:   { color: '#fff', fontSize: 14 },
+  playIcon:  { width: 0, height: 0, borderTopWidth: 7, borderBottomWidth: 7, borderLeftWidth: 11, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff', marginLeft: 2 },
+  pauseIcon: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  pauseBar:  { width: 3, height: 13, borderRadius: 1.5, backgroundColor: '#fff' },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
   bar:       { width: 3, borderRadius: 2, backgroundColor: BOND_PINK },
   dur:       { color: '#666', fontSize: 12 },
@@ -441,7 +451,7 @@ function ImpressionCard({ data, onEdit }) {
   return (
     <TouchableOpacity style={imp.card} onPress={onEdit} activeOpacity={0.85}>
       <View style={imp.topRow}>
-        <Text style={imp.icon}>{data.icon}</Text>
+        <View style={[imp.dot, { backgroundColor: data.color }]} />
         <Text style={imp.prompt}>{data.prompt}</Text>
       </View>
       {data.answer
@@ -453,7 +463,7 @@ function ImpressionCard({ data, onEdit }) {
 const imp = StyleSheet.create({
   card:      { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', gap: 10 },
   topRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  icon:      { fontSize: 20 },
+  dot:       { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   prompt:    { color: 'rgba(255,255,255,0.38)', fontSize: 12, fontWeight: '700', flex: 1, lineHeight: 17 },
   answer:    { color: '#fff', fontSize: 15, fontStyle: 'italic', lineHeight: 23, paddingLeft: 30 },
   emptyText: { color: 'rgba(255,255,255,0.2)', fontSize: 13, fontStyle: 'italic', paddingLeft: 30 },
@@ -469,7 +479,7 @@ function ImpressionEditModal({ visible, item, onSave, onClose }) {
         <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View style={ie.sheet}>
           <View style={ie.handle} />
-          <Text style={ie.icon}>{item?.icon}</Text>
+          {item?.color && <View style={[ie.colorBar, { backgroundColor: item.color }]} />}
           <Text style={ie.prompt}>{item?.prompt}</Text>
           <TextInput
             style={ie.input}
@@ -495,10 +505,10 @@ function ImpressionEditModal({ visible, item, onSave, onClose }) {
   );
 }
 const ie = StyleSheet.create({
-  sheet:   { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14, paddingBottom: 40 },
-  handle:  { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
-  icon:    { fontSize: 28, textAlign: 'center' },
-  prompt:  { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  sheet:    { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14, paddingBottom: 40 },
+  handle:   { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  colorBar: { height: 3, width: 40, borderRadius: 2, alignSelf: 'center' },
+  prompt:   { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 20 },
   input:   { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 16, padding: 16, fontSize: 15, minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#2a2a2a', lineHeight: 23 },
   count:   { color: '#333', fontSize: 11, textAlign: 'right' },
   saveBtn: { backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
@@ -551,29 +561,43 @@ const be = StyleSheet.create({
 
 // ─── PassportSection ──────────────────────────────────────────────────────────
 const STAMP_ROTATIONS = [-6, -3, 0, 3, 6];
+const MRZ_1 = 'P<WBONDHOLDER<<<<<<<<<<<<<<<<<<<<<<<<<<';
+const MRZ_2 = 'BC0000000<7WB<<<<<<<<<<<<<<<0000000000';
 
-function PassportSection({ bondCount, countries, myStamps, myMonuments, onViewAll }) {
+function PassportSection({ bondCount, countries, myStamps, myMonuments, hasBondPass, onViewAll }) {
   const allUnlocked = bondCount >= 10;
 
-  // ── Unlocked: real passport view ─────────────────────────────────────────
+  const stampCap    = hasBondPass ? STAMP_CAP.bond_pass    : STAMP_CAP.standard;
+  const monumentCap = hasBondPass ? MONUMENT_CAP.bond_pass : MONUMENT_CAP.standard;
+
+  // ── Unlocked: real passport ───────────────────────────────────────────────
   if (allUnlocked) {
     const heldMonuments = myMonuments
       .map(id => BOND_MONUMENTS.find(m => m.id === id))
       .filter(Boolean);
-    const hasAnything = myStamps.length > 0 || heldMonuments.length > 0;
 
     return (
-      <View style={ps.passport}>
+      <LinearGradient colors={['#0d1528', '#06091400']} style={ps.passport}>
 
-        {/* Passport header */}
+        {/* Watermark rings */}
+        <View style={ps.watermark} pointerEvents="none">
+          <View style={ps.wmRing1} />
+          <View style={ps.wmRing2} />
+          <View style={ps.wmRing3} />
+        </View>
+
+        {/* Header */}
         <View style={ps.phRow}>
           <View style={{ flex: 1 }}>
+            <Text style={ps.phNation}>WORLDBOND</Text>
             <Text style={ps.phTitle}>WORLD PASSPORT</Text>
-            <Text style={ps.phIssued}>Issued by WorldBond</Text>
+            <Text style={ps.phIssued}>International Division · All Borders</Text>
           </View>
-          <View style={ps.phSeal}>
-            <View style={ps.phSealRing}>
-              <Text style={ps.phSealTxt}>BOND</Text>
+          <View style={ps.sealOuter}>
+            <View style={ps.sealMiddle}>
+              <View style={ps.sealInner}>
+                <Text style={ps.sealTxt}>WB</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -581,52 +605,68 @@ function PassportSection({ bondCount, countries, myStamps, myMonuments, onViewAl
         <View style={ps.phDivider} />
 
         {/* Country Stamps */}
-        {myStamps.length > 0 && (
-          <View style={ps.phBlock}>
+        <View style={ps.phBlock}>
+          <View style={ps.phLabelRow}>
             <Text style={ps.phSectionLabel}>Country Stamps</Text>
-            <View style={ps.stampGrid}>
-              {myStamps.map((flag, i) => (
-                <View
-                  key={flag}
-                  style={[ps.stampOuter, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}
-                >
-                  <View style={ps.stampInner}>
-                    <Text style={ps.stampFlag}>{flag}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
+            <Text style={ps.phCap}>{myStamps.length} / {stampCap}</Text>
           </View>
-        )}
+          <View style={ps.stampGrid}>
+            {myStamps.map((flag, i) => (
+              <View
+                key={flag}
+                style={[ps.stampOuter, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}
+              >
+                <View style={ps.stampInner}>
+                  <Text style={ps.stampFlag}>{flag}</Text>
+                  <Text style={ps.stampCert}>CERTIFIED</Text>
+                </View>
+              </View>
+            ))}
+            {Array.from({ length: stampCap - myStamps.length }).map((_, i) => (
+              <View key={`es-${i}`} style={ps.stampEmpty} />
+            ))}
+          </View>
+          {myStamps.length === 0 && (
+            <Text style={ps.phHint}>Win a country stamp challenge to add your first seal</Text>
+          )}
+        </View>
 
-        {/* Monument badges */}
-        {heldMonuments.length > 0 && (
-          <View style={ps.phBlock}>
+        <View style={ps.phDivider} />
+
+        {/* Monuments */}
+        <View style={ps.phBlock}>
+          <View style={ps.phLabelRow}>
             <Text style={ps.phSectionLabel}>Monuments</Text>
-            <View style={ps.monumentList}>
-              {heldMonuments.map(m => (
-                <View key={m.id} style={ps.monumentBadge}>
-                  <Text style={ps.monumentIcon}>{m.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={ps.monumentName}>{m.name}</Text>
-                    <Text style={ps.monumentLoc}>{m.country}  {m.location}</Text>
-                  </View>
+            <Text style={ps.phCap}>{heldMonuments.length} / {monumentCap}</Text>
+          </View>
+          <View style={ps.monumentList}>
+            {heldMonuments.map(m => (
+              <View key={m.id} style={ps.monumentBadge}>
+                <View style={ps.monumentAccent} />
+                <Text style={ps.monumentIcon}>{m.icon}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={ps.monumentName}>{m.name}</Text>
+                  <Text style={ps.monumentLoc}>{m.country}  {m.location}</Text>
                 </View>
-              ))}
-            </View>
+                <Text style={ps.visaStamp}>VISA</Text>
+              </View>
+            ))}
+            {Array.from({ length: monumentCap - heldMonuments.length }).map((_, i) => (
+              <View key={`em-${i}`} style={ps.monumentEmpty} />
+            ))}
           </View>
-        )}
+          {heldMonuments.length === 0 && (
+            <Text style={ps.phHint}>Win a monument challenge to earn your first visa</Text>
+          )}
+        </View>
 
-        {/* Empty state */}
-        {!hasAnything && (
-          <View style={ps.phEmpty}>
-            <Text style={ps.phEmptyTitle}>No seals yet</Text>
-            <Text style={ps.phEmptyDesc}>
-              Win a country stamp or monument challenge to leave your mark
-            </Text>
-          </View>
-        )}
-      </View>
+        {/* Machine-readable zone */}
+        <View style={ps.mrz}>
+          <Text style={ps.mrzLine}>{MRZ_1}</Text>
+          <Text style={ps.mrzLine}>{MRZ_2}</Text>
+        </View>
+
+      </LinearGradient>
     );
   }
 
@@ -681,7 +721,7 @@ function PassportSection({ bondCount, countries, myStamps, myMonuments, onViewAl
           const on = bondCount >= gate.threshold;
           return (
             <View key={i} style={[ps.gate, on && ps.gateOn]}>
-              <Text style={ps.gateIcon}>{gate.icon}</Text>
+              <View style={[ps.gateDot, on && { backgroundColor: BOND_PINK }]} />
               <Text style={[ps.gateLabel, on && ps.gateLabelOn]} numberOfLines={1}>{gate.label}</Text>
               {on
                 ? <Text style={ps.gateCheck}>✓</Text>
@@ -714,42 +754,60 @@ const ps = StyleSheet.create({
   gatesRow:         { flexDirection: 'row', gap: 8 },
   gate:             { flex: 1, alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   gateOn:           { backgroundColor: BOND_PINK + '12', borderColor: BOND_PINK + '35' },
-  gateIcon:         { fontSize: 16 },
+  gateDot:          { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 2 },
   gateLabel:        { color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '700', textAlign: 'center' },
   gateLabelOn:      { color: BOND_PINK },
   gateCheck:        { color: BOND_PINK, fontSize: 10, fontWeight: '900' },
   gateThreshold:    { color: 'rgba(255,255,255,0.2)', fontSize: 9, fontWeight: '700' },
   // ── Unlocked passport ─────────────────────────────────────────────────────
-  passport:         { backgroundColor: '#0a0c12', borderRadius: 22, padding: 20, gap: 20, borderWidth: 1.5, borderColor: BOND_PINK + '40', marginHorizontal: 20 },
-  phRow:            { flexDirection: 'row', alignItems: 'center' },
-  phTitle:          { color: '#fff', fontSize: 13, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase' },
-  phIssued:         { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 3, fontWeight: '500', letterSpacing: 0.5 },
-  phSeal:           { alignItems: 'center', justifyContent: 'center' },
-  phSealRing:       { width: 52, height: 52, borderRadius: 26, borderWidth: 2, borderColor: BOND_PINK + '80', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '10' },
-  phSealTxt:        { color: BOND_PINK, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
-  phDivider:        { height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
-  phBlock:          { gap: 12 },
-  phSectionLabel:   { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2 },
+  passport:         { borderRadius: 22, overflow: 'hidden', marginHorizontal: 20, borderWidth: 1.5, borderColor: '#1e3a5f' },
+  // Watermark
+  watermark:        { position: 'absolute', top: 20, right: 20, width: 160, height: 160, alignItems: 'center', justifyContent: 'center' },
+  wmRing1:          { position: 'absolute', width: 160, height: 160, borderRadius: 80, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.04)' },
+  wmRing2:          { position: 'absolute', width: 110, height: 110, borderRadius: 55, borderWidth: 1,   borderColor: 'rgba(255,255,255,0.04)' },
+  wmRing3:          { position: 'absolute', width: 64,  height: 64,  borderRadius: 32, borderWidth: 1,   borderColor: 'rgba(255,255,255,0.04)' },
+  // Header
+  phRow:            { flexDirection: 'row', alignItems: 'center', padding: 18, paddingBottom: 14 },
+  phNation:         { color: BOND_PINK, fontSize: 9, fontWeight: '900', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 3 },
+  phTitle:          { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 2, textTransform: 'uppercase' },
+  phIssued:         { color: 'rgba(255,255,255,0.28)', fontSize: 10, marginTop: 4, fontWeight: '500', letterSpacing: 0.4 },
+  // Seal (3 rings)
+  sealOuter:        { width: 60, height: 60, borderRadius: 30, borderWidth: 1.5, borderColor: BOND_PINK + '45', alignItems: 'center', justifyContent: 'center' },
+  sealMiddle:       { width: 50, height: 50, borderRadius: 25, borderWidth: 1,   borderColor: BOND_PINK + '28', alignItems: 'center', justifyContent: 'center' },
+  sealInner:        { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, borderColor: BOND_PINK + '70', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '14' },
+  sealTxt:          { color: BOND_PINK, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  // Dividers & blocks
+  phDivider:        { height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 18 },
+  phBlock:          { paddingHorizontal: 18, paddingVertical: 14, gap: 12 },
+  phLabelRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  phSectionLabel:   { color: 'rgba(255,255,255,0.38)', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4 },
+  phCap:            { color: 'rgba(255,255,255,0.22)', fontSize: 10, fontWeight: '700' },
+  phHint:           { color: 'rgba(255,255,255,0.2)', fontSize: 12, fontStyle: 'italic', marginTop: 2 },
   // Country stamps
   stampGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  stampOuter:       { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: BOND_PINK + '70', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '08' },
-  stampInner:       { width: 60, height: 60, borderRadius: 30, borderWidth: 1, borderColor: BOND_PINK + '35', alignItems: 'center', justifyContent: 'center' },
-  stampFlag:        { fontSize: 34 },
-  // Monument badges
-  monumentList:     { gap: 10 },
-  monumentBadge:    { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  monumentIcon:     { fontSize: 28 },
-  monumentName:     { color: '#fff', fontSize: 14, fontWeight: '800' },
-  monumentLoc:      { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 },
-  // Empty state
-  phEmpty:          { alignItems: 'center', paddingVertical: 24, gap: 8 },
-  phEmptyTitle:     { color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: '700' },
-  phEmptyDesc:      { color: 'rgba(255,255,255,0.25)', fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  stampOuter:       { width: 88, height: 88, borderRadius: 44, borderWidth: 2, borderColor: BOND_PINK + '55', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '07' },
+  stampInner:       { width: 74, height: 74, borderRadius: 37, borderWidth: 1, borderColor: BOND_PINK + '28', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  stampFlag:        { fontSize: 38 },
+  stampCert:        { color: BOND_PINK, fontSize: 7, fontWeight: '900', letterSpacing: 1.5 },
+  stampEmpty:       { width: 88, height: 88, borderRadius: 44, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.02)' },
+  // Monuments
+  monumentList:     { gap: 8 },
+  monumentBadge:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 12, paddingLeft: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' },
+  monumentAccent:   { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: BOND_PINK + '80' },
+  monumentIcon:     { fontSize: 22 },
+  monumentName:     { color: '#fff', fontSize: 13, fontWeight: '800' },
+  monumentLoc:      { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 1 },
+  visaStamp:        { color: BOND_PINK + '55', fontSize: 8, fontWeight: '900', letterSpacing: 1.5, transform: [{ rotate: '-12deg' }] },
+  monumentEmpty:    { height: 46, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.015)' },
+  // Machine-readable zone
+  mrz:              { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 18, paddingVertical: 12, gap: 3 },
+  mrzLine:          { color: 'rgba(255,255,255,0.09)', fontSize: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1 },
 });
 
 // ─── MyProfileScreen ──────────────────────────────────────────────────────────
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { colors } = useTheme();
+  const { hasBondPass } = useBondPass();
   const { myStamps, myMonuments } = useWallet();
   const socket = getSocket();
 
@@ -1013,7 +1071,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
                   </LinearGradient>
                 )}
               </View>
-              <View style={s.cameraBtn}><Text style={{ fontSize: 13 }}>📷</Text></View>
+              <View style={s.cameraBtn}><Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>+</Text></View>
             </TouchableOpacity>
           </View>
 
@@ -1055,6 +1113,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             countries={flagsPlanted}
             myStamps={myStamps}
             myMonuments={myMonuments}
+            hasBondPass={hasBondPass}
             onViewAll={() => navigation.navigate('CountryStampChallenge', {
               stamp: flagsPlanted.length > 0 ? { flag: getCountryFlag(flagsPlanted[0]) } : {},
             })}
@@ -1078,7 +1137,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Moments ── */}
           <View style={s.section}>
             <View style={s.sectionRow}>
-              <Text style={s.sectionLabel}>📸 Moments</Text>
+              <Text style={s.sectionLabel}>Moments</Text>
               <Text style={s.galleryCount}>{(profile?.gallery_photos || []).length}/6</Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.polaroidRow}>
@@ -1102,30 +1161,28 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           {/* ── Voice Signature ── */}
           <View style={s.section}>
             <View style={s.sectionRow}>
-              <Text style={s.sectionLabel}>🎙 Voice Signature</Text>
+              <Text style={s.sectionLabel}>Voice Signature</Text>
             </View>
             {profile?.voice_note_url ? (
               <VoiceNotePlayer url={profile.voice_note_url} />
             ) : (
-              <TouchableOpacity
-                style={s.voiceEmpty}
-                onPress={() => Alert.alert('Coming soon', 'Voice recording will be available in the next update.')}
-                activeOpacity={0.85}
-              >
-                <Text style={{ fontSize: 30 }}>🎙️</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.voiceEmptyTitle}>Record your voice</Text>
-                  <Text style={s.voiceEmptyHint}>Let people hear you before they Bond</Text>
+              <View style={s.voiceEmpty}>
+                <View style={s.voiceMicIcon}>
+                  <View style={s.voiceMicHead} />
+                  <View style={s.voiceMicStand} />
                 </View>
-                <Text style={s.voiceArrow}>+</Text>
-              </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.voiceEmptyTitle}>Voice Signature</Text>
+                  <Text style={s.voiceEmptyHint}>Coming soon — let people hear you before they Bond</Text>
+                </View>
+              </View>
             )}
           </View>
 
           {/* ── World Impressions ── */}
           <View style={s.section}>
             <View style={s.sectionRow}>
-              <Text style={s.sectionLabel}>👣 World Impressions</Text>
+              <Text style={s.sectionLabel}>World Impressions</Text>
               <Text style={s.sectionSub}>3 questions · your permanent mark</Text>
             </View>
             {IMPRESSION_PROMPTS.map(p => (
@@ -1481,10 +1538,12 @@ const s = StyleSheet.create({
   sectionSub: { color: 'rgba(255,255,255,0.22)', fontSize: 10, fontWeight: '600' },
 
   // Voice
-  voiceEmpty:     { flexDirection: 'row', alignItems: 'center', backgroundColor: GLASS, borderRadius: 18, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed' },
-  voiceEmptyTitle:{ color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700' },
-  voiceEmptyHint: { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 3 },
-  voiceArrow:     { color: BOND_PINK, fontSize: 22, fontWeight: '300' },
+  voiceEmpty:      { flexDirection: 'row', alignItems: 'center', backgroundColor: GLASS, borderRadius: 18, padding: 18, gap: 14, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed' },
+  voiceEmptyTitle: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700' },
+  voiceEmptyHint:  { color: 'rgba(255,255,255,0.28)', fontSize: 12, marginTop: 3 },
+  voiceMicIcon:    { width: 32, height: 32, alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
+  voiceMicHead:    { width: 16, height: 20, borderRadius: 8, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  voiceMicStand:   { width: 2, height: 8, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.3)' },
 
   // Go Live
   liveCard:    { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(229,57,53,0.25)' },

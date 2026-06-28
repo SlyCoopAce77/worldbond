@@ -1,39 +1,85 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Linking } from 'react-native';
+import * as RNIap from 'react-native-iap';
 
 const BOND_PASS_KEY = 'worldbond_bond_pass';
+export const BOND_PASS_SKU = 'com.worldbond.bondpass.monthly';
 
 const BondPassContext = createContext(null);
 
 export function BondPassProvider({ children }) {
   const [hasBondPass, setHasBondPass] = useState(false);
+  const [product, setProduct] = useState(null);
+  const purchaseUpdateSub = useRef(null);
+  const purchaseErrorSub  = useRef(null);
 
   useEffect(() => {
-    async function restore() {
-      const val = await AsyncStorage.getItem(BOND_PASS_KEY);
-      if (val === 'true') { setHasBondPass(true); return; }
+    async function init() {
+      // Restore cached state immediately so UI doesn't flash
+      const cached = await AsyncStorage.getItem(BOND_PASS_KEY);
+      if (cached === 'true') setHasBondPass(true);
+
       // Migrate users who were on plus/pro tiers before the simplification
       const oldTier = await AsyncStorage.getItem('worldbond_tier');
       if (oldTier === 'plus' || oldTier === 'pro') {
         setHasBondPass(true);
         await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
       }
+
+      try {
+        await RNIap.initConnection();
+
+        const subs = await RNIap.getSubscriptions({ skus: [BOND_PASS_SKU] });
+        if (subs.length > 0) setProduct(subs[0]);
+
+        // Validate active subscription state against the store
+        const purchases = await RNIap.getAvailablePurchases();
+        const active = purchases.some(p => p.productId === BOND_PASS_SKU);
+        if (active) {
+          setHasBondPass(true);
+          await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
+        } else if (cached !== 'true') {
+          setHasBondPass(false);
+          await AsyncStorage.removeItem(BOND_PASS_KEY);
+        }
+
+        purchaseUpdateSub.current = RNIap.purchaseUpdatedListener(async (purchase) => {
+          if (purchase.productId !== BOND_PASS_SKU) return;
+          await RNIap.finishTransaction({ purchase, isConsumable: false });
+          setHasBondPass(true);
+          await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
+        });
+
+        purchaseErrorSub.current = RNIap.purchaseErrorListener((error) => {
+          if (error.code !== 'E_USER_CANCELLED') {
+            console.warn('Bond Pass IAP error:', error.message);
+          }
+        });
+      } catch (e) {
+        console.warn('Bond Pass IAP init error:', e);
+      }
     }
-    restore();
+
+    init();
+
+    return () => {
+      purchaseUpdateSub.current?.remove();
+      purchaseErrorSub.current?.remove();
+      RNIap.endConnection();
+    };
   }, []);
 
   async function subscribeToBondPass() {
-    setHasBondPass(true);
-    await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
+    await RNIap.requestSubscription({ sku: BOND_PASS_SKU });
   }
 
-  async function cancelBondPass() {
-    setHasBondPass(false);
-    await AsyncStorage.removeItem(BOND_PASS_KEY);
+  function cancelBondPass() {
+    Linking.openURL('https://apps.apple.com/account/subscriptions');
   }
 
   return (
-    <BondPassContext.Provider value={{ hasBondPass, subscribeToBondPass, cancelBondPass }}>
+    <BondPassContext.Provider value={{ hasBondPass, product, subscribeToBondPass, cancelBondPass }}>
       {children}
     </BondPassContext.Provider>
   );
@@ -44,8 +90,6 @@ export function useBondPass() {
 }
 
 // ─── Backward-compat shim ─────────────────────────────────────────────────────
-// Screens that haven't been migrated yet still call usePremium().
-// This maps hasBondPass → the shape they expect so nothing breaks.
 export function usePremium() {
   const { hasBondPass, subscribeToBondPass, cancelBondPass } = useBondPass();
   const tierInfo = {

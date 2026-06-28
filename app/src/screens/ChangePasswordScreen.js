@@ -31,8 +31,8 @@ export default function ChangePasswordScreen({ route, navigation }) {
     try {
       await axios.post(`${SERVER_URL}/api/auth/forgot-password`, { email }, { timeout: 10000 });
       setStep('code');
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,10 @@ export default function ChangePasswordScreen({ route, navigation }) {
           <Animated.View style={{ opacity: fadeAnim }}>
             <View style={styles.iconWrap}>
               <LinearGradient colors={[BOND_PINK + '30', BOND_PINK + '10']} style={styles.iconBg}>
-                <Text style={styles.icon}>🔑</Text>
+                <View style={styles.iconShape}>
+                  <View style={styles.iconShapeHead} />
+                  <View style={styles.iconShafft} />
+                </View>
               </LinearGradient>
             </View>
 
@@ -96,7 +99,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
 
             {!!error && (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorIcon}>⚠️</Text>
+                <View style={styles.errorIconBox}><Text style={styles.errorIconTxt}>!</Text></View>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -135,11 +138,10 @@ export default function ChangePasswordScreen({ route, navigation }) {
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>6-digit code</Text>
                     <View style={styles.inputWrap}>
-                      <Text style={styles.inputIcon}>📬</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="• • • • • •"
-                        placeholderTextColor="#536471"
+                        placeholderTextColor="rgba(255,255,255,0.3)"
                         value={code}
                         onChangeText={t => { setCode(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
                         keyboardType="number-pad"
@@ -153,11 +155,10 @@ export default function ChangePasswordScreen({ route, navigation }) {
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>New password</Text>
                     <View style={styles.inputWrap}>
-                      <Text style={styles.inputIcon}>🔒</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="At least 8 characters"
-                        placeholderTextColor="#536471"
+                        placeholderTextColor="rgba(255,255,255,0.35)"
                         value={newPassword}
                         onChangeText={t => { setNewPassword(t); setError(''); }}
                         secureTextEntry
@@ -171,11 +172,10 @@ export default function ChangePasswordScreen({ route, navigation }) {
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Confirm new password</Text>
                     <View style={styles.inputWrap}>
-                      <Text style={styles.inputIcon}>🔒</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Repeat password"
-                        placeholderTextColor="#536471"
+                        placeholderTextColor="rgba(255,255,255,0.35)"
                         value={confirmPassword}
                         onChangeText={t => { setConfirmPassword(t); setError(''); }}
                         secureTextEntry
@@ -218,7 +218,7 @@ export default function ChangePasswordScreen({ route, navigation }) {
             {step === 'done' && (
               <>
                 <View style={styles.successCard}>
-                  <Text style={styles.successIcon}>✅</Text>
+                  <Text style={styles.successCheckmark}>✓</Text>
                   <Text style={styles.successTitle}>Password changed!</Text>
                   <Text style={styles.successSub}>
                     Use your new password the next time you sign in.
@@ -251,27 +251,29 @@ const styles = StyleSheet.create({
   backBtnInner: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
 
-  iconWrap: { alignItems: 'center', marginBottom: 24 },
-  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BOND_PINK + '40' },
-  icon:     { fontSize: 36 },
+  iconWrap:      { alignItems: 'center', marginBottom: 24 },
+  iconBg:        { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BOND_PINK + '40' },
+  iconShape:     { alignItems: 'center', gap: 4 },
+  iconShapeHead: { width: 26, height: 26, borderRadius: 13, borderWidth: 3, borderColor: BOND_PINK },
+  iconShafft:    { width: 3, height: 16, borderRadius: 2, backgroundColor: BOND_PINK },
 
   header:   { marginBottom: 28, alignItems: 'center' },
   title:    { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.5, textAlign: 'center' },
-  subtitle: { fontSize: 15, color: '#536471', marginTop: 8, textAlign: 'center', lineHeight: 22 },
+  subtitle: { fontSize: 15, color: '#888', marginTop: 8, textAlign: 'center', lineHeight: 22 },
 
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
-  errorIcon:   { fontSize: 16 },
-  errorText:   { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
+  errorBanner:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
+  errorIconBox: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f04747', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  errorIconTxt: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  errorText:    { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
   emailBox:   { backgroundColor: '#16181C', borderRadius: 14, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#2F3336' },
-  emailLabel: { color: '#536471', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  emailLabel: { color: '#888', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
   emailValue: { color: '#e0e0f0', fontSize: 15 },
 
   form:       { gap: 20, marginBottom: 8 },
   fieldGroup: { gap: 8 },
-  label:      { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  label:      { color: '#888', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   inputWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
-  inputIcon:  { fontSize: 16, marginRight: 10 },
   input:      { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
   check:      { color: '#4ade80', fontSize: 16, fontWeight: '700' },
 
@@ -280,10 +282,10 @@ const styles = StyleSheet.create({
   btnGrad:{ paddingVertical: 19, alignItems: 'center', borderRadius: 18 },
   btnText:{ color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
 
-  successCard:  { backgroundColor: '#16181C', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#2F3336', marginBottom: 8 },
-  successIcon:  { fontSize: 40, marginBottom: 4 },
-  successTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  successSub:   { color: '#666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  successCard:      { backgroundColor: '#16181C', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#2F3336', marginBottom: 8 },
+  successCheckmark: { color: '#4ade80', fontSize: 44, fontWeight: '900', marginBottom: 4 },
+  successTitle:     { color: '#fff', fontSize: 18, fontWeight: '800' },
+  successSub:       { color: '#666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   resendBtn:  { paddingVertical: 16, alignItems: 'center' },
   resendText: { color: BOND_PINK, fontSize: 14, fontWeight: '600' },

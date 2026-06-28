@@ -3,6 +3,7 @@ const multer = require('multer');
 const { requireAuth } = require('../auth/auth.middleware');
 const { getProfile, upsertProfile, updateVoiceNote, updateGalleryPhotos, listProfiles } = require('./profiles.service');
 const { uploadBuffer } = require('../cloudinary');
+const { query } = require('../database/db');
 
 const audioUpload = multer({
   storage: multer.memoryStorage(),
@@ -21,6 +22,51 @@ router.get('/', async (req, res) => {
   try {
     const profiles = await listProfiles(req.userId, req.query);
     res.json({ profiles });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/profiles/blocks — list users blocked by the current user
+router.get('/blocks', async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.user_id, p.display_name, p.photo_url, p.country, b.created_at AS blocked_at
+       FROM user_blocks b
+       JOIN profiles p ON p.user_id = b.blocked_id
+       WHERE b.blocker_id = $1
+       ORDER BY b.created_at DESC`,
+      [req.userId],
+    );
+    res.json({ blocked: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/profiles/blocks/:userId — block a user
+router.post('/blocks/:userId', async (req, res) => {
+  const { userId } = req.params;
+  if (userId === req.userId) return res.status(400).json({ error: 'Cannot block yourself' });
+  try {
+    await query(
+      `INSERT INTO user_blocks (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [req.userId, userId],
+    );
+    res.json({ blocked: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/profiles/blocks/:userId — unblock a user
+router.delete('/blocks/:userId', async (req, res) => {
+  try {
+    await query(
+      `DELETE FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2`,
+      [req.userId, req.params.userId],
+    );
+    res.json({ blocked: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

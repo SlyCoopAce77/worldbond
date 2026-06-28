@@ -10,11 +10,12 @@ import { getSocket } from '../services/socket';
 import { stringToColor } from '../utils/apiUtils';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
-import { DEMO_STAMPS, BOND_MONUMENTS } from '../context/WalletContext';
+import { useWallet, BOND_MONUMENTS } from '../context/WalletContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
+const BOND_GOLD = '#FFB700';
 
 // ─── Static star field ────────────────────────────────────────────────────────
 const HERO_STARS = [...Array(38)].map(() => ({
@@ -239,9 +240,9 @@ const ctc = StyleSheet.create({
 
 // ─── PassportTeaser ───────────────────────────────────────────────────────────
 function PassportTeaser({ stamps, onPress }) {
-  const flags = Object.keys(stamps).slice(0, 6);
-  const extra = Math.max(0, Object.keys(stamps).length - 6);
-  const count = Object.keys(stamps).length;
+  const flags = stamps.slice(0, 6);
+  const extra = Math.max(0, stamps.length - 6);
+  const count = stamps.length;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.88} style={pte.card}>
       <View style={pte.header}>
@@ -505,6 +506,7 @@ function greeting() {
 export default function HomeScreen({ navigation, user }) {
   const { unreadCount } = useNotifications();
   const { streak, longest, tier: streakTier, milestones, primary } = useStreak();
+  const { myStamps, balance } = useWallet();
   const socket = getSocket();
 
   const [onlineUsers,  setOnlineUsers]  = useState([]);
@@ -571,11 +573,12 @@ export default function HomeScreen({ navigation, user }) {
       socket.emit('get_icebreaker');
       socket.emit('get_live_streams');
     }
+    await new Promise(r => setTimeout(r, 1000));
     setRefreshing(false);
   }
 
   const firstName   = (user?.display_name || user?.username || 'Bond').split(' ')[0];
-  const countryFlag = user?.country ? getCountryFlag(user.country) : '🌍';
+  const countryFlag = user?.country ? getCountryFlag(user.country) : '';
 
   function sect(i) {
     return {
@@ -583,8 +586,6 @@ export default function HomeScreen({ navigation, user }) {
       transform: [{ translateY: sectAnim[i].interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
     };
   }
-
-  const passportFlags = Object.keys(DEMO_STAMPS);
 
   return (
     <View style={s.container}>
@@ -631,6 +632,11 @@ export default function HomeScreen({ navigation, user }) {
               <View style={s.heroInner}>
                 <View style={s.heroLogoBar}>
                   <HomeLogoMark />
+                  <View style={s.headerRight}>
+                  <TouchableOpacity style={s.walletPill} onPress={() => navigation.navigate('Wallet', { currentUser: user })} activeOpacity={0.85}>
+                    <WorldMark size={14} color={BOND_GOLD} bondColor={BOND_GOLD} />
+                    <Text style={s.walletPillTxt}>{balance.toLocaleString()}</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity style={[s.notifBtn, unreadCount > 0 && s.notifBtnActive]} onPress={() => navigation.navigate('Notifications')}>
                     {/* Bell shape */}
                     <View style={s.bellWrap}>
@@ -647,6 +653,7 @@ export default function HomeScreen({ navigation, user }) {
                       </>
                     )}
                   </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={s.heroGreetBlock}>
                   <Text style={s.greetLine}>{greeting()}</Text>
@@ -724,11 +731,9 @@ export default function HomeScreen({ navigation, user }) {
         {/* ── World Passport ── */}
         <Animated.View style={[s.section, sect(2)]}>
           <PassportTeaser
-            stamps={DEMO_STAMPS}
+            stamps={myStamps}
             onPress={() => navigation.navigate('CountryStampChallenge', {
-              stamp: passportFlags.length > 0
-                ? { flag: passportFlags[0], ...(DEMO_STAMPS[passportFlags[0]] || {}) }
-                : {},
+              stamp: myStamps.length > 0 ? { flag: myStamps[0] } : {},
             })}
           />
         </Animated.View>
@@ -744,10 +749,15 @@ export default function HomeScreen({ navigation, user }) {
         {/* ── Live Now — only renders when streams are active ── */}
         {liveStreams.length > 0 && (
           <Animated.View style={[s.section, sect(4)]}>
-            <SectionHead
-              title="🔴 Live Now"
-              sub={`${liveStreams.length} stream${liveStreams.length > 1 ? 's' : ''} happening`}
-            />
+            <View style={sh.row}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={s.liveSectionDot} />
+                  <Text style={sh.title}>Live Now</Text>
+                </View>
+                <Text style={sh.sub}>{liveStreams.length} stream{liveStreams.length > 1 ? 's' : ''} happening</Text>
+              </View>
+            </View>
             <FlatList
               horizontal
               data={liveStreams}
@@ -765,10 +775,10 @@ export default function HomeScreen({ navigation, user }) {
                       <View style={s.liveDot} />
                       <Text style={s.liveBadgeTxt}>LIVE</Text>
                     </View>
-                    <Text style={s.liveEmoji}>{sv.hostCountry?.split(' ')[0] || '🌍'}</Text>
+                    <Text style={s.liveEmoji}>{sv.hostCountry?.split(' ')[0] || ''}</Text>
                     <Text style={s.liveName} numberOfLines={1}>{sv.hostName}</Text>
                     <Text style={s.liveStreamTitle} numberOfLines={1}>{sv.title}</Text>
-                    <Text style={s.liveViewers}>👁 {sv.viewerCount}</Text>
+                    <Text style={s.liveViewers}>{sv.viewerCount} watching</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
@@ -789,7 +799,7 @@ export default function HomeScreen({ navigation, user }) {
               keyExtractor={u => u.socketId}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 6 }}
-              renderItem={({ item }) => <StoryRing user={item} onPress={() => {}} />}
+              renderItem={({ item }) => <StoryRing user={item} onPress={() => navigation.navigate('Profile', { profileUser: item, bondUserId: item.userId })} />}
             />
           </Animated.View>
         )}
@@ -806,7 +816,7 @@ export default function HomeScreen({ navigation, user }) {
               primary={primary}
               milestones={milestones}
               longest={longest}
-              onPress={() => {}}
+              onPress={() => navigation.navigate('Wallet', { currentUser: user })}
             />
           </Animated.View>
         )}
@@ -845,6 +855,9 @@ const s = StyleSheet.create({
   heroInner: { paddingHorizontal: 22, paddingTop: 6, gap: 20 },
 
   heroLogoBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerRight:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  walletPill:    { flexDirection: 'row', alignItems: 'center', gap: 5, height: 36, paddingHorizontal: 12, backgroundColor: BOND_GOLD + '15', borderRadius: 12, borderWidth: 1, borderColor: BOND_GOLD + '40' },
+  walletPillTxt: { color: BOND_GOLD, fontSize: 13, fontWeight: '800' },
   notifBtn:       { flexDirection: 'row', alignItems: 'center', gap: 0, height: 36, paddingHorizontal: 12, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   notifBtnActive: { borderColor: BOND_PINK + '55', backgroundColor: BOND_PINK + '12' },
   bellWrap:       { alignItems: 'center', gap: 0 },
@@ -875,4 +888,5 @@ const s = StyleSheet.create({
   liveName:        { color: '#fff', fontWeight: '800', fontSize: 13 },
   liveStreamTitle: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
   liveViewers:     { color: '#e57373', fontSize: 11, fontWeight: '700' },
+  liveSectionDot:  { width: 9, height: 9, borderRadius: 5, backgroundColor: '#ef4444' },
 });

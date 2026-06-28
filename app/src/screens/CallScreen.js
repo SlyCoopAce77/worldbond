@@ -88,7 +88,7 @@ const ctrl = StyleSheet.create({
   circle:       { width: 60, height: 60, borderRadius: 30, backgroundColor: '#ffffff18', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ffffff22' },
   circleOn:     { backgroundColor: '#ffffff33', borderColor: '#ffffff55' },
   circleDanger: { backgroundColor: '#e5393533', borderColor: '#e5393555' },
-  icon:         { fontSize: 24 },
+  icon:         { fontSize: 13, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
   label:        { color: '#ffffff99', fontSize: 11, fontWeight: '600' },
 });
 
@@ -196,7 +196,7 @@ export default function CallScreen({ route, navigation }) {
         {/* ── Top area ── */}
         <View style={styles.top}>
           <Text style={styles.callTypeChip}>
-            {isVideo ? '📹  Video Call' : '📞  Voice Call'}
+            {isVideo ? 'Video Call' : 'Voice Call'}
           </Text>
         </View>
 
@@ -242,15 +242,15 @@ export default function CallScreen({ route, navigation }) {
           {status === 'connected' && (
             <>
               <View style={styles.ctrlRow}>
-                <CtrlBtn icon={muted ? '🔇' : '🎤'} label={muted ? 'Unmute' : 'Mute'} on={muted} onPress={() => setMuted(m => !m)} />
-                <CtrlBtn icon={isVideo ? '📹' : '🔊'} label={speaker ? 'Speaker Off' : 'Speaker'} on={speaker} onPress={() => setSpeaker(s => !s)} />
-                <CtrlBtn icon="⌨️" label="Keypad" on={keypad} onPress={() => setKeypad(k => !k)} />
-                <CtrlBtn icon="💬" label="Message" onPress={() => navigation.goBack()} />
+                <CtrlBtn icon={muted ? 'off' : 'MIC'} label={muted ? 'Unmute' : 'Mute'} on={muted} onPress={() => setMuted(m => !m)} />
+                <CtrlBtn icon={speaker ? 'SPK' : 'ear'} label={speaker ? 'Speaker Off' : 'Speaker'} on={speaker} onPress={() => setSpeaker(s => !s)} />
+                <CtrlBtn icon="#" label="Keypad" on={keypad} onPress={() => setKeypad(k => !k)} />
+                <CtrlBtn icon="→" label="Message" onPress={() => navigation.goBack()} />
               </View>
 
               <TouchableOpacity style={styles.endBtn} onPress={() => endCall(true)}>
                 <LinearGradient colors={['#e53935', '#b71c1c']} style={styles.endBtnGrad}>
-                  <Text style={styles.endBtnIcon}>📵</Text>
+                  <Text style={styles.endBtnIcon}>✕</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </>
@@ -260,12 +260,12 @@ export default function CallScreen({ route, navigation }) {
           {status === 'calling' && (
             <>
               <View style={styles.ctrlRow}>
-                <CtrlBtn icon={muted ? '🔇' : '🎤'} label={muted ? 'Unmute' : 'Mute'} on={muted} onPress={() => setMuted(m => !m)} />
-                <CtrlBtn icon="🔊" label="Speaker" on={speaker} onPress={() => setSpeaker(s => !s)} />
+                <CtrlBtn icon={muted ? 'off' : 'MIC'} label={muted ? 'Unmute' : 'Mute'} on={muted} onPress={() => setMuted(m => !m)} />
+                <CtrlBtn icon={speaker ? 'SPK' : 'ear'} label="Speaker" on={speaker} onPress={() => setSpeaker(s => !s)} />
               </View>
               <TouchableOpacity style={styles.endBtn} onPress={() => endCall(true)}>
                 <LinearGradient colors={['#e53935', '#b71c1c']} style={styles.endBtnGrad}>
-                  <Text style={styles.endBtnIcon}>📵</Text>
+                  <Text style={styles.endBtnIcon}>✕</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </>
@@ -277,7 +277,7 @@ export default function CallScreen({ route, navigation }) {
               <View style={styles.incomingBtnWrap}>
                 <TouchableOpacity style={styles.rejectBtn} onPress={rejectCall}>
                   <LinearGradient colors={['#e53935', '#b71c1c']} style={styles.incomingBtnGrad}>
-                    <Text style={styles.incomingBtnIcon}>📵</Text>
+                    <Text style={styles.incomingBtnIcon}>✕</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <Text style={styles.incomingBtnLabel}>Decline</Text>
@@ -286,7 +286,7 @@ export default function CallScreen({ route, navigation }) {
               <View style={styles.incomingBtnWrap}>
                 <TouchableOpacity style={styles.acceptBtn} onPress={acceptCall}>
                   <LinearGradient colors={['#43a047', '#2e7d32']} style={styles.incomingBtnGrad}>
-                    <Text style={styles.incomingBtnIcon}>{isVideo ? '📹' : '📞'}</Text>
+                    <Text style={styles.incomingBtnIcon}>{isVideo ? 'VID' : '↗'}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <Text style={styles.incomingBtnLabel}>Accept</Text>

@@ -8,7 +8,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { login } from '../../services/authApi';
 import { WorldWordmark } from '../../components/BondLogo';
 
-const AMBER   = '#FF0080';   // Frequency Blue
+const AMBER   = '#FF0080';
 const AMBER_D = '#CC0060';
 
 export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotPassword }) {
@@ -94,7 +94,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                     <TextInput
                       style={s.input}
                       placeholder="you@example.com"
-                      placeholderTextColor="#2e2e2e"
+                      placeholderTextColor="#555555"
                       value={email}
                       onChangeText={t => { setEmail(t); setError(''); }}
                       keyboardType="email-address"
@@ -118,7 +118,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                       ref={passwordRef}
                       style={s.input}
                       placeholder="Your password"
-                      placeholderTextColor="#2e2e2e"
+                      placeholderTextColor="#555555"
                       value={password}
                       onChangeText={t => { setPassword(t); setError(''); }}
                       secureTextEntry={!showPass}

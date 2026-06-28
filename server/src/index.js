@@ -13,6 +13,11 @@ const { addStory, getStoriesGrouped } = require('./stories');
 const { isConfigured: cloudinaryEnabled, uploadBuffer } = require('./cloudinary');
 const { requireAuth } = require('./auth/auth.middleware');
 
+// Stripe
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const SERVER_BASE = 'https://worldbond-server-production.up.railway.app';
+
 // Bond platform — persistent services
 const { runMigrations } = require('./database/db');
 const authRoutes        = require('./auth/auth.routes');
@@ -146,6 +151,90 @@ app.post('/api/debug/notify', async (req, res) => {
   const ev = events[type] || events.follower;
   ioInstance.emit(ev[0], ev[1]);
   res.json({ ok: true, fired: ev[0], userId: uid });
+});
+
+// ── Stripe: creator connects their bank account ───────────────────────────────
+app.post('/creator/connect-stripe', requireAuth, async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+  try {
+    const { userId, email } = req.body;
+    const { query: db } = require('./database/db');
+
+    // Check if creator already has a Stripe account
+    const existing = await db('SELECT stripe_account_id FROM profiles WHERE user_id = $1', [userId]);
+    let accountId = existing.rows[0]?.stripe_account_id;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email,
+        capabilities: { transfers: { requested: true } },
+      });
+      accountId = account.id;
+      await db('UPDATE profiles SET stripe_account_id = $1 WHERE user_id = $2', [accountId, userId]);
+    }
+
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${SERVER_BASE}/creator/stripe-refresh`,
+      return_url:  `${SERVER_BASE}/creator/stripe-return?userId=${userId}`,
+      type: 'account_onboarding',
+    });
+    res.json({ url: link.url });
+  } catch (err) {
+    console.error('[Stripe] connect error:', err.message);
+    res.status(500).json({ error: 'Could not create Stripe link' });
+  }
+});
+
+// Stripe returns here after creator completes onboarding
+app.get('/creator/stripe-return', async (req, res) => {
+  res.send('<html><body style="background:#000;color:#fff;font-family:sans-serif;text-align:center;padding-top:100px"><h2>Bank account connected!</h2><p>You can close this tab and return to Bond.</p></body></html>');
+});
+app.get('/creator/stripe-refresh', async (req, res) => {
+  res.send('<html><body style="background:#000;color:#fff;font-family:sans-serif;text-align:center;padding-top:100px"><h2>Session expired</h2><p>Please go back to the Bond app and try connecting again.</p></body></html>');
+});
+
+// ── Stripe: pay out a creator ─────────────────────────────────────────────────
+app.post('/creator/payout', requireAuth, async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+  try {
+    const { userId, stripeAccountId, amountCents } = req.body;
+    if (!stripeAccountId || !amountCents || amountCents < 100) {
+      return res.status(400).json({ error: 'Invalid payout request' });
+    }
+    const transfer = await stripe.transfers.create({
+      amount: amountCents,
+      currency: 'usd',
+      destination: stripeAccountId,
+      metadata: { userId },
+    });
+    res.json({ transfer: transfer.id });
+  } catch (err) {
+    console.error('[Stripe] payout error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Coins: credit after Apple/Google IAP purchase ─────────────────────────────
+app.post('/coins/credit', requireAuth, async (req, res) => {
+  try {
+    const { userId, sku } = req.body;
+    const coinMap = {
+      'com.worldbond.coins.100':  100,
+      'com.worldbond.coins.500':  550,   // 500 + 50 bonus
+      'com.worldbond.coins.1200': 1400,  // 1200 + 200 bonus
+      'com.worldbond.coins.3000': 3600,  // 3000 + 600 bonus
+    };
+    const coins = coinMap[sku];
+    if (!coins) return res.status(400).json({ error: 'Unknown product' });
+    const { query: db } = require('./database/db');
+    await db('UPDATE profiles SET coin_balance = COALESCE(coin_balance, 0) + $1 WHERE user_id = $2', [coins, userId]);
+    res.json({ ok: true, credited: coins });
+  } catch (err) {
+    console.error('[Coins] credit error:', err.message);
+    res.status(500).json({ error: 'Could not credit coins' });
+  }
 });
 
 setupSocket(io);

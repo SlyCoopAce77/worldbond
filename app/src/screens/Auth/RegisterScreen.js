@@ -127,7 +127,7 @@ function formatDOB(monthIdx, dayIdx, yearStr) {
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
+export default function RegisterScreen({ onSuccess, onBack, onGoLogin, onOpenTerms, onOpenPrivacy }) {
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
   const [confirm, setConfirm]         = useState('');
@@ -197,7 +197,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
         password,
         toISO(dobMonth, dobDay, YEARS[dobYear])
       );
-      onSuccess(result);
+      onSuccess({ ...result, dob: toISO(dobMonth, dobDay, YEARS[dobYear]) });
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong. Try again.');
     } finally {
@@ -255,7 +255,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                   <TextInput
                     style={styles.input}
                     placeholder="you@example.com"
-                    placeholderTextColor="#2e2e2e"
+                    placeholderTextColor="#555555"
                     value={email}
                     onChangeText={t => { setEmail(t); setError(''); }}
                     keyboardType="email-address"
@@ -275,7 +275,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                     ref={passwordRef}
                     style={styles.input}
                     placeholder="Create a strong password"
-                    placeholderTextColor="#2e2e2e"
+                    placeholderTextColor="#555555"
                     value={password}
                     onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPass}
@@ -313,7 +313,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
                     ref={confirmRef}
                     style={styles.input}
                     placeholder="Repeat your password"
-                    placeholderTextColor="#2e2e2e"
+                    placeholderTextColor="#555555"
                     value={confirm}
                     onChangeText={t => { setConfirm(t); setError(''); }}
                     secureTextEntry={!showConfirm}
@@ -371,9 +371,9 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
 
             <Text style={styles.terms}>
               By creating an account you agree to our{' '}
-              <Text style={styles.termsLink}>Terms of Service</Text>
+              <Text style={styles.termsLink} onPress={onOpenTerms}>Terms of Service</Text>
               {' '}and{' '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>.
+              <Text style={styles.termsLink} onPress={onOpenPrivacy}>Privacy Policy</Text>.
             </Text>
 
             <View style={styles.divider}>
@@ -446,7 +446,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin }) {
 
               {/* Warning */}
               <View style={dob.warningBox}>
-                <Text style={dob.warningTitle}>⚠️  Age Verification Required</Text>
+                <Text style={dob.warningTitle}>Age Verification Required</Text>
                 <Text style={dob.warningText}>
                   WorldBond is strictly 18+. Your date of birth is{' '}
                   <Text style={{ color: '#fff', fontWeight: '700' }}>permanently stored and cannot be changed</Text>

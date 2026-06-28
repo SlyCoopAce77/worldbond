@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Alert,
+  SafeAreaView, Alert, Modal, Linking, ActivityIndicator,
 } from 'react-native';
+import * as RNIap from 'react-native-iap';
 import LinearGradient from 'react-native-linear-gradient';
 import { WorldMark } from '../components/BondLogo';
 import { useBondPass } from '../context/PremiumContext';
@@ -19,8 +20,16 @@ const BOND_GOLD   = '#FFB700';
 const BASE_PAYOUT      = 0.70;
 const PASS_PAYOUT      = 0.75;
 const MIN_PAYOUT_COINS = 2500;
-// Top creator threshold: roughly #3 monthly creator earnings
 const TOP_CREATOR_COINS_THRESHOLD = 40000;
+
+const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
+
+const COIN_PACKS = [
+  { sku: 'com.worldbond.coins.100',  coins: 100,  price: '$0.99',  bonus: null,          popular: false },
+  { sku: 'com.worldbond.coins.500',  coins: 500,  price: '$3.99',  bonus: '+50 bonus',   popular: false },
+  { sku: 'com.worldbond.coins.1200', coins: 1200, price: '$8.99',  bonus: '+200 bonus',  popular: true  },
+  { sku: 'com.worldbond.coins.3000', coins: 3000, price: '$19.99', bonus: '+600 bonus',  popular: false },
+];
 
 const TABS = ['Earnings', 'Spending', 'Creators', 'Footprints'];
 
@@ -53,11 +62,11 @@ function relTime(ts) {
 
 function sourceLabel(source) {
   const map = {
-    gift_received: '🎁 Gift received',
-    stamp_royalty: '🌍 Stamp royalty',
-    live_gift:     '🎁 Gift sent',
-    demo_seed:     '🎉 Welcome bonus',
-    challenge_win: '🏆 Challenge win',
+    gift_received: 'Gift received',
+    stamp_royalty: 'Stamp royalty',
+    live_gift:     'Gift sent',
+    demo_seed:     'Welcome bonus',
+    challenge_win: 'Challenge win',
   };
   return map[source] || source;
 }
@@ -105,7 +114,7 @@ function CreatorPodium({ creators }) {
         <View style={[pod.avatar, { backgroundColor: '#555555' }]}>
           <Text style={pod.avatarTxt}>{second.username[0]}</Text>
         </View>
-        <Text style={pod.rank}>{second.badge.icon}</Text>
+        <Text style={pod.rank}>#2</Text>
         <Text style={pod.name} numberOfLines={1}>{second.username}</Text>
         <Text style={pod.flag}>{second.country}</Text>
         <LinearGradient colors={['#555555', '#444444']} style={[pod.plinth, { height: 60 }]}>
@@ -118,7 +127,7 @@ function CreatorPodium({ creators }) {
         <View style={[pod.avatar, pod.avatarGold]}>
           <Text style={pod.avatarTxt}>{first.username[0]}</Text>
         </View>
-        <Text style={pod.rank}>{first.badge.icon}</Text>
+        <Text style={pod.rank}>#1</Text>
         <Text style={pod.name} numberOfLines={1}>{first.username}</Text>
         <Text style={pod.flag}>{first.country}</Text>
         <LinearGradient colors={['#c8a600', '#a07800']} style={[pod.plinth, { height: 90 }]}>
@@ -131,7 +140,7 @@ function CreatorPodium({ creators }) {
         <View style={[pod.avatar, { backgroundColor: '#7c4a1e' }]}>
           <Text style={pod.avatarTxt}>{third.username[0]}</Text>
         </View>
-        <Text style={pod.rank}>{third.badge.icon}</Text>
+        <Text style={pod.rank}>#3</Text>
         <Text style={pod.name} numberOfLines={1}>{third.username}</Text>
         <Text style={pod.flag}>{third.country}</Text>
         <LinearGradient colors={['#7c4a1e', '#5a3210']} style={[pod.plinth, { height: 40 }]}>
@@ -148,7 +157,7 @@ const pod = StyleSheet.create({
   avatar:     { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   avatarGold: { backgroundColor: '#b8860b', borderWidth: 2, borderColor: '#ffd700' },
   avatarTxt:  { color: '#fff', fontSize: 22, fontWeight: '900' },
-  rank:       { fontSize: 20, marginBottom: 2 },
+  rank:       { fontSize: 13, fontWeight: '900', color: 'rgba(255,255,255,0.5)', marginBottom: 2 },
   name:       { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   flag:       { fontSize: 16, marginTop: 2, marginBottom: 6 },
   plinth:     { width: '100%', borderTopLeftRadius: 10, borderTopRightRadius: 10, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, gap: 2 },
@@ -202,11 +211,14 @@ export default function WalletScreen({ navigation, route }) {
   const { hasBondPass } = useBondPass();
   const {
     balance, transactions, myStamps, myMonuments, monthlyEarned,
-    stamps, earnCoins, lastPayoutTs, recordPayout,
+    stamps, lastPayoutTs, recordPayout,
   } = useWallet();
 
-  const [activeTab,  setActiveTab]  = useState('Earnings');
-  const [idVerified, setIdVerified] = useState(false);
+  const [activeTab,      setActiveTab]      = useState('Earnings');
+  const [idVerified,     setIdVerified]     = useState(false);
+  const [showCoinModal,  setShowCoinModal]  = useState(false);
+  const [purchasing,     setPurchasing]     = useState(false);
+  const [payingOut,      setPayingOut]      = useState(false);
 
   const payoutRate    = hasBondPass ? PASS_PAYOUT : BASE_PAYOUT;
   const availableUSD  = coinsToUSD(Math.floor(balance * payoutRate));
@@ -222,17 +234,14 @@ export default function WalletScreen({ navigation, route }) {
   const daysUntilNext  = cooldownMet ? 0 : Math.ceil((cooldownMs - elapsed) / 86400000);
 
   const reqs = [
-    { id: 'age',     label: 'Account 30+ days old', met: true },
+    { id: 'age', label: 'Account 30+ days old', met: currentUser?.created_at ? Date.now() - new Date(currentUser.created_at).getTime() >= 30 * 86400000 : false },
     {
       id: 'verify', label: 'Identity verified', met: idVerified,
       actionLabel: 'Verify ID',
       onAction: () => Alert.alert(
         'Identity Verification',
-        'Verify your identity to protect the creator community from fraudulent accounts.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Start Verification', onPress: () => setIdVerified(true) },
-        ]
+        'Identity verification will be available in an upcoming update.',
+        [{ text: 'OK' }],
       ),
     },
     { id: 'min',      label: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins`, met: balance >= MIN_PAYOUT_COINS },
@@ -247,31 +256,98 @@ export default function WalletScreen({ navigation, route }) {
   const allReqsMet = reqs.every(r => r.met);
 
   function handleBuyCoins() {
-    Alert.alert(
-      'Buy Bond Coins',
-      '500 BC — $4.99\n1,200 BC — $9.99\n2,500 BC — $19.99\n5,000 BC — $39.99\n\nPayment via Apple Pay or card.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Buy 500 BC  ($4.99)', onPress: () => earnCoins(500, 'demo_seed', {}) },
-      ]
-    );
+    setShowCoinModal(true);
   }
 
-  function handleRequestPayout() {
+  async function purchasePack(pack) {
+    try {
+      setPurchasing(true);
+      await RNIap.initConnection();
+      const purchase = await RNIap.requestPurchase({ sku: pack.sku });
+      await RNIap.finishTransaction({ purchase, isConsumable: true });
+      // Credit coins on the server
+      await fetch(`${SERVER_URL}/coins/credit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser?.userId,
+          sku: pack.sku,
+          receipt: purchase.transactionReceipt,
+        }),
+      });
+      setShowCoinModal(false);
+      Alert.alert('Coins Added', `${pack.coins.toLocaleString()}${pack.bonus ? ` + ${pack.bonus}` : ''} Bond Coins added to your wallet.`);
+    } catch (err) {
+      if (err.code !== 'E_USER_CANCELLED') {
+        Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
+      }
+    } finally {
+      setPurchasing(false);
+      RNIap.endConnection();
+    }
+  }
+
+  async function handleConnectStripe() {
+    try {
+      const res = await fetch(`${SERVER_URL}/creator/connect-stripe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser?.userId, email: currentUser?.email }),
+      });
+      const { url } = await res.json();
+      if (url) Linking.openURL(url);
+    } catch {
+      Alert.alert('Error', 'Could not connect to Stripe. Please try again.');
+    }
+  }
+
+  async function handleRequestPayout() {
     if (!allReqsMet) return;
+    if (!currentUser?.stripeAccountId) {
+      Alert.alert(
+        'Connect Your Bank First',
+        'You need to connect your bank account before cashing out. It only takes 2 minutes.',
+        [
+          { text: 'Connect Bank', onPress: handleConnectStripe },
+          { text: 'Not Now', style: 'cancel' },
+        ],
+      );
+      return;
+    }
     Alert.alert(
       'Request Payout',
-      `You'll receive $${availableUSD} USD (${Math.round(payoutRate * 100)}% of ${balance.toLocaleString()} BC).\n\nWorldBond keeps ${Math.round((1 - payoutRate) * 100)}% to cover platform costs and payment processing.\n\nNext payout available in ${cooldownDays} days.\n\nPayout via PayPal or bank transfer within 3–5 business days.`,
+      `You'll receive $${availableUSD} USD (${Math.round(payoutRate * 100)}% of ${balance.toLocaleString()} BC).\n\nWorldBond keeps ${Math.round((1 - payoutRate) * 100)}% to cover platform costs.\n\nFunds arrive in 3–5 business days via Stripe.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
-          onPress: () => {
-            recordPayout();
-            Alert.alert('Payout Requested', "You'll receive your funds within 3–5 business days.");
+          onPress: async () => {
+            try {
+              setPayingOut(true);
+              const res = await fetch(`${SERVER_URL}/creator/payout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: currentUser?.userId,
+                  stripeAccountId: currentUser.stripeAccountId,
+                  amountCents: Math.floor(parseFloat(availableUSD) * 100),
+                }),
+              });
+              const data = await res.json();
+              if (data.transfer) {
+                recordPayout();
+                Alert.alert('Payout Sent', 'Your funds are on the way. Check your bank in 3–5 business days.');
+              } else {
+                Alert.alert('Payout Failed', data.error || 'Please try again.');
+              }
+            } catch {
+              Alert.alert('Error', 'Could not process payout. Please try again.');
+            } finally {
+              setPayingOut(false);
+            }
           },
         },
-      ]
+      ],
     );
   }
 
@@ -329,24 +405,42 @@ export default function WalletScreen({ navigation, route }) {
 
           <PayoutRequirements reqs={reqs} />
 
+          {/* Connect bank account if not yet connected */}
+          {!currentUser?.stripeAccountId && (
+            <TouchableOpacity style={s.connectBankBtn} onPress={handleConnectStripe} activeOpacity={0.85}>
+              <View style={s.connectBankDot} />
+              <Text style={s.connectBankTxt}>Connect Bank Account</Text>
+              <Text style={s.connectBankArrow}>→</Text>
+            </TouchableOpacity>
+          )}
+          {currentUser?.stripeAccountId && (
+            <View style={s.bankConnectedRow}>
+              <View style={s.bankConnectedDot} />
+              <Text style={s.bankConnectedTxt}>Bank account connected</Text>
+            </View>
+          )}
+
           <TouchableOpacity
-            style={[s.payoutBtn, !allReqsMet && s.payoutBtnLocked]}
+            style={[s.payoutBtn, (!allReqsMet || payingOut) && s.payoutBtnLocked]}
             onPress={handleRequestPayout}
-            disabled={!allReqsMet}
+            disabled={!allReqsMet || payingOut}
           >
             <LinearGradient
               colors={allReqsMet ? ['#4ade80', '#16a34a'] : ['#222222', '#1a1a1a']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={s.payoutBtnGrad}
             >
-              <Text style={[s.payoutBtnTxt, !allReqsMet && { color: 'rgba(255,255,255,0.3)' }]}>
-                {allReqsMet ? 'Request Payout' : 'Complete requirements to unlock'}
-              </Text>
+              {payingOut
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={[s.payoutBtnTxt, !allReqsMet && { color: 'rgba(255,255,255,0.3)' }]}>
+                    {allReqsMet ? 'Request Payout' : 'Complete requirements to unlock'}
+                  </Text>
+              }
             </LinearGradient>
           </TouchableOpacity>
 
           <Text style={s.payoutNote}>
-            {cooldownDays}-day cooldown · 1 account per identity · earnings from verified sources only
+            {cooldownDays}-day cooldown · payouts via Stripe · 3–5 business days
           </Text>
         </View>
 
@@ -361,7 +455,7 @@ export default function WalletScreen({ navigation, route }) {
             <Text style={s.statLbl}>This Month</Text>
           </View>
           <View style={s.statCard}>
-            <Text style={s.statNum}>🌍 {myStamps.length + myMonuments.length}</Text>
+            <Text style={s.statNum}>{myStamps.length + myMonuments.length}</Text>
             <Text style={s.statLbl}>Footprints</Text>
           </View>
         </View>
@@ -419,7 +513,7 @@ export default function WalletScreen({ navigation, route }) {
         {activeTab === 'Creators' && (
           <View>
             <View style={s.creatorHeader}>
-              <Text style={s.creatorTitle}>Top Creators — June 2026</Text>
+              <Text style={s.creatorTitle}>Top Creators — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
               <Text style={s.creatorSub}>
                 Ranking resets every calendar month. Top 3 earn a bonus payout above the base 70%.
               </Text>
@@ -434,10 +528,10 @@ export default function WalletScreen({ navigation, route }) {
                   style={[s.creatorCard, c.rank === 1 && { borderColor: '#ffd70055' }]}
                 >
                   <View style={s.creatorLeft}>
-                    <Text style={s.creatorBadge}>{c.badge.icon} {c.badge.label}</Text>
+                    <Text style={s.creatorBadge}>#{c.rank} {c.badge.label}</Text>
                     <Text style={s.creatorName}>{c.username} {c.country}</Text>
                     <Text style={s.creatorStats}>{c.streams} streams · ~{c.avgViewers} avg viewers</Text>
-                    <CoinRow amount={`${c.coinsEarned.toLocaleString()} gifted`} textStyle={s.creatorStats} size={13} />
+                    <CoinRow amount={`${c.coinsEarned.toLocaleString()} earned`} textStyle={s.creatorStats} size={13} />
                   </View>
                   <View style={s.creatorRight}>
                     <Text style={[s.creatorPayout, { color: c.rank === 1 ? '#ffd700' : '#4ade80' }]}>
@@ -455,13 +549,13 @@ export default function WalletScreen({ navigation, route }) {
               <Text style={s.compareTitle}>WorldBond vs Other Platforms</Text>
               <Text style={s.compareSub}>What creators keep per $1 in gifts received</Text>
               {[
-                { label: 'Bigo Live',            pct: '35%', color: '#555555', you: false },
-                { label: 'TikTok LIVE',           pct: '50%', color: '#555555', you: false },
+                { label: 'Bigo Live',            pct: '35%', color: 'rgba(255,255,255,0.4)', you: false },
+                { label: 'TikTok LIVE',           pct: '50%', color: 'rgba(255,255,255,0.4)', you: false },
                 { label: 'YouTube SuperChat',     pct: '70%', color: '#888888', you: false },
                 { label: 'Twitch Bits',           pct: '71%', color: '#888888', you: false },
                 { label: 'WorldBond Standard',    pct: '70%', color: BOND_PINK,  you: true  },
                 { label: 'WorldBond Bond Pass',   pct: '75%', color: BOND_PINK,  you: true  },
-                { label: '🥇 Top Creator',        pct: '85%', color: '#ffd700', you: true  },
+                { label: 'Top Creator',            pct: '85%', color: '#ffd700', you: true  },
                 { label: '+ Stamp Royalty',       pct: '+3%', color: '#4ade80', you: true  },
                 { label: '+ Monument Royalty',    pct: '+2%', color: '#4ade80', you: true  },
               ].map(row => (
@@ -566,7 +660,7 @@ export default function WalletScreen({ navigation, route }) {
             })()}
 
             <View style={[s.fpSection, { marginTop: 20 }]}>
-              <Text style={s.fpSectionTitle}>🏛️ Bond Monuments</Text>
+              <Text style={s.fpSectionTitle}>Bond Monuments</Text>
               <Text style={s.fpSectionSub}>
                 1-of-1 per landmark · earn +2% royalty from all gifts during streams in that region
               </Text>
@@ -608,6 +702,45 @@ export default function WalletScreen({ navigation, route }) {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+
+      {/* ── Coin Purchase Modal ── */}
+      <Modal visible={showCoinModal} animationType="slide" transparent onRequestClose={() => setShowCoinModal(false)}>
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowCoinModal(false)} />
+        <View style={s.coinSheet}>
+          <View style={s.coinSheetHandle} />
+          <Text style={s.coinSheetTitle}>Buy Bond Coins</Text>
+          <Text style={s.coinSheetSub}>Coins let you send gifts during live streams</Text>
+
+          {COIN_PACKS.map(pack => (
+            <TouchableOpacity
+              key={pack.sku}
+              style={[s.coinPack, pack.popular && s.coinPackPopular]}
+              onPress={() => purchasePack(pack)}
+              disabled={purchasing}
+              activeOpacity={0.85}
+            >
+              {pack.popular && (
+                <View style={s.popularBadge}><Text style={s.popularBadgeTxt}>Most Popular</Text></View>
+              )}
+              <View style={{ flex: 1 }}>
+                <CoinRow amount={pack.coins} textStyle={s.coinPackAmount} size={20} />
+                {pack.bonus && <Text style={s.coinPackBonus}>{pack.bonus}</Text>}
+              </View>
+              <Text style={s.coinPackPrice}>{pack.price}</Text>
+            </TouchableOpacity>
+          ))}
+
+          {purchasing && (
+            <View style={s.purchasingRow}>
+              <ActivityIndicator color={BOND_GOLD} size="small" />
+              <Text style={s.purchasingTxt}>Processing purchase…</Text>
+            </View>
+          )}
+
+          <Text style={s.coinSheetNote}>Purchases are processed through Apple. Coins are non-refundable.</Text>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -646,48 +779,74 @@ const s = StyleSheet.create({
   payoutBtnLocked: { opacity: 0.6 },
   payoutBtnGrad:   { paddingVertical: 14, alignItems: 'center' },
   payoutBtnTxt:    { color: '#fff', fontSize: 14, fontWeight: '800' },
-  payoutNote:      { color: 'rgba(255,255,255,0.25)', fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 16 },
+  payoutNote:      { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 12, lineHeight: 16 },
+
+  // Connect bank
+  connectBankBtn:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#4ade8015', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, borderWidth: 1, borderColor: '#4ade8044', marginBottom: 14 },
+  connectBankDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4ade80' },
+  connectBankTxt:    { flex: 1, color: '#4ade80', fontSize: 14, fontWeight: '700' },
+  connectBankArrow:  { color: '#4ade80', fontSize: 16, fontWeight: '700' },
+  bankConnectedRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  bankConnectedDot:  { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#4ade80' },
+  bankConnectedTxt:  { color: '#4ade80', fontSize: 12, fontWeight: '600' },
+
+  // Coin purchase modal
+  modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  coinSheet:         { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, paddingBottom: 44 },
+  coinSheetHandle:   { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  coinSheetTitle:    { color: '#fff', fontSize: 20, fontWeight: '900' },
+  coinSheetSub:      { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: -4 },
+  coinPack:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2a2a2a' },
+  coinPackPopular:   { borderColor: BOND_GOLD + '88', backgroundColor: BOND_GOLD + '10' },
+  popularBadge:      { position: 'absolute', top: -10, right: 14, backgroundColor: BOND_GOLD, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  popularBadgeTxt:   { color: '#000', fontSize: 10, fontWeight: '900' },
+  coinPackAmount:    { color: '#fff', fontSize: 18, fontWeight: '900' },
+  coinPackBonus:     { color: '#4ade80', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  coinPackPrice:     { color: BOND_GOLD, fontSize: 17, fontWeight: '900' },
+  purchasingRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  purchasingTxt:     { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
+  coinSheetNote:     { color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'center', lineHeight: 16 },
 
   // Stats row
   statsRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 8 },
   statCard: { flex: 1, backgroundColor: '#0f1116', borderRadius: 16, padding: 14, alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#1e2028' },
   statNum:  { color: '#fff', fontSize: 13, fontWeight: '800' },
-  statLbl:  { color: '#555555', fontSize: 11 },
+  statLbl:  { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
 
   // Tabs
   tabsRow:     { paddingHorizontal: 16, gap: 8, paddingBottom: 14 },
   tab:         { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, backgroundColor: '#0f1116', borderWidth: 1, borderColor: '#1e2028' },
   tabActive:   { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '40' },
-  tabTxt:      { color: '#555555', fontSize: 13, fontWeight: '700' },
+  tabTxt:      { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '700' },
   tabTxtActive:{ color: BOND_PINK },
 
   // Transaction list
   list:    { paddingHorizontal: 16, gap: 8 },
   txRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0f1116', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#1e2028' },
   txSource:{ color: '#fff', fontSize: 14, fontWeight: '700' },
-  txTime:  { color: '#444444', fontSize: 12, marginTop: 3 },
+  txTime:  { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 3 },
   txEarn:  { color: '#4ade80', fontSize: 14, fontWeight: '800' },
   txSpend: { color: '#f87171', fontSize: 14, fontWeight: '800' },
-  emptyTxt:{ color: '#444444', fontSize: 14, textAlign: 'center', paddingVertical: 40, paddingHorizontal: 16 },
+  emptyTxt:{ color: 'rgba(255,255,255,0.35)', fontSize: 14, textAlign: 'center', paddingVertical: 40, paddingHorizontal: 16 },
 
   // Creators tab
   creatorHeader:    { paddingHorizontal: 16, paddingBottom: 8 },
   creatorTitle:     { color: '#fff', fontSize: 17, fontWeight: '900' },
-  creatorSub:       { color: '#555555', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  creatorSub:       { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 4, lineHeight: 18 },
   creatorCard:      { borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#1e2028' },
   creatorLeft:      { flex: 1, gap: 3 },
   creatorBadge:     { color: '#ffd700', fontSize: 12, fontWeight: '800' },
   creatorName:      { color: '#fff', fontSize: 15, fontWeight: '800' },
-  creatorStats:     { color: '#555555', fontSize: 12 },
+  creatorStats:     { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
   creatorRight:     { alignItems: 'center', minWidth: 70 },
   creatorPayout:    { fontSize: 22, fontWeight: '900' },
-  creatorPayoutLbl: { color: '#555555', fontSize: 11 },
+  creatorPayoutLbl: { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
   creatorUSD:       { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
 
   // Platform comparison
   compareCard:   { margin: 16, backgroundColor: '#0f1116', borderRadius: 18, padding: 18, borderWidth: 1, borderColor: '#1e2028' },
   compareTitle:  { color: '#fff', fontSize: 15, fontWeight: '900', marginBottom: 4 },
-  compareSub:    { color: '#555555', fontSize: 12, marginBottom: 12 },
+  compareSub:    { color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 12 },
   compareRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderColor: '#1a1c1a' },
   compareRowYou: { backgroundColor: BOND_PINK + '0a', marginHorizontal: -18, paddingHorizontal: 18 },
   compareLabel:  { color: '#777777', fontSize: 13 },
@@ -696,7 +855,7 @@ const s = StyleSheet.create({
   // Footprints tab
   fpSection:      { backgroundColor: '#0f1116', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#1e2028', gap: 6, marginBottom: 4 },
   fpSectionTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  fpSectionSub:   { color: '#555555', fontSize: 12, lineHeight: 18 },
+  fpSectionSub:   { color: 'rgba(255,255,255,0.4)', fontSize: 12, lineHeight: 18 },
   fpRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0f1116', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#1e2028' },
   fpRowMine:      { borderColor: BOND_PINK + '40', backgroundColor: BOND_PINK + '08' },
   fpRowFeatured:  { borderColor: BOND_PINK + '55', backgroundColor: BOND_PINK + '06' },
@@ -704,7 +863,7 @@ const s = StyleSheet.create({
   fpIcon:         { fontSize: 26 },
   fpHolder:       { color: '#fff', fontSize: 13, fontWeight: '700' },
   fpHolderName:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 2 },
-  fpSub:          { color: '#555555', fontSize: 11, marginTop: 1 },
+  fpSub:          { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 1 },
   fpEarned:       { color: BOND_GOLD, fontSize: 12, marginTop: 2 },
   droppedLabel:   { color: '#ff6b00', fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   featuredRowHint:{ color: BOND_PINK, fontSize: 10, fontWeight: '700', marginTop: 2 },

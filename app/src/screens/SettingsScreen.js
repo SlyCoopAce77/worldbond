@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, Switch, Alert, ActivityIndicator,
-  Animated, Linking,
+  Animated, Linking, Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -83,34 +83,6 @@ function NavRow({ sym, label, sublabel, value, onPress, danger, colors }) {
   );
 }
 
-function RadioGroup({ label, options, value, onChange, colors }) {
-  return (
-    <View style={s.radioGroup}>
-      <Text style={[s.radioLabel, { color: colors.text }]}>{label}</Text>
-      <View style={s.radioOptions}>
-        {options.map(opt => (
-          <TouchableOpacity
-            key={opt.value}
-            style={[
-              s.radioBtn,
-              { backgroundColor: colors.inputBg, borderColor: colors.border },
-              value === opt.value && { backgroundColor: BOND_PINK + '18', borderColor: BOND_PINK + '55' },
-            ]}
-            onPress={() => onChange(opt.value)}
-          >
-            <Text style={[
-              s.radioBtnText,
-              { color: colors.textMuted },
-              value === opt.value && { color: BOND_PINK, fontWeight: '800' },
-            ]}>
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
 
 function Card({ children, colors }) {
   return (
@@ -126,12 +98,43 @@ function Divider({ colors }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+const HELP_FAQS = [
+  {
+    q: 'How do I Bond with someone?',
+    a: 'Visit their profile and tap the Bond button. Once they accept, you are connected.',
+  },
+  {
+    q: 'What is Bond Pass?',
+    a: 'Bond Pass is our premium plan ($4.99/month). It gives you unlimited daily connects, the ability to message anyone, a 75% gift payout rate, and more.',
+  },
+  {
+    q: 'How do coins work?',
+    a: 'Bond Coins are earned through gifts from other users, completing challenges, and stamp royalties. You can gift coins to creators you enjoy.',
+  },
+  {
+    q: 'Why can I only message some users?',
+    a: 'Free accounts can only message users you are bonded with. Bond Pass removes this restriction — you can message anyone.',
+  },
+  {
+    q: 'How do I delete my account?',
+    a: 'Scroll to the bottom of Settings and tap Delete Account. This permanently removes all your data and cannot be undone.',
+  },
+  {
+    q: 'Something is broken — how do I report it?',
+    a: 'Tap Report a Bug in Settings, or email us directly at support@bond.app. Please describe what happened and what you expected.',
+  },
+];
+
 export default function SettingsScreen({ navigation, onLogout }) {
   const { hasBondPass } = useBondPass();
   const { colors }      = useTheme();
   const [settings, setSettings]     = useState(DEFAULTS);
   const [saving,   setSaving]       = useState(false);
   const [profile,  setProfile]      = useState(null);
+  const [showHelp,         setShowHelp]         = useState(false);
+  const [showBlockList,    setShowBlockList]    = useState(false);
+  const [blockedUsers,     setBlockedUsers]     = useState([]);
+  const [loadingBlocks,    setLoadingBlocks]    = useState(false);
   const fadeAnim                    = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -214,6 +217,40 @@ export default function SettingsScreen({ navigation, onLogout }) {
     );
   }
 
+  async function openBlockList() {
+    setShowBlockList(true);
+    setLoadingBlocks(true);
+    try {
+      const token = await getAccessToken();
+      const { data } = await axios.get(`${SERVER_URL}/api/profiles/blocks`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 8000,
+      });
+      setBlockedUsers(data.blocked || []);
+    } catch {
+      Alert.alert('Error', 'Could not load blocked users. Try again.');
+    } finally {
+      setLoadingBlocks(false);
+    }
+  }
+
+  async function handleUnblock(userId, displayName) {
+    Alert.alert('Unblock', `Unblock ${displayName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Unblock', onPress: async () => {
+        try {
+          const token = await getAccessToken();
+          await axios.delete(`${SERVER_URL}/api/profiles/blocks/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setBlockedUsers(prev => prev.filter(u => String(u.user_id) !== String(userId)));
+        } catch {
+          Alert.alert('Error', 'Could not unblock. Try again.');
+        }
+      }},
+    ]);
+  }
+
   function handleLogout() {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -267,14 +304,6 @@ export default function SettingsScreen({ navigation, onLogout }) {
           />
           <Divider colors={colors} />
           <NavRow
-            sym="@"
-            label="Email"
-            sublabel={email}
-            onPress={() => Alert.alert('Change Email', 'Email change is coming soon.')}
-            colors={colors}
-          />
-          <Divider colors={colors} />
-          <NavRow
             sym="*"
             label="Change Password"
             onPress={() => navigation.navigate('ChangePassword', { email: profile?.email || '' })}
@@ -324,7 +353,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
             sym="×"
             label="Blocked Users"
             sublabel="Manage your block list"
-            onPress={() => Alert.alert('Blocked Users', 'Block list management coming soon.')}
+            onPress={openBlockList}
             colors={colors}
           />
         </Card>
@@ -369,7 +398,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
           />
           <Divider colors={colors} />
           <ToggleRow
-            sym="♪"
+            sym="N"
             label="Notification Sounds"
             sublabel="Play sounds for incoming alerts"
             value={settings.notifSounds}
@@ -420,14 +449,6 @@ export default function SettingsScreen({ navigation, onLogout }) {
             onToggle={() => toggle('safeSearch')}
             colors={colors}
           />
-          <Divider colors={colors} />
-          <NavRow
-            sym="×"
-            label="Blocked Users"
-            sublabel="Manage your block list"
-            onPress={() => Alert.alert('Blocked Users', 'Block list management coming soon.')}
-            colors={colors}
-          />
         </Card>
 
         {/* ── Support ── */}
@@ -436,14 +457,22 @@ export default function SettingsScreen({ navigation, onLogout }) {
           <NavRow
             sym="?"
             label="Help Center"
-            onPress={() => Linking.openURL('mailto:support@bond.app?subject=Help')}
+            onPress={() => setShowHelp(true)}
             colors={colors}
           />
           <Divider colors={colors} />
           <NavRow
             sym="!"
             label="Report a Bug"
-            onPress={() => Linking.openURL('mailto:support@bond.app?subject=Bug Report')}
+            onPress={() => {
+              Linking.canOpenURL('mailto:support@bond.app').then(can => {
+                if (can) {
+                  Linking.openURL('mailto:support@bond.app?subject=Bug Report');
+                } else {
+                  Alert.alert('Report a Bug', 'Email us at support@bond.app and describe what happened.');
+                }
+              });
+            }}
             colors={colors}
           />
           <Divider colors={colors} />
@@ -502,6 +531,86 @@ export default function SettingsScreen({ navigation, onLogout }) {
 
         <View style={{ height: 40 }} />
       </Animated.ScrollView>
+
+      {/* ── Blocked Users Modal ── */}
+      <Modal visible={showBlockList} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowBlockList(false)}>
+        <SafeAreaView style={s.helpContainer}>
+          <View style={s.helpHeader}>
+            <Text style={s.helpTitle}>Blocked Users</Text>
+            <TouchableOpacity style={s.helpClose} onPress={() => setShowBlockList(false)}>
+              <Text style={s.helpCloseTxt}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={s.blockScroll} showsVerticalScrollIndicator={false}>
+            {loadingBlocks ? (
+              <ActivityIndicator color={BOND_PINK} style={{ marginTop: 48 }} />
+            ) : blockedUsers.length === 0 ? (
+              <View style={s.blockEmpty}>
+                <Text style={s.blockEmptyTxt}>No blocked users</Text>
+                <Text style={s.blockEmptyHint}>Users you block will appear here. You can block someone from their profile.</Text>
+              </View>
+            ) : (
+              blockedUsers.map(u => (
+                <View key={u.user_id} style={s.blockRow}>
+                  <View style={s.blockAvatar}>
+                    <Text style={s.blockAvatarTxt}>{(u.display_name || '?')[0].toUpperCase()}</Text>
+                  </View>
+                  <View style={s.blockInfo}>
+                    <Text style={s.blockName}>{u.display_name || 'Unknown'}</Text>
+                    {u.country ? <Text style={s.blockCountry}>{u.country}</Text> : null}
+                  </View>
+                  <TouchableOpacity
+                    style={s.unblockBtn}
+                    onPress={() => handleUnblock(u.user_id, u.display_name || 'this user')}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={s.unblockTxt}>Unblock</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ── Help Center Modal ── */}
+      <Modal visible={showHelp} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowHelp(false)}>
+        <SafeAreaView style={s.helpContainer}>
+          <View style={s.helpHeader}>
+            <Text style={s.helpTitle}>Help Center</Text>
+            <TouchableOpacity style={s.helpClose} onPress={() => setShowHelp(false)}>
+              <Text style={s.helpCloseTxt}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={s.helpScroll} showsVerticalScrollIndicator={false}>
+            <Text style={s.helpIntro}>Frequently asked questions</Text>
+            {HELP_FAQS.map((item, i) => (
+              <View key={i} style={s.faqItem}>
+                <Text style={s.faqQ}>{item.q}</Text>
+                <Text style={s.faqA}>{item.a}</Text>
+              </View>
+            ))}
+            <View style={s.helpContactWrap}>
+              <Text style={s.helpContactLabel}>Still need help?</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  Linking.canOpenURL('mailto:support@bond.app').then(can => {
+                    if (can) {
+                      Linking.openURL('mailto:support@bond.app?subject=Help');
+                    } else {
+                      Alert.alert('Contact Support', 'Email us at support@bond.app');
+                    }
+                  });
+                }}
+                activeOpacity={0.75}
+              >
+                <Text style={s.helpContactEmail}>support@bond.app</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -540,9 +649,32 @@ const s = StyleSheet.create({
   rowValue:     { fontSize: 13, fontWeight: '700' },
   chevron:      { fontSize: 22, fontWeight: '300' },
 
-  radioGroup:   { paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
-  radioLabel:   { fontSize: 15, fontWeight: '600' },
-  radioOptions: { flexDirection: 'row', gap: 8 },
-  radioBtn:     { flex: 1, paddingVertical: 9, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
-  radioBtnText: { fontSize: 13, fontWeight: '700' },
+  // Help Center Modal
+  helpContainer:    { flex: 1, backgroundColor: '#08090d' },
+  helpHeader:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1e2028' },
+  helpTitle:        { color: '#ffffff', fontSize: 18, fontWeight: '800' },
+  helpClose:        { paddingHorizontal: 14, paddingVertical: 6, backgroundColor: '#1C1F23', borderRadius: 10, borderWidth: 1, borderColor: '#2F3336' },
+  helpCloseTxt:     { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  helpScroll:       { padding: 20, gap: 16 },
+  helpIntro:        { color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  faqItem:          { backgroundColor: '#0f1116', borderRadius: 14, borderWidth: 1, borderColor: '#1e2028', padding: 16, gap: 8 },
+  faqQ:             { color: '#ffffff', fontSize: 15, fontWeight: '700', lineHeight: 21 },
+  faqA:             { color: 'rgba(255,255,255,0.55)', fontSize: 14, lineHeight: 22 },
+  helpContactWrap:  { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  helpContactLabel: { color: 'rgba(255,255,255,0.35)', fontSize: 13 },
+  helpContactEmail: { color: BOND_PINK, fontSize: 15, fontWeight: '700' },
+
+  // Blocked Users Modal
+  blockScroll:    { padding: 16, gap: 2 },
+  blockEmpty:     { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32, gap: 12 },
+  blockEmptyTxt:  { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+  blockEmptyHint: { color: 'rgba(255,255,255,0.35)', fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  blockRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1e2028' },
+  blockAvatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1C1F23', alignItems: 'center', justifyContent: 'center' },
+  blockAvatarTxt: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
+  blockInfo:      { flex: 1, gap: 2 },
+  blockName:      { color: '#ffffff', fontSize: 15, fontWeight: '700' },
+  blockCountry:   { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+  unblockBtn:     { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10, borderWidth: 1, borderColor: BOND_PINK + '60', backgroundColor: BOND_PINK + '12' },
+  unblockTxt:     { color: BOND_PINK, fontSize: 13, fontWeight: '700' },
 });

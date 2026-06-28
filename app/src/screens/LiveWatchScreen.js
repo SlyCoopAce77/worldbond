@@ -16,7 +16,7 @@ import WorldDrop, { isLegendGift } from '../components/WorldDrop';
 
 const { width, height } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
-const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
+const REACTIONS = ['❤️', '🔥', '😂', '👍', '😮'];
 
 export default function LiveWatchScreen({ route, navigation }) {
   const { stream, currentUser } = route.params || {};
@@ -39,49 +39,57 @@ export default function LiveWatchScreen({ route, navigation }) {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - (stream?.startedAt || Date.now())) / 1000));
-    }, 1000);
+    if (stream?.startedAt) {
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - stream.startedAt) / 1000));
+      }, 1000);
+    } else {
+      timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    }
     return () => clearInterval(timerRef.current);
   }, []);
 
   useEffect(() => {
-    socket.emit('join_live', { streamId: stream?.streamId });
+    if (!stream?.streamId) { navigation.goBack(); return; }
 
-    socket.on('live_joined',       ({ messages: history }) => setMessages(history || []));
-    socket.on('live_viewer_count', ({ count }) => setViewerCount(count));
-
-    socket.on('live_message', msg => {
+    function onJoined({ messages: history }) { setMessages(history || []); }
+    function onViewerCount({ count }) { setViewerCount(count); }
+    function onMessage(msg) {
       setMessages(prev => [...prev, msg]);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
-    });
-
-    socket.on('live_reaction', ({ emoji }) => {
+    }
+    function onReaction({ emoji }) {
       const id = `${Date.now()}-${Math.random()}`;
       setFloats(prev => [...prev, { emoji, id }]);
-    });
-
-    socket.on('live_gift_received', ({ senderName, senderCountry, gift, isStampHolder }) => {
+    }
+    function onGiftReceived({ senderName, senderCountry, gift, isStampHolder }) {
       const id = `${Date.now()}-${Math.random()}`;
       if (isLegendGift(gift.id)) {
         setDrops(prev => [...prev, { id, senderName, senderCountry, gift, isStampHolder }]);
       } else {
         setBursts(prev => [...prev, { id, senderName, senderCountry, gift }]);
       }
-    });
+    }
+    function onLiveEnded({ streamId }) {
+      if (streamId === stream.streamId) setEnded(true);
+    }
 
-    socket.on('live_ended', ({ streamId }) => {
-      if (streamId === stream?.streamId) setEnded(true);
-    });
+    socket.emit('join_live', { streamId: stream.streamId });
+    socket.on('live_joined',        onJoined);
+    socket.on('live_viewer_count',  onViewerCount);
+    socket.on('live_message',       onMessage);
+    socket.on('live_reaction',      onReaction);
+    socket.on('live_gift_received', onGiftReceived);
+    socket.on('live_ended',         onLiveEnded);
 
     return () => {
-      socket.emit('leave_live', { streamId: stream?.streamId });
-      socket.off('live_joined');
-      socket.off('live_viewer_count');
-      socket.off('live_message');
-      socket.off('live_reaction');
-      socket.off('live_gift_received');
-      socket.off('live_ended');
+      socket.emit('leave_live', { streamId: stream.streamId });
+      socket.off('live_joined',        onJoined);
+      socket.off('live_viewer_count',  onViewerCount);
+      socket.off('live_message',       onMessage);
+      socket.off('live_reaction',      onReaction);
+      socket.off('live_gift_received', onGiftReceived);
+      socket.off('live_ended',         onLiveEnded);
     };
   }, []);
 
@@ -96,10 +104,10 @@ export default function LiveWatchScreen({ route, navigation }) {
   }
 
   function sendGift(gift) {
-    if (balance < gift.coins) return;
-    spendCoins(gift.coins, 'live_gift', { giftId: gift.id, streamId: stream?.streamId });
+    if (!stream?.streamId || balance < gift.coins) return;
+    spendCoins(gift.coins, 'live_gift', { giftId: gift.id, streamId: stream.streamId });
     socket.emit('live_gift', {
-      streamId: stream?.streamId,
+      streamId: stream.streamId,
       gift: { id: gift.id, name: gift.name, coins: gift.coins, color: gift.color, tier: gift.tier, tagline: gift.tagline },
     });
   }
@@ -114,7 +122,10 @@ export default function LiveWatchScreen({ route, navigation }) {
     return (
       <View style={styles.endedScreen}>
         <LinearGradient colors={['#1a0a2e', '#000000']} style={StyleSheet.absoluteFill} />
-        <Text style={{ fontSize: 52, marginBottom: 20 }}>📴</Text>
+        <View style={styles.endedIcon}>
+          <View style={styles.endedIconBar} />
+          <View style={styles.endedIconBar} />
+        </View>
         <Text style={styles.endedTitle}>Live ended</Text>
         <Text style={styles.endedSub}>{stream?.hostName} ended their stream</Text>
         <TouchableOpacity style={styles.endedBtn} onPress={() => navigation.goBack()}>
@@ -171,7 +182,7 @@ export default function LiveWatchScreen({ route, navigation }) {
 
           <View style={styles.topRight}>
             <View style={styles.viewerPill}>
-              <Text style={styles.viewerIcon}>👁</Text>
+              <View style={styles.viewerDot} />
               <Text style={styles.viewerCount}>{viewerCount}</Text>
             </View>
             <Text style={styles.timerText}>{formatDuration(elapsed)}</Text>
@@ -202,7 +213,7 @@ export default function LiveWatchScreen({ route, navigation }) {
                         <Text style={[styles.msgName, { color: nameColor }]}>{item.senderName}</Text>
                       </View>
                       <Text style={styles.msgText}>{item.text}</Text>
-                      {item.wasTranslated ? <Text style={styles.translated}>🌐</Text> : null}
+                      {item.wasTranslated ? <View style={styles.translatedBadge}><Text style={styles.translatedTxt}>TR</Text></View> : null}
                     </View>
                   </View>
                 );
@@ -257,7 +268,7 @@ export default function LiveWatchScreen({ route, navigation }) {
               />
               {text.trim() ? (
                 <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-                  <Text style={styles.sendIcon}>➤</Text>
+                  <Text style={styles.sendIcon}>›</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -300,7 +311,7 @@ const styles = StyleSheet.create({
   streamTitle:  { color: 'rgba(255,255,255,0.55)', fontSize: 11 },
   topRight:     { alignItems: 'flex-end', gap: 4 },
   viewerPill:   { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
-  viewerIcon:   { fontSize: 12 },
+  viewerDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' },
   viewerCount:  { color: '#fff', fontSize: 13, fontWeight: '700' },
   timerText:    { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
 
@@ -312,8 +323,9 @@ const styles = StyleSheet.create({
   msgMeta:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
   msgFlag:      { fontSize: 12 },
   msgName:      { fontSize: 12, fontWeight: '800' },
-  msgText:      { color: '#fff', fontSize: 14, lineHeight: 20 },
-  translated:   { color: 'rgba(255,255,255,0.35)', fontSize: 10 },
+  msgText:         { color: '#fff', fontSize: 14, lineHeight: 20 },
+  translatedBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  translatedTxt:   { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
   burstZone:    { position: 'absolute', top: height * 0.2, left: 0, right: 0, zIndex: 10 },
 
   giftStrip:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#FFB70022' },
@@ -334,9 +346,11 @@ const styles = StyleSheet.create({
   sendBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
   sendIcon:     { color: '#fff', fontSize: 18 },
 
-  endedScreen:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  endedTitle:   { color: '#fff', fontSize: 24, fontWeight: '900' },
-  endedSub:     { color: '#666', fontSize: 14, marginBottom: 20 },
-  endedBtn:     { backgroundColor: BOND_PINK, borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
-  endedBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  endedScreen:   { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  endedIcon:     { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10 },
+  endedIconBar:  { width: 5, height: 24, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+  endedTitle:    { color: '#fff', fontSize: 24, fontWeight: '900' },
+  endedSub:      { color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 20 },
+  endedBtn:      { backgroundColor: BOND_PINK, borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
+  endedBtnText:  { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

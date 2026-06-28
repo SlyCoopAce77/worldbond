@@ -9,6 +9,7 @@ import RegisterScreen        from './Auth/RegisterScreen';
 import OnboardingScreen      from './Auth/OnboardingScreen';
 import ForgotPasswordScreen  from './Auth/ForgotPasswordScreen';
 import ResetPasswordScreen   from './Auth/ResetPasswordScreen';
+import LegalScreen           from './LegalScreen';
 
 const SCREENS = {
   LANDING:        'landing',
@@ -24,6 +25,8 @@ export default function AuthScreen({ onLogin }) {
   const [screen,       setScreen]       = useState(SCREENS.LANDING);
   const [userId,       setUserId]       = useState(null);
   const [resetEmail,   setResetEmail]   = useState('');
+  const [dob,          setDob]          = useState(null);
+  const [legalType,    setLegalType]    = useState(null);
 
   async function handleLoginSuccess({ userId: id, access }) {
     setUserId(id);
@@ -54,13 +57,18 @@ export default function AuthScreen({ onLogin }) {
     }
   }
 
-  function handleRegisterSuccess({ userId: id }) {
+  function handleRegisterSuccess({ userId: id, dob: d }) {
     setUserId(id);
+    setDob(d);
     setScreen(SCREENS.ONBOARDING);
   }
 
   function handleOnboardingComplete(socketProfile) {
     onLogin(socketProfile);
+  }
+
+  if (legalType) {
+    return <LegalScreen type={legalType} onBack={() => setLegalType(null)} />;
   }
 
   switch (screen) {
@@ -110,8 +118,10 @@ export default function AuthScreen({ onLogin }) {
       return (
         <RegisterScreen
           onSuccess={handleRegisterSuccess}
-          onBack={()       => setScreen(SCREENS.LANDING)}
+          onBack={() => setScreen(SCREENS.LANDING)}
           onGoLogin={() => setScreen(SCREENS.LOGIN)}
+          onOpenTerms={() => setLegalType('terms')}
+          onOpenPrivacy={() => setLegalType('privacy')}
         />
       );
 
@@ -119,6 +129,7 @@ export default function AuthScreen({ onLogin }) {
       return (
         <OnboardingScreen
           userId={userId}
+          dob={dob}
           onComplete={handleOnboardingComplete}
         />
       );

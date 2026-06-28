@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useBondPass } from '../context/PremiumContext';
+import { useWallet, MONUMENT_CAP } from '../context/WalletContext';
 import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE } from '../context/ChallengeContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -143,7 +144,7 @@ function CommentsSection({ comments = [], onPost, username }) {
           value={draft}
           onChangeText={setDraft}
           placeholder="Add a comment…"
-          placeholderTextColor="#444"
+          placeholderTextColor="rgba(255,255,255,0.3)"
           multiline={false}
           maxLength={180}
           returnKeyType="send"
@@ -280,6 +281,9 @@ const rl = StyleSheet.create({
 export default function MonumentChallengeScreen({ route, navigation }) {
   const { monument, currentUser } = route.params || {};
   const { hasBondPass } = useBondPass();
+  const { myMonuments } = useWallet();
+  const monumentCap   = hasBondPass ? MONUMENT_CAP.bond_pass : MONUMENT_CAP.standard;
+  const atMonumentCap = myMonuments.length >= monumentCap;
   const canView    = hasBondPass;
   const canContrib = hasBondPass;
 
@@ -319,6 +323,15 @@ export default function MonumentChallengeScreen({ route, navigation }) {
 
   function handleInitiate() {
     if (!canContrib || !monument?.holder) return;
+    if (atMonumentCap) {
+      const upgradeNote = hasBondPass ? '' : '\n\nUpgrade to Bond Pass to hold up to 3 monuments.';
+      Alert.alert(
+        'Monument Slots Full',
+        `You are holding ${myMonuments.length}/${monumentCap} monuments. Drop one before challenging for a new one.${upgradeNote}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     Alert.alert(
       'Start Challenge',
       `Challenge @${monument.holder} for ${monument.name}?\n\nBurns ${ENTRY_FEE} Bond Coins and starts a 7-day contest. Cannot be cancelled.`,

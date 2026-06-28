@@ -88,47 +88,42 @@ export default function PlaceDetailScreen({ route, navigation }) {
       socket.emit('get_reviews', { placeId: place?.id });
       socket.emit('get_venue_events', { placeId: place?.id });
     }
+    function onPlaceCheckins({ placeId, checkins: c }) { if (placeId === place?.id) setCheckins(c); }
+    function onPlaceReviews({ placeId, reviews: r, avgRating: avg }) { if (placeId === place?.id) { setReviews(r); setAvgRating(avg); } }
+    function onPlaceHistory({ placeId, messages: hist }) { if (placeId === place?.id) setMessages(hist); }
+    function onPlaceMessage(msg) { setMessages(prev => [...prev, msg]); }
+    function onVenueEvents({ placeId, events }) { if (placeId === place?.id) setVenueEvents(events || []); }
+    function onVenueLiveUpdate({ placeId, isLive }) { if (placeId === place?.id) setIsVenueLive(isLive); }
+    function onSpotPulses({ placeId, pulses }) { if (placeId === place?.id) setSpotPulses(pulses || []); }
+    function onSpotPulseAdded({ placeId, pulse }) { if (placeId === place?.id) setSpotPulses(prev => [pulse, ...prev]); }
+    function onPulseRemoved({ pulseId }) { setSpotPulses(prev => prev.filter(p => p.id !== pulseId)); }
+
     if (socket.connected) fetchPlaceData();
     else socket.once('connect', fetchPlaceData);
 
-    socket.on('place_checkins', ({ placeId, checkins: c }) => {
-      if (placeId === place?.id) setCheckins(c);
-    });
-    socket.on('place_reviews', ({ placeId, reviews: r, avgRating: avg }) => {
-      if (placeId === place?.id) { setReviews(r); setAvgRating(avg); }
-    });
-    socket.on('place_history', ({ placeId, messages: hist }) => {
-      if (placeId === place?.id) setMessages(hist);
-    });
-    socket.on('place_message', msg => setMessages(prev => [...prev, msg]));
-    socket.on('venue_events', ({ placeId, events }) => {
-      if (placeId === place?.id) setVenueEvents(events || []);
-    });
-    socket.on('venue_live_update', ({ placeId, isLive }) => {
-      if (placeId === place?.id) setIsVenueLive(isLive);
-    });
-    socket.on('spot_pulses', ({ placeId, pulses }) => {
-      if (placeId === place?.id) setSpotPulses(pulses || []);
-    });
-    socket.on('spot_pulse_added', ({ placeId, pulse }) => {
-      if (placeId === place?.id) setSpotPulses(prev => [pulse, ...prev]);
-    });
-    socket.on('pulse_removed', ({ pulseId }) => {
-      setSpotPulses(prev => prev.filter(p => p.id !== pulseId));
-    });
+    socket.on('place_checkins',   onPlaceCheckins);
+    socket.on('place_reviews',    onPlaceReviews);
+    socket.on('place_history',    onPlaceHistory);
+    socket.on('place_message',    onPlaceMessage);
+    socket.on('venue_events',     onVenueEvents);
+    socket.on('venue_live_update',onVenueLiveUpdate);
+    socket.on('spot_pulses',      onSpotPulses);
+    socket.on('spot_pulse_added', onSpotPulseAdded);
+    socket.on('pulse_removed',    onPulseRemoved);
     socket.emit('get_spot_pulses', { placeId: place?.id });
 
     return () => {
       if (checkedInRef.current) socket.emit('checkout_place', { placeId: place?.id });
-      socket.off('place_checkins');
-      socket.off('place_reviews');
-      socket.off('place_history');
-      socket.off('place_message');
-      socket.off('venue_events');
-      socket.off('venue_live_update');
-      socket.off('spot_pulses');
-      socket.off('spot_pulse_added');
-      socket.off('pulse_removed');
+      socket.off('connect',          fetchPlaceData);
+      socket.off('place_checkins',   onPlaceCheckins);
+      socket.off('place_reviews',    onPlaceReviews);
+      socket.off('place_history',    onPlaceHistory);
+      socket.off('place_message',    onPlaceMessage);
+      socket.off('venue_events',     onVenueEvents);
+      socket.off('venue_live_update',onVenueLiveUpdate);
+      socket.off('spot_pulses',      onSpotPulses);
+      socket.off('spot_pulse_added', onSpotPulseAdded);
+      socket.off('pulse_removed',    onPulseRemoved);
     };
   }, []);
 
@@ -236,7 +231,11 @@ export default function PlaceDetailScreen({ route, navigation }) {
             </View>
           )}
           <Text style={styles.messageText}>{item.text}</Text>
-          {item.wasTranslated && <Text style={styles.translatedTag}>🌐 translated</Text>}
+          {item.wasTranslated && (
+            <View style={styles.translatedBadge}>
+              <Text style={styles.translatedTxt}>TR</Text>
+            </View>
+          )}
           <Text style={styles.timestamp}>
             {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
@@ -253,20 +252,20 @@ export default function PlaceDetailScreen({ route, navigation }) {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerIcon}>{place.typeInfo?.icon || '📍'}</Text>
+          <Text style={styles.headerIcon}>{place.typeInfo?.icon || '•'}</Text>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.headerName} numberOfLines={1}>{place.name}</Text>
             <Text style={styles.headerCity}>{place.city}, {place.country?.split(' ').slice(1).join(' ')}</Text>
           </View>
         </View>
         <TouchableOpacity style={[styles.saveBtn, saved && styles.saveBtnOn]} onPress={toggleSave}>
-          <Text style={{ fontSize: 18 }}>{saved ? '🔖' : '＋'}</Text>
+          <Text style={{ fontSize: 18 }}>{saved ? '✓' : '＋'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.checkinBtn, checkedIn && styles.checkinBtnActive]}
           onPress={toggleCheckin}
         >
-          <Text style={styles.checkinBtnText}>{checkedIn ? '✓ Here' : '📍 Check in'}</Text>
+          <Text style={styles.checkinBtnText}>{checkedIn ? '✓ Here' : 'Check in'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -367,7 +366,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
             onPress={toggleCheckin}
           >
             <Text style={styles.bigCheckinBtnText}>
-              {checkedIn ? '✓ You are checked in — tap to leave' : '📍 Check In & Join the Chat'}
+              {checkedIn ? '✓ You are checked in — tap to leave' : 'Check In & Join the Chat'}
             </Text>
           </TouchableOpacity>
           {!checkedIn && (
@@ -437,7 +436,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
         <>
           {!checkedIn && (
             <View style={styles.lockedBanner}>
-              <Text style={styles.lockedText}>📍 Check in to join the conversation</Text>
+              <Text style={styles.lockedText}>Check in to join the conversation</Text>
               <TouchableOpacity style={styles.lockedBtn} onPress={toggleCheckin}>
                 <Text style={styles.lockedBtnText}>Check In</Text>
               </TouchableOpacity>
@@ -451,7 +450,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
             contentContainerStyle={styles.messageList}
             ListEmptyComponent={
               <View style={styles.emptyChatWrap}>
-                <Text style={styles.emptyChatIcon}>{place.typeInfo?.icon || '📍'}</Text>
+                <Text style={styles.emptyChatIcon}>{place.typeInfo?.icon || '•'}</Text>
                 <Text style={styles.emptyChatText}>No messages yet at {place.name}</Text>
                 <Text style={styles.emptyChatSub}>Check in and say hello to people here!</Text>
               </View>
@@ -464,7 +463,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
                 <TextInput
                   style={styles.input}
                   placeholder="Chat with people here..."
-                  placeholderTextColor="#888"
+                  placeholderTextColor="rgba(255,255,255,0.35)"
                   value={text}
                   onChangeText={setText}
                   multiline
@@ -474,7 +473,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
                   onPress={sendMessage}
                   disabled={!text.trim()}
                 >
-                  <Text style={styles.sendBtnText}>➤</Text>
+                  <Text style={styles.sendBtnText}>›</Text>
                 </TouchableOpacity>
               </View>
             </KeyboardAvoidingView>
@@ -500,7 +499,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
             <TextInput
               style={styles.reviewInput}
               placeholder="Tell people what it's like here... (optional)"
-              placeholderTextColor="#555"
+              placeholderTextColor="rgba(255,255,255,0.35)"
               value={reviewText}
               onChangeText={setReviewText}
               multiline
@@ -553,9 +552,8 @@ export default function PlaceDetailScreen({ route, navigation }) {
         <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }}>
           {venueEvents.length === 0 ? (
             <View style={{ alignItems: 'center', paddingTop: 50, gap: 12 }}>
-              <Text style={{ fontSize: 42 }}>📅</Text>
               <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>No events posted yet</Text>
-              <Text style={{ color: '#555', fontSize: 13, textAlign: 'center' }}>Venue owners can post upcoming concerts, parties, and events.</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center' }}>Venue owners can post upcoming concerts, parties, and events.</Text>
               <TouchableOpacity style={styles.postEventCta} onPress={() => setShowPostEvent(true)}>
                 <Text style={styles.postEventCtaTxt}>Post the first event →</Text>
               </TouchableOpacity>
@@ -578,7 +576,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
                       )}
                     </View>
                     <Text style={styles.eventTitle}>{evt.title}</Text>
-                    <Text style={styles.eventDate}>📅 {formatDate(evt.date)}</Text>
+                    <Text style={styles.eventDate}>{formatDate(evt.date)}</Text>
                     {evt.description ? <Text style={styles.eventDesc}>{evt.description}</Text> : null}
                     <Text style={styles.eventPostedBy}>Posted by {evt.postedBy} {evt.postedByCountry}</Text>
                   </LinearGradient>
@@ -651,7 +649,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
             <TextInput
               style={styles.pulseInput}
               placeholder="What's happening? (e.g. Ladies Night this Friday, free entry before midnight)"
-              placeholderTextColor="#555"
+              placeholderTextColor="rgba(255,255,255,0.35)"
               value={pulseMsg}
               onChangeText={t => setPulseMsg(t.slice(0, 160))}
               multiline
@@ -659,8 +657,8 @@ export default function PlaceDetailScreen({ route, navigation }) {
             />
             <Text style={styles.pulseCharCount}>{pulseMsg.length}/160</Text>
 
-            <TextInput style={styles.pulseInput} placeholder="When? (e.g. Friday Dec 27, 9pm — optional)" placeholderTextColor="#555" value={pulseTime} onChangeText={setPulseTime} />
-            <TextInput style={styles.pulseInput} placeholder="Address for directions (e.g. 1-2-3 Shibuya, Tokyo — optional)" placeholderTextColor="#555" value={pulseAddress} onChangeText={setPulseAddress} />
+            <TextInput style={styles.pulseInput} placeholder="When? (e.g. Friday Dec 27, 9pm — optional)" placeholderTextColor="rgba(255,255,255,0.35)" value={pulseTime} onChangeText={setPulseTime} />
+            <TextInput style={styles.pulseInput} placeholder="Address for directions (e.g. 1-2-3 Shibuya, Tokyo — optional)" placeholderTextColor="rgba(255,255,255,0.35)" value={pulseAddress} onChangeText={setPulseAddress} />
 
             {/* Duration */}
             <Text style={styles.pulseDurationLabel}>Show this pulse for</Text>
@@ -692,10 +690,10 @@ export default function PlaceDetailScreen({ route, navigation }) {
             <View style={styles.evtHandle} />
             <Text style={styles.evtSheetTitle}>Post Event at {place?.name}</Text>
 
-            <TextInput style={styles.evtInput} placeholder="Event title…" placeholderTextColor="#444" value={evtTitle} onChangeText={setEvtTitle} />
-            <TextInput style={styles.evtInput} placeholder="Date & time (e.g. Dec 25, 9pm)…" placeholderTextColor="#444" value={evtDate} onChangeText={setEvtDate} />
-            <TextInput style={styles.evtInput} placeholder="Price (e.g. Free, $20, €15)…" placeholderTextColor="#444" value={evtPrice} onChangeText={setEvtPrice} />
-            <TextInput style={[styles.evtInput, { minHeight: 70 }]} placeholder="Description (optional)…" placeholderTextColor="#444" value={evtDesc} onChangeText={setEvtDesc} multiline />
+            <TextInput style={styles.evtInput} placeholder="Event title…" placeholderTextColor="rgba(255,255,255,0.3)" value={evtTitle} onChangeText={setEvtTitle} />
+            <TextInput style={styles.evtInput} placeholder="Date & time (e.g. Dec 25, 9pm)…" placeholderTextColor="rgba(255,255,255,0.3)" value={evtDate} onChangeText={setEvtDate} />
+            <TextInput style={styles.evtInput} placeholder="Price (e.g. Free, $20, €15)…" placeholderTextColor="rgba(255,255,255,0.3)" value={evtPrice} onChangeText={setEvtPrice} />
+            <TextInput style={[styles.evtInput, { minHeight: 70 }]} placeholder="Description (optional)…" placeholderTextColor="rgba(255,255,255,0.3)" value={evtDesc} onChangeText={setEvtDesc} multiline />
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
               {EVENT_TYPES.map(et => (
@@ -709,7 +707,7 @@ export default function PlaceDetailScreen({ route, navigation }) {
             </ScrollView>
 
             <TouchableOpacity style={styles.evtSubmitBtn} onPress={submitVenueEvent}>
-              <Text style={styles.evtSubmitTxt}>Post Event 📅</Text>
+              <Text style={styles.evtSubmitTxt}>Post Event</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -757,8 +755,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2F3336',
   },
   tabActive: { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '66' },
-  tabIcon:  { fontSize: 16 },
-  tabLabel: { color: '#666', fontSize: 13, fontWeight: '700' },
+  tabLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '700' },
   tabLabelActive: { color: BOND_PINK },
   tabBadge: { backgroundColor: '#2F3336', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, minWidth: 22, alignItems: 'center' },
   tabBadgeActive: { backgroundColor: BOND_PINK + '44' },
@@ -804,9 +801,10 @@ const styles = StyleSheet.create({
   bubbleOther: { backgroundColor: '#1C1F23', borderBottomLeftRadius: 4 },
   senderRow: { flexDirection: 'row', gap: 6, marginBottom: 4, alignItems: 'center' },
   senderName: { color: '#aaa', fontSize: 11, fontWeight: '600' },
-  senderCountry: { color: '#666', fontSize: 10 },
+  senderCountry: { color: 'rgba(255,255,255,0.4)', fontSize: 10 },
   messageText: { color: '#fff', fontSize: 15 },
-  translatedTag: { color: '#aaa', fontSize: 10, marginTop: 4 },
+  translatedBadge: { alignSelf: 'flex-start', backgroundColor: '#9d7cff22', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2, marginTop: 4 },
+  translatedTxt:   { color: '#9d7cff', fontSize: 9, fontWeight: '800' },
   timestamp: { color: 'rgba(255,255,255,0.4)', fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', padding: 12,
@@ -853,7 +851,7 @@ const styles = StyleSheet.create({
   reviewFormTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   starsRow: { flexDirection: 'row', gap: 8 },
   starBtn: { padding: 4 },
-  starIcon: { fontSize: 32, color: '#444' },
+  starIcon: { fontSize: 32, color: 'rgba(255,255,255,0.25)' },
   starIconFilled: { color: '#FFB700' },
   reviewInput: {
     backgroundColor: '#000000', color: '#fff', borderRadius: 10,
@@ -881,7 +879,7 @@ const styles = StyleSheet.create({
   reviewStars: { alignItems: 'flex-end' },
   reviewStarsText: { color: '#FFB700', fontSize: 16 },
   reviewText: { color: '#ccc', fontSize: 14, lineHeight: 20 },
-  reviewDate: { color: '#555', fontSize: 11 },
+  reviewDate: { color: 'rgba(255,255,255,0.35)', fontSize: 11 },
 
   // Directions button (info tab)
   directionsBtn: { marginHorizontal: 16, marginTop: 8, marginBottom: 16, borderRadius: 14, paddingVertical: 14, alignItems: 'center', backgroundColor: BOND_PINK + '18', borderWidth: 1, borderColor: BOND_PINK + '44' },
@@ -906,7 +904,7 @@ const styles = StyleSheet.create({
   eventTitle:    { color: '#fff', fontSize: 17, fontWeight: '900' },
   eventDate:     { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
   eventDesc:     { color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 19 },
-  eventPostedBy: { color: '#444', fontSize: 11 },
+  eventPostedBy: { color: 'rgba(255,255,255,0.35)', fontSize: 11 },
   addEventBtn:   { backgroundColor: 'rgba(108,71,255,0.12)', borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(108,71,255,0.25)', marginTop: 4 },
   addEventTxt:   { color: BOND_PINK, fontSize: 14, fontWeight: '700' },
   postEventCta:  { backgroundColor: BOND_PINK, borderRadius: 14, paddingHorizontal: 22, paddingVertical: 12 },
@@ -919,12 +917,12 @@ const styles = StyleSheet.create({
   dropPulseArrow:   { color: '#9d7cff', fontSize: 16, fontWeight: '700' },
   emptyPulse:       { alignItems: 'center', paddingTop: 50, gap: 10 },
   emptyPulseTxt:    { color: '#fff', fontSize: 17, fontWeight: '700' },
-  emptyPulseSub:    { color: '#666', fontSize: 13, textAlign: 'center', paddingHorizontal: 20, lineHeight: 20 },
+  emptyPulseSub:    { color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', paddingHorizontal: 20, lineHeight: 20 },
   pulseCard:        { backgroundColor: '#16181C', borderRadius: 18, padding: 16, borderWidth: 1, gap: 10 },
   pulseCardTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pulseTypePill:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   pulseTypeLabel:   { fontSize: 12, fontWeight: '700' },
-  pulseAge:         { color: '#555', fontSize: 11 },
+  pulseAge:         { color: 'rgba(255,255,255,0.35)', fontSize: 11 },
   pulseMsg:         { color: '#fff', fontSize: 15, lineHeight: 22, fontWeight: '500' },
   pulseTime:        { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
   pulseDir:         { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: BOND_PINK + '20', borderWidth: 1, borderColor: BOND_PINK + '55' },
@@ -933,16 +931,16 @@ const styles = StyleSheet.create({
   // Pulse form modal
   pulseSheet:       { backgroundColor: '#111', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 12, paddingBottom: 44 },
   pulseSheetTitle:  { color: '#fff', fontSize: 17, fontWeight: '900' },
-  pulseSheetSub:    { color: '#666', fontSize: 13, marginTop: -4 },
+  pulseSheetSub:    { color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: -4 },
   pulseInput:       { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, borderWidth: 1, borderColor: '#2a2a2a', textAlignVertical: 'top' },
-  pulseCharCount:   { color: '#444', fontSize: 11, textAlign: 'right', marginTop: -8 },
+  pulseCharCount:   { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'right', marginTop: -8 },
   pulseTypeChip:    { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
-  pulseTypeChipTxt: { color: '#666', fontSize: 13, fontWeight: '600' },
+  pulseTypeChipTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
   pulseDurationLabel:{ color: '#888', fontSize: 12, fontWeight: '600', marginTop: 4 },
   pulseDurationRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   durationChip:     { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
   durationChipOn:   { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK },
-  durationChipTxt:  { color: '#666', fontSize: 12, fontWeight: '600' },
+  durationChipTxt:  { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '600' },
   durationChipTxtOn:{ color: '#bba8ff', fontWeight: '800' },
   pulseSubmitBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, marginTop: 4 },
   pulseSubmitTxt:   { color: '#fff', fontSize: 16, fontWeight: '800' },
@@ -953,7 +951,7 @@ const styles = StyleSheet.create({
   evtSheetTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
   evtInput:      { backgroundColor: '#1a1a1a', color: '#fff', borderRadius: 14, padding: 14, fontSize: 14, borderWidth: 1, borderColor: '#2a2a2a' },
   evtTypeChip:   { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#2a2a2a' },
-  evtTypeLabel:  { color: '#666', fontSize: 13, fontWeight: '600' },
+  evtTypeLabel:  { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
   evtSubmitBtn:  { backgroundColor: BOND_PINK, borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   evtSubmitTxt:  { color: '#fff', fontSize: 16, fontWeight: '800' },
 });

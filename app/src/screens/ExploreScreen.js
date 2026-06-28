@@ -16,16 +16,16 @@ const BOND_PINK = '#FF0080';
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
 const TYPE_META = {
-  bar:        { icon: '🍺', label: 'Bars',       color: '#FFB700', grad: ['#2a1a00', '#0d0800'] },
-  club:       { icon: '🎉', label: 'Clubs',       color: '#8b5cf6', grad: ['#1a0a2e', '#080412'] },
-  karaoke:    { icon: '🎤', label: 'Karaoke',     color: '#ec4899', grad: ['#2a0a1a', '#0d0408'] },
-  gaming:     { icon: '🎮', label: 'Gaming',      color: '#3b82f6', grad: ['#0a1a2e', '#030810'] },
-  restaurant: { icon: '🍜', label: 'Food',        color: '#ef4444', grad: ['#2a0808', '#0d0303'] },
-  park:       { icon: '🌳', label: 'Parks',       color: '#22c55e', grad: ['#0a1e0a', '#030a03'] },
-  beach:      { icon: '🏖️', label: 'Beach',       color: '#06b6d4', grad: ['#001e2a', '#00080f'] },
-  sports:     { icon: '⚽', label: 'Sports',      color: '#f97316', grad: ['#2a1000', '#0d0600'] },
-  lounge:     { icon: '🛋️', label: 'Lounges',     color: '#a78bfa', grad: ['#1a1030', '#07040f'] },
-  arcade:     { icon: '🕹️', label: 'Arcade',      color: '#6366f1', grad: ['#0e0e2e', '#030310'] },
+  bar:        { icon: '🍺', label: 'Bars',       color: '#FFB700' },
+  club:       { icon: '🎉', label: 'Clubs',       color: '#8b5cf6' },
+  karaoke:    { icon: '🎤', label: 'Karaoke',     color: '#ec4899' },
+  gaming:     { icon: '🎮', label: 'Gaming',      color: '#3b82f6' },
+  restaurant: { icon: '🍜', label: 'Food',        color: '#ef4444' },
+  park:       { icon: '🌳', label: 'Parks',       color: '#22c55e' },
+  beach:      { icon: '🏖️', label: 'Beach',       color: '#06b6d4' },
+  sports:     { icon: '⚽', label: 'Sports',      color: '#f97316' },
+  lounge:     { icon: '🛋️', label: 'Lounges',     color: '#a78bfa' },
+  arcade:     { icon: '🕹️', label: 'Arcade',      color: '#6366f1' },
 };
 
 const VIBES = [
@@ -133,7 +133,7 @@ const cc = StyleSheet.create({
 
 // ─── Compact spot card (used in horizontal group rows) ───────────────────────
 function CompactSpotCard({ item, onPress, saved, onToggleSave }) {
-  const meta = TYPE_META[item.type] || { icon: '📍', label: item.type, color: BOND_PINK };
+  const meta = TYPE_META[item.type] || { icon: '•', label: item.type, color: BOND_PINK };
   return (
     // Outer View so the save button and the card tap are completely independent
     <View style={csc.card}>
@@ -153,7 +153,7 @@ function CompactSpotCard({ item, onPress, saved, onToggleSave }) {
         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
         activeOpacity={0.7}
       >
-        <Text style={csc.saveBtnTxt}>{saved ? '🔖' : '＋'}</Text>
+        <Text style={csc.saveBtnTxt}>{saved ? '✓' : '＋'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -169,6 +169,35 @@ const csc = StyleSheet.create({
   name:      { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 17 },
   city:      { color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '600' },
   vibe:      { fontSize: 10, fontWeight: '700' },
+});
+
+// ─── Event pill (horizontal scroll card for upcoming events) ─────────────────
+function EventPill({ event, onPress }) {
+  const et = EVENT_TYPES.find(e => e.key === event.type) || EVENT_TYPES[0];
+  return (
+    <TouchableOpacity style={[ep.card, { borderColor: et.color + '44' }]} onPress={onPress} activeOpacity={0.85}>
+      <View style={[ep.typePill, { backgroundColor: et.color + '22' }]}>
+        <View style={[ep.dot, { backgroundColor: et.color }]} />
+        <Text style={[ep.typeLabel, { color: et.color }]}>{et.label}</Text>
+      </View>
+      <Text style={ep.title} numberOfLines={2}>{event.title}</Text>
+      <Text style={ep.meta} numberOfLines={1}>{countryFlag(event.placeCountry)} {event.placeName}</Text>
+      <Text style={ep.date} numberOfLines={1}>{formatDate(event.date)}</Text>
+      <Text style={[ep.price, { color: (!event.price || event.price === 'Free') ? '#22c55e' : et.color }]}>
+        {(!event.price || event.price === 'Free') ? 'Free' : event.price}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+const ep = StyleSheet.create({
+  card:      { width: 180, backgroundColor: '#16181C', borderRadius: 18, padding: 14, gap: 8, borderWidth: 1 },
+  typePill:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, alignSelf: 'flex-start' },
+  dot:       { width: 6, height: 6, borderRadius: 3 },
+  typeLabel: { fontSize: 11, fontWeight: '700' },
+  title:     { color: '#fff', fontSize: 14, fontWeight: '900', lineHeight: 18 },
+  meta:      { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  date:      { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
+  price:     { fontSize: 12, fontWeight: '800' },
 });
 
 // ─── Spot card ────────────────────────────────────────────────────────────────
@@ -342,31 +371,40 @@ export default function ExploreScreen({ navigation, user }) {
       socket.emit('get_upcoming_events');
       socket.emit('get_live_venues');
     }
+    function onCountriesList(list) { setCountries(list); }
+    function onUpcomingEvents(evts) { setUpcomingEvents(evts || []); }
+    function onLiveVenues(venues) { setLiveVenues(venues || []); }
+    function onCountryPlacesList({ places }) { setSpots(places || []); setLoading(false); }
+    function onVibeSpotsList({ places }) { setSpots(places || []); setLoading(false); }
+    function onVenueLiveUpdate() { socket.emit('get_live_venues'); }
+    function onAllActivePulses(pulses) { setActivePulses(pulses || []); }
+    function onPulseDropped({ pulse }) {
+      setActivePulses(prev => [pulse, ...prev.filter(p => p.id !== pulse.id)]);
+    }
+
     if (socket.connected) init();
     else socket.once('connect', init);
 
-    socket.on('countries_list',    list  => setCountries(list));
-    socket.on('upcoming_events',   evts  => setUpcomingEvents(evts || []));
-    socket.on('live_venues',       venues=> setLiveVenues(venues || []));
-    socket.on('country_places_list', ({ places }) => { setSpots(places || []); setLoading(false); });
-    socket.on('vibe_spots_list',     ({ places }) => { setSpots(places || []); setLoading(false); });
-    socket.on('venue_live_update',  () => socket.emit('get_live_venues'));
-    socket.on('all_active_pulses',  pulses => setActivePulses(pulses || []));
-    socket.on('pulse_dropped', ({ pulse }) => setActivePulses(prev => {
-      const without = prev.filter(p => p.id !== pulse.id);
-      return [pulse, ...without];
-    }));
+    socket.on('countries_list',      onCountriesList);
+    socket.on('upcoming_events',     onUpcomingEvents);
+    socket.on('live_venues',         onLiveVenues);
+    socket.on('country_places_list', onCountryPlacesList);
+    socket.on('vibe_spots_list',     onVibeSpotsList);
+    socket.on('venue_live_update',   onVenueLiveUpdate);
+    socket.on('all_active_pulses',   onAllActivePulses);
+    socket.on('pulse_dropped',       onPulseDropped);
     socket.emit('get_all_active_pulses');
 
     return () => {
-      socket.off('countries_list');
-      socket.off('upcoming_events');
-      socket.off('live_venues');
-      socket.off('country_places_list');
-      socket.off('vibe_spots_list');
-      socket.off('venue_live_update');
-      socket.off('all_active_pulses');
-      socket.off('pulse_dropped');
+      socket.off('connect',            init);
+      socket.off('countries_list',     onCountriesList);
+      socket.off('upcoming_events',    onUpcomingEvents);
+      socket.off('live_venues',        onLiveVenues);
+      socket.off('country_places_list',onCountryPlacesList);
+      socket.off('vibe_spots_list',    onVibeSpotsList);
+      socket.off('venue_live_update',  onVenueLiveUpdate);
+      socket.off('all_active_pulses',  onAllActivePulses);
+      socket.off('pulse_dropped',      onPulseDropped);
     };
   }, []);
 
@@ -563,17 +601,16 @@ export default function ExploreScreen({ navigation, user }) {
 
           {/* Search */}
           <View style={ds.searchWrap}>
-            <Text style={ds.searchIcon}>🔍</Text>
             <TextInput
               style={ds.searchInput}
               placeholder="Search countries, cities, spots…"
-              placeholderTextColor="#666"
+              placeholderTextColor="rgba(255,255,255,0.35)"
               value={search}
               onChangeText={setSearch}
               autoCapitalize="none"
             />
             {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444', paddingHorizontal: 6 }}>✕</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: 'rgba(255,255,255,0.4)', paddingHorizontal: 6 }}>✕</Text></TouchableOpacity>
             )}
           </View>
 
@@ -760,7 +797,6 @@ export default function ExploreScreen({ navigation, user }) {
               )}
               ListEmptyComponent={
                 <View style={ds.empty}>
-                  <Text style={{ fontSize: 36 }}>🌍</Text>
                   <Text style={ds.emptyTxt}>No countries match "{search}"</Text>
                 </View>
               }
@@ -778,7 +814,7 @@ export default function ExploreScreen({ navigation, user }) {
   const spotVibeMeta  = activeVibe   ? VIBES.find(v => v.key === activeVibe)   : null;
   const spotsHeading  = activeCountry
     ? `${countryFlag(activeCountry)} ${countryName(activeCountry)}`
-    : spotVibeMeta ? `${spotVibeMeta.icon} ${spotVibeMeta.label} Worldwide` : 'Spots';
+    : spotVibeMeta ? `${spotVibeMeta.label} Worldwide` : 'Spots';
 
   const countryUpcoming = activeCountry
     ? upcomingEvents.filter(e => e.placeCountry === activeCountry)
@@ -813,16 +849,15 @@ export default function ExploreScreen({ navigation, user }) {
 
         {/* Search — inside scroll so it doesn't add to fixed header height */}
         <View style={sv.searchWrap}>
-          <Text style={{ color: '#555', fontSize: 14 }}>🔍</Text>
           <TextInput
             style={sv.searchInput}
             placeholder={activeCountry ? 'Search spots, vibes, tags…' : 'Search by country, city, spot…'}
-            placeholderTextColor="#666"
+            placeholderTextColor="rgba(255,255,255,0.35)"
             value={search}
             onChangeText={setSearch}
             autoCapitalize="none"
           />
-          {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: '#444' }}>✕</Text></TouchableOpacity>}
+          {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: 'rgba(255,255,255,0.4)' }}>✕</Text></TouchableOpacity>}
         </View>
 
         {/* Vibe type filter chips */}
@@ -871,7 +906,7 @@ export default function ExploreScreen({ navigation, user }) {
                 onPress={() => { setSavedSpots([]); AsyncStorage.setItem(SAVED_KEY, '[]'); }}
                 style={{ marginLeft: 'auto', paddingHorizontal: 10 }}
               >
-                <Text style={{ color: '#444', fontSize: 12 }}>Clear all</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>Clear all</Text>
               </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 4 }}>
@@ -945,7 +980,7 @@ export default function ExploreScreen({ navigation, user }) {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingHorizontal: 16 }}>
               {liveSpots.map(p => {
-                const meta = TYPE_META[p.type] || { icon: '📍', color: BOND_PINK };
+                const meta = TYPE_META[p.type] || { color: BOND_PINK };
                 return (
                   <TouchableOpacity key={p.id} style={sv.liveCard} onPress={() => openSpot(p)} activeOpacity={0.85}>
                     <Text style={sv.liveName} numberOfLines={2}>{p.name}</Text>
@@ -978,17 +1013,16 @@ export default function ExploreScreen({ navigation, user }) {
         {/* ── GROUPED VIEW (All Vibes) — horizontal row per type ── */}
         {loading ? (
           <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
-            <Text style={{ color: '#555', fontSize: 15 }}>Loading spots…</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>Loading spots…</Text>
           </View>
         ) : filteredSpots.length === 0 ? (
           <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
-            <Text style={{ fontSize: 40 }}>🔍</Text>
-            <Text style={{ color: '#555', fontSize: 15 }}>No spots match your search</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>No spots match your search</Text>
           </View>
         ) : groupedByType ? (
           // Grouped horizontal sections — no endless scrolling
           groupedByType.map(([type, typeSpots]) => {
-            const meta = TYPE_META[type] || { icon: '📍', label: type, color: BOND_PINK };
+            const meta = TYPE_META[type] || { icon: '•', label: type, color: BOND_PINK };
             return (
               <View key={type} style={sv.typeGroup}>
                 <View style={sv.typeGroupHeader}>
@@ -1046,7 +1080,6 @@ const ds = StyleSheet.create({
   title:        { color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   sub:          { color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 4 },
   searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#3a3d44', marginHorizontal: 20, marginBottom: 12 },
-  searchIcon:   { fontSize: 15, color: '#777' },
   searchInput:  { flex: 1, color: '#fff', fontSize: 15 },
   section:      { marginBottom: 24 },
   sectionRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, marginBottom: 14 },
@@ -1068,7 +1101,7 @@ const ds = StyleSheet.create({
   regionTxt:    { color: '#999', fontSize: 13, fontWeight: '600' },
   regionTxtOn:  { color: BOND_PINK, fontWeight: '800' },
   empty:        { alignItems: 'center', paddingTop: 40, gap: 10 },
-  emptyTxt:     { color: '#666', fontSize: 14 },
+  emptyTxt:     { color: 'rgba(255,255,255,0.4)', fontSize: 14 },
 
   // GPS location banner
   locBanner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, marginBottom: 20, backgroundColor: BOND_PINK + '18', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: BOND_PINK + '44' },
@@ -1106,8 +1139,6 @@ const sv = StyleSheet.create({
   sub:             { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 2 },
   searchWrap:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, gap: 10, borderWidth: 1, borderColor: '#3a3d44', marginHorizontal: 20, marginTop: 4, marginBottom: 14 },
   searchInput:     { flex: 1, color: '#fff', fontSize: 14 },
-  filterRow:       { borderBottomWidth: 1, borderBottomColor: '#111' },
-  cityRow:         { borderBottomWidth: 1, borderBottomColor: '#0d0d0d' },
   filterChip:      { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#3a3d44' },
   filterTxt:       { color: '#999', fontSize: 13, fontWeight: '600' },
   cityChip:        { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#3a3d44' },

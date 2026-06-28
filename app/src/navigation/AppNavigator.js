@@ -37,28 +37,59 @@ import CountryStampChallengeScreen from '../screens/CountryStampChallengeScreen'
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-function TabIcon({ icon, color, focused, activeBg }) {
-  return (
-    <View style={[tabStyles.iconWrap, focused && { backgroundColor: activeBg || '#FF008018' }]}>
-      <Text style={{ fontSize: 20 }}>{icon}</Text>
-    </View>
-  );
-}
-
 function HomeTabIcon({ color, focused }) {
   const bondC  = focused ? '#FF0080' : color;
   const globeC = focused ? '#fff'    : color;
   return (
-    <View style={[tabStyles.homeWrap, focused && tabStyles.homeWrapActive]}>
-      <WorldMark size={26} color={globeC} bondColor={bondC} />
+    <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
+      <WorldMark size={24} color={globeC} bondColor={bondC} />
+    </View>
+  );
+}
+
+function LiveTabIcon({ color, focused }) {
+  const c = focused ? '#e53935' : color;
+  return (
+    <View style={[tabStyles.iconWrap, focused && { backgroundColor: '#e5393518' }]}>
+      <View style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: c, opacity: 0.3 }} />
+        <View style={{ position: 'absolute', width: 17, height: 17, borderRadius: 9,  borderWidth: 1.5, borderColor: c, opacity: 0.6 }} />
+        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c }} />
+      </View>
+    </View>
+  );
+}
+
+function ConnectTabIcon({ color, focused }) {
+  const c = focused ? '#FF0080' : color;
+  return (
+    <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
+      <View style={{ width: 30, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', left: 0,  width: 19, height: 19, borderRadius: 10, borderWidth: 2, borderColor: c, opacity: focused ? 0.6 : 0.5 }} />
+        <View style={{ position: 'absolute', right: 0, width: 19, height: 19, borderRadius: 10, borderWidth: 2, borderColor: c }} />
+      </View>
+    </View>
+  );
+}
+
+function ProfileTabIcon({ color, focused, user }) {
+  const initial = (user?.display_name || user?.username || '?')[0].toUpperCase();
+  return (
+    <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapActive]}>
+      <View style={[tabStyles.profileCircle, focused
+        ? { backgroundColor: '#FF0080', borderColor: '#FF0080' }
+        : { backgroundColor: 'transparent', borderColor: color }
+      ]}>
+        <Text style={{ color: focused ? '#fff' : color, fontSize: 12, fontWeight: '800' }}>{initial}</Text>
+      </View>
     </View>
   );
 }
 
 const tabStyles = StyleSheet.create({
   iconWrap:       { width: 44, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  homeWrap:       { alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  homeWrapActive: { backgroundColor: '#FF008018' },
+  iconWrapActive: { backgroundColor: '#FF008018' },
+  profileCircle:  { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 });
 
 function HomeTabs({ user, onLogout }) {
@@ -91,30 +122,31 @@ function HomeTabs({ user, onLogout }) {
       </Tab.Screen>
 
       <Tab.Screen
-        name="Discover"
-        options={{
-          tabBarLabel: 'Connect',
-          tabBarIcon: ({ color, focused }) => <TabIcon icon="🌐" color={color} focused={focused} activeBg="#FF008018" />,
-        }}
-      >
-        {props => <DiscoverScreen {...props} user={user} />}
-      </Tab.Screen>
-
-      <Tab.Screen
         name="LiveHub"
         options={{
           tabBarLabel: 'Live',
-          tabBarIcon: ({ color, focused }) => <TabIcon icon="📡" color={color} focused={focused} activeBg="#e5393518" />,
+          tabBarIcon: ({ color, focused }) => <LiveTabIcon color={color} focused={focused} />,
+          tabBarActiveTintColor: '#e53935',
         }}
       >
         {props => <LiveHubScreen {...props} user={user} />}
       </Tab.Screen>
 
       <Tab.Screen
+        name="Discover"
+        options={{
+          tabBarLabel: 'Connect',
+          tabBarIcon: ({ color, focused }) => <ConnectTabIcon color={color} focused={focused} />,
+        }}
+      >
+        {props => <DiscoverScreen {...props} user={user} />}
+      </Tab.Screen>
+
+      <Tab.Screen
         name="Me"
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, focused }) => <TabIcon icon="👤" color={color} focused={focused} activeBg="#FF008018" />,
+          tabBarLabel: 'Me',
+          tabBarIcon: ({ color, focused }) => <ProfileTabIcon color={color} focused={focused} user={user} />,
         }}
       >
         {props => <MyProfileScreen {...props} user={user} onLogout={onLogout} />}

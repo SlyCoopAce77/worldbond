@@ -15,6 +15,7 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
   const [password,    setPassword]    = useState('');
   const [confirm,     setConfirm]     = useState('');
   const [showPass,    setShowPass]    = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
   const [done,        setDone]        = useState(false);
@@ -57,7 +58,7 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
       <SafeAreaView style={styles.container}>
         <View style={styles.doneWrap}>
           <LinearGradient colors={[BOND_PINK + '30', BOND_PINK + '10']} style={styles.doneIconBg}>
-            <Text style={styles.doneIcon}>✅</Text>
+            <Text style={styles.doneCheckmark}>✓</Text>
           </LinearGradient>
           <Text style={styles.doneTitle}>Password reset!</Text>
           <Text style={styles.doneSub}>Your password has been updated. Sign in with your new password.</Text>
@@ -98,7 +99,7 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
 
             {!!error && (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorIcon}>⚠️</Text>
+                <View style={styles.errorIconBox}><Text style={styles.errorIconTxt}>!</Text></View>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -111,7 +112,7 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
                   <TextInput
                     style={[styles.input, styles.codeInput]}
                     placeholder="000000"
-                    placeholderTextColor="#2F3336"
+                    placeholderTextColor="rgba(255,255,255,0.25)"
                     value={code}
                     onChangeText={t => { setCode(t.replace(/\D/g, '').slice(0, 6)); setError(''); }}
                     keyboardType="number-pad"
@@ -128,12 +129,11 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>New Password</Text>
                 <View style={[styles.inputWrap, password.length > 0 && styles.inputWrapFocused]}>
-                  <Text style={styles.inputIcon}>🔒</Text>
                   <TextInput
                     ref={passRef}
                     style={styles.input}
                     placeholder="At least 8 characters"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
                     value={password}
                     onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPass}
@@ -149,21 +149,24 @@ export default function ResetPasswordScreen({ email, onBack, onSuccess }) {
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Confirm Password</Text>
                 <View style={[styles.inputWrap, confirm.length > 0 && styles.inputWrapFocused]}>
-                  <Text style={styles.inputIcon}>🔒</Text>
                   <TextInput
                     ref={confirmRef}
                     style={styles.input}
                     placeholder="Repeat your new password"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
                     value={confirm}
                     onChangeText={t => { setConfirm(t); setError(''); }}
-                    secureTextEntry={!showPass}
+                    secureTextEntry={!showConfirm}
                     returnKeyType="done"
                     onSubmitEditing={handleReset}
                   />
-                  {confirm.length > 0 && password === confirm && (
+                  {confirm.length > 0 && password === confirm ? (
                     <Text style={styles.checkMark}>✓</Text>
-                  )}
+                  ) : confirm.length > 0 ? (
+                    <TouchableOpacity onPress={() => setShowConfirm(v => !v)} style={styles.showHide}>
+                      <Text style={styles.showHideText}>{showConfirm ? 'Hide' : 'Show'}</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
 
@@ -217,9 +220,10 @@ const styles = StyleSheet.create({
   subtitle:       { fontSize: 15, color: '#536471', marginTop: 8, lineHeight: 22 },
   emailHighlight: { color: BOND_PINK, fontWeight: '700' },
 
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
-  errorIcon:   { fontSize: 16 },
-  errorText:   { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
+  errorBanner:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
+  errorIconBox: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f04747', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  errorIconTxt: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  errorText:    { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
   form:       { gap: 20 },
   fieldGroup: { gap: 8 },
@@ -227,9 +231,8 @@ const styles = StyleSheet.create({
 
   inputWrap:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#16181C', borderRadius: 16, borderWidth: 1, borderColor: '#2F3336', paddingHorizontal: 16 },
   inputWrapFocused: { borderColor: BOND_PINK + '40' },
-  codeWrap:         { justifyContent: 'center' },
-  inputIcon:        { fontSize: 16, marginRight: 10 },
-  input:            { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
+  codeWrap: { justifyContent: 'center' },
+  input:    { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 17 },
   codeInput:        { textAlign: 'center', fontSize: 28, fontWeight: '800', letterSpacing: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   checkMark:        { color: '#57f287', fontSize: 18, fontWeight: '800', marginLeft: 8 },
   showHide:         { paddingLeft: 8 },
@@ -246,7 +249,7 @@ const styles = StyleSheet.create({
 
   doneWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
   doneIconBg:  { width: 100, height: 100, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  doneIcon:    { fontSize: 48 },
+  doneCheckmark: { color: '#57f287', fontSize: 56, fontWeight: '900', lineHeight: 64 },
   doneTitle:   { color: '#fff', fontSize: 28, fontWeight: '900', textAlign: 'center' },
   doneSub:     { color: '#666666', fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
   doneBtn:     { width: '100%', borderRadius: 18, overflow: 'hidden' },

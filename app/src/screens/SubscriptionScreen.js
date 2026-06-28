@@ -5,23 +5,25 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useBondPass } from '../context/PremiumContext';
+import { WorldMark } from '../components/BondLogo';
 
 const BOND_PINK = '#FF0080';
 
 const PASS_FEATURES = [
-  { icon: '♾️',  text: 'Unlimited daily connects'                        },
-  { icon: '✍️',  text: '150-char personal note with every bond request'  },
-  { icon: '💬',  text: 'Message anyone — bonded or not'                  },
-  { icon: '💸',  text: '75% gift payout rate (vs 50% standard)'          },
-  { icon: '📡',  text: '5 Random Connects per day'                       },
-  { icon: '🎛️',  text: 'Advanced matching filters (gender, vibe)'        },
-  { icon: '🎪',  text: 'Create & host events'                            },
-  { icon: '⭐',  text: 'Bond Pass badge on your profile'                  },
+  { text: 'Unlimited daily connects'                        },
+  { text: '150-char personal note with every bond request'  },
+  { text: 'Message anyone — bonded or not'                  },
+  { text: '75% gift payout rate (vs 70% standard)'          },
+  { text: '5 Random Connects per day'                       },
+  { text: 'Advanced matching filters (gender, vibe)'        },
+  { text: 'Create and host events'                          },
+  { text: 'Bond Pass badge on your profile'                 },
 ];
 
 export default function SubscriptionScreen({ navigation }) {
-  const { hasBondPass, subscribeToBondPass, cancelBondPass } = useBondPass();
+  const { hasBondPass, product, subscribeToBondPass, cancelBondPass } = useBondPass();
   const [loading, setLoading] = useState(false);
+  const prevHasBondPass = useRef(hasBondPass);
 
   const heroAnim = useRef(new Animated.Value(0)).current;
   const cardAnim = useRef(new Animated.Value(0)).current;
@@ -41,29 +43,39 @@ export default function SubscriptionScreen({ navigation }) {
     }
   }, [hasBondPass]);
 
+  // Detect successful purchase completing in background listener
+  useEffect(() => {
+    if (!prevHasBondPass.current && hasBondPass && loading) {
+      setLoading(false);
+      Alert.alert(
+        'Bond Pass Active',
+        'Unlimited connects, priority features, and 75% payout rate — all yours.',
+        [{ text: "Let's go!", onPress: () => navigation.goBack() }],
+      );
+    }
+    prevHasBondPass.current = hasBondPass;
+  }, [hasBondPass, loading, navigation]);
+
   async function handleSubscribe() {
     setLoading(true);
-    // Production: replace with RevenueCat / StoreKit purchase
-    await new Promise(r => setTimeout(r, 1200));
-    await subscribeToBondPass();
-    setLoading(false);
-    Alert.alert(
-      '⚡ Bond Pass Active',
-      'Unlimited connects, priority features, and 75% payout rate — all yours.',
-      [{ text: "Let's go!", onPress: () => navigation.goBack() }],
-    );
+    try {
+      await subscribeToBondPass();
+      // Success handled in the useEffect above via purchaseUpdatedListener
+    } catch (e) {
+      setLoading(false);
+      if (e.code !== 'E_USER_CANCELLED') {
+        Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
+      }
+    }
   }
 
-  async function handleCancel() {
+  function handleCancel() {
     Alert.alert(
-      'Cancel Bond Pass?',
-      'You will lose access to Bond Pass features at the end of your billing period.',
+      'Manage Bond Pass',
+      'Subscriptions are managed through Apple. Tap below to open your subscription settings.',
       [
-        { text: 'Keep Bond Pass', style: 'cancel' },
-        { text: 'Cancel', style: 'destructive', onPress: async () => {
-          await cancelBondPass();
-          navigation.goBack();
-        }},
+        { text: 'Not Now', style: 'cancel' },
+        { text: 'Open Settings', onPress: cancelBondPass },
       ],
     );
   }
@@ -88,7 +100,7 @@ export default function SubscriptionScreen({ navigation }) {
         {/* ── Hero ── */}
         <Animated.View style={[s.hero, { opacity: heroAnim, transform: [{ translateY: heroTranslate }] }]}>
           <LinearGradient colors={[BOND_PINK + '22', BOND_PINK + '08', '#000000']} style={s.heroBg}>
-            <Text style={s.heroGlobe}>🌍</Text>
+            <WorldMark size={72} color="#ffffff" bondColor={BOND_PINK} />
             <Text style={s.heroTitle}>Bond Without Limits</Text>
             <Text style={s.heroSub}>
               One plan · every feature · no tiers to worry about
@@ -102,14 +114,14 @@ export default function SubscriptionScreen({ navigation }) {
 
             {hasBondPass && (
               <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.activeBadge}>
-                <Text style={s.activeBadgeText}>⚡  ACTIVE</Text>
+                <Text style={s.activeBadgeText}>ACTIVE</Text>
               </LinearGradient>
             )}
 
             <View style={s.priceRow}>
               <Text style={s.planName}>Bond Pass</Text>
               <View style={s.pricePill}>
-                <Text style={s.priceAmount}>$4.99</Text>
+                <Text style={s.priceAmount}>{product?.localizedPrice ?? '$4.99'}</Text>
                 <Text style={s.pricePer}>/month</Text>
               </View>
             </View>
@@ -119,7 +131,7 @@ export default function SubscriptionScreen({ navigation }) {
             <View style={s.featureList}>
               {PASS_FEATURES.map((f, i) => (
                 <View key={i} style={s.featureRow}>
-                  <Text style={s.featureIcon}>{f.icon}</Text>
+                  <View style={s.featureDot} />
                   <Text style={s.featureText}>{f.text}</Text>
                 </View>
               ))}
@@ -155,7 +167,7 @@ export default function SubscriptionScreen({ navigation }) {
             {[
               '5 daily connects',
               'Message bonded users only',
-              '50% gift payout rate',
+              '70% gift payout rate',
               '1 Random Connect per day',
               'Join up to 3 events',
             ].map((line, i) => (
@@ -176,7 +188,7 @@ export default function SubscriptionScreen({ navigation }) {
           ) : (
             <Text style={s.footerNote}>Cancel anytime · Payments secured by App Store</Text>
           )}
-          <Text style={s.footerBrand}>Bond — connecting humanity, one conversation at a time 🌍</Text>
+          <Text style={s.footerBrand}>WorldBond — connecting humanity, one conversation at a time</Text>
         </View>
 
       </ScrollView>
@@ -201,8 +213,7 @@ const s = StyleSheet.create({
   // Hero
   hero:      { marginBottom: 4 },
   heroBg:    { alignItems: 'center', paddingTop: 32, paddingBottom: 24, paddingHorizontal: 24 },
-  heroGlobe: { fontSize: 64 },
-  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 12, textAlign: 'center', letterSpacing: -0.5 },
+  heroTitle: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 16, textAlign: 'center', letterSpacing: -0.5 },
   heroSub:   { color: '#666666', fontSize: 14, marginTop: 10, textAlign: 'center', lineHeight: 21, maxWidth: 280 },
 
   // Plan card
@@ -226,7 +237,7 @@ const s = StyleSheet.create({
 
   featureList: { gap: 13, marginBottom: 4 },
   featureRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  featureIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  featureDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: BOND_PINK, flexShrink: 0, marginTop: 1 },
   featureText: { color: '#cccccc', fontSize: 14, lineHeight: 20, flex: 1 },
 
   ctaWrap: { borderRadius: 16, overflow: 'hidden' },
@@ -247,7 +258,7 @@ const s = StyleSheet.create({
   // Footer
   footer:      { alignItems: 'center', gap: 8, paddingHorizontal: 24, marginTop: 4 },
   footerNote:  { color: '#333333', fontSize: 12, textAlign: 'center' },
-  footerBrand: { color: '#2a2a2a', fontSize: 11, textAlign: 'center', fontStyle: 'italic' },
+  footerBrand: { color: 'rgba(255,255,255,0.12)', fontSize: 11, textAlign: 'center', fontStyle: 'italic' },
   cancelBtn:   { paddingVertical: 10 },
   cancelText:  { color: '#ef4444', fontSize: 14, fontWeight: '600', textAlign: 'center' },
 });

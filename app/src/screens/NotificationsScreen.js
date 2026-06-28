@@ -24,7 +24,7 @@ const TYPE = {
   payout:    { sym: '$',  color: '#FFB700', label: 'payout'                },
 };
 
-const FOOTPRINT_TYPES = new Set(['gift', 'payout', 'comment']);
+const FOOTPRINT_TYPES = new Set(['gift', 'bond', 'payout', 'milestone']);
 
 // ─── Type icon (colored badge, no emoji) ─────────────────────────────────────
 function TypeIcon({ meta }) {
@@ -171,8 +171,8 @@ function Empty({ tab }) {
       <Text style={s.emptyTitle}>{isFootprints ? 'No footprints yet' : 'Nothing here yet'}</Text>
       <Text style={s.emptySub}>
         {isFootprints
-          ? 'When someone likes, echoes, gifts you, or mentions you — it shows here.'
-          : 'Activity from across the app shows up here as it happens.'}
+          ? 'When someone gifts you, bonds with you, or your stamp earns a payout — it shows here.'
+          : 'When someone bonds with you, joins your live, or sends a gift — it shows here.'}
       </Text>
     </View>
   );
@@ -180,7 +180,7 @@ function Empty({ tab }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function NotificationsScreen({ navigation }) {
-  const { notifications, unreadCount, markRead, markAllRead, dismiss, dismissAll } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, dismissAll } = useNotifications();
   const [tab, setTab]   = useState('all');
   const indicatorX      = useRef(new Animated.Value(0)).current;
   const headerFade      = useRef(new Animated.Value(0)).current;
@@ -212,7 +212,10 @@ export default function NotificationsScreen({ navigation }) {
 
   function handlePress(item) {
     markRead(item.id);
-    if (item.fromId) navigation.navigate('Profile', { bondUserId: item.fromId });
+    if (item.fromId) navigation.navigate('Profile', {
+      bondUserId:  item.fromId,
+      profileUser: { userId: item.fromId, username: item.from, photo_url: item.fromPhoto || null },
+    });
   }
 
   return (
@@ -260,7 +263,7 @@ export default function NotificationsScreen({ navigation }) {
       {/* ── Feed ── */}
       <FlatList
         data={displayed}
-        keyExtractor={n => n.id}
+        keyExtractor={n => String(n.id)}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.list}
         ListEmptyComponent={<Empty tab={tab} />}
@@ -305,15 +308,15 @@ const s = StyleSheet.create({
   unreadDot:      { width: 8, height: 8, borderRadius: 4, marginTop: 14, marginRight: 8, flexShrink: 0 },
   rowBody:        { flex: 1 },
   rowTop:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  rowTitle:       { color: 'rgba(255,255,255,0.35)', fontSize: 14, fontWeight: '500', flex: 1, lineHeight: 20 },
+  rowTitle:       { color: 'rgba(255,255,255,0.45)', fontSize: 14, fontWeight: '500', flex: 1, lineHeight: 20 },
   rowTitleUnread: { color: '#fff', fontWeight: '700' },
-  rowTime:        { color: 'rgba(255,255,255,0.25)', fontSize: 12, flexShrink: 0, marginTop: 1 },
-  rowSub:         { color: 'rgba(255,255,255,0.35)', fontSize: 13, lineHeight: 19, marginTop: 4 },
+  rowTime:        { color: 'rgba(255,255,255,0.35)', fontSize: 12, flexShrink: 0, marginTop: 1 },
+  rowSub:         { color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 19, marginTop: 4 },
 
   empty:          { alignItems: 'center', paddingTop: 90, paddingHorizontal: 50, gap: 14 },
   emptyTitle:     { color: '#fff', fontSize: 18, fontWeight: '800' },
   emptySub:       { color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   clearAll:       { alignSelf: 'center', marginTop: 30, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 14, borderWidth: 1, borderColor: '#1A1A1A' },
-  clearAllTxt:    { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: '600' },
+  clearAllTxt:    { color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: '600' },
 });

@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useBondPass } from '../context/PremiumContext';
+import { useWallet, STAMP_CAP } from '../context/WalletContext';
 import {
   useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE, FEATURED_FEE,
   getFeaturedFlag, getNextFeaturedFlag, isStampDropped,
@@ -288,6 +289,9 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
   const { stamp, currentUser } = route.params || {};
 
   const { hasBondPass } = useBondPass();
+  const { myStamps } = useWallet();
+  const stampCap   = hasBondPass ? STAMP_CAP.bond_pass : STAMP_CAP.standard;
+  const atStampCap = myStamps.length >= stampCap;
   const canView    = hasBondPass;
   const canContrib = hasBondPass;
 
@@ -335,6 +339,15 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
 
   function handleInitiate() {
     if (!canContrib || !stamp?.holder) return;
+    if (atStampCap) {
+      const upgradeNote = hasBondPass ? '' : '\n\nUpgrade to Bond Pass to hold up to 4 stamps.';
+      Alert.alert(
+        'Stamp Slots Full',
+        `You are holding ${myStamps.length}/${stampCap} stamps. Drop a stamp before challenging for a new one.${upgradeNote}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     const feeNote = isFeatured
       ? `Burns ${effectiveFee} Bond Coins (50% off — featured this week).`
       : `Burns ${effectiveFee} Bond Coins.`;

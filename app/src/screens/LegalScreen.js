@@ -10,7 +10,7 @@ const TERMS_TEXT = `TERMS OF SERVICE
 Effective Date: ${EFFECTIVE_DATE}
 
 1. ACCEPTANCE
-By creating an account or using Bond ("the App"), you agree to these Terms. If you are under 13 years old you may not use the App.
+By creating an account or using Bond ("the App"), you agree to these Terms. If you are under 18 years old you may not use the App.
 
 2. ACCOUNT
 You are responsible for your account and all activity under it. Provide accurate information when registering. You may not share or sell your account.
@@ -24,7 +24,7 @@ You must not:
 • Impersonate other people or entities
 • Use the App for spam or unsolicited commercial messages
 • Attempt to hack, reverse-engineer, or disrupt the service
-• Use the App if you are under 13 years old
+• Use the App if you are under 18 years old
 
 5. MODERATION
 Bond may remove content or suspend accounts that violate these Terms at any time and without prior notice.
@@ -74,7 +74,7 @@ We do not sell your personal data. We may share information with:
 We retain your data for as long as your account is active. You can permanently delete your account and all associated data via Settings → Delete Account.
 
 5. CHILDREN'S PRIVACY
-Bond is not directed to children under 13. We do not knowingly collect personal information from children under 13. If we become aware that we have, we will delete it promptly.
+Bond is not directed to children under 18. We do not knowingly collect personal information from children under 18. If we become aware that we have, we will delete it promptly.
 
 6. SECURITY
 We use industry-standard security measures including HTTPS encrypted connections and hashed password storage. No internet transmission is 100% secure.
@@ -95,8 +95,9 @@ We may update this Privacy Policy. We will notify you of material changes throug
 10. CONTACT
 Privacy questions: ${SUPPORT_EMAIL}`;
 
-export default function LegalScreen({ route, navigation }) {
-  const type    = route.params?.type || 'terms';
+export default function LegalScreen({ route, navigation, type: typeProp, onBack }) {
+  const type    = typeProp || route?.params?.type || 'terms';
+  const goBack  = onBack   || (() => navigation?.goBack());
   const isTerms = type === 'terms';
   const title   = isTerms ? 'Terms of Service' : 'Privacy Policy';
   const body    = isTerms ? TERMS_TEXT : PRIVACY_TEXT;
@@ -104,7 +105,7 @@ export default function LegalScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.title}>{title}</Text>

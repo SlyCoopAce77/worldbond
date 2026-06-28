@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bond</string>
+	<string>WorldBond</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -32,13 +32,13 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Bond uses your camera for video calls and profile photos.</string>
+	<string>WorldBond uses your camera for video calls and profile photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Bond uses your location to show you people and places nearby.</string>
+	<string>WorldBond uses your location to show you people and places nearby.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Bond uses your microphone for voice calls, live streams, and voice notes.</string>
+	<string>WorldBond uses your microphone for voice calls, live streams, and voice notes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Bond accesses your photos so you can share them in chats and set your profile picture.</string>
+	<string>WorldBond accesses your photos so you can share them in chats and set your profile picture.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

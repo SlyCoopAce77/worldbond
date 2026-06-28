@@ -37,8 +37,8 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
         email: email.trim().toLowerCase(),
       }, { timeout: 10000 });
       setSent(true);
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -59,7 +59,10 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
 
             <View style={styles.iconWrap}>
               <LinearGradient colors={[BOND_PINK + '30', BOND_PINK + '10']} style={styles.iconBg}>
-                <Text style={styles.icon}>🔑</Text>
+                <View style={styles.iconShape}>
+                  <View style={styles.iconShapeHead} />
+                  <View style={styles.iconShafft} />
+                </View>
               </LinearGradient>
             </View>
 
@@ -74,7 +77,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
 
             {!!error && (
               <View style={styles.errorBanner}>
-                <Text style={styles.errorIcon}>⚠️</Text>
+                <View style={styles.errorIconBox}><Text style={styles.errorIconTxt}>!</Text></View>
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -82,7 +85,7 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
             {sent ? (
               <>
                 <View style={styles.successCard}>
-                  <Text style={styles.successIcon}>📬</Text>
+                  <Text style={styles.successCheckmark}>✓</Text>
                   <Text style={styles.successTitle}>Check your inbox</Text>
                   <Text style={styles.successSub}>The code expires in 15 minutes. Check your spam folder if you don't see it.</Text>
                 </View>
@@ -111,11 +114,10 @@ export default function ForgotPasswordScreen({ onBack, onCodeSent }) {
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Email address</Text>
                     <View style={[styles.inputWrap, email.length > 0 && styles.inputWrapFocused]}>
-                      <Text style={styles.inputIcon}>✉️</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="you@example.com"
-                        placeholderTextColor="#536471"
+                        placeholderTextColor="rgba(255,255,255,0.35)"
                         value={email}
                         onChangeText={t => { setEmail(t); setError(''); }}
                         keyboardType="email-address"
@@ -167,17 +169,20 @@ const styles = StyleSheet.create({
   backBtnInner: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#16181C', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
   backIcon:     { color: '#fff', fontSize: 26, lineHeight: 30 },
 
-  iconWrap: { alignItems: 'center', marginBottom: 24 },
-  iconBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BOND_PINK + '40' },
-  icon:     { fontSize: 36 },
+  iconWrap:      { alignItems: 'center', marginBottom: 24 },
+  iconBg:        { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BOND_PINK + '40' },
+  iconShape:     { alignItems: 'center', gap: 4 },
+  iconShapeHead: { width: 26, height: 26, borderRadius: 13, borderWidth: 3, borderColor: BOND_PINK },
+  iconShafft:    { width: 3, height: 16, borderRadius: 2, backgroundColor: BOND_PINK },
 
   header:   { marginBottom: 28, alignItems: 'center' },
   title:    { fontSize: 30, fontWeight: '900', color: '#fff', letterSpacing: -0.5, textAlign: 'center' },
   subtitle: { fontSize: 15, color: '#536471', marginTop: 8, textAlign: 'center', lineHeight: 22 },
 
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
-  errorIcon:   { fontSize: 16 },
-  errorText:   { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
+  errorBanner:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f0474712', borderWidth: 1, borderColor: '#f0474730', borderRadius: 14, padding: 14, marginBottom: 20 },
+  errorIconBox:  { width: 20, height: 20, borderRadius: 10, backgroundColor: '#f04747', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  errorIconTxt:  { color: '#fff', fontSize: 12, fontWeight: '900' },
+  errorText:     { color: '#f04747', fontSize: 14, flex: 1, lineHeight: 20 },
 
   form:             { gap: 20, marginBottom: 8 },
   fieldGroup:       { gap: 8 },
@@ -192,9 +197,9 @@ const styles = StyleSheet.create({
   submitGrad:   { paddingVertical: 19, alignItems: 'center', borderRadius: 18 },
   submitText:   { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.2 },
 
-  successCard:  { backgroundColor: '#16181C', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#2F3336', marginBottom: 8 },
-  successIcon:  { fontSize: 40, marginBottom: 4 },
-  successTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  successCard:      { backgroundColor: '#16181C', borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#2F3336', marginBottom: 8 },
+  successCheckmark: { color: '#57f287', fontSize: 44, fontWeight: '900', marginBottom: 4 },
+  successTitle:     { color: '#fff', fontSize: 18, fontWeight: '800' },
   successSub:   { color: '#666666', fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   resendBtn:  { paddingVertical: 16, alignItems: 'center' },

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Pressable,
   StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform,
-  Animated, Image, Modal, ScrollView, Alert,
+  Animated, Image, Modal, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -162,6 +162,7 @@ function TypingBubble({ name }) {
             }]}
           />
         ))}
+        <Text style={styles.typingLabel}>{name} is typing</Text>
       </View>
     </View>
   );
@@ -175,7 +176,7 @@ export default function ChatScreen({ route, navigation }) {
   const [messages,    setMessages]    = useState([]);
   const [text,        setText]        = useState('');
   const [showGifts,   setShowGifts]   = useState(false);
-  const [giftAnim]                    = useState(new Animated.Value(0));
+  const giftAnim                      = useRef(new Animated.Value(0)).current;
   const [lastGift,    setLastGift]    = useState(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherOnline, setOtherOnline] = useState(false);
@@ -197,41 +198,44 @@ export default function ChatScreen({ route, navigation }) {
     if (!otherUser?.socketId) return;
     socket.emit('get_dm_history', { otherSocketId: otherUser.socketId });
 
-    socket.on('dm_history', msgs => setMessages(msgs || []));
-
-    socket.on('direct_message', msg => {
+    function onDmHistory(msgs) { setMessages(msgs || []); }
+    function onDirectMessage(msg) {
       setMessages(prev => [...prev, msg]);
       setOtherTyping(false);
-    });
-
-    socket.on('gift_received', giftMsg => {
+    }
+    function onGiftReceived(giftMsg) {
       setLastGift(giftMsg);
       setMessages(prev => [...prev, giftMsg]);
       triggerGiftAnim();
-    });
-
-    socket.on('gift_sent', giftMsg => setMessages(prev => [...prev, giftMsg]));
-
-    socket.on('user_typing', ({ fromSocketId }) => {
+    }
+    function onGiftSent(giftMsg) { setMessages(prev => [...prev, giftMsg]); }
+    function onUserTyping({ fromSocketId }) {
       if (fromSocketId === otherUser.socketId) setOtherTyping(true);
-    });
-    socket.on('user_stopped_typing', ({ fromSocketId }) => {
+    }
+    function onUserStoppedTyping({ fromSocketId }) {
       if (fromSocketId === otherUser.socketId) setOtherTyping(false);
-    });
-
-    socket.on('user_list', users => {
+    }
+    function onUserList(users) {
       setOtherOnline(users.some(u => u.socketId === otherUser.socketId));
-    });
+    }
+
+    socket.on('dm_history',          onDmHistory);
+    socket.on('direct_message',      onDirectMessage);
+    socket.on('gift_received',       onGiftReceived);
+    socket.on('gift_sent',           onGiftSent);
+    socket.on('user_typing',         onUserTyping);
+    socket.on('user_stopped_typing', onUserStoppedTyping);
+    socket.on('user_list',           onUserList);
     socket.emit('get_users');
 
     return () => {
-      socket.off('dm_history');
-      socket.off('direct_message');
-      socket.off('gift_received');
-      socket.off('gift_sent');
-      socket.off('user_typing');
-      socket.off('user_stopped_typing');
-      socket.off('user_list');
+      socket.off('dm_history',          onDmHistory);
+      socket.off('direct_message',      onDirectMessage);
+      socket.off('gift_received',       onGiftReceived);
+      socket.off('gift_sent',           onGiftSent);
+      socket.off('user_typing',         onUserTyping);
+      socket.off('user_stopped_typing', onUserStoppedTyping);
+      socket.off('user_list',           onUserList);
       clearTimeout(typingTimer.current);
     };
   }, [otherUser?.socketId]);
@@ -300,7 +304,7 @@ export default function ChatScreen({ route, navigation }) {
       });
       socket.emit('direct_message', {
         toSocketId: otherUser.socketId,
-        text:     '📷 Photo',
+        text:     'Photo',
         imageUrl: data.imageUrl,
         matchId,
       });
@@ -427,11 +431,11 @@ export default function ChatScreen({ route, navigation }) {
             {item.imageUrl && (
               <Image source={{ uri: item.imageUrl }} style={styles.imageThumb} resizeMode="cover" />
             )}
-            {(item.text && item.text !== '📷 Photo') && (
+            {(item.text && item.text !== 'Photo') && (
               <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{item.text}</Text>
             )}
             {item.wasTranslated && (
-              <Text style={styles.translatedTag}>🌐 auto-translated</Text>
+              <Text style={styles.translatedTag}>auto-translated</Text>
             )}
             <View style={styles.msgMeta}>
               <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
@@ -472,7 +476,7 @@ export default function ChatScreen({ route, navigation }) {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const headerSubtitle = otherOnline
-    ? '🟢 Online now'
+    ? 'Online now'
     : otherUser?.country || '';
 
   return (
@@ -523,14 +527,14 @@ export default function ChatScreen({ route, navigation }) {
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.callBtn} onPress={reportUser}>
-            <Text style={styles.callIcon}>🚩</Text>
+          <TouchableOpacity style={styles.hdrBtn} onPress={reportUser}>
+            <Text style={styles.hdrBtnTxt}>···</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.callBtn} onPress={() => startCall('voice')}>
-            <Text style={styles.callIcon}>📞</Text>
+          <TouchableOpacity style={styles.hdrBtn} onPress={() => startCall('voice')}>
+            <Text style={styles.hdrBtnTxt}>Call</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.callBtn} onPress={() => startCall('video')}>
-            <Text style={styles.callIcon}>📹</Text>
+          <TouchableOpacity style={styles.hdrBtn} onPress={() => startCall('video')}>
+            <Text style={styles.hdrBtnTxt}>Video</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -538,7 +542,7 @@ export default function ChatScreen({ route, navigation }) {
       {/* Compatibility banner */}
       {compatibilityScore != null && (
         <LinearGradient colors={[`${BOND_PINK}1a`, 'transparent']} style={styles.compatBanner}>
-          <Text style={styles.compatText}>✨ {compatibilityScore}% Bond Match</Text>
+          <Text style={styles.compatText}>{compatibilityScore}% Bond Match</Text>
         </LinearGradient>
       )}
 
@@ -584,10 +588,7 @@ export default function ChatScreen({ route, navigation }) {
           ref={flatRef}
           data={displayData}
           keyExtractor={item => String(item.id)}
-          renderItem={({ item, index }) => {
-            if (item._sep) return renderMessage({ item, index });
-            return renderMessage({ item, index });
-          }}
+          renderItem={({ item, index }) => renderMessage({ item, index })}
           contentContainerStyle={styles.msgList}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: true })}
@@ -617,7 +618,10 @@ export default function ChatScreen({ route, navigation }) {
             onPress={pickAndSendPhoto}
             disabled={uploading}
           >
-            <Text style={styles.inputActionIcon}>{uploading ? '⏳' : '📷'}</Text>
+            {uploading
+              ? <ActivityIndicator size="small" color={BOND_PINK} />
+              : <Text style={styles.inputActionTxt}>+</Text>
+            }
           </TouchableOpacity>
           <TouchableOpacity style={[styles.inputAction, styles.giftInputBtn]} onPress={() => setShowGifts(true)}>
             <WorldMark size={18} color="#FFB700" bondColor="#FFB700" />
@@ -626,21 +630,17 @@ export default function ChatScreen({ route, navigation }) {
             ref={inputRef}
             style={styles.input}
             placeholder={`Message ${displayName}…`}
-            placeholderTextColor="#555"
+            placeholderTextColor="rgba(255,255,255,0.35)"
             value={text}
             onChangeText={handleTextChange}
             multiline
             maxLength={1000}
           />
-          {text.trim() ? (
+          {text.trim() && (
             <TouchableOpacity onPress={sendMessage} activeOpacity={0.85}>
               <LinearGradient colors={[BOND_PINK, '#CC0060']} style={styles.sendBtn}>
-                <Text style={styles.sendIcon}>➤</Text>
+                <Text style={styles.sendIcon}>›</Text>
               </LinearGradient>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.inputAction}>
-              <Text style={styles.inputActionIcon}>🎤</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -689,7 +689,7 @@ export default function ChatScreen({ route, navigation }) {
               style={[styles.contextAction, { borderTopWidth: 1, borderTopColor: BORDER }]}
               onPress={() => { setContextMsg(null); confirmReport('message'); }}
             >
-              <Text style={styles.contextActionIcon}>🚩</Text>
+              <Text style={[styles.contextActionIcon, { color: '#e53935', fontWeight: '800' }]}>!</Text>
               <Text style={[styles.contextActionText, { color: '#e53935' }]}>Report Message</Text>
             </TouchableOpacity>
 
@@ -738,8 +738,8 @@ const styles = StyleSheet.create({
   headerName: { color: '#fff', fontWeight: '700', fontSize: 15 },
   headerSub:  { color: '#888', fontSize: 11, marginTop: 1 },
   headerActions: { flexDirection: 'row', gap: 6 },
-  callBtn: { backgroundColor: CARD, borderRadius: 10, width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  callIcon: { fontSize: 18 },
+  hdrBtn:    { backgroundColor: CARD, borderRadius: 10, paddingHorizontal: 10, height: 34, alignItems: 'center', justifyContent: 'center', minWidth: 38 },
+  hdrBtnTxt: { color: '#ccc', fontSize: 12, fontWeight: '700' },
 
   // Compatibility banner
   compatBanner: { paddingHorizontal: 16, paddingVertical: 7, alignItems: 'center' },
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
     marginVertical: 12, gap: 8,
   },
   dateSepLine: { flex: 1, height: 1, backgroundColor: BORDER },
-  dateSepText: { color: '#555', fontSize: 11, fontWeight: '600' },
+  dateSepText: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '600' },
 
   msgRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 6 },
   msgRowMine: { justifyContent: 'flex-end' },
@@ -807,10 +807,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12,
     flexDirection: 'row', alignItems: 'center', gap: 5,
   },
-  typingDot: {
-    width: 7, height: 7, borderRadius: 4,
-    backgroundColor: '#666',
-  },
+  typingDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.4)' },
+  typingLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginLeft: 4 },
 
   // Empty state
   emptyState: { alignItems: 'center', padding: 28, paddingTop: 40, gap: 8 },
@@ -825,7 +823,7 @@ const styles = StyleSheet.create({
   pulseHeader:  { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 10, alignSelf: 'flex-start' },
   pulseDot:     { width: 7, height: 7, borderRadius: 4, backgroundColor: BOND_PINK },
   pulseTitle:   { color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
-  pulseDate:    { color: '#333', fontSize: 11, fontWeight: '600', marginLeft: 'auto' },
+  pulseDate:    { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '600', marginLeft: 'auto' },
   pulseCard:    { width: '100%', flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: BORDER, borderLeftWidth: 0, marginBottom: 8 },
   pulseAccent:  { width: 3, alignSelf: 'stretch' },
   pulseBody:    { flex: 1, paddingHorizontal: 14, paddingVertical: 13, gap: 5 },
@@ -844,7 +842,7 @@ const styles = StyleSheet.create({
   replyBarAccent: { width: 3, height: '100%', backgroundColor: BOND_PINK, borderRadius: 2 },
   replyBarName:   { color: BOND_PINK, fontSize: 11, fontWeight: '700', marginBottom: 2 },
   replyBarPreview:{ color: '#888', fontSize: 12 },
-  replyBarClose:  { color: '#666', fontSize: 16, paddingHorizontal: 4 },
+  replyBarClose:  { color: 'rgba(255,255,255,0.4)', fontSize: 16, paddingHorizontal: 4 },
 
   // Input bar
   inputBar: {
@@ -857,8 +855,8 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20, backgroundColor: CARD,
     alignItems: 'center', justifyContent: 'center',
   },
-  giftInputBtn: { backgroundColor: 'rgba(255,183,0,0.12)', borderWidth: 1, borderColor: 'rgba(255,183,0,0.25)' },
-  inputActionIcon: { fontSize: 20 },
+  giftInputBtn:   { backgroundColor: 'rgba(255,183,0,0.12)', borderWidth: 1, borderColor: 'rgba(255,183,0,0.25)' },
+  inputActionTxt: { color: '#aaa', fontSize: 22, fontWeight: '300', lineHeight: 26 },
   input: {
     flex: 1, backgroundColor: CARD, color: '#fff', borderRadius: 22,
     paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, maxHeight: 110,

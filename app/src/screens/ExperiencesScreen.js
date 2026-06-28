@@ -197,7 +197,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 <TextInput
                   style={cm.input}
                   placeholder="e.g. Try street food in Bangkok with someone fun"
-                  placeholderTextColor="#444"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
                   value={form.title}
                   onChangeText={t => update('title', t)}
                   maxLength={200}
@@ -210,7 +210,7 @@ function CreateModal({ visible, onClose, user, onCreated }) {
                 <TextInput
                   style={[cm.input, { minHeight: 80, textAlignVertical: 'top' }]}
                   placeholder="Tell them a bit more about you and this experience..."
-                  placeholderTextColor="#444"
+                  placeholderTextColor="rgba(255,255,255,0.3)"
                   value={form.description}
                   onChangeText={t => update('description', t)}
                   multiline

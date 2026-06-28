@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
   TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
@@ -29,13 +30,6 @@ const TAB_W = width / TABS.length;
 
 import { stringToColor, authHeader } from '../utils/apiUtils';
 
-const CT_META = {
-  dating:     { emoji:'❤️',  label:'Dating',           color:'#e91e63' },
-  friendship: { emoji:'🤝',  label:'Friends',          color:'#2196f3' },
-  travel:     { emoji:'✈️',  label:'Travel',           color:'#ff9800' },
-  language:   { emoji:'💬',  label:'Language Exchange', color:'#9c27b0' },
-  mentorship: { emoji:'🎓',  label:'Mentorship',       color:'#57f287' },
-};
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ photo_url, name, size = 44 }) {
@@ -60,6 +54,7 @@ function IcebreakerTab({ user, navigation }) {
   const [commentTexts,     setCommentTexts]     = useState({});
   const [likedCommentIds,  setLikedCommentIds]  = useState(new Set());
   const [myResponseId,     setMyResponseId]     = useState(null);
+  const [onlineUsers,      setOnlineUsers]      = useState({});
   const scrollRef = useRef(null);
   const socket = getSocket();
 
@@ -84,7 +79,7 @@ function IcebreakerTab({ user, navigation }) {
       // Restore submitted state if user already answered; reset if server lost the data
       const myUserId = user?.userId;
       if (myUserId) {
-        const mine = r.find(resp => resp.userId === myUserId);
+        const mine = r.find(resp => String(resp.userId) === String(myUserId));
         if (mine) {
           setSubmitted(true);
           setMyAnswerText(mine.text);
@@ -98,9 +93,32 @@ function IcebreakerTab({ user, navigation }) {
       }
     });
 
-    socket.on('icebreaker_responses', ({ responses: r }) => setResponses(r));
-    return () => { socket.off('icebreaker_data'); socket.off('icebreaker_responses'); };
+    socket.on('icebreaker_responses', ({ responses: r }) => {
+      setResponses(r);
+      const myUserId = user?.userId;
+      if (myUserId) {
+        const mine = r.find(resp => String(resp.userId) === String(myUserId));
+        if (mine) setMyResponseId(mine.id);
+      }
+    });
+
+    socket.on('user_list', users => {
+      const map = {};
+      users.forEach(u => { if (u.userId) map[String(u.userId)] = u; });
+      setOnlineUsers(map);
+    });
+    if (socket.connected) socket.emit('get_users');
+
+    return () => {
+      socket.off('icebreaker_data');
+      socket.off('icebreaker_responses');
+      socket.off('user_list');
+    };
   }, []);
+
+  useFocusEffect(useCallback(() => {
+    if (socket.connected) socket.emit('get_icebreaker');
+  }, []));
 
   function submit() {
     if (!myAnswer.trim()) return;
@@ -180,7 +198,27 @@ function IcebreakerTab({ user, navigation }) {
     });
   }
 
-  const visible = responses;
+  function handleMessage(r) {
+    if (!r.userId) return;
+    const online = onlineUsers[String(r.userId)];
+    if (online?.socketId) {
+      navigation.navigate('Chat', {
+        otherUser: {
+          userId:       String(r.userId),
+          username:     r.username,
+          display_name: r.username,
+          photo_url:    r.photo_url,
+          country:      r.country,
+          socketId:     online.socketId,
+        },
+      });
+    } else {
+      navigation.navigate('Profile', {
+        profileUser: { userId: r.userId, username: r.username, photo_url: r.photo_url, country: r.country, language: r.language },
+        bondUserId: r.userId,
+      });
+    }
+  }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90} style={{ flex: 1 }}>
@@ -252,12 +290,12 @@ function IcebreakerTab({ user, navigation }) {
       )}
 
       {/* Responses */}
-      {visible.length > 0 && (
+      {responses.length > 0 && (
         <View style={tab.responsesWrap}>
           <Text style={tab.responsesLabel}>
             {submitted ? `${responses.length} people answered` : 'Share your answer to interact ↑'}
           </Text>
-          {visible.map(r => {
+          {responses.map(r => {
             const isLiked          = likedIds.has(r.id);
             const flag             = getCountryFlag(r.country);
             const countryName      = getCountryName(r.country);
@@ -299,9 +337,7 @@ function IcebreakerTab({ user, navigation }) {
                     activeOpacity={submitted ? 0.7 : 1}
                     disabled={!submitted}
                   >
-                    <Text style={[tab.likeIcon, isLiked && tab.likeIconActive]}>
-                      👣
-                    </Text>
+                    <View style={[tab.likeHeart, isLiked && tab.likeHeartActive]} />
                     <Text style={[tab.footerCount, isLiked && tab.likeCountActive]}>
                       {likeCount}
                     </Text>
@@ -312,15 +348,23 @@ function IcebreakerTab({ user, navigation }) {
                     onPress={() => toggleComments(r.id)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[tab.commentIcon, commentsOpen && tab.commentIconActive]}>💬</Text>
+                    <Text style={[tab.commentLbl, commentsOpen && tab.commentLblActive]}>Reply</Text>
                     <Text style={[tab.footerCount, commentsOpen && tab.commentCountActive]}>
                       {commentCount}
                     </Text>
                   </TouchableOpacity>
 
-                  {!submitted && (
-                    <Text style={tab.likeHint}>Share your answer to interact</Text>
-                  )}
+                  {!submitted ? (
+                    <Text style={tab.likeHint}>Answer to interact</Text>
+                  ) : r.userId && String(r.userId) !== String(user?.userId) ? (
+                    <TouchableOpacity
+                      style={tab.msgBtn}
+                      onPress={() => handleMessage(r)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={tab.msgBtnTxt}>Message</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
 
                 {/* Expandable comment section */}
@@ -358,9 +402,7 @@ function IcebreakerTab({ user, navigation }) {
                                 activeOpacity={submitted ? 0.7 : 1}
                                 disabled={!submitted}
                               >
-                                <Text style={[tab.commentLikeIcon, cLiked && tab.likeIconActive]}>
-                                  👣
-                                </Text>
+                                <View style={[tab.commentLikeIcon, cLiked && tab.commentLikeIconActive]} />
                                 {(c.likes > 0) && (
                                   <Text style={[tab.commentLikeCount, cLiked && tab.likeCountActive]}>
                                     {c.likes}
@@ -468,14 +510,16 @@ const tab = StyleSheet.create({
 
   responseFooter:    { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 10 },
   footerBtn:         { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  likeIcon:          { fontSize: 20, opacity: 0.3 },
-  likeIconActive:    { opacity: 1 },
-  footerCount:       { fontSize: 16, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
+  likeHeart:         { width: 16, height: 16, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.15)' },
+  likeHeartActive:   { backgroundColor: BOND_PINK },
+  footerCount:       { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.4)' },
   likeCountActive:   { color: BOND_PINK },
-  commentIcon:       { fontSize: 20 },
-  commentIconActive: { },
+  commentLbl:        { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.35)' },
+  commentLblActive:  { color: '#57c4ff' },
   commentCountActive:{ color: '#57c4ff' },
   likeHint:          { color: 'rgba(255,255,255,0.2)', fontSize: 11, fontStyle: 'italic', marginLeft: 'auto' },
+  msgBtn:            { marginLeft: 'auto', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, backgroundColor: BOND_PINK + '18', borderWidth: 1, borderColor: BOND_PINK + '40' },
+  msgBtnTxt:         { color: BOND_PINK, fontSize: 12, fontWeight: '800' },
 
   commentsSection:   { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', paddingTop: 12, gap: 12 },
   noComments:        { color: 'rgba(255,255,255,0.25)', fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 4 },
@@ -492,7 +536,8 @@ const tab = StyleSheet.create({
   commentText:       { color: 'rgba(255,255,255,0.8)', fontSize: 13, lineHeight: 20 },
   commentActions:    { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 2 },
   commentLikeBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  commentLikeIcon:   { fontSize: 14, opacity: 0.3 },
+  commentLikeIcon:      { width: 12, height: 12, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.2)' },
+  commentLikeIconActive:{ backgroundColor: BOND_PINK },
   commentLikeCount:  { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.35)' },
   commentDeleteBtn:  { paddingHorizontal: 2 },
   commentDeleteIcon: { fontSize: 12, color: 'rgba(255,255,255,0.22)' },
@@ -537,65 +582,72 @@ const DEMO_SIGNALS = [
   {
     id: 'd1', name: 'Kenji',  initials: 'KT', age: 26, flag: '🇯🇵', country: 'Japan',    username: '@kenji_tokyo',
     trail: ['🇯🇵', '🇧🇷', '🇳🇬', '🇮🇳'], strength: 91, freq: 'cultural',  online: true,
-    tagline: 'Exploring world music & art 🎵',   avatarColor: '#6C47FF',
+    tagline: 'Exploring world music and art',   avatarColor: '#6C47FF',
     bio: 'Music producer & culture traveller. I\'ve played in bands across 3 continents and still searching for the perfect beat. Let\'s talk art, food, and everything in between.',
-    interests: ['🎵 Music', '🎨 Art', '🌍 Travel', '🍜 Food', '🎭 Culture'],
+    interests: ['Music', 'Art', 'Travel', 'Food', 'Culture'],
     photos: [null, null, null],
+    impressions: { give: 'Anime and the idea that storytelling can be art', draw: 'Every person I meet knows something I don\'t', moment: 'Performing live in Lagos — the crowd knew every word' },
   },
   {
     id: 'd2', name: 'Amara',  initials: 'AL', age: 23, flag: '🇳🇬', country: 'Nigeria',  username: '@amara_lagos',
     trail: ['🇳🇬', '🇬🇭', '🇵🇹', '🇸🇪'], strength: 78, freq: 'friends',   online: true,
     tagline: 'Looking for genuine connection',    avatarColor: '#00b894',
     bio: 'Software engineer by day, storyteller by night. I believe every person carries a unique world inside them — I want to hear yours.',
-    interests: ['💻 Tech', '📚 Books', '🌿 Nature', '✍️ Writing'],
+    interests: ['Tech', 'Books', 'Nature', 'Writing'],
     photos: [null, null, null],
+    impressions: { give: 'Afrobeats — a rhythm the whole world now moves to', draw: 'I love hearing the story behind the person', moment: 'Writing my first app at 3am and watching it run' },
   },
   {
     id: 'd3', name: 'Lucas',  initials: 'LS', age: 29, flag: '🇧🇷', country: 'Brazil',   username: '@lucas_sp',
     trail: ['🇧🇷', '🇦🇷', '🇯🇵', '🇺🇸'], strength: 72, freq: 'adventure', online: false,
-    tagline: 'Digital nomad · always moving ✈️', avatarColor: '#e17055',
+    tagline: 'Digital nomad · always moving',   avatarColor: '#e17055',
     bio: 'Remote designer living out of a backpack. Currently in Asia, was in Europe last month. Ask me about the best street food anywhere in the world.',
-    interests: ['✈️ Travel', '🎨 Design', '🍢 Street Food', '📸 Photography'],
+    interests: ['Travel', 'Design', 'Street Food', 'Photography'],
     photos: [null, null, null],
+    impressions: { give: 'Carnival — a celebration the world copies but can\'t replicate', draw: 'I collect moments, not things', moment: 'Getting lost in Tokyo with no data and finding my way by instinct' },
   },
   {
     id: 'd4', name: 'Sofia',  initials: 'SS', age: 25, flag: '🇸🇪', country: 'Sweden',   username: '@sofia_stockholm',
     trail: ['🇸🇪', '🇩🇪', '🇫🇷', '🇮🇳'], strength: 65, freq: 'cultural',  online: true,
     tagline: 'Language nerd · speaks 4 languages', avatarColor: '#0984e3',
     bio: 'Fluent in Swedish, German, French and Hindi. Learning Mandarin. I think language is the most beautiful bridge between cultures.',
-    interests: ['🗣️ Languages', '📖 Literature', '🎻 Classical Music', '🌸 Mindfulness'],
+    interests: ['Languages', 'Literature', 'Classical Music', 'Mindfulness'],
     photos: [null, null, null],
+    impressions: { give: 'Fika — the art of slowing down over coffee', draw: 'A new language is a new way of thinking', moment: 'The first time I dreamed in a foreign language' },
   },
   {
     id: 'd5', name: 'Priya',  initials: 'PM', age: 24, flag: '🇮🇳', country: 'India',    username: '@priya_mumbai',
     trail: ['🇮🇳', '🇦🇪', '🇬🇧', '🇧🇷'], strength: 60, freq: 'romantic',  online: false,
-    tagline: 'Coffee lover · global art explorer ☕', avatarColor: '#e91e63',
+    tagline: 'Coffee lover · global art explorer', avatarColor: '#e91e63',
     bio: 'Architect with a passion for public art installations. My dream is to leave something beautiful in every city I visit. Coffee is my love language.',
-    interests: ['🏛️ Architecture', '☕ Coffee', '🎨 Art', '🌆 Cities', '📷 Photos'],
+    interests: ['Architecture', 'Coffee', 'Art', 'Cities', 'Photography'],
     photos: [null, null, null],
+    impressions: { give: 'The concept of zero — mathematics owes us', draw: 'Cities tell the story of their people through buildings', moment: 'Standing inside the Pantheon and realising someone built this without computers' },
   },
   {
     id: 'd6', name: 'Yusuf',  initials: 'YC', age: 28, flag: '🇪🇬', country: 'Egypt',    username: '@yusuf_cairo',
     trail: ['🇪🇬', '🇸🇦', '🇹🇷', '🇩🇪'], strength: 54, freq: 'friends',   online: true,
     tagline: 'History buff · open to all cultures', avatarColor: '#fdcb6e',
     bio: 'Archaeologist working on digs across the Middle East. History isn\'t just the past — it\'s the map to understanding every culture alive today.',
-    interests: ['🏺 History', '📜 Archaeology', '🕌 Architecture', '🌍 Culture'],
+    interests: ['History', 'Archaeology', 'Architecture', 'Culture'],
     photos: [null, null, null],
+    impressions: { give: 'Writing — one of the oldest technologies that still runs the world', draw: 'History is never finished — there\'s always more to uncover', moment: 'Holding a 3,000-year-old artefact and feeling time collapse' },
   },
   {
     id: 'd7', name: 'Lucia',  initials: 'LC', age: 22, flag: '🇲🇽', country: 'Mexico',   username: '@lucia_cdmx',
     trail: ['🇲🇽', '🇨🇴', '🇪🇸', '🇯🇵'], strength: 49, freq: 'adventure', online: true,
-    tagline: 'Salsa & street food enthusiast 🌮', avatarColor: '#a29bfe',
+    tagline: 'Salsa and street food enthusiast', avatarColor: '#a29bfe',
     bio: 'Dance instructor & foodie. Salsa is my therapy and tacos are my religion. Looking for people who want to actually experience life, not just scroll through it.',
-    interests: ['💃 Dance', '🌮 Food', '🎶 Latin Music', '✈️ Adventure'],
+    interests: ['Dance', 'Food', 'Latin Music', 'Adventure'],
     photos: [null, null, null],
+    impressions: { give: 'Mezcal and the tradition of gathering around a shared cup', draw: 'People who are fully present — no phones, just connection', moment: 'Teaching a complete stranger to salsa at a street festival and watching them fall in love with it' },
   },
 ];
 
 const GENDER_OPTIONS_FP = [
-  { id: 'everyone', label: 'Everyone', icon: '🌍', color: BOND_PINK },
-  { id: 'women',    label: 'Women',    icon: '👩', color: '#e91e63' },
-  { id: 'men',      label: 'Men',      icon: '👨', color: '#0984e3' },
+  { id: 'everyone', label: 'Everyone', color: BOND_PINK },
+  { id: 'women',    label: 'Women',    color: '#e91e63' },
+  { id: 'men',      label: 'Men',      color: '#0984e3' },
 ];
 
 const ALL_COUNTRIES = [
@@ -794,9 +846,9 @@ const ALL_COUNTRIES = [
 ];
 
 const REACH_OPTIONS = [
-  { id: 'nearby',    label: 'Near Me',    icon: '📍', desc: 'Bonds in your city',    color: '#57f287' },
-  { id: 'country',   label: 'My Country', icon: '🏠', desc: 'Same country as you',   color: '#4fc3f7' },
-  { id: 'worldwide', label: 'Worldwide',  icon: '🌍', desc: 'Anyone on the planet',  color: BOND_PINK },
+  { id: 'nearby',    label: 'Near Me',    desc: 'Bonds in your city',   color: '#57f287' },
+  { id: 'country',   label: 'My Country', desc: 'Same country as you',  color: '#4fc3f7' },
+  { id: 'worldwide', label: 'Worldwide',  desc: 'Anyone on the planet', color: BOND_PINK },
 ];
 
 
@@ -847,7 +899,7 @@ function UpgradeModal({ visible, onClose, navigation }) {
             <View style={up.perks}>
               {PERKS.map((p, i) => (
                 <View key={i} style={up.perkRow}>
-                  <Text style={up.perkDot}>⚡</Text>
+                  <View style={up.perkDot} />
                   <Text style={up.perkTxt}>{p}</Text>
                 </View>
               ))}
@@ -887,7 +939,7 @@ const up = StyleSheet.create({
   divider:  { height: 1, backgroundColor: '#1e2028' },
   perks:    { padding: 16, gap: 10 },
   perkRow:  { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  perkDot:  { fontSize: 12 },
+  perkDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: BOND_PINK, marginTop: 6, flexShrink: 0 },
   perkTxt:  { color: '#bbb', fontSize: 13, lineHeight: 18, flex: 1 },
   ctaBtn:   { borderRadius: 16, overflow: 'hidden' },
   ctaGrad:  { paddingVertical: 16, alignItems: 'center' },
@@ -942,7 +994,15 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
               <View key={i} style={[pv.photoTile, { backgroundColor: '#080a0f' }]}>
                 {item.url
                   ? <Image source={{ uri: item.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  : <View style={pv.emptyPhotoTile}><Text style={pv.emptyPhotoIcon}>📷</Text><Text style={pv.emptyPhotoTxt}>No photo</Text></View>
+                  : <View style={pv.emptyPhotoTile}>
+                      <View style={pv.emptyCamera}>
+                        <View style={pv.emptyCameraBump} />
+                        <View style={pv.emptyCameraBody}>
+                          <View style={pv.emptyCameraLens} />
+                        </View>
+                      </View>
+                      <Text style={pv.emptyPhotoTxt}>No photo</Text>
+                    </View>
                 }
               </View>
             );
@@ -993,6 +1053,30 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
             <Text style={pv.bioTxt}>{sig.bio}</Text>
           </View>
         ) : null}
+
+        {/* World Impressions */}
+        {sig.impressions && Object.values(sig.impressions).some(Boolean) && (
+          <View style={pv.section}>
+            <Text style={pv.sectionLabel}>WORLD IMPRESSIONS</Text>
+            {[
+              { key: 'give',   color: '#4fc3f7', prompt: 'One thing my country gave the world…'              },
+              { key: 'draw',   color: '#81c784', prompt: 'What draws me to meeting new people…'              },
+              { key: 'moment', color: '#ffb74d', prompt: 'The moment that left the biggest footprint on me…' },
+            ].map(p => {
+              const answer = sig.impressions?.[p.key];
+              if (!answer?.trim()) return null;
+              return (
+                <View key={p.key} style={pv.impressionCard}>
+                  <View style={[pv.impressionBar, { backgroundColor: p.color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={pv.impressionPrompt}>{p.prompt}</Text>
+                    <Text style={pv.impressionAnswer}>{answer}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* Tagline */}
         <View style={pv.taglineBox}>
@@ -1295,7 +1379,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             onPress={() => navigation.navigate('Subscription')}
             activeOpacity={0.8}
           >
-            <Text style={st.signalUpgradeTxt}>⚡  {sc.upgradeHint}</Text>
+            <Text style={st.signalUpgradeTxt}>{sc.upgradeHint}</Text>
           </TouchableOpacity>
         )}
 
@@ -1422,7 +1506,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
             <Text style={fp2.cooldownTimerNote}>Daily at midnight</Text>
           </View>
           <TouchableOpacity style={fp2.cooldownUpgradeBtn} onPress={() => setShowUpgrade(true)} activeOpacity={0.85}>
-            <Text style={fp2.cooldownUpgradeTxt}>⚡  Get Bond Pass</Text>
+            <Text style={fp2.cooldownUpgradeTxt}>Get Bond Pass</Text>
           </TouchableOpacity>
           <Text style={fp2.cooldownOr}>Unlimited bonds · Stronger signal · Priority matches</Text>
         </View>
@@ -1548,7 +1632,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
                 >
                   <Text style={[fp.reachLabel, active && { color: r.color }]}>{r.label}</Text>
                   <Text style={fp.reachDesc} numberOfLines={1}>{r.desc}</Text>
-                  {locked && <View style={fp.reachLock}><Text style={{ fontSize: 9 }}>🔒</Text></View>}
+                  {locked && <View style={fp.reachLock}><Text style={fp.reachLockTxt}>+</Text></View>}
                   {active && <View style={[fp.reachDot, { backgroundColor: r.color }]} />}
                 </TouchableOpacity>
               );
@@ -1558,7 +1642,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           {/* ── Looking for ── */}
           <View style={[fp.sectionRow, { marginTop: 22 }]}>
             <Text style={fp.sectionLabel}>LOOKING FOR</Text>
-            {!hasBondPass && <Text style={fp.lockBadge}>🔒 Bond Pass</Text>}
+            {!hasBondPass && <Text style={fp.lockBadge}>Bond Pass</Text>}
           </View>
           <View style={[fp.genderRow, !hasBondPass && fp.lockedSection]}>
             {GENDER_OPTIONS_FP.map(g => {
@@ -1605,13 +1689,16 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           {/* ── Country ── */}
           <View style={[fp.sectionRow, { marginTop: 22 }]}>
             <Text style={fp.sectionLabel}>COUNTRY</Text>
-            {!hasBondPass && <Text style={fp.lockBadge}>🔒 Bond Pass</Text>}
+            {!hasBondPass && <Text style={fp.lockBadge}>Bond Pass</Text>}
           </View>
           <View style={[!hasBondPass && fp.lockedSection]}>
 
             {/* Search bar */}
             <View style={fp.countrySearchBar}>
-              <Text style={fp.countrySearchIcon}>🔍</Text>
+              <View style={fp.countrySearchIcon}>
+                  <View style={fp.searchCircle} />
+                  <View style={fp.searchHandle} />
+                </View>
               <TextInput
                 style={fp.countrySearchInput}
                 placeholder="Search country..."
@@ -1704,18 +1791,17 @@ const fp = StyleSheet.create({
   reachTile:      { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 14, paddingHorizontal: 6,
                     borderRadius: 18, backgroundColor: '#111318', borderWidth: 1.5, borderColor: '#1e2028',
                     position: 'relative' },
-  reachIcon:      { fontSize: 22 },
   reachLabel:     { color: '#bbb', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   reachDesc:      { color: '#666', fontSize: 9, fontWeight: '600', textAlign: 'center' },
   reachDot:       { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5 },
-  reachLock:      { position: 'absolute', top: 6, right: 6 },
+  reachLock:      { position: 'absolute', top: 6, right: 6, backgroundColor: '#FFB70020', borderRadius: 6, paddingHorizontal: 4, paddingVertical: 1 },
+  reachLockTxt:   { color: '#FFB700', fontSize: 7, fontWeight: '900' },
 
   // Gender pills — full-width 3-up row
   genderRow:      { flexDirection: 'row', gap: 10 },
   genderPill:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
                     paddingVertical: 14, borderRadius: 18, backgroundColor: '#111318',
                     borderWidth: 1.5, borderColor: '#1e2028' },
-  genderPillIcon: { fontSize: 20 },
   genderPillTxt:  { color: '#aaa', fontSize: 13, fontWeight: '800' },
 
   // Age range steppers
@@ -1734,7 +1820,9 @@ const fp = StyleSheet.create({
   countrySearchBar:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111318',
                         borderRadius: 14, borderWidth: 1.5, borderColor: '#1e2028',
                         paddingHorizontal: 12, paddingVertical: 10, gap: 8, marginBottom: 10 },
-  countrySearchIcon:  { fontSize: 14 },
+  countrySearchIcon:  { width: 16, height: 16, position: 'relative', justifyContent: 'flex-end', alignItems: 'flex-end' },
+  searchCircle:       { width: 11, height: 11, borderRadius: 6, borderWidth: 1.5, borderColor: '#555', position: 'absolute', top: 0, left: 0 },
+  searchHandle:       { width: 5, height: 1.5, borderRadius: 1, backgroundColor: '#555', transform: [{ rotate: '45deg' }], marginTop: 10, marginLeft: 9 },
   countrySearchInput: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600', padding: 0 },
   countrySearchClear: { color: '#444', fontSize: 13, fontWeight: '700' },
 
@@ -1778,16 +1866,6 @@ const fp = StyleSheet.create({
 
 // ── WorldBond Footprint card styles ──────────────────────────────────────────
 const fp2 = StyleSheet.create({
-  // Signal header
-  signalHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                   paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  signalBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14,
-                   borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-  signalEmoji:   { fontSize: 13 },
-  signalName:    { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
-  bondsLeft:     { alignItems: 'flex-end' },
-  bondsLeftNum:  { color: '#fff', fontSize: 16, fontWeight: '900', lineHeight: 18 },
-  bondsLeftLabel:{ color: '#333', fontSize: 10, fontWeight: '700' },
   topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 6 },
   vibeChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#0e1016', borderRadius: 22, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#252730' },
   vibeIcon:     { fontSize: 18, color: '#666', fontWeight: '700' },
@@ -1852,12 +1930,6 @@ const fp2 = StyleSheet.create({
   cooldownUpgradeTxt:{ color: '#fff', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
   cooldownOr:        { color: '#2a2c34', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 4 },
 
-  // Bond Signal strip
-  signalStrip:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginBottom: 8,
-                       paddingHorizontal: 14, paddingVertical: 9, borderRadius: 16, borderWidth: 1 },
-  signalStripLabel:  { fontSize: 12, fontWeight: '800' },
-  signalStripSub:    { color: '#2a2c34', fontSize: 11, fontWeight: '600', flex: 1 },
-  signalUpgradeArrow:{ fontSize: 11, fontWeight: '800' },
 });
 
 // ── Full Profile View styles ──────────────────────────────────────────────────
@@ -1881,9 +1953,17 @@ const pv = StyleSheet.create({
   swipeHint:   { position: 'absolute', bottom: 14, right: 16, flexDirection: 'row', alignItems: 'center',
                  backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
   swipeHintTxt:{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '700' },
-  emptyPhotoTile: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyPhotoIcon: { fontSize: 36, opacity: 0.18 },
-  emptyPhotoTxt: { color: '#1e2028', fontSize: 12, fontWeight: '700' },
+  emptyPhotoTile:   { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  emptyCamera:      { alignItems: 'center' },
+  emptyCameraBump:  { width: 14, height: 6, borderRadius: 2, backgroundColor: '#1e2028', alignSelf: 'center', marginBottom: -1 },
+  emptyCameraBody:  { width: 46, height: 34, borderRadius: 8, backgroundColor: '#1e2028', alignItems: 'center', justifyContent: 'center' },
+  emptyCameraLens:  { width: 22, height: 22, borderRadius: 11, backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: '#2a2c3a' },
+  emptyPhotoTxt:    { color: '#1e2028', fontSize: 12, fontWeight: '700' },
+
+  impressionCard:   { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#0e1016', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: '#1e2028', marginBottom: 8 },
+  impressionBar:    { width: 3, borderRadius: 2, alignSelf: 'stretch', minHeight: 32 },
+  impressionPrompt: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '700', marginBottom: 4, letterSpacing: 0.3 },
+  impressionAnswer: { color: 'rgba(255,255,255,0.65)', fontSize: 13, lineHeight: 18 },
   photoDots:   { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 10 },
   photoDot:    { width: 5, height: 5, borderRadius: 3, backgroundColor: '#1e2028' },
   photoDotActive: { backgroundColor: BOND_PINK, width: 16 },
@@ -1940,38 +2020,6 @@ const pv = StyleSheet.create({
 });
 
 const st = StyleSheet.create({
-  // Filter row (horizontal scroll)
-  filterScrollView:    { flexGrow: 0, flexShrink: 0 },
-  filterRow:           { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  filterChip:          { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#0e1016', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#1e2028' },
-  filterChipActive:    { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '18' },
-  filterChipIcon:      { fontSize: 13 },
-  filterChipTxt:       { color: '#555', fontSize: 12, fontWeight: '700' },
-  filterChipTxtActive: { color: '#fff' },
-  filterChipCaret:     { color: '#2a2c34', fontSize: 9, marginLeft: 1 },
-
-  // Card deck
-  deckWrap:         { flex: 1, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  card:             { width: CARD_W, height: '100%', borderRadius: 26, overflow: 'hidden',
-                      shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
-  cardPulseRing:    { borderRadius: 26, borderWidth: 2 },
-  cardGradient:     { flex: 1, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  cardAvatarWrap:   { alignItems: 'center', gap: 10, marginBottom: 110 },
-  cardAvatar:       { width: 118, height: 118, borderRadius: 59, alignItems: 'center', justifyContent: 'center',
-                      borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.12)' },
-  cardAvatarTxt:    { fontSize: 44, fontWeight: '900', color: 'rgba(255,255,255,0.9)' },
-  tapHint:          { color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
-  onlineDot:        { position: 'absolute', top: 16, right: 16, width: 11, height: 11, borderRadius: 5.5,
-                      backgroundColor: '#57f287', borderWidth: 2, borderColor: 'rgba(0,0,0,0.5)' },
-  cardBottom:       { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, paddingBottom: 18, gap: 5 },
-  cardNameRow:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardName:         { color: '#fff', fontSize: 23, fontWeight: '900', flex: 1, letterSpacing: -0.4 },
-  cardFlagPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)',
-                      borderRadius: 13, paddingHorizontal: 9, paddingVertical: 5 },
-  cardFlagTxt:      { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' },
-  cardTagline:      { color: 'rgba(255,255,255,0.5)', fontSize: 13, lineHeight: 19 },
-  connectsLeft:     { position: 'absolute', bottom: 4, alignSelf: 'center' },
-  connectsLeftTxt:  { color: '#333', fontSize: 10 },
 
   // Swipe stamp labels
   swipeLabel:       { position: 'absolute', top: 34, paddingHorizontal: 14, paddingVertical: 7,
@@ -1980,57 +2028,6 @@ const st = StyleSheet.create({
   connectLabelTxt:  { color: BOND_PINK, fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
   passLabel:        { left: 18, borderColor: '#888', transform: [{ rotate: '-14deg' }] },
   passLabelTxt:     { color: '#888', fontSize: 20, fontWeight: '900', letterSpacing: 0.8 },
-
-  // Action buttons
-  actionRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-                      gap: 18, paddingHorizontal: 28, paddingTop: 12, paddingBottom: 24 },
-  btnPass:          { alignItems: 'center', gap: 3, width: 64, height: 64, borderRadius: 32,
-                      backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: '#2a2a2a',
-                      justifyContent: 'center' },
-  btnPassIcon:      { color: '#555', fontSize: 22, fontWeight: '900' },
-  btnRandom:        { alignItems: 'center', justifyContent: 'center', gap: 2,
-                      width: 78, height: 78, borderRadius: 39,
-                      backgroundColor: BOND_PINK, shadowColor: BOND_PINK,
-                      shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
-  btnRandomIcon:    { fontSize: 28 },
-  btnRandomLabel:   { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  btnConnect:       { alignItems: 'center', gap: 3, width: 64, height: 64, borderRadius: 32,
-                      backgroundColor: '#0e1016', borderWidth: 1.5, borderColor: BOND_PINK + '66',
-                      justifyContent: 'center' },
-  btnConnectIcon:   { fontSize: 22 },
-  btnLabel:         { color: '#555', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  btnDim:           { opacity: 0.3 },
-
-  // Profile sheet (redesigned)
-  profileSheet:          { backgroundColor: '#111318', borderTopLeftRadius: 26, borderTopRightRadius: 26,
-                           padding: 22, paddingBottom: 38, position: 'absolute', bottom: 0, left: 0, right: 0 },
-  profilePhotoHero:      { alignItems: 'center', marginBottom: 14, position: 'relative' },
-  profileOnlineBadge:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8,
-                           backgroundColor: '#57f28720', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4,
-                           borderWidth: 1, borderColor: '#57f28740' },
-  profileOnlineDot:      { width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' },
-  profileOnlineTxt:      { color: '#57f287', fontSize: 11, fontWeight: '700' },
-  profileSheetName:      { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  profileSheetHandle:    { color: '#555', fontSize: 13, textAlign: 'center', marginTop: 2, marginBottom: 6 },
-  profileSheetLoc:       { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', marginBottom: 12 },
-  profileSheetLocTxt:    { color: '#888', fontSize: 14, fontWeight: '700' },
-  profileSheetTagline:   { color: '#555', fontSize: 14, textAlign: 'center', fontStyle: 'italic', lineHeight: 20, marginBottom: 16 },
-  profileMeta:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  profileMetaItem:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14 },
-  profileMetaSep:        { width: 1, height: 20, backgroundColor: '#1e2028' },
-  profileMetaIcon:       { fontSize: 14 },
-  profileMetaVal:        { color: '#777', fontSize: 12, fontWeight: '700' },
-  profileSectionLabel:   { color: '#333', fontSize: 10, fontWeight: '900', letterSpacing: 1.2,
-                           textTransform: 'uppercase', marginBottom: 8 },
-  profileTrailPill:      { backgroundColor: '#0e1016', borderRadius: 12, padding: 8,
-                           borderWidth: 1, borderColor: '#1e2028' },
-  profileBtns:           { flexDirection: 'row', gap: 12, marginTop: 4 },
-  profileBtnPass:        { flex: 1, borderRadius: 22, paddingVertical: 14, alignItems: 'center',
-                           backgroundColor: '#0e1016', borderWidth: 1, borderColor: '#2a2a2a' },
-  profileBtnPassTxt:     { color: '#666', fontSize: 15, fontWeight: '800' },
-  profileBtnConnect:     { flex: 2, borderRadius: 22, paddingVertical: 14, alignItems: 'center',
-                           backgroundColor: BOND_PINK },
-  profileBtnConnectTxt:  { color: '#fff', fontSize: 15, fontWeight: '900' },
 
   // Locking / searching
   lockScreen:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 22, padding: 32 },
@@ -2270,7 +2267,7 @@ function PeopleTab({ user, navigation, bondMatches = [], setBondMatches }) {
             <TextInput
               style={pe.input}
               placeholder="Message…"
-              placeholderTextColor="#333"
+              placeholderTextColor="rgba(255,255,255,0.25)"
               value={chatText}
               onChangeText={setChatText}
               returnKeyType="send"
@@ -2703,9 +2700,11 @@ export default function DiscoverScreen({ navigation, user, route }) {
       </View>
 
       {/* ── Content ── */}
-      {activeTab === 'icebreaker' && <IcebreakerTab user={user} navigation={navigation} />}
-      {activeTab === 'random'     && <RandomTab user={user} navigation={navigation} onMatch={addBondMatch} switchTab={switchTab} />}
-      {activeTab === 'people'     && <PeopleTab user={user} navigation={navigation} bondMatches={bondMatches} setBondMatches={setBondMatches} />}
+      <View style={{ display: activeTab === 'icebreaker' ? 'flex' : 'none', flex: 1 }}>
+        <IcebreakerTab user={user} navigation={navigation} />
+      </View>
+      {activeTab === 'random' && <RandomTab user={user} navigation={navigation} onMatch={addBondMatch} switchTab={switchTab} />}
+      {activeTab === 'people' && <PeopleTab user={user} navigation={navigation} bondMatches={bondMatches} setBondMatches={setBondMatches} />}
     </SafeAreaView>
   );
 }

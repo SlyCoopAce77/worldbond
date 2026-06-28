@@ -22,21 +22,27 @@ const BOND_PINK = '#FF0080';
 
 const { width, height } = Dimensions.get('window');
 
+const IMPRESSION_PROMPTS = [
+  { key: 'give',   color: '#4fc3f7', prompt: 'One thing my country gave the world…'              },
+  { key: 'draw',   color: '#81c784', prompt: 'What draws me to meeting new people…'              },
+  { key: 'moment', color: '#ffb74d', prompt: 'The moment that left the biggest footprint on me…' },
+];
+
 const SOCIAL_PLATFORMS = [
-  { key: 'instagram', label: 'Instagram', icon: '📸', baseUrl: 'https://instagram.com/' },
-  { key: 'tiktok',    label: 'TikTok',    icon: '🎵', baseUrl: 'https://tiktok.com/@' },
-  { key: 'twitter',   label: 'X / Twitter', icon: '🐦', baseUrl: 'https://x.com/' },
-  { key: 'snapchat',  label: 'Snapchat',  icon: '👻', baseUrl: 'https://snapchat.com/add/' },
-  { key: 'youtube',   label: 'YouTube',   icon: '▶️',  baseUrl: 'https://youtube.com/' },
+  { key: 'instagram', label: 'Instagram',   baseUrl: 'https://instagram.com/' },
+  { key: 'tiktok',    label: 'TikTok',      baseUrl: 'https://tiktok.com/@' },
+  { key: 'twitter',   label: 'X / Twitter', baseUrl: 'https://x.com/' },
+  { key: 'snapchat',  label: 'Snapchat',    baseUrl: 'https://snapchat.com/add/' },
+  { key: 'youtube',   label: 'YouTube',     baseUrl: 'https://youtube.com/' },
 ];
 
 function getReliability(score) {
-  if (!score) return { label: 'New',       color: '#888', emoji: '🌱' };
-  if (score >= 4.5) return { label: 'Excellent', color: '#ffd700', emoji: '⭐' };
-  if (score >= 3.5) return { label: 'Great',     color: '#57f287', emoji: '✅' };
-  if (score >= 2.5) return { label: 'Good',      color: '#57c4ff', emoji: '👍' };
-  if (score >= 1.5) return { label: 'Fair',      color: '#fee75c', emoji: '⚠️' };
-  return               { label: 'Low',       color: '#f04747', emoji: '❌' };
+  if (!score)       return { label: 'New',       color: '#888'    };
+  if (score >= 4.5) return { label: 'Excellent', color: '#ffd700' };
+  if (score >= 3.5) return { label: 'Great',     color: '#57f287' };
+  if (score >= 2.5) return { label: 'Good',      color: '#57c4ff' };
+  if (score >= 1.5) return { label: 'Fair',      color: '#fee75c' };
+  return                   { label: 'Low',       color: '#f04747' };
 }
 
 // ─── Voice note player ─────────────────────────────────────────────────────
@@ -117,7 +123,14 @@ function VoiceNotePlayer({ url }) {
               onPress={togglePlay}
               disabled={loadErr}
             >
-              <Text style={vStyles.btnIcon}>{playing ? '⏸' : '▶'}</Text>
+              {playing ? (
+                <View style={vStyles.pauseIcon}>
+                  <View style={vStyles.pauseBar} />
+                  <View style={vStyles.pauseBar} />
+                </View>
+              ) : (
+                <View style={vStyles.playIcon} />
+              )}
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -128,7 +141,7 @@ function VoiceNotePlayer({ url }) {
         </View>
         <Text style={vStyles.dur}>{loadErr ? '--:--' : fmt(playing ? position : duration)}</Text>
       </View>
-      {!loadErr && <Text style={vStyles.hint}>Tap to hear their voice 🎙️</Text>}
+      {!loadErr && <Text style={vStyles.hint}>Tap to hear their voice</Text>}
     </View>
   );
 }
@@ -138,7 +151,9 @@ const vStyles = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', backgroundColor: BOND_PINK + '12', borderRadius: 18, padding: 14, gap: 12, borderWidth: 1, borderColor: BOND_PINK + '30' },
   btn:       { width: 46, height: 46, borderRadius: 23, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
   btnActive: { backgroundColor: '#CC0060' },
-  btnIcon:   { color: '#fff', fontSize: 16 },
+  playIcon:  { width: 0, height: 0, borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 13, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#fff', marginLeft: 3 },
+  pauseIcon: { flexDirection: 'row', gap: 4 },
+  pauseBar:  { width: 4, height: 15, borderRadius: 2, backgroundColor: '#fff' },
   waveform:  { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2, height: 44 },
   bar:       { width: 3, borderRadius: 2, backgroundColor: BOND_PINK },
   dur:       { color: '#666', fontSize: 12 },
@@ -228,6 +243,7 @@ export default function ProfileScreen({ route, navigation }) {
   const [showGiftPicker,   setShowGiftPicker]   = useState(false);
   const [isLive,           setIsLive]           = useState(false);
   const [coverPhotoUrl,    setCoverPhotoUrl]    = useState(null);
+  const [isBlocked,        setIsBlocked]        = useState(false);
 
   const { hasBondPass } = useBondPass();
 
@@ -241,14 +257,18 @@ export default function ProfileScreen({ route, navigation }) {
       try {
         const token = await getAccessToken();
         const headers = { Authorization: `Bearer ${token}` };
-        const [pRes, eRes] = await Promise.allSettled([
+        const [pRes, eRes, bRes] = await Promise.allSettled([
           axios.get(`${SERVER_URL}/api/profiles/${bondUserId}`, { headers, timeout: 8000 }),
           axios.get(`${SERVER_URL}/api/experiences`, { params: { userId: bondUserId }, headers, timeout: 8000 }),
+          axios.get(`${SERVER_URL}/api/profiles/blocks`, { headers, timeout: 8000 }),
         ]);
         if (pRes.status === 'fulfilled') setBondProfile(pRes.value.data);
-        else setProfileNotFound(true);
+        else { setProfileNotFound(true); }
         if (eRes.status === 'fulfilled') setExperiences(eRes.value.data.filter(e => e.user_id === bondUserId));
-      } catch {}
+        if (bRes.status === 'fulfilled') {
+          setIsBlocked(bRes.value.data.blocked.some(b => String(b.user_id) === String(bondUserId)));
+        }
+      } catch { setProfileNotFound(true); }
       finally {
         setLoadingBond(false);
         Animated.parallel([
@@ -343,7 +363,7 @@ export default function ProfileScreen({ route, navigation }) {
       setConnected(true);
       setBondNote('');
       Alert.alert(
-        '🌍 Bonded!',
+        'Bonded!',
         `Your Bond request was sent to ${displayName}.`,
       );
     } catch (err) {
@@ -355,9 +375,35 @@ export default function ProfileScreen({ route, navigation }) {
 
 
   function sendGift(gift) {
-    const socket = getSocket();
     socket.emit('send_gift', { toSocketId: profileUser?.socketId, gift });
     setShowGiftPicker(false);
+  }
+
+  async function handleBlock() {
+    const displayName = bondProfile?.display_name || profileUser?.username || 'this user';
+    if (isBlocked) {
+      Alert.alert('Unblock User', `Unblock ${displayName}? They will be able to appear in discovery again.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Unblock', onPress: async () => {
+          try {
+            const token = await getAccessToken();
+            await axios.delete(`${SERVER_URL}/api/profiles/blocks/${bondUserId}`, { headers: { Authorization: `Bearer ${token}` } });
+            setIsBlocked(false);
+          } catch { Alert.alert('Error', 'Could not unblock. Try again.'); }
+        }},
+      ]);
+    } else {
+      Alert.alert('Block User', `Block ${displayName}? They will no longer appear in discovery and cannot message you.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Block', style: 'destructive', onPress: async () => {
+          try {
+            const token = await getAccessToken();
+            await axios.post(`${SERVER_URL}/api/profiles/blocks/${bondUserId}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+            setIsBlocked(true);
+          } catch { Alert.alert('Error', 'Could not block. Try again.'); }
+        }},
+      ]);
+    }
   }
 
   async function pickCoverPhoto() {
@@ -423,11 +469,26 @@ export default function ProfileScreen({ route, navigation }) {
                   <Text style={styles.liveBadgeTxt}>LIVE</Text>
                 </View>
               )}
-              {isOwnProfile && (
+              {isOwnProfile ? (
                 <TouchableOpacity style={styles.editCoverBtn} onPress={pickCoverPhoto} activeOpacity={0.8}>
                   <Text style={styles.editCoverDots}>•••</Text>
                 </TouchableOpacity>
-              )}
+              ) : bondUserId ? (
+                <TouchableOpacity
+                  style={styles.editCoverBtn}
+                  onPress={() => Alert.alert(
+                    isBlocked ? 'Unblock User' : 'More Options',
+                    undefined,
+                    [
+                      { text: isBlocked ? 'Unblock' : 'Block User', onPress: handleBlock },
+                      { text: 'Cancel', style: 'cancel' },
+                    ],
+                  )}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.editCoverDots}>•••</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </SafeAreaView>
         </View>
@@ -468,7 +529,7 @@ export default function ProfileScreen({ route, navigation }) {
             )}
             {bondProfile?.bond_pass && (
               <View style={{ backgroundColor: BOND_PINK + '22', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 }}>
-                <Text style={{ color: BOND_PINK, fontSize: 10, fontWeight: '900' }}>⚡ PASS</Text>
+                <Text style={{ color: BOND_PINK, fontSize: 10, fontWeight: '900' }}>PASS</Text>
               </View>
             )}
           </View>
@@ -485,10 +546,16 @@ export default function ProfileScreen({ route, navigation }) {
 
           {bondProfile?.ghost_score ? (
             <View style={[styles.relBadge, { backgroundColor: reliability.color + '22', borderColor: reliability.color + '55', marginTop: 4 }]}>
-              <Text style={{ fontSize: 12 }}>{reliability.emoji}</Text>
+              <View style={[styles.relDot, { backgroundColor: reliability.color }]} />
               <Text style={[styles.relBadgeText, { color: reliability.color }]}>{reliability.label} responder</Text>
             </View>
           ) : null}
+          {bondProfile?.is_online && (
+            <View style={styles.onlineBadge}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.onlineTxt}>Online now</Text>
+            </View>
+          )}
         </View>
 
         {/* ── Twitter-style stats — sits just below profile info ── */}
@@ -505,7 +572,7 @@ export default function ProfileScreen({ route, navigation }) {
           <Text style={styles.twitterDot}>·</Text>
           <View style={styles.twitterStat}>
             <Text style={styles.twitterStatNum}>{countryFlagCount ?? '—'}</Text>
-            <Text style={styles.twitterStatLabel}> Footprints</Text>
+            <Text style={styles.twitterStatLabel}> Countries</Text>
           </View>
           {hasBondPass && bondProfile?.rank != null && (
             <>
@@ -530,7 +597,6 @@ export default function ProfileScreen({ route, navigation }) {
 
           {profileNotFound && !loadingBond && (
             <View style={styles.notFoundCard}>
-              <Text style={{ fontSize: 40 }}>👤</Text>
               <Text style={styles.notFoundText}>Profile not available</Text>
             </View>
           )}
@@ -554,6 +620,26 @@ export default function ProfileScreen({ route, navigation }) {
                 </View>
               </View>
 
+              {/* World Impressions */}
+              {IMPRESSION_PROMPTS.some(p => bondProfile?.impressions?.[p.key]) && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>World Impressions</Text>
+                  {IMPRESSION_PROMPTS.map(p => {
+                    const answer = bondProfile?.impressions?.[p.key];
+                    if (!answer?.trim()) return null;
+                    return (
+                      <View key={p.key} style={styles.impressionCard}>
+                        <View style={[styles.impressionBar, { backgroundColor: p.color }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.impressionPrompt}>{p.prompt}</Text>
+                          <Text style={styles.impressionAnswer}>{answer}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
               {/* Here For */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Here For</Text>
@@ -561,7 +647,7 @@ export default function ProfileScreen({ route, navigation }) {
                   <View style={styles.ctWrap}>
                     {connectionTypesData.map(ct => (
                       <View key={ct.key} style={[styles.ctBadge, { backgroundColor: ct.color + '18', borderColor: ct.color + '55' }]}>
-                        <Text style={{ fontSize: 16 }}>{ct.emoji}</Text>
+                        <View style={[styles.relDot, { backgroundColor: ct.color }]} />
                         <Text style={[styles.ctLabel, { color: ct.color }]}>{ct.label}</Text>
                       </View>
                     ))}
@@ -573,13 +659,29 @@ export default function ProfileScreen({ route, navigation }) {
                 )}
               </View>
 
+              {/* Countries Bonded */}
+              {(bondProfile?.stamps || []).length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Countries Bonded</Text>
+                  <View style={styles.stampWrap}>
+                    {bondProfile.stamps.slice(0, 20).map((flag, i) => (
+                      <Text key={i} style={styles.stampFlag}>{flag}</Text>
+                    ))}
+                    {bondProfile.stamps.length > 20 && (
+                      <View style={styles.stampMore}>
+                        <Text style={styles.stampMoreTxt}>+{bondProfile.stamps.length - 20}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
               {/* Photos */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Photos</Text>
-                <View style={styles.galleryGrid}>
-                  {Array.from({ length: 9 }).map((_, i) => {
-                    const url = (bondProfile?.gallery_photos || [])[i];
-                    return url ? (
+              {(bondProfile?.gallery_photos || []).length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Photos</Text>
+                  <View style={styles.galleryGrid}>
+                    {bondProfile.gallery_photos.map((url, i) => (
                       <TouchableOpacity
                         key={i}
                         style={styles.gallerySlot}
@@ -588,12 +690,10 @@ export default function ProfileScreen({ route, navigation }) {
                       >
                         <Image source={{ uri: url }} style={styles.galleryImg} />
                       </TouchableOpacity>
-                    ) : (
-                      <View key={i} style={styles.gallerySlotEmpty} />
-                    );
-                  })}
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Compatibility */}
               {(compatibilityScore != null || scoreBreakdown) && (
@@ -613,7 +713,7 @@ export default function ProfileScreen({ route, navigation }) {
                         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                           {ct && (
                             <View style={[styles.expIcon, { backgroundColor: ct.color + '20' }]}>
-                              <Text style={{ fontSize: 20 }}>{ct.emoji}</Text>
+                              <View style={[styles.relDot, { backgroundColor: ct.color, width: 10, height: 10, borderRadius: 5 }]} />
                             </View>
                           )}
                           <View style={{ flex: 1 }}>
@@ -658,7 +758,9 @@ export default function ProfileScreen({ route, navigation }) {
                         style={styles.socialCard}
                         onPress={() => Linking.openURL(p.baseUrl + handle.replace('@', '').trim())}
                       >
-                        <Text style={styles.socialIcon}>{p.icon}</Text>
+                        <View style={styles.socialBadge}>
+                          <Text style={styles.socialBadgeTxt}>{p.label[0]}</Text>
+                        </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.socialPlatform}>{p.label}</Text>
                           <Text style={styles.socialHandle}>{handle}</Text>
@@ -698,14 +800,25 @@ export default function ProfileScreen({ route, navigation }) {
             activeOpacity={0.8}
           >
             <WorldMark size={18} color="#FFB700" bondColor="#FFB700" />
-            <Text style={styles.giftActionTxt}>BOND GIFT</Text>
+            <Text style={styles.giftActionTxt}>Gift</Text>
           </TouchableOpacity>
+
+          {/* Message button */}
+          {bondUserId && (
+            <TouchableOpacity
+              style={styles.messageActionBtn}
+              onPress={() => navigation.navigate('Chat', { user: profileUser, bondUserId })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.messageActionTxt}>Message</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Bond button */}
           {bondUserId && (
             connected ? (
               <View style={styles.bondedBtn}>
-                <Text style={styles.bondedBtnText}>✓ 🌍 Bonded</Text>
+                <Text style={styles.bondedBtnText}>✓ Bonded</Text>
               </View>
             ) : (
               <LinearGradient
@@ -720,7 +833,7 @@ export default function ProfileScreen({ route, navigation }) {
                 >
                   {connecting
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={styles.bondBtnText}>🌍  Bond</Text>
+                    : <Text style={styles.bondBtnText}>Bond</Text>
                   }
                 </TouchableOpacity>
               </LinearGradient>
@@ -747,7 +860,6 @@ export default function ProfileScreen({ route, navigation }) {
 
           {/* Bond Pass badge header */}
           <View style={[styles.sheetTierBadge, { backgroundColor: BOND_PINK + '22', borderColor: BOND_PINK + '55' }]}>
-            <Text style={styles.sheetTierIcon}>🌍</Text>
             <Text style={[styles.sheetTierLabel, { color: BOND_PINK }]}>Bond Pass</Text>
           </View>
 
@@ -761,7 +873,7 @@ export default function ProfileScreen({ route, navigation }) {
             <TextInput
               style={styles.sheetInput}
               placeholder="Write a personal note… (150 chars)"
-              placeholderTextColor="#444"
+              placeholderTextColor="rgba(255,255,255,0.3)"
               value={bondNote}
               onChangeText={t => setBondNote(t.slice(0, 150))}
               multiline
@@ -785,7 +897,7 @@ export default function ProfileScreen({ route, navigation }) {
             >
               {connecting
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.sheetSendTxt}>🌍  Send Bond</Text>
+                : <Text style={styles.sheetSendTxt}>Send Bond</Text>
               }
             </TouchableOpacity>
           </LinearGradient>
@@ -843,13 +955,13 @@ const styles = StyleSheet.create({
   verifyTxt:       { color: '#fff', fontSize: 10, fontWeight: '900' },
   relBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginTop: 4 },
   relBadgeText:    { fontSize: 12, fontWeight: '700' },
+  relDot:          { width: 7, height: 7, borderRadius: 4 },
 
   body:            { paddingTop: 0, gap: 24, paddingHorizontal: 16 },
 
   galleryGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gallerySlot:      { width: (width - 40 - 16) / 3, aspectRatio: 1, borderRadius: 16, overflow: 'hidden' },
   galleryImg:       { width: '100%', height: '100%' },
-  gallerySlotEmpty: { width: (width - 40 - 16) / 3, height: (width - 40 - 16) / 3, borderRadius: 16, backgroundColor: '#111316', borderWidth: 1.5, borderColor: '#2a2e35', borderStyle: 'dashed' },
 
   photoModal:          { flex: 1, backgroundColor: '#000000f2', alignItems: 'center', justifyContent: 'center' },
   photoModalImg:       { width, height: width },
@@ -882,7 +994,6 @@ const styles = StyleSheet.create({
   emptyRow:        { backgroundColor: '#111316', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#222527', alignItems: 'center' },
   emptyText:       { color: '#3a3f44', fontSize: 14, fontStyle: 'italic' },
 
-
   bioCard:         { backgroundColor: '#111316', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#222527' },
   bioText:         { color: '#bbb', fontSize: 15, lineHeight: 26 },
   bioEmpty:        { color: '#3a3f44', fontSize: 15, lineHeight: 26, fontStyle: 'italic' },
@@ -895,7 +1006,8 @@ const styles = StyleSheet.create({
   interestBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   socialCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111316', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#222527', gap: 12 },
-  socialIcon:      { fontSize: 26 },
+  socialBadge:     { width: 38, height: 38, borderRadius: 12, backgroundColor: '#1e2128', alignItems: 'center', justifyContent: 'center' },
+  socialBadgeTxt:  { color: '#888', fontSize: 15, fontWeight: '800' },
   socialPlatform:  { color: '#555', fontSize: 11, marginBottom: 2 },
   socialHandle:    { color: '#fff', fontSize: 14, fontWeight: '600' },
   socialArrow:     { color: BOND_PINK, fontSize: 20, fontWeight: '700' },
@@ -906,8 +1018,29 @@ const styles = StyleSheet.create({
   bondBtn:         { flex: 1, borderRadius: 18, overflow: 'hidden' },
   bondBtnInner:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   bondBtnText:     { color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
-  bondedBtn:       { flex: 2, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#57f28720', borderWidth: 1, borderColor: '#57f287' },
+  bondedBtn:       { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#57f28720', borderWidth: 1, borderColor: '#57f287' },
   bondedBtnText:   { color: '#57f287', fontSize: 15, fontWeight: '700' },
+
+  // Online badge
+  onlineBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 2 },
+  onlineDot:        { width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' },
+  onlineTxt:        { color: '#57f287', fontSize: 12, fontWeight: '600' },
+
+  // Stamps
+  stampWrap:        { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  stampFlag:        { fontSize: 28 },
+  stampMore:        { width: 38, height: 38, borderRadius: 10, backgroundColor: '#1C1F23', borderWidth: 1, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
+  stampMoreTxt:     { color: '#888', fontSize: 11, fontWeight: '700' },
+
+  // World Impressions
+  impressionCard:   { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#111316', borderRadius: 16, padding: 14, gap: 12, borderWidth: 1, borderColor: '#222527' },
+  impressionBar:    { width: 3, borderRadius: 2, alignSelf: 'stretch', minHeight: 36 },
+  impressionPrompt: { color: '#555', fontSize: 11, fontWeight: '700', marginBottom: 4 },
+  impressionAnswer: { color: '#ccc', fontSize: 14, lineHeight: 20 },
+
+  // Message action button
+  messageActionBtn: { flex: 1, paddingVertical: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+  messageActionTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   // Bond Request Sheet
   sheetOverlay:    { flex: 1, backgroundColor: '#000000aa' },
@@ -917,7 +1050,6 @@ const styles = StyleSheet.create({
   sheetHandle:     { width: 40, height: 4, borderRadius: 2, backgroundColor: '#333', alignSelf: 'center', marginBottom: 8 },
   sheetTierBadge:  { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
                      paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  sheetTierIcon:   { fontSize: 16 },
   sheetTierLabel:  { fontSize: 13, fontWeight: '800' },
 
   sheetTitle:      { color: '#fff', fontSize: 20, fontWeight: '900' },

@@ -14,7 +14,7 @@ import WorldDrop, { isLegendGift } from '../components/WorldDrop';
 
 const { width, height } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
-const REACTIONS = ['❤️', '🔥', '😂', '🙌', '😮', '💯'];
+const REACTIONS = ['❤️', '🔥', '😂', '👍', '😮'];
 
 export default function LiveScreen({ route, navigation }) {
   const { user, currentUser, preTitle } = route.params || {};
@@ -33,6 +33,7 @@ export default function LiveScreen({ route, navigation }) {
   const [drops,        setDrops]        = useState([]);
   const [elapsed,      setElapsed]      = useState(0);
   const [viewerJoined, setViewerJoined] = useState(null);
+  const [starting,     setStarting]     = useState(false);
 
   const flatRef      = useRef(null);
   const timerRef     = useRef(null);
@@ -46,20 +47,20 @@ export default function LiveScreen({ route, navigation }) {
   }, [phase]);
 
   function startLive() {
+    setStarting(true);
     const liveTitle = title.trim() || `${activeUser?.username}'s Live`;
     socket.emit('go_live', { title: liveTitle });
   }
 
   useEffect(() => {
-    socket.on('live_started', ({ streamId: sid }) => {
+    function onLiveStarted({ streamId: sid }) {
+      setStarting(false);
       isLiveRef.current = true;
       setStreamId(sid);
       setPhase('live');
-    });
-
-    socket.on('live_viewer_count', ({ count }) => setViewerCount(count));
-
-    socket.on('live_viewer_joined', ({ viewerName, count }) => {
+    }
+    function onViewerCount({ count }) { setViewerCount(count); }
+    function onViewerJoined({ viewerName, count }) {
       setViewerCount(count);
       setViewerJoined(`${viewerName} joined`);
       joinFadeAnim.setValue(1);
@@ -67,19 +68,16 @@ export default function LiveScreen({ route, navigation }) {
         Animated.delay(2000),
         Animated.timing(joinFadeAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
       ]).start(() => setViewerJoined(null));
-    });
-
-    socket.on('live_message', msg => {
+    }
+    function onMessage(msg) {
       setMessages(prev => [...prev, msg]);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 50);
-    });
-
-    socket.on('live_reaction', ({ emoji }) => {
+    }
+    function onReaction({ emoji }) {
       const id = `${Date.now()}-${Math.random()}`;
       setFloats(prev => [...prev, { emoji, id }]);
-    });
-
-    socket.on('live_gift_received', ({ senderName, senderCountry, gift, isStampHolder }) => {
+    }
+    function onGiftReceived({ senderName, senderCountry, gift, isStampHolder }) {
       const id = `${Date.now()}-${Math.random()}`;
       if (isLegendGift(gift.id)) {
         setDrops(prev => [...prev, { id, senderName, senderCountry, gift, isStampHolder }]);
@@ -87,20 +85,27 @@ export default function LiveScreen({ route, navigation }) {
         setBursts(prev => [...prev, { id, senderName, senderCountry, gift }]);
       }
       earnCoins(gift.coins, 'live_gift', { giftId: gift.id, senderName });
-    });
-
-    socket.on('live_ended', () => {
+    }
+    function onLiveEnded() {
       if (isLiveRef.current) navigation.goBack();
-    });
+    }
+
+    socket.on('live_started',       onLiveStarted);
+    socket.on('live_viewer_count',  onViewerCount);
+    socket.on('live_viewer_joined', onViewerJoined);
+    socket.on('live_message',       onMessage);
+    socket.on('live_reaction',      onReaction);
+    socket.on('live_gift_received', onGiftReceived);
+    socket.on('live_ended',         onLiveEnded);
 
     return () => {
-      socket.off('live_started');
-      socket.off('live_viewer_count');
-      socket.off('live_viewer_joined');
-      socket.off('live_message');
-      socket.off('live_reaction');
-      socket.off('live_gift_received');
-      socket.off('live_ended');
+      socket.off('live_started',       onLiveStarted);
+      socket.off('live_viewer_count',  onViewerCount);
+      socket.off('live_viewer_joined', onViewerJoined);
+      socket.off('live_message',       onMessage);
+      socket.off('live_reaction',      onReaction);
+      socket.off('live_gift_received', onGiftReceived);
+      socket.off('live_ended',         onLiveEnded);
     };
   }, []);
 
@@ -175,10 +180,10 @@ export default function LiveScreen({ route, navigation }) {
               autoFocus
             />
 
-            <TouchableOpacity style={styles.goLiveBtn} onPress={startLive} activeOpacity={0.85}>
-              <LinearGradient colors={['#e53935', '#b71c1c']} style={styles.goLiveBtnGrad}>
+            <TouchableOpacity style={styles.goLiveBtn} onPress={startLive} disabled={starting} activeOpacity={0.85}>
+              <LinearGradient colors={[BOND_PINK, '#CC0060']} style={styles.goLiveBtnGrad}>
                 <View style={styles.goLiveDot} />
-                <Text style={styles.goLiveBtnText}>Go Live</Text>
+                <Text style={styles.goLiveBtnText}>{starting ? 'Starting…' : 'Go Live'}</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -308,7 +313,7 @@ export default function LiveScreen({ route, navigation }) {
               />
               {text.trim() ? (
                 <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-                  <Text style={styles.sendIcon}>➤</Text>
+                  <Text style={styles.sendIcon}>›</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -377,12 +382,12 @@ const styles = StyleSheet.create({
   backIcon:        { color: '#fff', fontSize: 24 },
   lobbyContent:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 16 },
   lobbyAvatarWrap: { position: 'relative', marginBottom: 8 },
-  lobbyAvatar:     { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#e53935' },
+  lobbyAvatar:     { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: BOND_PINK },
   lobbyInitial:    { color: '#fff', fontSize: 48, fontWeight: '900' },
   lobbyLivePill:   { position: 'absolute', bottom: -8, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#e53935', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   lobbyTitle:      { color: '#fff', fontSize: 24, fontWeight: '900', textAlign: 'center' },
   lobbySub:        { color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', lineHeight: 21 },
-  lobbyInput:      { width: '100%', backgroundColor: '#16181C', color: '#fff', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, fontSize: 15, borderWidth: 1, borderColor: '#2F3336', marginTop: 8 },
+  lobbyInput:      { width: '100%', backgroundColor: '#16181C', color: '#fff', borderRadius: 16, paddingHorizontal: 18, paddingVertical: 16, fontSize: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', marginTop: 8 },
   goLiveBtn:       { width: '100%', borderRadius: 18, overflow: 'hidden', marginTop: 4 },
   goLiveBtnGrad:   { paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   goLiveDot:       { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff' },

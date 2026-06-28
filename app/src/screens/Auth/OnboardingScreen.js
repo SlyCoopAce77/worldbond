@@ -14,8 +14,9 @@ const { width } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
 
 const GENDERS = [
-  { id: 'Man',   icon: '👨', label: 'Man'   },
-  { id: 'Woman', icon: '👩', label: 'Woman' },
+  { id: 'Man',   label: 'Man'   },
+  { id: 'Woman', label: 'Woman' },
+  { id: 'Other', label: 'Other' },
 ];
 
 const LANGUAGES = [
@@ -34,34 +35,45 @@ const LANGUAGES = [
 ];
 
 const COUNTRIES = [
-  { flag: '🇺🇸', name: 'United States' }, { flag: '🇯🇵', name: 'Japan' },
-  { flag: '🇹🇭', name: 'Thailand' },      { flag: '🇰🇷', name: 'South Korea' },
-  { flag: '🇬🇧', name: 'United Kingdom' }, { flag: '🇫🇷', name: 'France' },
-  { flag: '🇩🇪', name: 'Germany' },        { flag: '🇧🇷', name: 'Brazil' },
-  { flag: '🇲🇽', name: 'Mexico' },         { flag: '🇮🇳', name: 'India' },
-  { flag: '🇦🇺', name: 'Australia' },      { flag: '🇨🇦', name: 'Canada' },
-  { flag: '🇨🇳', name: 'China' },          { flag: '🇿🇦', name: 'South Africa' },
-  { flag: '🇳🇬', name: 'Nigeria' },        { flag: '🇮🇩', name: 'Indonesia' },
-  { flag: '🇵🇭', name: 'Philippines' },    { flag: '🇻🇳', name: 'Vietnam' },
-  { flag: '🇸🇬', name: 'Singapore' },      { flag: '🇲🇾', name: 'Malaysia' },
+  { flag: '🇺🇸', name: 'United States' },   { flag: '🇬🇧', name: 'United Kingdom' },
+  { flag: '🇨🇦', name: 'Canada' },           { flag: '🇦🇺', name: 'Australia' },
+  { flag: '🇳🇿', name: 'New Zealand' },      { flag: '🇫🇷', name: 'France' },
+  { flag: '🇩🇪', name: 'Germany' },          { flag: '🇮🇹', name: 'Italy' },
+  { flag: '🇪🇸', name: 'Spain' },            { flag: '🇵🇹', name: 'Portugal' },
+  { flag: '🇳🇱', name: 'Netherlands' },      { flag: '🇸🇪', name: 'Sweden' },
+  { flag: '🇳🇴', name: 'Norway' },           { flag: '🇵🇱', name: 'Poland' },
+  { flag: '🇺🇦', name: 'Ukraine' },          { flag: '🇷🇺', name: 'Russia' },
+  { flag: '🇹🇷', name: 'Turkey' },           { flag: '🇯🇵', name: 'Japan' },
+  { flag: '🇰🇷', name: 'South Korea' },      { flag: '🇨🇳', name: 'China' },
+  { flag: '🇮🇳', name: 'India' },            { flag: '🇵🇰', name: 'Pakistan' },
+  { flag: '🇧🇩', name: 'Bangladesh' },       { flag: '🇮🇩', name: 'Indonesia' },
+  { flag: '🇵🇭', name: 'Philippines' },      { flag: '🇻🇳', name: 'Vietnam' },
+  { flag: '🇹🇭', name: 'Thailand' },         { flag: '🇲🇾', name: 'Malaysia' },
+  { flag: '🇸🇬', name: 'Singapore' },        { flag: '🇸🇦', name: 'Saudi Arabia' },
+  { flag: '🇦🇪', name: 'UAE' },              { flag: '🇪🇬', name: 'Egypt' },
+  { flag: '🇳🇬', name: 'Nigeria' },          { flag: '🇬🇭', name: 'Ghana' },
+  { flag: '🇰🇪', name: 'Kenya' },            { flag: '🇿🇦', name: 'South Africa' },
+  { flag: '🇧🇷', name: 'Brazil' },           { flag: '🇲🇽', name: 'Mexico' },
+  { flag: '🇨🇴', name: 'Colombia' },         { flag: '🇦🇷', name: 'Argentina' },
+  { flag: '🌐', name: 'Other / Unlisted' },
 ];
 
 const CONNECTION_TYPES = [
-  { key: 'dating',     emoji: '❤️',  color: '#e91e63', title: 'Dating',           desc: 'Looking for a romantic connection' },
-  { key: 'friendship', emoji: '🤝',  color: '#2196f3', title: 'Friendship',       desc: 'Make genuine friends worldwide' },
-  { key: 'travel',     emoji: '✈️',  color: '#ff9800', title: 'Travel Buddy',     desc: 'Find someone to explore with' },
-  { key: 'language',   emoji: '💬',  color: '#9c27b0', title: 'Language Exchange', desc: 'Practice languages with natives' },
-  { key: 'mentorship', emoji: '🎓',  color: '#4caf50', title: 'Mentorship',       desc: 'Learn from or guide others' },
+  { key: 'dating',     color: '#e91e63', title: 'Dating',           desc: 'Looking for a romantic connection' },
+  { key: 'friendship', color: '#2196f3', title: 'Friendship',       desc: 'Make genuine friends worldwide' },
+  { key: 'travel',     color: '#ff9800', title: 'Travel Buddy',     desc: 'Find someone to explore with' },
+  { key: 'language',   color: '#9c27b0', title: 'Language Exchange', desc: 'Practice languages with natives' },
+  { key: 'mentorship', color: '#4caf50', title: 'Mentorship',       desc: 'Learn from or guide others' },
 ];
 
 const TOTAL_STEPS = 5;
 
 const STEP_META = [
-  { icon: '👤', title: 'About you',        subtitle: 'How others will see you on Bond' },
-  { icon: '🌍', title: 'Where are you?',   subtitle: 'Helps us find nearby Bonds' },
-  { icon: '🎯', title: 'Why are you here?',subtitle: 'Select all that apply' },
-  { icon: '✨', title: 'Your vibe',        subtitle: 'A photo and a line about you goes a long way' },
-  { icon: '🌐', title: 'App Language',     subtitle: 'Choose the language you want the app in' },
+  { title: 'About you',        subtitle: 'How others will see you on Bond' },
+  { title: 'Where are you?',   subtitle: 'Your home base on WorldBond' },
+  { title: 'Why are you here?',subtitle: 'Select all that apply' },
+  { title: 'Your vibe',        subtitle: 'A photo and a line about you goes a long way' },
+  { title: 'App Language',     subtitle: 'Choose the language you want the app in' },
 ];
 
 // ─── Step progress bar ────────────────────────────────────────────────────────
@@ -81,12 +93,21 @@ const bar = StyleSheet.create({
   segActive: { backgroundColor: BOND_PINK },
 });
 
-export default function OnboardingScreen({ userId, onComplete }) {
+function ageFromDob(dobStr) {
+  if (!dobStr) return null;
+  const d = new Date(dobStr);
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age;
+}
+
+export default function OnboardingScreen({ userId, dob, onComplete }) {
   const [step, setStep]       = useState(1);
   const [loading, setLoading] = useState(false);
 
   const [displayName, setDisplayName] = useState('');
-  const [age, setAge]                 = useState('');
   const [gender, setGender]           = useState('');
 
   const [country, setCountry]   = useState(null);
@@ -124,8 +145,6 @@ export default function OnboardingScreen({ userId, onComplete }) {
   function goNext() {
     if (step === 1) {
       if (!displayName.trim()) return Alert.alert('Missing', 'Enter a display name');
-      const n = parseInt(age, 10);
-      if (!age || isNaN(n) || n < 18 || n > 100) return Alert.alert('Missing', 'Enter your age (18+)');
       if (!gender) return Alert.alert('Missing', 'Select your gender');
     }
     if (step === 2 && !country) return Alert.alert('Missing', 'Select your country');
@@ -173,7 +192,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
 
       await axios.put(`${SERVER_URL}/api/profiles/me`, {
         display_name:     displayName.trim(),
-        age:              parseInt(age, 10),
+        age:              ageFromDob(dob),
         gender,
         country:          country.name,
         city:             city.trim() || null,
@@ -212,7 +231,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
           {/* Step header */}
           <Animated.View style={[s.stepHeader, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <View style={s.stepIconBadge}>
-              <Text style={s.stepIconText}>{meta.icon}</Text>
+              <Text style={s.stepIconText}>{step}</Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.stepCount}>Step {step} of {TOTAL_STEPS}</Text>
@@ -232,45 +251,33 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   <TextInput
                     style={s.input}
                     placeholder="What should people call you?"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
                     value={displayName}
                     onChangeText={setDisplayName}
                     maxLength={30}
                   />
                 </View>
 
-                <View style={s.row}>
-                  <View style={[s.field, { flex: 1 }]}>
-                    <Text style={s.label}>Age</Text>
-                    <TextInput
-                      style={s.input}
-                      placeholder="18+"
-                      placeholderTextColor="#536471"
-                      value={age}
-                      onChangeText={setAge}
-                      keyboardType="number-pad"
-                      maxLength={3}
-                    />
-                  </View>
-                  <View style={[s.field, { flex: 2 }]}>
-                    <Text style={s.label}>Gender</Text>
-                    <View style={s.genderRow}>
-                      {GENDERS.map(g => {
-                        const active = gender === g.id;
-                        return (
-                          <TouchableOpacity
-                            key={g.id}
-                            style={[s.genderCard, active && s.genderCardOn]}
-                            onPress={() => setGender(g.id)}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={s.genderIcon}>{g.icon}</Text>
-                            <Text style={[s.genderLabel, active && s.genderLabelOn]}>{g.label}</Text>
-                            {active && <View style={s.genderCheck}><Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>✓</Text></View>}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
+                <View style={s.field}>
+                  <Text style={s.label}>Gender</Text>
+                  <View style={s.genderRow}>
+                    {GENDERS.map(g => {
+                      const active = gender === g.id;
+                      return (
+                        <TouchableOpacity
+                          key={g.id}
+                          style={[s.genderCard, active && s.genderCardOn]}
+                          onPress={() => setGender(g.id)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={[s.genderSymbol, active && { borderColor: BOND_PINK }]}>
+                            <Text style={[s.genderSymbolTxt, active && { color: BOND_PINK }]}>{g.id[0]}</Text>
+                          </View>
+                          <Text style={[s.genderLabel, active && s.genderLabelOn]}>{g.label}</Text>
+                          {active && <View style={s.genderCheck}><Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>✓</Text></View>}
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               </View>
@@ -303,7 +310,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   <TextInput
                     style={s.input}
                     placeholder="e.g. Tokyo, Bangkok, New York"
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
                     value={city}
                     onChangeText={setCity}
                   />
@@ -324,7 +331,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                       activeOpacity={0.8}
                     >
                       <View style={[s.ctIconWrap, { backgroundColor: ct.color + '20', borderColor: ct.color + '40' }]}>
-                        <Text style={{ fontSize: 24 }}>{ct.emoji}</Text>
+                        <Text style={[s.ctIconLetter, { color: ct.color }]}>{ct.title[0]}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[s.ctTitle, on && { color: '#fff' }]}>{ct.title}</Text>
@@ -347,13 +354,17 @@ export default function OnboardingScreen({ userId, onComplete }) {
                     <>
                       <Image source={{ uri: photo.uri }} style={s.photoPreview} />
                       <View style={s.photoOverlay}>
-                        <Text style={{ fontSize: 22 }}>📷</Text>
                         <Text style={s.photoOverlayText}>Change photo</Text>
                       </View>
                     </>
                   ) : (
                     <LinearGradient colors={['#16181C', '#000000']} style={s.photoPlaceholder}>
-                      <Text style={{ fontSize: 44 }}>📷</Text>
+                      <View style={s.cameraIcon}>
+                        <View style={s.cameraBump} />
+                        <View style={s.cameraBody}>
+                          <View style={s.cameraLens} />
+                        </View>
+                      </View>
                       <Text style={s.photoPlaceholderTitle}>Add a profile photo</Text>
                       <Text style={s.photoPlaceholderSub}>Gets 3× more Bonds</Text>
                     </LinearGradient>
@@ -373,7 +384,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   <TextInput
                     style={[s.input, s.bioInput]}
                     placeholder="What makes you interesting? A joke, a dream, a quirk..."
-                    placeholderTextColor="#536471"
+                    placeholderTextColor="rgba(255,255,255,0.35)"
                     value={bio}
                     onChangeText={setBio}
                     multiline
@@ -430,7 +441,7 @@ export default function OnboardingScreen({ userId, onComplete }) {
                   style={s.nextGrad}
                 >
                   <Text style={s.nextText}>
-                    {step === TOTAL_STEPS ? 'Enter Bond 🫂' : 'Continue →'}
+                    {step === TOTAL_STEPS ? 'Enter Bond →' : 'Continue →'}
                   </Text>
                 </LinearGradient>
               )}
@@ -469,7 +480,6 @@ const s = StyleSheet.create({
   content:  {},
 
   form:     { gap: 22 },
-  row:      { flexDirection: 'row', gap: 14 },
   field:    { gap: 8 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label:    { color: '#536471', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
@@ -511,13 +521,21 @@ const s = StyleSheet.create({
   backText: { color: BOND_PINK, fontSize: 15, fontWeight: '700' },
 
   // Gender cards (Step 1)
-  genderRow:    { flexDirection: 'row', gap: 10 },
-  genderCard:   { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 6, position: 'relative' },
-  genderCardOn: { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '12' },
-  genderIcon:   { fontSize: 30 },
-  genderLabel:  { color: '#536471', fontSize: 14, fontWeight: '700' },
-  genderLabelOn:{ color: BOND_PINK },
-  genderCheck:  { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
+  genderRow:     { flexDirection: 'row', gap: 10 },
+  genderCard:    { flex: 1, alignItems: 'center', paddingVertical: 18, borderRadius: 18, backgroundColor: '#16181C', borderWidth: 1.5, borderColor: '#2F3336', gap: 6, position: 'relative' },
+  genderCardOn:  { borderColor: BOND_PINK, backgroundColor: BOND_PINK + '12' },
+  genderSymbol:  { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: '#2F3336', alignItems: 'center', justifyContent: 'center' },
+  genderSymbolTxt:{ color: '#536471', fontSize: 18, fontWeight: '900' },
+  genderLabel:   { color: '#536471', fontSize: 14, fontWeight: '700' },
+  genderLabelOn: { color: BOND_PINK },
+  genderCheck:   { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, backgroundColor: BOND_PINK, alignItems: 'center', justifyContent: 'center' },
+  // Connection type icon letter (Step 3)
+  ctIconLetter:  { fontSize: 20, fontWeight: '900' },
+  // Drawn camera (Step 4)
+  cameraIcon:    { alignItems: 'center', gap: 0 },
+  cameraBump:    { width: 16, height: 7, borderRadius: 3, backgroundColor: '#3a3a3a', alignSelf: 'center', marginBottom: -1 },
+  cameraBody:    { width: 56, height: 42, borderRadius: 10, backgroundColor: '#3a3a3a', alignItems: 'center', justifyContent: 'center' },
+  cameraLens:    { width: 28, height: 28, borderRadius: 14, backgroundColor: '#222', borderWidth: 2, borderColor: '#555' },
 
   // App language grid (Step 5)
   appLangGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

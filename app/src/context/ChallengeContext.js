@@ -24,12 +24,14 @@ export const CHALLENGE_MS   = 7  * 86400000;   // 7 days per challenge window
 export const COOLDOWN_MS    = 30 * 86400000;   // 30-day cooldown after a challenge resolves
 export const INACTIVE_DROP_MS = 30 * 86400000; // holder drops stamp after 30 days no activity
 
-// Weekly rotation pool — cycles every 7 days deterministically (no server needed)
+// Weekly featured stamp rotation — cycles every 7 days deterministically (no server needed).
+// Only includes countries with active 18+ streaming communities (Tier 1 + Tier 2 global markets).
+// Tier 1: highest streaming volume  |  Tier 2: strong and growing
 export const STAMP_ROTATION = [
-  '🇺🇸','🇯🇵','🇧🇷','🇰🇷','🇬🇧','🇳🇬',
-  '🇫🇷','🇩🇪','🇮🇳','🇲🇽','🇨🇦','🇦🇺',
-  '🇿🇦','🇸🇦','🇹🇷','🇦🇷','🇵🇭','🇮🇩',
-  '🇮🇹','🇪🇸','🇨🇴','🇬🇭','🇵🇰','🇧🇩',
+  // Tier 1 — most contested
+  '🇺🇸','🇧🇷','🇰🇷','🇯🇵','🇩🇪','🇬🇧','🇫🇷','🇪🇸','🇷🇺','🇨🇦','🇲🇽',
+  // Tier 2 — strong and growing
+  '🇦🇷','🇵🇭','🇮🇳','🇮🇩','🇹🇷','🇦🇺','🇸🇦','🇵🇱','🇹🇭','🇸🇪','🇳🇱','🇵🇹','🇨🇴',
 ];
 
 export function getFeaturedFlag() {
@@ -49,55 +51,6 @@ export function isStampDropped(stamp) {
   return Date.now() - lastActive > INACTIVE_DROP_MS;
 }
 
-// ── Demo seed challenges ──────────────────────────────────────────────────────
-const NOW = Date.now();
-
-// Active monument challenge: Eiffel Tower
-const SEED_CHALLENGE = {
-  id:                  'ch_demo_001',
-  monumentId:          'eiffel',
-  challengerUsername:  'Marcel_Lyon',
-  holderUsername:      'Amélie_Paris',
-  startedAt:           NOW - 2 * 86400000,
-  endsAt:              NOW + 5 * 86400000,
-  status:              'active',
-  cooldownUntil:       null,
-  winner:              null,
-  scores: {
-    challenger: { gifts: 840,  bonds: 600, liveHours: 300, votes: 225, total: 1965 },
-    holder:     { gifts: 1620, bonds: 900, liveHours: 600, votes: 375, total: 3495 },
-  },
-  dailyUsage: {},
-  comments: [
-    { id: 'c1', username: 'Kenji_JP',      text: 'Amélie has held this for months, Marcel has his work cut out 😅', ts: NOW - 90 * 60000 },
-    { id: 'c2', username: 'Priya_Mumbai',  text: 'Go Marcel!! The challenger always has the energy 🔥',            ts: NOW - 45 * 60000 },
-    { id: 'c3', username: 'DeShawn_ATL',   text: 'I streamed from Paris last night — got my live hours in 📡',     ts: NOW - 12 * 60000 },
-  ],
-};
-
-// Active stamp challenge: 🇰🇷 South Korea (held by JiMin_Seoul, highest earner)
-const SEED_STAMP_CHALLENGE = {
-  id:                  'ch_stamp_001',
-  monumentId:          'stamp_🇰🇷',
-  challengerUsername:  'K_Fan_Global',
-  holderUsername:      'JiMin_Seoul',
-  startedAt:           NOW - 1 * 86400000,
-  endsAt:              NOW + 6 * 86400000,
-  status:              'active',
-  cooldownUntil:       null,
-  winner:              null,
-  scores: {
-    challenger: { gifts: 1200, bonds: 450, liveHours: 600, votes: 150, total: 2400 },
-    holder:     { gifts: 2800, bonds: 750, liveHours: 900, votes: 375, total: 4825 },
-  },
-  dailyUsage: {},
-  comments: [
-    { id: 'sc1', username: 'Seoul_Stream',  text: 'JiMin has the whole K-pop community voting for her 🇰🇷🔥', ts: NOW - 60 * 60000 },
-    { id: 'sc2', username: 'K_Fan_Global',  text: 'We\'re closing the gap every day — stay tuned 👀',         ts: NOW - 25 * 60000 },
-    { id: 'sc3', username: 'BondWatcher',   text: 'Most competitive stamp challenge I\'ve seen this month',   ts: NOW - 8  * 60000 },
-  ],
-};
-
 const ChallengeContext = createContext(null);
 
 export function ChallengeProvider({ children }) {
@@ -108,12 +61,9 @@ export function ChallengeProvider({ children }) {
 
   useEffect(() => {
     AsyncStorage.getItem(KEY).then(raw => {
-      let base = {
-        [SEED_CHALLENGE.id]:       SEED_CHALLENGE,
-        [SEED_STAMP_CHALLENGE.id]: SEED_STAMP_CHALLENGE,
-      };
+      let base = {};
       if (raw) {
-        try { base = { ...base, ...JSON.parse(raw) }; } catch {}
+        try { base = JSON.parse(raw); } catch {}
       }
       // Auto-resolve any expired active challenges
       const now = Date.now();

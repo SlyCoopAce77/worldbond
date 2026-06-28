@@ -10,6 +10,25 @@ import { WalletProvider } from './src/context/WalletContext';
 import { StreakProvider } from './src/context/StreakContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
+// ── DEMO MODE — set false before shipping ─────────────────────────────────────
+const DEMO_MODE = false;
+const DEMO_PROFILE = {
+  username:         'BondUser_Demo',
+  display_name:     'Bond Demo',
+  userId:           'demo_001',
+  user_id:          'demo_001',
+  country:          '🇺🇸',
+  language:         'en',
+  connection_types: ['friendship', 'travel'],
+  bio:              'Testing out WorldBond — everything from stamps to chats.',
+  age:              24,
+  ghost_score:      4.2,
+  bond_pass:        false,
+  photo_url:        null,
+  socials:          {},
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 function Inner() {
   const { colors, isDark } = useTheme();
   const [user, setUser]   = useState(null);
@@ -17,16 +36,19 @@ function Inner() {
 
   useEffect(() => {
     async function restoreSession() {
+      if (DEMO_MODE) {
+        setUser(DEMO_PROFILE);
+        setLoading(false);
+        return;
+      }
       try {
         const authed  = await isAuthenticated();
         const profile = await getSavedProfile();
         if (authed && profile) {
-          // Fully authenticated with a completed profile — auto-login
           setUser(profile);
           const socket = getSocket();
           socket.emit('register', profile);
         }
-        // If only one is present (partial state), show auth screens
       } catch {
         // Storage read error — show auth screens
       } finally {
@@ -52,19 +74,24 @@ function Inner() {
     return (
       <View style={[styles.splash, { backgroundColor: colors.bg }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
-        <ActivityIndicator size="large" color="#1D9BF0" />
+        <ActivityIndicator size="large" color="#FF0080" />
       </View>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
+        <AuthScreen onLogin={handleLogin} />
+      </>
     );
   }
 
   return (
     <>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
-      {user ? (
-        <AppNavigator user={user} onLogout={handleLogout} />
-      ) : (
-        <AuthScreen onLogin={handleLogin} />
-      )}
+      <AppNavigator user={user} onLogout={handleLogout} />
     </>
   );
 }

@@ -1,0 +1,6 @@
+module Pods_WorldBond {
+  umbrella header "Pods-WorldBond-umbrella.h"
+
+  export *
+  module * { export * }
+}
