@@ -76,6 +76,35 @@ app.use('/api/profiles',    profileRoutes);
 app.use('/api/experiences', experienceRoutes);
 app.use('/api/matches',     matchingRoutes);
 
+// Legal pages
+const LEGAL_CSS = `body{margin:0;font-family:-apple-system,sans-serif;background:#000;color:#fff;padding:40px 24px;max-width:680px;margin:0 auto;line-height:1.7}h1{color:#FF0080;font-size:28px;margin-bottom:4px}h2{color:#fff;font-size:17px;margin-top:32px}p,li{color:#aaa;font-size:15px}a{color:#FF0080}footer{color:#444;font-size:12px;margin-top:48px;border-top:1px solid #111;padding-top:16px}`;
+
+app.get('/privacy', (req, res) => res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Privacy Policy — WorldBond</title><style>${LEGAL_CSS}</style></head><body>
+<h1>WorldBond</h1><p style="color:#555;font-size:13px">Privacy Policy &nbsp;·&nbsp; Last updated June 2026</p>
+<h2>1. Information We Collect</h2><p>We collect information you provide directly: email address, date of birth, display name, gender, country, city, profile photo, bio, and language preference. We also collect usage data such as check-ins, messages, and interactions within the app.</p>
+<h2>2. How We Use Your Information</h2><p>We use your information to provide and improve the WorldBond service, match you with other users, send password reset emails, and ensure platform safety. We do not sell your personal data to third parties.</p>
+<h2>3. Age Requirement</h2><p>WorldBond is strictly for users 18 years of age and older. We collect date of birth at registration and permanently store it. Users found to be under 18 are permanently banned.</p>
+<h2>4. Data Storage & Security</h2><p>Your data is stored securely on encrypted servers. We use industry-standard security practices to protect your information. Passwords are hashed and never stored in plain text.</p>
+<h2>5. Third-Party Services</h2><p>We use Stripe for payment processing (subject to <a href="https://stripe.com/privacy">Stripe's Privacy Policy</a>). We use Apple In-App Purchase for coin purchases on iOS. We use Google services on Android.</p>
+<h2>6. Your Rights</h2><p>You may request deletion of your account and associated data at any time by contacting us at support@worldbond.app. Account deletion is permanent and irreversible.</p>
+<h2>7. Cookies & Tracking</h2><p>The WorldBond app does not use cookies. We may collect anonymised analytics data to improve the service.</p>
+<h2>8. Changes to This Policy</h2><p>We may update this policy from time to time. We will notify users of significant changes via the app or email.</p>
+<h2>9. Contact</h2><p>Questions? Email us at <a href="mailto:support@worldbond.app">support@worldbond.app</a></p>
+<footer>© 2026 WorldBond. All rights reserved.</footer></body></html>`));
+
+app.get('/terms', (req, res) => res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Terms of Service — WorldBond</title><style>${LEGAL_CSS}</style></head><body>
+<h1>WorldBond</h1><p style="color:#555;font-size:13px">Terms of Service &nbsp;·&nbsp; Last updated June 2026</p>
+<h2>1. Acceptance</h2><p>By creating an account you agree to these Terms. If you do not agree, do not use WorldBond.</p>
+<h2>2. Eligibility</h2><p>You must be 18 or older to use WorldBond. By registering you confirm your date of birth is accurate. Providing false age information results in a permanent ban with no appeal.</p>
+<h2>3. User Conduct</h2><p>You agree not to: harass or harm other users, post illegal content, impersonate others, attempt to access other users' accounts, or use the platform for spam or commercial solicitation without permission.</p>
+<h2>4. Content</h2><p>You retain ownership of content you post. By posting, you grant WorldBond a non-exclusive licence to display that content within the platform. You are solely responsible for the content you share.</p>
+<h2>5. Payments & Coins</h2><p>WorldBond Coins are a virtual currency with no cash value and cannot be refunded. All purchases are final. Coin balances may be forfeited if your account is terminated for violations.</p>
+<h2>6. Account Termination</h2><p>We reserve the right to suspend or permanently ban any account that violates these Terms, at our sole discretion.</p>
+<h2>7. Disclaimer</h2><p>WorldBond is provided "as is" without warranties of any kind. We are not liable for user-generated content or interactions between users.</p>
+<h2>8. Governing Law</h2><p>These Terms are governed by the laws of the United States.</p>
+<h2>9. Contact</h2><p>Questions? Email <a href="mailto:support@worldbond.app">support@worldbond.app</a></p>
+<footer>© 2026 WorldBond. All rights reserved.</footer></body></html>`));
+
 // REST endpoints
 app.get('/health', (req, res) => res.json({ status: 'WorldBond server running' }));
 app.get('/api/groups', (req, res) => res.json(GROUP_CATEGORIES));

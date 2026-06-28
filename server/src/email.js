@@ -12,17 +12,19 @@ const transporter = nodemailer.createTransport({
 
 async function sendPasswordReset(toEmail, code) {
   await transporter.sendMail({
-    from:    `"Bond" <${process.env.SMTP_USER}>`,
+    from:    `"WorldBond" <${process.env.SMTP_USER}>`,
     to:      toEmail,
-    subject: 'Your Bond password reset code',
+    subject: 'Your WorldBond password reset code',
     html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0a18;color:#fff;border-radius:16px">
-        <h2 style="color:#5865f2;margin-top:0">🫂 Reset your Bond password</h2>
-        <p style="color:#aaa;margin-bottom:24px">Enter this 6-digit code in the app. It expires in <strong style="color:#fff">15 minutes</strong>.</p>
-        <div style="background:#12122a;border:2px solid #5865f240;border-radius:16px;padding:28px;text-align:center;margin-bottom:24px">
-          <span style="font-size:40px;font-weight:900;letter-spacing:14px;color:#fff;font-family:monospace">${code}</span>
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#000000;color:#fff;border-radius:16px">
+        <h2 style="color:#FF0080;margin-top:0;font-size:22px;letter-spacing:-0.5px">WorldBond</h2>
+        <h3 style="color:#fff;margin-top:0">Reset your password</h3>
+        <p style="color:#888;margin-bottom:24px">Enter this 6-digit code in the app. It expires in <strong style="color:#fff">15 minutes</strong>.</p>
+        <div style="background:#111;border:2px solid #FF008040;border-radius:16px;padding:28px;text-align:center;margin-bottom:24px">
+          <span style="font-size:40px;font-weight:900;letter-spacing:14px;color:#FF0080;font-family:monospace">${code}</span>
         </div>
-        <p style="color:#555;font-size:12px;line-height:1.6">If you didn't request a password reset, you can safely ignore this email. Your password will not change.</p>
+        <p style="color:#444;font-size:12px;line-height:1.6">If you didn't request a password reset, you can safely ignore this email. Your password will not change.</p>
+        <p style="color:#333;font-size:11px;margin-top:24px">WorldBond — Connect the world</p>
       </div>
     `,
   });

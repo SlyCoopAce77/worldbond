@@ -50,6 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_language ON profiles(language);
 CREATE INDEX IF NOT EXISTS idx_profiles_ghost    ON profiles(ghost_score);
 
 -- Safe migrations
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS date_of_birth     DATE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gallery_photos    TEXT[]  DEFAULT '{}';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS coin_balance      INTEGER DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;

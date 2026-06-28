@@ -8,6 +8,7 @@ import LoginScreen           from './Auth/LoginScreen';
 import RegisterScreen        from './Auth/RegisterScreen';
 import OnboardingScreen      from './Auth/OnboardingScreen';
 import ForgotPasswordScreen  from './Auth/ForgotPasswordScreen';
+import ForgotEmailScreen     from './Auth/ForgotEmailScreen';
 import ResetPasswordScreen   from './Auth/ResetPasswordScreen';
 import LegalScreen           from './LegalScreen';
 
@@ -18,6 +19,7 @@ const SCREENS = {
   ONBOARDING:     'onboarding',
   LOADING:        'loading',
   FORGOT_PASSWORD:'forgot_password',
+  FORGOT_EMAIL:   'forgot_email',
   RESET_PASSWORD: 'reset_password',
 };
 
@@ -94,6 +96,14 @@ export default function AuthScreen({ onLogin }) {
           onBack={()            => setScreen(SCREENS.LANDING)}
           onGoRegister={() => setScreen(SCREENS.REGISTER)}
           onForgotPassword={() => setScreen(SCREENS.FORGOT_PASSWORD)}
+          onForgotEmail={() => setScreen(SCREENS.FORGOT_EMAIL)}
+        />
+      );
+
+    case SCREENS.FORGOT_EMAIL:
+      return (
+        <ForgotEmailScreen
+          onBack={() => setScreen(SCREENS.LOGIN)}
         />
       );
 

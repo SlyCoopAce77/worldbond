@@ -8,10 +8,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import { login } from '../../services/authApi';
 import { WorldWordmark } from '../../components/BondLogo';
 
-const AMBER   = '#FF0080';
-const AMBER_D = '#CC0060';
+const BOND_PINK  = '#FF0080';
+const BOND_PINK_D = '#CC0060';
 
-export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotPassword }) {
+export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotPassword, onForgotEmail }) {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -64,7 +64,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                   <Text style={s.backArrow}>‹</Text>
                 </View>
               </TouchableOpacity>
-              <WorldWordmark size={18} color="#fff" bondColor={AMBER} bondTextColor={AMBER} />
+              <WorldWordmark size={18} color="#fff" bondColor={BOND_PINK} bondTextColor={BOND_PINK} />
               <View style={{ width: 40 }} />
             </View>
 
@@ -94,7 +94,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                     <TextInput
                       style={s.input}
                       placeholder="you@example.com"
-                      placeholderTextColor="#555555"
+                      placeholderTextColor="rgba(255,255,255,0.35)"
                       value={email}
                       onChangeText={t => { setEmail(t); setError(''); }}
                       keyboardType="email-address"
@@ -118,7 +118,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                       ref={passwordRef}
                       style={s.input}
                       placeholder="Your password"
-                      placeholderTextColor="#555555"
+                      placeholderTextColor="rgba(255,255,255,0.35)"
                       value={password}
                       onChangeText={t => { setPassword(t); setError(''); }}
                       secureTextEntry={!showPass}
@@ -145,7 +145,7 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                   </View>
                 ) : (
                   <LinearGradient
-                    colors={[AMBER, AMBER_D]}
+                    colors={[BOND_PINK, BOND_PINK_D]}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                     style={s.submitGrad}
                   >
@@ -168,6 +168,10 @@ export default function LoginScreen({ onSuccess, onBack, onGoRegister, onForgotP
                   <Text style={s.footerLink}> Create account</Text>
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity style={s.forgotEmailBtn} onPress={onForgotEmail}>
+                <Text style={s.forgotEmailText}>Forgot your email address?</Text>
+              </TouchableOpacity>
 
             </Animated.View>
           </ScrollView>
@@ -214,7 +218,7 @@ const s = StyleSheet.create({
 
   labelRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label:      { color: '#ffffff', opacity: 0.30, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
-  forgotLink: { color: AMBER, fontSize: 13, fontWeight: '600' },
+  forgotLink: { color: BOND_PINK, fontSize: 13, fontWeight: '600' },
 
   inputBox: {
     flexDirection: 'row', alignItems: 'center',
@@ -225,12 +229,12 @@ const s = StyleSheet.create({
   inputBoxActive: { borderColor: '#FF008050' },
   input:   { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 18 },
   eyeBtn:  { paddingLeft: 10 },
-  eyeText: { color: AMBER, fontSize: 13, fontWeight: '600' },
+  eyeText: { color: BOND_PINK, fontSize: 13, fontWeight: '600' },
 
   // Submit
   submitWrap: { borderRadius: 18, overflow: 'hidden', marginTop: 32 },
   submitOff:  { opacity: 0.4 },
-  submitGrad: { paddingVertical: 20, alignItems: 'center', borderRadius: 18, backgroundColor: AMBER },
+  submitGrad: { paddingVertical: 20, alignItems: 'center', borderRadius: 18, backgroundColor: BOND_PINK },
   submitText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
 
   // Divider
@@ -239,7 +243,9 @@ const s = StyleSheet.create({
   dividerLabel:{ color: '#ffffff', opacity: 0.25, fontSize: 13, fontWeight: '600' },
 
   // Footer
-  footerRow:  { flexDirection: 'row', justifyContent: 'center', paddingBottom: 8 },
-  footerText: { color: '#ffffff', opacity: 0.40, fontSize: 15 },
-  footerLink: { color: AMBER, fontSize: 15, fontWeight: '700' },
+  footerRow:      { flexDirection: 'row', justifyContent: 'center', paddingBottom: 8 },
+  footerText:     { color: '#ffffff', opacity: 0.40, fontSize: 15 },
+  footerLink:     { color: BOND_PINK, fontSize: 15, fontWeight: '700' },
+  forgotEmailBtn: { alignItems: 'center', paddingVertical: 14 },
+  forgotEmailText:{ color: '#444', fontSize: 13, fontWeight: '500' },
 });

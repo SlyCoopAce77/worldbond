@@ -354,7 +354,7 @@ export default function ProfileScreen({ route, navigation }) {
     setShowBondSheet(false);
     try {
       const token = await getAccessToken();
-      const ct = (bondProfile?.connection_types || [])[0] || 'friendship';
+      const ct = (bondProfile?.connection_types || [])[0] || 'circle';
       await axios.post(`${SERVER_URL}/api/matches`, {
         targetUserId: bondUserId,
         connectionType: ct,
