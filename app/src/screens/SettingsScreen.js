@@ -121,7 +121,7 @@ const HELP_FAQS = [
   },
   {
     q: 'Something is broken — how do I report it?',
-    a: 'Tap Report a Bug in Settings, or email us directly at support@bond.app. Please describe what happened and what you expected.',
+    a: 'Tap Report a Bug in Settings, or email us directly at support@worldbond.app. Please describe what happened and what you expected.',
   },
 ];
 
@@ -191,7 +191,7 @@ export default function SettingsScreen({ navigation, onLogout }) {
               onLogout?.();
             } catch {
               setSaving(false);
-              Alert.alert('Error', 'Could not delete account. Contact support@bond.app.');
+              Alert.alert('Error', 'Could not delete account. Contact support@worldbond.app.');
             }
           },
         },
@@ -465,11 +465,11 @@ export default function SettingsScreen({ navigation, onLogout }) {
             sym="!"
             label="Report a Bug"
             onPress={() => {
-              Linking.canOpenURL('mailto:support@bond.app').then(can => {
+              Linking.canOpenURL('mailto:support@worldbond.app').then(can => {
                 if (can) {
-                  Linking.openURL('mailto:support@bond.app?subject=Bug Report');
+                  Linking.openURL('mailto:support@worldbond.app?subject=Bug Report');
                 } else {
-                  Alert.alert('Report a Bug', 'Email us at support@bond.app and describe what happened.');
+                  Alert.alert('Report a Bug', 'Email us at support@worldbond.app and describe what happened.');
                 }
               });
             }}
@@ -594,17 +594,17 @@ export default function SettingsScreen({ navigation, onLogout }) {
               <Text style={s.helpContactLabel}>Still need help?</Text>
               <TouchableOpacity
                 onPress={() => {
-                  Linking.canOpenURL('mailto:support@bond.app').then(can => {
+                  Linking.canOpenURL('mailto:support@worldbond.app').then(can => {
                     if (can) {
-                      Linking.openURL('mailto:support@bond.app?subject=Help');
+                      Linking.openURL('mailto:support@worldbond.app?subject=Help');
                     } else {
-                      Alert.alert('Contact Support', 'Email us at support@bond.app');
+                      Alert.alert('Contact Support', 'Email us at support@worldbond.app');
                     }
                   });
                 }}
                 activeOpacity={0.75}
               >
-                <Text style={s.helpContactEmail}>support@bond.app</Text>
+                <Text style={s.helpContactEmail}>support@worldbond.app</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
