@@ -59,17 +59,18 @@ const COUNTRIES = [
 ];
 
 const CONNECTION_TYPES = [
-  { key: 'dating',     color: '#e91e63', title: 'Dating',           desc: 'Looking for a romantic connection' },
-  { key: 'friendship', color: '#2196f3', title: 'Friendship',       desc: 'Make genuine friends worldwide' },
-  { key: 'travel',     color: '#ff9800', title: 'Travel Buddy',     desc: 'Find someone to explore with' },
-  { key: 'language',   color: '#9c27b0', title: 'Language Exchange', desc: 'Practice languages with natives' },
-  { key: 'mentorship', color: '#4caf50', title: 'Mentorship',       desc: 'Learn from or guide others' },
+  { key: 'bond',     color: '#FF0080', title: 'Bond',     desc: 'Find love across borders' },
+  { key: 'circle',   color: '#3b82f6', title: 'Circle',   desc: 'Build your global tribe' },
+  { key: 'journey',  color: '#FFB700', title: 'Journey',  desc: 'Find a travel companion' },
+  { key: 'babel',    color: '#8b5cf6', title: 'Babel',    desc: 'Language & culture exchange' },
+  { key: 'bridge',   color: '#06b6d4', title: 'Bridge',   desc: 'Network & create together' },
+  { key: 'compass',  color: '#22c55e', title: 'Compass',  desc: 'Mentor or be mentored' },
 ];
 
 const TOTAL_STEPS = 5;
 
 const STEP_META = [
-  { title: 'About you',        subtitle: 'How others will see you on Bond' },
+  { title: 'About you',        subtitle: 'How others will see you on WorldBond' },
   { title: 'Where are you?',   subtitle: 'Your home base on WorldBond' },
   { title: 'Why are you here?',subtitle: 'Select all that apply' },
   { title: 'Your vibe',        subtitle: 'A photo and a line about you goes a long way' },
@@ -110,9 +111,10 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
   const [displayName, setDisplayName] = useState('');
   const [gender, setGender]           = useState('');
 
-  const [country, setCountry]   = useState(null);
-  const [city, setCity]         = useState('');
-  const [language, setLanguage] = useState('en');
+  const [country, setCountry]       = useState(null);
+  const [city, setCity]             = useState('');
+  const [language, setLanguage]     = useState('en');
+  const [customLanguage, setCustomLanguage] = useState('');
 
   const [connectionTypes, setConnectionTypes] = useState([]);
 
@@ -149,7 +151,11 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
     }
     if (step === 2 && !country) return Alert.alert('Missing', 'Select your country');
     if (step === 3 && connectionTypes.length === 0) return Alert.alert('Missing', 'Choose at least one reason');
-    if (step === TOTAL_STEPS) { handleFinish(); return; }
+    if (step === TOTAL_STEPS) {
+      if (language === 'other' && !customLanguage.trim()) return Alert.alert('Missing', 'Enter your language');
+      handleFinish();
+      return;
+    }
     animateStep(step + 1);
   }
 
@@ -165,6 +171,7 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
 
   async function handleFinish() {
     setLoading(true);
+    const finalLanguage = language === 'other' ? customLanguage.trim().toLowerCase() : language;
     try {
       const token   = await getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
@@ -176,7 +183,7 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
         form.append('userId',   userId);
         form.append('username', displayName.trim());
         form.append('country',  country.name);
-        form.append('language', language);
+        form.append('language', finalLanguage);
         try {
           const uploadRes = await fetch(`${SERVER_URL}/api/photos/upload`, {
             method: 'POST',
@@ -196,7 +203,7 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
         gender,
         country:          country.name,
         city:             city.trim() || null,
-        language,
+        language:         finalLanguage,
         connection_types: connectionTypes,
         bio:              bio.trim() || null,
         photo_url:        photoUrl,
@@ -205,7 +212,7 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
       const socketProfile = await finalizeProfile({
         userId,
         display_name:     displayName.trim(),
-        language,
+        language:         finalLanguage,
         country:          `${country.flag} ${country.name}`,
         connection_types: connectionTypes,
       });
@@ -230,9 +237,6 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
 
           {/* Step header */}
           <Animated.View style={[s.stepHeader, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={s.stepIconBadge}>
-              <Text style={s.stepIconText}>{step}</Text>
-            </View>
             <View style={{ flex: 1 }}>
               <Text style={s.stepCount}>Step {step} of {TOTAL_STEPS}</Text>
               <Text style={s.stepTitle}>{meta.title}</Text>
@@ -415,7 +419,31 @@ export default function OnboardingScreen({ userId, dob, onComplete }) {
                       </TouchableOpacity>
                     );
                   })}
+                  {/* Other */}
+                  <TouchableOpacity
+                    style={[s.appLangCard, language === 'other' && s.appLangCardOn]}
+                    onPress={() => setLanguage('other')}
+                    activeOpacity={0.8}
+                  >
+                    {language === 'other' && <View style={s.appLangActiveLine} />}
+                    <Text style={s.appLangFlag}>🌐</Text>
+                    <Text style={[s.appLangLabel, language === 'other' && s.appLangLabelOn]}>Other</Text>
+                    {language === 'other' && <Text style={s.appLangCheck}>✓</Text>}
+                  </TouchableOpacity>
                 </View>
+
+                {language === 'other' && (
+                  <TextInput
+                    style={s.input}
+                    placeholder="Type your language..."
+                    placeholderTextColor="rgba(255,255,255,0.35)"
+                    value={customLanguage}
+                    onChangeText={setCustomLanguage}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                  />
+                )}
+
                 <Text style={s.appLangHint}>
                   This sets the language WorldBond uses across the app
                 </Text>

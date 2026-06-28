@@ -4,19 +4,19 @@ import {
 } from 'react-native';
 
 const EFFECTIVE_DATE = 'January 1, 2025';
-const SUPPORT_EMAIL  = 'support@bond.app';
+const SUPPORT_EMAIL  = 'support@worldbond.app';
 
 const TERMS_TEXT = `TERMS OF SERVICE
 Effective Date: ${EFFECTIVE_DATE}
 
 1. ACCEPTANCE
-By creating an account or using Bond ("the App"), you agree to these Terms. If you are under 18 years old you may not use the App.
+By creating an account or using WorldBond ("the App"), you agree to these Terms. If you are under 18 years old you may not use the App.
 
 2. ACCOUNT
 You are responsible for your account and all activity under it. Provide accurate information when registering. You may not share or sell your account.
 
 3. USER CONTENT
-You own the content you post. By posting, you grant Bond a non-exclusive, royalty-free license to display your content within the App. You are solely responsible for your posts and interactions.
+You own the content you post. By posting, you grant WorldBond a non-exclusive, royalty-free license to display your content within the App. You are solely responsible for your posts and interactions.
 
 4. PROHIBITED CONDUCT
 You must not:
@@ -27,16 +27,16 @@ You must not:
 • Use the App if you are under 18 years old
 
 5. MODERATION
-Bond may remove content or suspend accounts that violate these Terms at any time and without prior notice.
+WorldBond may remove content or suspend accounts that violate these Terms at any time and without prior notice.
 
 6. INTELLECTUAL PROPERTY
-Bond's name, logo, and technology are owned by Bond. User-generated content remains the property of the respective users.
+WorldBond's name, logo, and technology are owned by WorldBond. User-generated content remains the property of the respective users.
 
 7. DISCLAIMER
 The App is provided "as is" without warranties of any kind, including availability, accuracy, or fitness for a particular purpose.
 
 8. LIMITATION OF LIABILITY
-To the maximum extent permitted by law, Bond is not liable for indirect, incidental, or consequential damages arising from use of the App.
+To the maximum extent permitted by law, WorldBond is not liable for indirect, incidental, or consequential damages arising from use of the App.
 
 9. CHANGES
 We may update these Terms. Continued use of the App after changes constitutes acceptance of the revised Terms.
@@ -74,7 +74,7 @@ We do not sell your personal data. We may share information with:
 We retain your data for as long as your account is active. You can permanently delete your account and all associated data via Settings → Delete Account.
 
 5. CHILDREN'S PRIVACY
-Bond is not directed to children under 18. We do not knowingly collect personal information from children under 18. If we become aware that we have, we will delete it promptly.
+WorldBond is not directed to children under 18. We do not knowingly collect personal information from children under 18. If we become aware that we have, we will delete it promptly.
 
 6. SECURITY
 We use industry-standard security measures including HTTPS encrypted connections and hashed password storage. No internet transmission is 100% secure.

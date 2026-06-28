@@ -168,7 +168,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin, onOpenTer
     if (age < 18) {
       setDobStep('closed');
       setDobSet(false);
-      setError('You must be 18 or older to join Bond.');
+      setError('You must be 18 or older to join WorldBond.');
       return;
     }
     setDobStep('confirm');
@@ -188,7 +188,7 @@ export default function RegisterScreen({ onSuccess, onBack, onGoLogin, onOpenTer
     if (password.length < 8)  return setError('Password must be at least 8 characters');
     if (password !== confirm)  return setError('Passwords do not match');
     if (!dobSet)               return setError('Please confirm your date of birth');
-    if (age < 18)              return setError('You must be 18 or older to join Bond.');
+    if (age < 18)              return setError('You must be 18 or older to join WorldBond.');
 
     setLoading(true);
     try {
