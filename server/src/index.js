@@ -619,6 +619,57 @@ app.post('/admin/flag-account', requireAuth, async (req, res) => {
   }
 });
 
+// ── Globe Trotter: record a verified stamp or monument win ────────────────────
+// Called server-side when a challenge resolves. Rate-limited: 1 win per target
+// per user per 30 days — prevents any replay or double-counting.
+app.post('/challenge/record-win', requireAuth, async (req, res) => {
+  const userId  = req.user?.userId;
+  const { winType, targetId } = req.body; // winType: 'stamp' | 'monument'
+  if (!userId || !winType || !targetId) return res.status(400).json({ error: 'Missing fields.' });
+  if (!['stamp', 'monument'].includes(winType)) return res.status(400).json({ error: 'Invalid winType.' });
+
+  // Global rate limit: max 2 win recordings per user per hour (prevents burst spam)
+  if (!rateLimit(`win:${userId}`, 2, 3600000)) {
+    return res.status(429).json({ error: 'Too many win recordings. Try again later.' });
+  }
+
+  try {
+    const { query: db } = require('./database/db');
+    const year = new Date().getFullYear();
+
+    // Enforce 30-day cooldown: same user, same target, within 30 days
+    const recent = await db(
+      `SELECT id FROM challenge_wins
+       WHERE user_id = $1 AND win_type = $2 AND target_id = $3
+         AND won_at > NOW() - INTERVAL '30 days'`,
+      [userId, winType, targetId]
+    );
+    if (recent.rowCount > 0) {
+      return res.status(429).json({ error: 'Already recorded a win for this target in the last 30 days.' });
+    }
+
+    // Record the win
+    await db(
+      `INSERT INTO challenge_wins (user_id, win_type, target_id, year) VALUES ($1, $2, $3, $4)`,
+      [userId, winType, targetId, year]
+    );
+
+    // Update yearly progress counter
+    const col = winType === 'stamp' ? 'stamp_wins' : 'monument_wins';
+    await db(
+      `INSERT INTO yearly_challenge_progress (user_id, year, ${col}, updated_at)
+       VALUES ($1, $2, 1, NOW())
+       ON CONFLICT (user_id, year) DO UPDATE SET ${col} = yearly_challenge_progress.${col} + 1, updated_at = NOW()`,
+      [userId, year]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Win] record error:', err.message);
+    res.status(500).json({ error: 'Could not record win.' });
+  }
+});
+
 // ── Admin: suspend or reinstate a user account ────────────────────────────────
 app.post('/admin/suspend-account', requireAuth, async (req, res) => {
   const { targetUserId, suspend, reason } = req.body;

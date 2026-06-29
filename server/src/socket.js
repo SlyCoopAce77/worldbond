@@ -1,5 +1,23 @@
 const { v4: uuidv4 } = require('uuid');
 const { translateText } = require('./translate');
+const { query: dbQuery } = require('./database/db');
+
+// ── Yearly challenge helpers ───────────────────────────────────────────────────
+function currentYear() { return new Date().getFullYear(); }
+
+async function upsertYearlyProgress(userId, updates) {
+  if (!userId) return;
+  const year = currentYear();
+  const cols  = Object.keys(updates);
+  const incs  = cols.map(c => `${c} = COALESCE(${c}, 0) + $${cols.indexOf(c) + 3}`).join(', ');
+  const vals  = cols.map(c => updates[c]);
+  await dbQuery(
+    `INSERT INTO yearly_challenge_progress (user_id, year, ${cols.join(', ')}, updated_at)
+     VALUES ($1, $2, ${vals.map((_, i) => `$${i + 3}`).join(', ')}, NOW())
+     ON CONFLICT (user_id, year) DO UPDATE SET ${incs}, updated_at = NOW()`,
+    [userId, year, ...vals]
+  ).catch(e => console.warn('[Yearly] upsert error:', e.message));
+}
 
 // ── Whitelisted gift types — server is the source of truth for coin values ────
 // Matches GiftPicker.js GIFTS exactly. Client sends gift.id; server resolves coin value.
@@ -945,19 +963,33 @@ function setupSocket(io) {
         prevSockets.forEach(s => s.leave(`live:${socket.id}`));
       }
 
+      const sessionId = uuidv4();
       liveStreams[socket.id] = {
         streamId:    socket.id,
+        sessionId,
         hostSocketId: socket.id,
         hostName:    user.username,
+        hostUserId:  user.userId || null,
         hostCountry: user.country,
         hostPhoto:   user.photo_url || null,
         title:       title || `${user.username}'s Live`,
         category:    category || 'general',
         thumbnail:   thumbnail || null,
         viewerIds:   new Set(),
+        uniqueViewerIds: new Set(), // all-time unique viewers for this session
         messages:    [],
         startedAt:   Date.now(),
+        peakViewers: 0,
       };
+
+      // Record session start in DB (tamper-proof — server sets started_at)
+      if (user.userId) {
+        dbQuery(
+          `INSERT INTO stream_sessions (id, user_id, stream_socket_id, started_at, year)
+           VALUES ($1, $2, $3, NOW(), $4)`,
+          [sessionId, user.userId, socket.id, currentYear()]
+        ).catch(e => console.warn('[Stream] session insert error:', e.message));
+      }
 
       socket.join(`live:${socket.id}`);
       io.emit('live_streams', Object.values(liveStreams).map(s => ({
@@ -967,9 +999,48 @@ function setupSocket(io) {
       console.log(`[Live] ${user.username} went live`);
     });
 
-    socket.on('end_live', () => {
+    // Shared stream-end logic — called from end_live and disconnect
+    async function finalizeStream(stream) {
+      if (!stream) return;
+      const userId = stream.hostUserId;
+      const durationMs      = Date.now() - stream.startedAt;
+      const durationMinutes = Math.floor(durationMs / 60000);
+      const durationHours   = durationMinutes / 60;
+      const uniqueViewers   = stream.uniqueViewerIds?.size || 0;
+      const qualifies       = durationMinutes >= 300; // 5 hours minimum
+
+      if (userId && stream.sessionId) {
+        // Update session record with end time, duration, viewer counts
+        await dbQuery(
+          `UPDATE stream_sessions
+           SET ended_at = NOW(), duration_minutes = $1,
+               peak_viewers = $2, total_unique_viewers = $3,
+               counted_for_yearly = $4
+           WHERE id = $5`,
+          [durationMinutes, stream.peakViewers || 0, uniqueViewers, qualifies, stream.sessionId]
+        ).catch(e => console.warn('[Stream] session update error:', e.message));
+
+        // Update yearly challenge progress if stream qualifies (5+ hrs)
+        if (qualifies) {
+          await upsertYearlyProgress(userId, {
+            streams_completed: 1,
+            stream_hours:      parseFloat(durationHours.toFixed(2)),
+            total_viewers:     uniqueViewers,
+          });
+        } else {
+          // Always accumulate hours and viewers regardless (for Bond Marathon / Bond Elite)
+          await upsertYearlyProgress(userId, {
+            stream_hours:  parseFloat(durationHours.toFixed(2)),
+            total_viewers: uniqueViewers,
+          });
+        }
+      }
+    }
+
+    socket.on('end_live', async () => {
       const stream = liveStreams[socket.id];
       if (!stream) return;
+      await finalizeStream(stream);
       io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
       delete liveStreams[socket.id];
       io.emit('live_streams', Object.values(liveStreams).map(s => ({
@@ -982,6 +1053,12 @@ function setupSocket(io) {
       const stream = liveStreams[streamId];
       if (!stream) return socket.emit('live_error', 'Stream not found or ended');
       stream.viewerIds.add(socket.id);
+      stream.uniqueViewerIds = stream.uniqueViewerIds || new Set();
+      const viewer = connectedUsers[socket.id];
+      if (viewer?.userId) stream.uniqueViewerIds.add(viewer.userId);
+      if (stream.viewerIds.size > (stream.peakViewers || 0)) {
+        stream.peakViewers = stream.viewerIds.size;
+      }
       socket.join(`live:${streamId}`);
 
       // Send recent messages + stream info
@@ -1078,6 +1155,11 @@ function setupSocket(io) {
         senderCountry: sender.country || '',
         gift:          verifiedGift,
       });
+
+      // Track Gift Legend progress: accumulate BC received for the stream host
+      if (stream.hostUserId) {
+        upsertYearlyProgress(stream.hostUserId, { gifts_received_bc: verifiedGift.coins });
+      }
     });
 
     // ── FOLLOWS ──
@@ -1150,10 +1232,42 @@ function setupSocket(io) {
 
     // Disconnect
 
-    socket.on('disconnect', () => {
+    // ── Yearly challenge progress (server-authoritative) ──────────────────────
+    socket.on('get_yearly_challenge', () => {
+      // Challenges are defined client-side; server just confirms the channel is live
+      socket.emit('yearly_challenge', null);
+    });
+
+    socket.on('get_challenge_progress', async () => {
+      const user = connectedUsers[socket.id];
+      if (!user?.userId) return socket.emit('challenge_progress', {});
+      try {
+        const { rows } = await dbQuery(
+          `SELECT streams_completed, stream_hours, total_viewers,
+                  stamp_wins, monument_wins, gifts_received_bc
+           FROM yearly_challenge_progress
+           WHERE user_id = $1 AND year = $2`,
+          [user.userId, currentYear()]
+        );
+        const row = rows[0] || {};
+        socket.emit('challenge_progress', {
+          worldStreamer: row.streams_completed   || 0,
+          globeTrotter:  (row.stamp_wins || 0) + (row.monument_wins || 0),
+          bondMarathon:  parseFloat(row.stream_hours || 0),
+          bondElite:     row.total_viewers       || 0,
+          giftLegend:    row.gifts_received_bc   || 0,
+        });
+      } catch (e) {
+        console.warn('[Yearly] progress fetch error:', e.message);
+        socket.emit('challenge_progress', {});
+      }
+    });
+
+    socket.on('disconnect', async () => {
       delete socketGiftCounts[socket.id]; // clean up rate tracker
-      // End live stream if host disconnects
+      // End live stream if host disconnects — finalize session stats
       if (liveStreams[socket.id]) {
+        await finalizeStream(liveStreams[socket.id]);
         io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
         delete liveStreams[socket.id];
         io.emit('live_streams', Object.values(liveStreams).map(s => ({

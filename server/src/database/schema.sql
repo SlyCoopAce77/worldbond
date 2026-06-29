@@ -101,6 +101,49 @@ CREATE TABLE IF NOT EXISTS fraud_flags (
 );
 CREATE INDEX IF NOT EXISTS idx_fraud_flags_user ON fraud_flags(user_id, resolved);
 
+-- ─── YEARLY CHALLENGE PROGRESS (server-authoritative, one row per user per year) ─
+CREATE TABLE IF NOT EXISTS yearly_challenge_progress (
+  user_id              UUID REFERENCES users(id) ON DELETE CASCADE,
+  year                 INTEGER NOT NULL,
+  streams_completed    INTEGER DEFAULT 0,     -- World Streamer: 5+ hr streams
+  stream_hours         DECIMAL(10,2) DEFAULT 0, -- Bond Marathon: cumulative hours
+  total_viewers        INTEGER DEFAULT 0,     -- Bond Elite: cumulative unique viewers
+  stamp_wins           INTEGER DEFAULT 0,     -- Globe Trotter: Country Stamp wins
+  monument_wins        INTEGER DEFAULT 0,     -- Globe Trotter: Bond Monument wins
+  gifts_received_bc    INTEGER DEFAULT 0,     -- Gift Legend: BC received in gifts
+  updated_at           TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, year)
+);
+CREATE INDEX IF NOT EXISTS idx_yearly_progress_user ON yearly_challenge_progress(user_id);
+
+-- ─── STREAM SESSIONS — tamper-proof record of every live session ──────────────
+CREATE TABLE IF NOT EXISTS stream_sessions (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id              UUID REFERENCES users(id) ON DELETE CASCADE,
+  stream_socket_id     TEXT NOT NULL,
+  started_at           TIMESTAMPTZ NOT NULL,
+  ended_at             TIMESTAMPTZ,
+  duration_minutes     INTEGER,               -- computed on end
+  peak_viewers         INTEGER DEFAULT 0,
+  total_unique_viewers INTEGER DEFAULT 0,
+  counted_for_yearly   BOOLEAN DEFAULT FALSE, -- true only if duration >= 300 min (5 hrs)
+  year                 INTEGER NOT NULL,
+  created_at           TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_user ON stream_sessions(user_id, year);
+
+-- ─── CHALLENGE WIN LOG — rate-limited audit of stamp/monument wins ────────────
+CREATE TABLE IF NOT EXISTS challenge_wins (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  win_type    VARCHAR(20) NOT NULL,  -- 'stamp' or 'monument'
+  target_id   TEXT NOT NULL,         -- flag emoji or monument id
+  won_at      TIMESTAMPTZ DEFAULT NOW(),
+  year        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_challenge_wins_user ON challenge_wins(user_id, year);
+-- Prevents recording more than 1 win per target per 30 days (enforced in app logic)
+
 -- ─── EXPERIENCES ─────────────────────────────────────────────────────────────
 -- "I want to try street food in Bangkok with someone who can make me laugh"
 CREATE TABLE IF NOT EXISTS experiences (

@@ -1,6 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
+
+async function reportChallengeWin(winType, targetId) {
+  try {
+    const authRaw = await AsyncStorage.getItem('worldbond_auth');
+    const auth    = authRaw ? JSON.parse(authRaw) : null;
+    if (!auth?.token) return;
+    await fetch(`${SERVER_URL}/challenge/record-win`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+      body: JSON.stringify({ winType, targetId }),
+    });
+  } catch {}
+}
+
 const KEY = 'wb_monument_challenges';
 
 // ── Anti-spam daily limits (per user, per challenge, per day) ─────────────────
@@ -84,10 +99,26 @@ export function ChallengeProvider({ children }) {
   function _resolve(ch) {
     const cTotal = ch.scores.challenger.total;
     const hTotal = ch.scores.holder.total;
+    const winner = cTotal > hTotal ? 'challenger' : 'holder';
+
+    // Report win to server for Globe Trotter yearly tracking
+    const winType  = ch.monumentId?.startsWith('stamp_') ? 'stamp' : 'monument';
+    const targetId = winType === 'stamp'
+      ? ch.monumentId.replace('stamp_', '')
+      : ch.monumentId;
+    const winnerUsername = winner === 'challenger' ? ch.challengerUsername : ch.holderUsername;
+    // We only report server-side; the server validates the 30-day cooldown
+    AsyncStorage.getItem('worldbond_auth').then(raw => {
+      const auth = raw ? JSON.parse(raw) : null;
+      if (auth?.username === winnerUsername) {
+        reportChallengeWin(winType, targetId);
+      }
+    }).catch(() => {});
+
     return {
       ...ch,
       status:        'resolved',
-      winner:        cTotal > hTotal ? 'challenger' : 'holder',
+      winner,
       cooldownUntil: Date.now() + COOLDOWN_MS,
     };
   }
