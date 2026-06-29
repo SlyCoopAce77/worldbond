@@ -649,7 +649,6 @@ function PassportSection({ bondCount, countries, myStamps, myMonuments, hasBondP
       {!allUnlocked && (
         <View style={ps.lockOverlay} pointerEvents="none">
           <View style={ps.lockBox}>
-            <Text style={ps.lockIcon}>🔒</Text>
             <Text style={ps.lockLabel}>
               {bondCount === 0 ? 'Make your first bond to begin' : `${3 - bondCount} more bond${3 - bondCount !== 1 ? 's' : ''} to unlock`}
             </Text>
@@ -735,7 +734,6 @@ const ps = StyleSheet.create({
   // Lock overlay (shown before 3 bonds)
   lockOverlay:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
   lockBox:          { alignItems: 'center', gap: 8, paddingHorizontal: 24 },
-  lockIcon:         { fontSize: 28 },
   lockLabel:        { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   lockBar:          { height: 4, width: 140, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' },
   lockFill:         { height: 4, backgroundColor: BOND_PINK, borderRadius: 2 },
