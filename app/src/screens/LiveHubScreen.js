@@ -190,7 +190,7 @@ function YearlyChallenge({ challenges, progress }) {
           const done    = current >= c.goal;
           return (
             <View key={c.key} style={[wc.row, i < list.length - 1 && wc.rowBorder]}>
-              <Text style={[wc.num, i < 3 && wc.numTop]}>{i + 1}</Text>
+              <Text style={wc.num}>{i + 1}</Text>
               <View style={wc.info}>
                 <View style={wc.titleRow}>
                   <Text style={wc.title}>{c.title}</Text>
@@ -237,8 +237,7 @@ const wc = StyleSheet.create({
   ends:        { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '700', flexShrink: 0 },
   row:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   rowBorder:   { borderBottomWidth: 1, borderBottomColor: '#ffffff08' },
-  num:         { color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: '900', width: 18, textAlign: 'center', flexShrink: 0 },
-  numTop:      { color: BOND_PINK },
+  num:         { color: BOND_PINK, fontSize: 13, fontWeight: '900', width: 18, textAlign: 'center', flexShrink: 0 },
   info:        { flex: 1, gap: 2 },
   titleRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title:       { color: '#fff', fontSize: 13, fontWeight: '800' },

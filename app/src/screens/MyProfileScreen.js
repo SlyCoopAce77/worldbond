@@ -598,10 +598,11 @@ function PassportSection({ bondCount, countries, myStamps, myMonuments, hasBondP
             </View>
             <View style={ps.stampGrid}>
               {myStamps.map((flag, i) => (
-                <View key={flag} style={[ps.stampOuter, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}>
-                  <View style={ps.stampInner}>
+                <View key={flag} style={[ps.stampShell, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}>
+                  <View style={ps.stampInnerRing}>
+                    <Text style={ps.stampNation}>WORLDBOND</Text>
                     <Text style={ps.stampFlag}>{flag}</Text>
-                    <Text style={ps.stampCert}>CERTIFIED</Text>
+                    <Text style={ps.stampEntry}>ADMITTED</Text>
                   </View>
                 </View>
               ))}
@@ -621,14 +622,18 @@ function PassportSection({ bondCount, countries, myStamps, myMonuments, hasBondP
             </View>
             <View style={ps.monumentList}>
               {heldMonuments.map(m => (
-                <View key={m.id} style={ps.monumentBadge}>
-                  <View style={ps.monumentAccent} />
-                  <Text style={ps.monumentIcon}>{m.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={ps.monumentName}>{m.name}</Text>
-                    <Text style={ps.monumentLoc}>{m.country}  {m.location}</Text>
+                <View key={m.id} style={ps.monumentVisa}>
+                  <View style={ps.monumentVisSeal}>
+                    <Text style={ps.monumentVisIcon}>{m.icon}</Text>
                   </View>
-                  <Text style={ps.visaStamp}>VISA</Text>
+                  <View style={ps.monumentVisBody}>
+                    <Text style={ps.monumentVisName}>{m.name}</Text>
+                    <Text style={ps.monumentVisLoc}>{m.country}  {m.location}</Text>
+                  </View>
+                  <View style={ps.monumentVisRight}>
+                    <Text style={ps.monumentVisVisa}>VISA</Text>
+                    <Text style={ps.monumentVisGranted}>GRANTED</Text>
+                  </View>
                 </View>
               ))}
               {Array.from({ length: monumentCap - heldMonuments.length }).map((_, i) => (
@@ -713,22 +718,26 @@ const ps = StyleSheet.create({
   phSectionLabel:   { color: 'rgba(255,255,255,0.38)', fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4 },
   phCap:            { color: 'rgba(255,255,255,0.22)', fontSize: 10, fontWeight: '700' },
   phHint:           { color: 'rgba(255,255,255,0.2)', fontSize: 12, fontStyle: 'italic', marginTop: 2 },
-  // Country stamps
-  stampGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  stampOuter:       { width: 88, height: 88, borderRadius: 44, borderWidth: 2, borderColor: BOND_PINK + '55', alignItems: 'center', justifyContent: 'center', backgroundColor: BOND_PINK + '07' },
-  stampInner:       { width: 74, height: 74, borderRadius: 37, borderWidth: 1, borderColor: BOND_PINK + '28', alignItems: 'center', justifyContent: 'center', gap: 3 },
-  stampFlag:        { fontSize: 38 },
-  stampCert:        { color: BOND_PINK, fontSize: 7, fontWeight: '900', letterSpacing: 1.5 },
-  stampEmpty:       { width: 88, height: 88, borderRadius: 44, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.02)' },
-  // Monuments
-  monumentList:     { gap: 8 },
-  monumentBadge:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 12, paddingLeft: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' },
-  monumentAccent:   { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: BOND_PINK + '80' },
-  monumentIcon:     { fontSize: 22 },
-  monumentName:     { color: '#fff', fontSize: 13, fontWeight: '800' },
-  monumentLoc:      { color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 1 },
-  visaStamp:        { color: BOND_PINK + '55', fontSize: 8, fontWeight: '900', letterSpacing: 1.5, transform: [{ rotate: '-12deg' }] },
-  monumentEmpty:    { height: 46, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.015)' },
+  // Country stamps — pressed ink seal
+  stampGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  stampShell:        { width: 90, height: 90, borderRadius: 45, borderWidth: 2, borderColor: BOND_PINK + '75', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,0,128,0.07)', shadowColor: BOND_PINK, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.35, shadowRadius: 8 },
+  stampInnerRing:    { width: 74, height: 74, borderRadius: 37, borderWidth: 1, borderColor: BOND_PINK + '30', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  stampNation:       { color: BOND_PINK, fontSize: 6, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  stampFlag:         { fontSize: 30 },
+  stampEntry:        { color: BOND_PINK + 'aa', fontSize: 6, fontWeight: '800', letterSpacing: 1 },
+  stampEmpty:        { width: 90, height: 90, borderRadius: 45, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.01)' },
+  // Monuments — visa stamp style
+  monumentList:      { gap: 8 },
+  monumentVisa:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,0,128,0.04)', borderRadius: 10, padding: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: BOND_PINK + '45' },
+  monumentVisSeal:   { width: 38, height: 38, borderRadius: 19, backgroundColor: BOND_PINK + '14', borderWidth: 1, borderColor: BOND_PINK + '40', alignItems: 'center', justifyContent: 'center' },
+  monumentVisIcon:   { fontSize: 20 },
+  monumentVisBody:   { flex: 1, gap: 2 },
+  monumentVisName:   { color: '#fff', fontSize: 13, fontWeight: '800' },
+  monumentVisLoc:    { color: 'rgba(255,255,255,0.38)', fontSize: 10, fontWeight: '500' },
+  monumentVisRight:  { alignItems: 'center', gap: 1 },
+  monumentVisVisa:   { color: BOND_PINK, fontSize: 12, fontWeight: '900', letterSpacing: 2, transform: [{ rotate: '-8deg' }] },
+  monumentVisGranted:{ color: BOND_PINK + '60', fontSize: 6, fontWeight: '800', letterSpacing: 1.5, transform: [{ rotate: '-8deg' }] },
+  monumentEmpty:     { height: 58, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(255,255,255,0.015)' },
   // Machine-readable zone
   mrz:              { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 18, paddingVertical: 12, gap: 3 },
   mrzLine:          { color: 'rgba(255,255,255,0.09)', fontSize: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1 },
