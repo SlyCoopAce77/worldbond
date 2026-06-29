@@ -1080,6 +1080,8 @@ PODS:
     - glog
     - RCT-Folly (= 2022.05.16.00)
     - React-Core
+  - RNIap (12.16.4):
+    - React-Core
   - RNScreens (3.37.0):
     - glog
     - RCT-Folly (= 2022.05.16.00)
@@ -1155,6 +1157,7 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNIap (from `../node_modules/react-native-iap`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSound (from `../node_modules/react-native-sound`)
   - RNVectorIcons (from `../node_modules/react-native-vector-icons`)
@@ -1276,6 +1279,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-async-storage/async-storage"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNIap:
+    :path: "../node_modules/react-native-iap"
   RNScreens:
     :path: "../node_modules/react-native-screens"
   RNSound:
@@ -1342,6 +1347,7 @@ SPEC CHECKSUMS:
   ReactCommon: 35e3b6a1c75d462acb0155e38e627b98d5bf586b
   RNCAsyncStorage: b6410dead2732b5c72a7fdb1ecb5651bbcf4674b
   RNGestureHandler: 00bdee09fadaa19f114f84aa82a47d0ddcdbc67d
+  RNIap: 65051c94a29a17bd8356bcf16a878821862eecd0
   RNScreens: b12996ef8ef492d56d126400e8aef6e613c13ef6
   RNSound: 314cc5226453ef4a3314a196c65e8a65e5106a7b
   RNVectorIcons: 87d954b745b517a6676a853c0eb43679d96c74ef

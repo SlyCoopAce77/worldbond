@@ -1,0 +1,6 @@
+module RNIap {
+  umbrella header "RNIap-umbrella.h"
+
+  export *
+  module * { export * }
+}
