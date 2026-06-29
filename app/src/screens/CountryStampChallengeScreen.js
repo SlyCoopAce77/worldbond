@@ -289,7 +289,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
   const { stamp, currentUser } = route.params || {};
 
   const { hasBondPass } = useBondPass();
-  const { myStamps } = useWallet();
+  const { myStamps, balance, spendCoins } = useWallet();
   const stampCap   = hasBondPass ? STAMP_CAP.bond_pass : STAMP_CAP.standard;
   const atStampCap = myStamps.length >= stampCap;
   const canView    = hasBondPass;
@@ -339,6 +339,7 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
 
   function handleInitiate() {
     if (!canContrib || !stamp?.holder) return;
+
     if (atStampCap) {
       const upgradeNote = hasBondPass ? '' : '\n\nUpgrade to Bond Pass to hold up to 4 stamps.';
       Alert.alert(
@@ -348,9 +349,19 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
       );
       return;
     }
+
+    if (balance < effectiveFee) {
+      Alert.alert(
+        'Not Enough Coins',
+        `You need ${effectiveFee} Bond Coins to start this challenge. You have ${balance.toLocaleString()}.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const feeNote = isFeatured
-      ? `Burns ${effectiveFee} Bond Coins (50% off — featured this week).`
-      : `Burns ${effectiveFee} Bond Coins.`;
+      ? `${effectiveFee} Bond Coins will be burned (50% off — featured this week).`
+      : `${effectiveFee} Bond Coins will be burned.`;
     Alert.alert(
       'Start Stamp Challenge',
       `Challenge @${stamp.holder} for the ${countryName} stamp?\n\n${feeNote} Win a 7-day contest to take it.`,
@@ -360,8 +371,16 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
           text: `Start — ${effectiveFee} Coins`,
           style: 'destructive',
           onPress: () => {
-            const res = initiateStampChallenge(flag, myUsername, stamp.holder);
-            if (res.error) Alert.alert('Error', res.error);
+            // Deduct entry fee first — if this fails, don't start the challenge
+            const spent = spendCoins(effectiveFee, 'challenge_entry', { country: countryName, flag });
+            if (!spent) {
+              Alert.alert('Error', 'Could not deduct entry fee. Check your balance.');
+              return;
+            }
+            const result = initiateStampChallenge(flag, myUsername, stamp.holder);
+            if (result.error) {
+              Alert.alert('Challenge Error', result.error);
+            }
           },
         },
       ]

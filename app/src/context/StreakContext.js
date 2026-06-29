@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEY = 'worldbond_streak_v1';
+const KEY        = 'worldbond_streak_v1';
+const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
 
 // ─── Streak tiers — evolves as the streak grows ───────────────────────────────
 // Each tier is a "1-of-1" footprint milestone unique to the user's journey.
@@ -136,44 +137,64 @@ export function StreakProvider({ children }) {
   }
 
   useEffect(() => {
-    AsyncStorage.getItem(KEY).then(raw => {
+    async function init() {
+      // Try server-side validated streak first (tamper-proof)
+      try {
+        const authRaw = await AsyncStorage.getItem('worldbond_auth');
+        const auth    = authRaw ? JSON.parse(authRaw) : null;
+        if (auth?.token && auth?.userId) {
+          const res = await fetch(`${SERVER_URL}/streak/checkin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+            body: JSON.stringify({ userId: auth.userId }),
+          });
+          if (res.ok) {
+            const { streak: s, longest: l } = await res.json();
+            const today = todayStr();
+            setStreak(s);
+            setLongest(l);
+            setLastDate(today);
+            setLoading(false);
+            await save({ streak: s, longest: l, lastDate: today });
+            return;
+          }
+        }
+      } catch {
+        // Network offline — fall back to local
+      }
+
+      // Offline fallback (local only — not authoritative, but functional)
+      const raw = await AsyncStorage.getItem(KEY);
       let data = {};
       try { if (raw) data = JSON.parse(raw); } catch {}
       const today = todayStr();
       const last  = data.lastDate;
-
       let newStreak  = data.streak  || 0;
       let newLongest = data.longest || 0;
       let newDate    = last;
 
       if (!last) {
-        // First checkin
-        newStreak = 1;
-        newLongest = 1;
-        newDate = today;
+        newStreak = 1; newLongest = 1; newDate = today;
       } else {
         const diff = Math.round((new Date(today) - new Date(last)) / 86400000);
-        if (diff === 0) {
-          // Already checked in today — no change
-        } else if (diff === 1) {
-          // Perfect streak — increment
-          newStreak = (data.streak || 0) + 1;
+        if (diff === 1) {
+          newStreak  = (data.streak || 0) + 1;
           newLongest = Math.max(newStreak, data.longest || 0);
-          newDate = today;
-        } else {
-          // Missed a day — reset
-          newStreak = 1;
-          newDate = today;
+          newDate    = today;
+        } else if (diff > 1) {
+          newStreak = 1; newDate = today;
         }
       }
 
       const updated = { streak: newStreak, longest: newLongest, lastDate: newDate };
-      save(updated);
+      await save(updated);
       setStreak(newStreak);
       setLongest(newLongest);
       setLastDate(newDate);
       setLoading(false);
-    });
+    }
+
+    init();
   }, []);
 
   const tier       = getStreakTier(streak);

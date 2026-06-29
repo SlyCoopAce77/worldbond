@@ -1,5 +1,44 @@
 const { v4: uuidv4 } = require('uuid');
 const { translateText } = require('./translate');
+
+// ── Whitelisted gift types — server is the source of truth for coin values ────
+// Matches GiftPicker.js GIFTS exactly. Client sends gift.id; server resolves coin value.
+const GIFT_CATALOG = {
+  world_hello:       { id: 'world_hello',       name: 'World Hello',       coins: 10,     color: '#4ade80', tier: 'starter'  },
+  bond_shake:        { id: 'bond_shake',         name: 'Bond Shake',        coins: 25,     color: '#4ade80', tier: 'starter'  },
+  postcard:          { id: 'postcard',            name: 'Postcard',          coins: 50,     color: '#4ade80', tier: 'starter'  },
+  map_pin:           { id: 'map_pin',             name: 'Map Pin',           coins: 100,    color: '#4ade80', tier: 'starter'  },
+  passport:          { id: 'passport',            name: 'Passport',          coins: 200,    color: '#60a5fa', tier: 'explorer' },
+  world_map:         { id: 'world_map',           name: 'World Map',         coins: 500,    color: '#60a5fa', tier: 'explorer' },
+  first_class:       { id: 'first_class',         name: 'First Class',       coins: 1000,   color: '#60a5fa', tier: 'explorer' },
+  globe_spin:        { id: 'globe_spin',          name: 'Globe Spin',        coins: 1500,   color: '#60a5fa', tier: 'explorer' },
+  heritage:          { id: 'heritage',            name: 'Heritage',          coins: 2500,   color: '#c084fc', tier: 'voyager'  },
+  culture_crown:     { id: 'culture_crown',       name: 'Culture Crown',     coins: 4000,   color: '#c084fc', tier: 'voyager'  },
+  embassy_seal:      { id: 'embassy_seal',        name: 'Embassy Seal',      coins: 6000,   color: '#c084fc', tier: 'voyager'  },
+  bond_satellite:    { id: 'bond_satellite',      name: 'Bond Satellite',    coins: 10000,  color: '#FFB700', tier: 'elite'    },
+  world_ambassador:  { id: 'world_ambassador',    name: 'World Ambassador',  coins: 20000,  color: '#FFB700', tier: 'elite'    },
+  bond_atlas:        { id: 'bond_atlas',          name: 'Bond Atlas',        coins: 35000,  color: '#FFB700', tier: 'elite'    },
+  bond_sovereign:    { id: 'bond_sovereign',      name: 'Bond Sovereign',    coins: 50000,  color: '#FF0080', tier: 'legend'   },
+  planet_bond:       { id: 'planet_bond',         name: 'Planet Bond',       coins: 100000, color: '#FF0080', tier: 'legend'   },
+  bond_eternal:      { id: 'bond_eternal',        name: 'Bond Eternal',      coins: 250000, color: '#FF0080', tier: 'legend'   },
+};
+
+// ── Per-socket rate limiter (in-memory, resets on disconnect) ─────────────────
+const socketGiftCounts = {}; // socketId -> { count, windowStart }
+const GIFT_RATE_LIMIT  = 30; // max 30 gifts per minute per sender
+const GIFT_WINDOW_MS   = 60000;
+
+function checkGiftRate(socketId) {
+  const now   = Date.now();
+  const entry = socketGiftCounts[socketId];
+  if (!entry || now - entry.windowStart > GIFT_WINDOW_MS) {
+    socketGiftCounts[socketId] = { count: 1, windowStart: now };
+    return true;
+  }
+  if (entry.count >= GIFT_RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
 const { GROUP_CATEGORIES, addMessageToRoom, getRoomHistory } = require('./groups');
 const {
   checkIn, checkOut, getCheckins,
@@ -1022,11 +1061,22 @@ function setupSocket(io) {
       const sender = connectedUsers[socket.id];
       const stream = liveStreams[streamId];
       if (!sender || !stream) return;
+
+      // Rate limit: 30 gifts per minute per sender
+      if (!checkGiftRate(socket.id)) return;
+
+      // Validate gift type against server catalog — client cannot set coin values
+      const catalogGift = gift?.id ? GIFT_CATALOG[gift.id] : null;
+      if (!catalogGift) return; // unknown or tampered gift type — silently drop
+
+      // Always use the server-side coin value, never the client-sent value
+      const verifiedGift = { ...catalogGift };
+
       io.to(`live:${streamId}`).emit('live_gift_received', {
         senderId:      socket.id,
         senderName:    sender.username,
         senderCountry: sender.country || '',
-        gift,
+        gift:          verifiedGift,
       });
     });
 
@@ -1101,6 +1151,7 @@ function setupSocket(io) {
     // Disconnect
 
     socket.on('disconnect', () => {
+      delete socketGiftCounts[socket.id]; // clean up rate tracker
       // End live stream if host disconnects
       if (liveStreams[socket.id]) {
         io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });

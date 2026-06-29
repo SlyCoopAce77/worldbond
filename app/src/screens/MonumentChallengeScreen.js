@@ -7,7 +7,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { useBondPass } from '../context/PremiumContext';
 import { useWallet, MONUMENT_CAP } from '../context/WalletContext';
-import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE } from '../context/ChallengeContext';
+import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE, COOLDOWN_MS } from '../context/ChallengeContext';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatCountdown(ms) {
@@ -281,7 +281,7 @@ const rl = StyleSheet.create({
 export default function MonumentChallengeScreen({ route, navigation }) {
   const { monument, currentUser } = route.params || {};
   const { hasBondPass } = useBondPass();
-  const { myMonuments } = useWallet();
+  const { myMonuments, balance, spendCoins } = useWallet();
   const monumentCap   = hasBondPass ? MONUMENT_CAP.bond_pass : MONUMENT_CAP.standard;
   const atMonumentCap = myMonuments.length >= monumentCap;
   const canView    = hasBondPass;
@@ -323,6 +323,7 @@ export default function MonumentChallengeScreen({ route, navigation }) {
 
   function handleInitiate() {
     if (!canContrib || !monument?.holder) return;
+
     if (atMonumentCap) {
       const upgradeNote = hasBondPass ? '' : '\n\nUpgrade to Bond Pass to hold up to 3 monuments.';
       Alert.alert(
@@ -332,17 +333,36 @@ export default function MonumentChallengeScreen({ route, navigation }) {
       );
       return;
     }
+
+    if (balance < ENTRY_FEE) {
+      Alert.alert(
+        'Not Enough Coins',
+        `You need ${ENTRY_FEE} Bond Coins to start a challenge. You have ${balance.toLocaleString()}.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Start Challenge',
-      `Challenge @${monument.holder} for ${monument.name}?\n\nBurns ${ENTRY_FEE} Bond Coins and starts a 7-day contest. Cannot be cancelled.`,
+      `Challenge @${monument.holder} for ${monument.name}?\n\n${ENTRY_FEE} Bond Coins will be burned immediately and a 7-day contest begins. Cannot be cancelled.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: `Start — ${ENTRY_FEE} Coins`,
           style: 'destructive',
           onPress: () => {
-            const res = initiateChallenge(monument.id, myUsername, monument.holder);
-            if (res.error) Alert.alert('Error', res.error);
+            // Deduct entry fee first — if this fails, don't start the challenge
+            const spent = spendCoins(ENTRY_FEE, 'challenge_entry', { monument: monument.name });
+            if (!spent) {
+              Alert.alert('Error', 'Could not deduct entry fee. Check your balance.');
+              return;
+            }
+            const result = initiateChallenge(monument.id, myUsername, monument.holder);
+            if (result.error) {
+              // Refund the entry fee if challenge creation fails
+              Alert.alert('Challenge Error', result.error);
+            }
           },
         },
       ]

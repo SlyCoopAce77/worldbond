@@ -255,9 +255,13 @@ export function WalletProvider({ children }) {
   }
 
   function spendCoins(amount, source, meta = {}) {
+    const currentBalance = stateRef.current.balance;
+    if (currentBalance < amount) return false; // not enough coins — caller handles this
+
     const tx = { id: Date.now(), type: 'spend', amount, source, ...meta, ts: Date.now() };
     setBalance(b => {
-      const nb = Math.max(0, b - amount);
+      if (b < amount) return b; // double-check inside updater (handles race conditions)
+      const nb = b - amount;
       const { myStamps: ms, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
       setSpent(s => {
         const ns = s + amount;

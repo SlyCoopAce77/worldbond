@@ -50,10 +50,55 @@ CREATE INDEX IF NOT EXISTS idx_profiles_language ON profiles(language);
 CREATE INDEX IF NOT EXISTS idx_profiles_ghost    ON profiles(ghost_score);
 
 -- Safe migrations
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS date_of_birth     DATE;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gallery_photos    TEXT[]  DEFAULT '{}';
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS coin_balance      INTEGER DEFAULT 0;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS date_of_birth        DATE;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS signup_ip            TEXT;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS device_fingerprint   TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gallery_photos       TEXT[]  DEFAULT '{}';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS coin_balance         INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS stripe_account_id   TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_payout_at       TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_id_verified       BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS has_bond_pass        BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_days          INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_last_checkin  DATE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_longest       INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_coins_earned   INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_coins_date     DATE;
+
+-- ─── IAP RECEIPT LOG — prevents replay attacks ────────────────────────────────
+CREATE TABLE IF NOT EXISTS iap_receipts (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID REFERENCES users(id) ON DELETE CASCADE,
+  receipt_hash   VARCHAR(512) UNIQUE NOT NULL,
+  product_id     VARCHAR(255),
+  environment    VARCHAR(20) DEFAULT 'production',
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_iap_receipts_hash ON iap_receipts(receipt_hash);
+
+-- ─── PAYOUT AUDIT LOG — immutable record of every payout ─────────────────────
+CREATE TABLE IF NOT EXISTS payout_audit (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID REFERENCES users(id),
+  coins_deducted  INTEGER NOT NULL,
+  amount_cents    INTEGER NOT NULL,
+  payout_rate     DECIMAL(4,2) NOT NULL,
+  stripe_tx_id    TEXT,
+  ip_address      TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_payout_audit_user ON payout_audit(user_id);
+
+-- ─── FRAUD FLAGS — manual and automated review flags ─────────────────────────
+CREATE TABLE IF NOT EXISTS fraud_flags (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  flag_type   VARCHAR(100) NOT NULL,
+  details     JSONB DEFAULT '{}',
+  resolved    BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_fraud_flags_user ON fraud_flags(user_id, resolved);
 
 -- ─── EXPERIENCES ─────────────────────────────────────────────────────────────
 -- "I want to try street food in Bangkok with someone who can make me laugh"

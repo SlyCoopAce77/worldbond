@@ -1,7 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const path = require('path');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const multer = require('multer');
@@ -12,6 +14,55 @@ const { addPhoto, getPhotos } = require('./photos');
 const { addStory, getStoriesGrouped } = require('./stories');
 const { isConfigured: cloudinaryEnabled, uploadBuffer } = require('./cloudinary');
 const { requireAuth } = require('./auth/auth.middleware');
+
+// ── In-memory rate limiter (no extra packages needed) ─────────────────────────
+const _rlMap = new Map();
+function rateLimit(key, maxHits, windowMs) {
+  const now = Date.now();
+  let entry = _rlMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 1, resetAt: now + windowMs };
+    _rlMap.set(key, entry);
+    return true;
+  }
+  if (entry.count >= maxHits) return false;
+  entry.count++;
+  return true;
+}
+// Clean stale rate-limit entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of _rlMap) if (now > v.resetAt) _rlMap.delete(k);
+}, 600000);
+
+// ── Apple IAP receipt verification ───────────────────────────────────────────
+const APPLE_VERIFY_PROD    = 'buy.itunes.apple.com';
+const APPLE_VERIFY_SANDBOX = 'sandbox.itunes.apple.com';
+const APPLE_SHARED_SECRET  = process.env.APPLE_SHARED_SECRET || '';
+
+function appleVerifyReceipt(receiptData, sandbox = false) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      'receipt-data': receiptData,
+      password: APPLE_SHARED_SECRET,
+      'exclude-old-transactions': true,
+    });
+    const host = sandbox ? APPLE_VERIFY_SANDBOX : APPLE_VERIFY_PROD;
+    const options = { hostname: host, path: '/verifyReceipt', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } };
+    const req = https.request(options, r => {
+      let data = '';
+      r.on('data', d => { data += d; });
+      r.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error('Apple parse error')); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
 
 // Stripe
 const Stripe = require('stripe');
@@ -96,7 +147,7 @@ app.get('/terms', (req, res) => res.send(`<!DOCTYPE html><html><head><meta chars
 <h1>WorldBond</h1><p style="color:#555;font-size:13px">Terms of Service &nbsp;·&nbsp; Last updated June 2026</p>
 <h2>1. Acceptance</h2><p>By creating an account you agree to these Terms. If you do not agree, do not use WorldBond.</p>
 <h2>2. Eligibility</h2><p>You must be 18 or older to use WorldBond. By registering you confirm your date of birth is accurate. Providing false age information results in a permanent ban with no appeal.</p>
-<h2>3. User Conduct</h2><p>You agree not to: harass or harm other users, post illegal content, impersonate others, attempt to access other users' accounts, or use the platform for spam or commercial solicitation without permission.</p>
+<h2>3. User Conduct</h2><p>You agree not to: harass or harm other users, post illegal content, impersonate others, attempt to access other users' accounts, or use the platform for spam or commercial solicitation without permission. You may not use bots, scripts, artificial intelligence, or any automated means to create accounts, send gifts, earn coins, inflate challenge scores, or manipulate any feature of the platform. Accounts found to be automated or controlled by AI will be permanently banned and all coin balances forfeited with no appeal.</p>
 <h2>4. Content</h2><p>You retain ownership of content you post. By posting, you grant WorldBond a non-exclusive licence to display that content within the platform. You are solely responsible for the content you share.</p>
 <h2>5. Payments & Coins</h2><p>WorldBond Coins are a virtual currency with no cash value and cannot be refunded. All purchases are final. Coin balances may be forfeited if your account is terminated for violations.</p>
 <h2>6. Account Termination</h2><p>We reserve the right to suspend or permanently ban any account that violates these Terms, at our sole discretion.</p>
@@ -182,6 +233,77 @@ app.post('/api/debug/notify', async (req, res) => {
   res.json({ ok: true, fired: ev[0], userId: uid });
 });
 
+// ── Gift coins: record server-side earn with daily cap ───────────────────────
+// Prevents AI bots from sending infinite gifts to farm royalties.
+const DAILY_EARN_CAP = 50000; // 50,000 coins per day max ($500 face value)
+
+app.post('/coins/earn', requireAuth, async (req, res) => {
+  const userId   = req.user?.userId || req.body.userId;
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+  // Rate limit: max 200 earn events per hour per user
+  if (!rateLimit(`earn:${userId}`, 200, 3600000)) {
+    await require('./database/db').query(
+      `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'earn_rate_exceeded', $2)`,
+      [userId, JSON.stringify({ clientIp })]
+    ).catch(() => {});
+    return res.status(429).json({ error: 'Earning rate limit exceeded.' });
+  }
+
+  try {
+    const { amount, source } = req.body;
+    if (!amount || amount <= 0 || !Number.isInteger(amount)) {
+      return res.status(400).json({ error: 'Invalid amount.' });
+    }
+
+    const { query: db } = require('./database/db');
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Fetch current daily earned amount
+    const { rows } = await db(
+      `SELECT daily_coins_earned, daily_coins_date FROM profiles WHERE user_id = $1`,
+      [userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+
+    const profileDateStr = rows[0].daily_coins_date
+      ? new Date(rows[0].daily_coins_date).toISOString().slice(0, 10)
+      : null;
+    const dailyEarned = profileDateStr === today ? (rows[0].daily_coins_earned || 0) : 0;
+
+    if (dailyEarned + amount > DAILY_EARN_CAP) {
+      // Flag and cap — don't block completely, just don't credit overage
+      const allowed = Math.max(0, DAILY_EARN_CAP - dailyEarned);
+      if (allowed === 0) {
+        return res.status(400).json({ error: 'Daily earning limit reached. Try again tomorrow.' });
+      }
+      // Credit only what's allowed
+      await db(
+        `UPDATE profiles
+         SET coin_balance = COALESCE(coin_balance, 0) + $1,
+             daily_coins_earned = $2,
+             daily_coins_date = CURRENT_DATE
+         WHERE user_id = $3`,
+        [allowed, dailyEarned + allowed, userId]
+      );
+      return res.json({ ok: true, credited: allowed, cappedAt: DAILY_EARN_CAP });
+    }
+
+    await db(
+      `UPDATE profiles
+       SET coin_balance = COALESCE(coin_balance, 0) + $1,
+           daily_coins_earned = $2,
+           daily_coins_date = CURRENT_DATE
+       WHERE user_id = $3`,
+      [amount, dailyEarned + amount, userId]
+    );
+    res.json({ ok: true, credited: amount });
+  } catch (err) {
+    console.error('[Coins] earn error:', err.message);
+    res.status(500).json({ error: 'Could not credit earned coins.' });
+  }
+});
+
 // ── Stripe: creator connects their bank account ───────────────────────────────
 app.post('/creator/connect-stripe', requireAuth, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
@@ -225,44 +347,275 @@ app.get('/creator/stripe-refresh', async (req, res) => {
 });
 
 // ── Stripe: pay out a creator ─────────────────────────────────────────────────
+// All amounts computed server-side. Client cannot set the payout value.
+const MIN_PAYOUT_COINS = 2500;   // 2500 coins = $25 minimum
+const MAX_PAYOUT_COINS = 500000; // $5000 hard cap per payout (manual review above this)
+
 app.post('/creator/payout', requireAuth, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+
+  const userId    = req.user?.userId || req.body.userId;
+  const clientIp  = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+  // Rate limit: max 3 payout attempts per hour per user (not 3 payouts — 3 attempts)
+  if (!rateLimit(`payout_attempt:${userId}`, 3, 3600000)) {
+    return res.status(429).json({ error: 'Too many payout requests. Try again in an hour.' });
+  }
+  // Rate limit: max 10 payout attempts per hour per IP
+  if (!rateLimit(`payout_ip:${clientIp}`, 10, 3600000)) {
+    return res.status(429).json({ error: 'Too many requests from this network.' });
+  }
+
   try {
-    const { userId, stripeAccountId, amountCents } = req.body;
-    if (!stripeAccountId || !amountCents || amountCents < 100) {
-      return res.status(400).json({ error: 'Invalid payout request' });
+    const { query: db } = require('./database/db');
+
+    // ── 1. Load verified server-side state ─────────────────────────────────────
+    const { rows } = await db(
+      `SELECT p.coin_balance, p.stripe_account_id, p.has_bond_pass,
+              p.last_payout_at, p.is_id_verified,
+              u.created_at
+       FROM profiles p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.user_id = $1`,
+      [userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+
+    const {
+      coin_balance, stripe_account_id, has_bond_pass,
+      last_payout_at, is_id_verified, created_at,
+    } = rows[0];
+
+    // ── 2. Account age — must be 30+ days old ─────────────────────────────────
+    const ageDays = (Date.now() - new Date(created_at).getTime()) / 86400000;
+    if (ageDays < 30) {
+      return res.status(403).json({ error: 'Account must be at least 30 days old to cash out.' });
     }
+
+    // ── 3. Minimum balance ────────────────────────────────────────────────────
+    if (!coin_balance || coin_balance < MIN_PAYOUT_COINS) {
+      return res.status(400).json({ error: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins required to cash out.` });
+    }
+
+    // ── 4. Payout cooldown (server-enforced, not client) ──────────────────────
+    if (last_payout_at) {
+      const cooldownDays = has_bond_pass ? 14 : 30;
+      const elapsed      = Date.now() - new Date(last_payout_at).getTime();
+      const cooldownMs   = cooldownDays * 86400000;
+      if (elapsed < cooldownMs) {
+        const daysLeft = Math.ceil((cooldownMs - elapsed) / 86400000);
+        return res.status(400).json({ error: `Payout cooldown active. ${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining.` });
+      }
+    }
+
+    // ── 5. Stripe account must be connected ───────────────────────────────────
+    if (!stripe_account_id) {
+      return res.status(400).json({ error: 'No bank account connected. Please connect your bank first.' });
+    }
+
+    // ── 6. Bot / fraud flag check ─────────────────────────────────────────────
+    const flagRes = await db(
+      `SELECT COUNT(*) AS cnt FROM fraud_flags WHERE user_id = $1 AND resolved = FALSE`,
+      [userId]
+    );
+    if (parseInt(flagRes.rows[0]?.cnt) > 0) {
+      return res.status(403).json({ error: 'Your account is under review. Email support@worldbond.app.' });
+    }
+
+    // ── 7. Compute payout server-side — client amount is ignored ──────────────
+    const coinsToPay   = Math.min(coin_balance, MAX_PAYOUT_COINS);
+    const payoutRate   = has_bond_pass ? 0.75 : 0.70;
+    const amountCents  = Math.floor(coinsToPay * payoutRate); // 100 coins = $1 = 100 cents
+
+    if (amountCents < 100) {
+      return res.status(400).json({ error: 'Payout amount too small after rate calculation.' });
+    }
+
+    // ── 8. Flag large payouts for manual review but don't block them ──────────
+    if (amountCents > 100000) { // > $1000
+      await db(
+        `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'large_payout', $2)`,
+        [userId, JSON.stringify({ amountCents, coinsToPay, clientIp })]
+      );
+    }
+
+    // ── 9. Execute Stripe transfer ────────────────────────────────────────────
     const transfer = await stripe.transfers.create({
       amount: amountCents,
       currency: 'usd',
-      destination: stripeAccountId,
-      metadata: { userId },
+      destination: stripe_account_id,
+      metadata: { userId, coins: coinsToPay, rate: String(payoutRate) },
     });
-    res.json({ transfer: transfer.id });
+
+    // ── 10. Deduct coins and record cooldown timestamp ────────────────────────
+    await db(
+      `UPDATE profiles SET coin_balance = coin_balance - $1, last_payout_at = NOW() WHERE user_id = $2`,
+      [coinsToPay, userId]
+    );
+
+    // ── 11. Immutable audit trail ─────────────────────────────────────────────
+    await db(
+      `INSERT INTO payout_audit (user_id, coins_deducted, amount_cents, payout_rate, stripe_tx_id, ip_address)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, coinsToPay, amountCents, payoutRate, transfer.id, clientIp]
+    );
+
+    res.json({ transfer: transfer.id, amountCents, coinsDeducted: coinsToPay });
   } catch (err) {
     console.error('[Stripe] payout error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── Coins: credit after Apple/Google IAP purchase ─────────────────────────────
+// ── Coins: credit after Apple IAP purchase ────────────────────────────────────
+// Verifies receipt with Apple and prevents replay (same receipt used twice).
 app.post('/coins/credit', requireAuth, async (req, res) => {
+  const userId   = req.user?.userId || req.body.userId;
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+  // Rate limit: max 20 coin purchases per user per day (generous, avoids abuse)
+  if (!rateLimit(`coins_credit:${userId}`, 20, 86400000)) {
+    return res.status(429).json({ error: 'Too many purchase requests today.' });
+  }
+
   try {
-    const { userId, sku } = req.body;
+    const { sku, receipt } = req.body;
+
     const coinMap = {
       'com.worldbond.coins.100':  100,
-      'com.worldbond.coins.500':  550,   // 500 + 50 bonus
-      'com.worldbond.coins.1200': 1400,  // 1200 + 200 bonus
-      'com.worldbond.coins.3000': 3600,  // 3000 + 600 bonus
+      'com.worldbond.coins.500':  550,
+      'com.worldbond.coins.1200': 1400,
+      'com.worldbond.coins.3000': 3600,
     };
     const coins = coinMap[sku];
-    if (!coins) return res.status(400).json({ error: 'Unknown product' });
+    if (!coins) return res.status(400).json({ error: 'Unknown product.' });
+
     const { query: db } = require('./database/db');
-    await db('UPDATE profiles SET coin_balance = COALESCE(coin_balance, 0) + $1 WHERE user_id = $2', [coins, userId]);
+
+    // ── Replay attack prevention ───────────────────────────────────────────────
+    // Hash the receipt so we can detect the same Apple transaction being submitted twice.
+    if (receipt) {
+      const receiptHash = crypto.createHash('sha256').update(receipt).digest('hex');
+      try {
+        await db(
+          `INSERT INTO iap_receipts (user_id, receipt_hash, product_id) VALUES ($1, $2, $3)`,
+          [userId, receiptHash, sku]
+        );
+      } catch (dupErr) {
+        // Unique constraint violation = this receipt was already used
+        if (dupErr.code === '23505') {
+          await db(
+            `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'receipt_replay', $2)`,
+            [userId, JSON.stringify({ sku, receiptHash, clientIp })]
+          );
+          return res.status(409).json({ error: 'This purchase has already been credited.' });
+        }
+        throw dupErr;
+      }
+
+      // ── Verify receipt with Apple ─────────────────────────────────────────────
+      if (APPLE_SHARED_SECRET) {
+        let appleRes;
+        try {
+          appleRes = await appleVerifyReceipt(receipt, false);
+          // Status 21007 = sandbox receipt sent to production; retry with sandbox
+          if (appleRes.status === 21007) appleRes = await appleVerifyReceipt(receipt, true);
+        } catch (appleErr) {
+          console.warn('[Apple] receipt verify error:', appleErr.message);
+          // If Apple is unreachable, log but don't block (avoid false positives)
+        }
+
+        if (appleRes && appleRes.status !== 0) {
+          // Apple rejected the receipt
+          await db(
+            `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'invalid_receipt', $2)`,
+            [userId, JSON.stringify({ sku, appleStatus: appleRes.status, clientIp })]
+          );
+          // Remove the receipt hash so they can't claim we already processed it
+          await db(`DELETE FROM iap_receipts WHERE user_id = $1 AND receipt_hash = $2`, [userId, receiptHash]);
+          return res.status(400).json({ error: 'Purchase receipt is not valid.' });
+        }
+      }
+    }
+
+    // ── Credit coins ──────────────────────────────────────────────────────────
+    await db(
+      `UPDATE profiles SET coin_balance = COALESCE(coin_balance, 0) + $1 WHERE user_id = $2`,
+      [coins, userId]
+    );
     res.json({ ok: true, credited: coins });
   } catch (err) {
     console.error('[Coins] credit error:', err.message);
-    res.status(500).json({ error: 'Could not credit coins' });
+    res.status(500).json({ error: 'Could not credit coins.' });
+  }
+});
+
+// ── Streak: server-side daily check-in ───────────────────────────────────────
+// Prevents users from writing fake streak values to AsyncStorage.
+app.post('/streak/checkin', requireAuth, async (req, res) => {
+  const userId = req.user?.userId || req.body.userId;
+
+  // Rate limit: once per hour per user (daily checkin, but allow retries)
+  if (!rateLimit(`streak:${userId}`, 3, 3600000)) {
+    return res.status(429).json({ error: 'Too many checkin requests.' });
+  }
+
+  try {
+    const { query: db } = require('./database/db');
+    const { rows } = await db(
+      `SELECT streak_days, streak_last_checkin, streak_longest FROM profiles WHERE user_id = $1`,
+      [userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+
+    const { streak_days, streak_last_checkin, streak_longest } = rows[0];
+    const todayStr  = new Date().toISOString().slice(0, 10);
+    const lastStr   = streak_last_checkin ? streak_last_checkin.toISOString?.().slice(0, 10) || String(streak_last_checkin).slice(0, 10) : null;
+
+    if (lastStr === todayStr) {
+      // Already checked in today
+      return res.json({ streak: streak_days, longest: streak_longest, alreadyDone: true });
+    }
+
+    let newStreak = 1;
+    if (lastStr) {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      newStreak = lastStr === yesterday ? (streak_days || 0) + 1 : 1;
+    }
+    const newLongest = Math.max(newStreak, streak_longest || 0);
+
+    await db(
+      `UPDATE profiles SET streak_days = $1, streak_last_checkin = CURRENT_DATE, streak_longest = $2 WHERE user_id = $3`,
+      [newStreak, newLongest, userId]
+    );
+
+    res.json({ streak: newStreak, longest: newLongest, alreadyDone: false });
+  } catch (err) {
+    console.error('[Streak] checkin error:', err.message);
+    res.status(500).json({ error: 'Could not update streak.' });
+  }
+});
+
+// ── Bot / fraud detection: report suspicious account ─────────────────────────
+app.post('/admin/flag-account', requireAuth, async (req, res) => {
+  const reporterId = req.user?.userId || req.body.reporterId;
+  const { targetUserId, flagType, details } = req.body;
+  if (!targetUserId || !flagType) return res.status(400).json({ error: 'Missing fields.' });
+
+  if (!rateLimit(`flag:${reporterId}`, 5, 3600000)) {
+    return res.status(429).json({ error: 'Too many reports.' });
+  }
+
+  try {
+    const { query: db } = require('./database/db');
+    await db(
+      `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, $2, $3)`,
+      [targetUserId, flagType, JSON.stringify({ reportedBy: reporterId, ...details })]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Flag] error:', err.message);
+    res.status(500).json({ error: 'Could not submit flag.' });
   }
 });
 
