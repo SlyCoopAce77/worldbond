@@ -619,6 +619,33 @@ app.post('/admin/flag-account', requireAuth, async (req, res) => {
   }
 });
 
+// ── Admin: suspend or reinstate a user account ────────────────────────────────
+app.post('/admin/suspend-account', requireAuth, async (req, res) => {
+  const { targetUserId, suspend, reason } = req.body;
+  if (!targetUserId || suspend === undefined) return res.status(400).json({ error: 'Missing fields.' });
+
+  const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const callerId = req.user?.userId;
+  if (!ADMIN_IDS.includes(callerId)) return res.status(403).json({ error: 'Not authorized.' });
+
+  try {
+    const { query: db } = require('./database/db');
+    await db('UPDATE users SET is_suspended = $1 WHERE id = $2', [Boolean(suspend), targetUserId]);
+    if (suspend) {
+      await db(
+        `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'account_suspended', $2)`,
+        [targetUserId, JSON.stringify({ reason: reason || 'admin action', by: callerId })]
+      ).catch(() => {});
+      // Revoke all active sessions immediately
+      await db('DELETE FROM refresh_tokens WHERE user_id = $1', [targetUserId]).catch(() => {});
+    }
+    res.json({ ok: true, suspended: Boolean(suspend) });
+  } catch (err) {
+    console.error('[Suspend] error:', err.message);
+    res.status(500).json({ error: 'Could not update account.' });
+  }
+});
+
 setupSocket(io);
 
 const PORT = process.env.PORT || 3001;

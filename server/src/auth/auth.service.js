@@ -17,16 +17,34 @@ function signRefresh(userId) {
   return jwt.sign({ sub: userId, jti: uuidv4() }, process.env.JWT_SECRET, { expiresIn: REFRESH_TTL });
 }
 
-async function register({ email, password, dateOfBirth }) {
+async function register({ email, password, dateOfBirth, ip = null, suspicious = false }) {
   const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
   if (existing.rowCount > 0) throw Object.assign(new Error('Email already registered'), { status: 409 });
 
+  // Block if this IP already has 5+ accounts (farm detection)
+  if (ip && ip !== 'unknown') {
+    const ipCount = await query('SELECT COUNT(*) FROM users WHERE signup_ip = $1', [ip]);
+    if (parseInt(ipCount.rows[0].count, 10) >= 5) {
+      throw Object.assign(new Error('Account limit reached for this device.'), { status: 429 });
+    }
+  }
+
   const hash = await bcrypt.hash(password, 12);
   const { rows } = await query(
-    'INSERT INTO users (email, password_hash, date_of_birth) VALUES ($1, $2, $3) RETURNING id',
-    [email.toLowerCase(), hash, dateOfBirth]
+    'INSERT INTO users (email, password_hash, date_of_birth, signup_ip) VALUES ($1, $2, $3, $4) RETURNING id',
+    [email.toLowerCase(), hash, dateOfBirth, ip]
   );
   const userId = rows[0].id;
+
+  // Auto-flag suspicious accounts for review (they can still sign up, just monitored)
+  if (suspicious) {
+    await query(
+      `INSERT INTO fraud_flags (user_id, flag_type, details)
+       VALUES ($1, 'suspicious_email', $2)`,
+      [userId, JSON.stringify({ email: email.toLowerCase(), reason: 'bot-like email pattern' })]
+    ).catch(() => {});
+  }
+
   const access  = signAccess(userId);
   const refresh = signRefresh(userId);
 
@@ -39,11 +57,18 @@ async function register({ email, password, dateOfBirth }) {
 }
 
 async function login({ email, password }) {
-  const { rows } = await query('SELECT id, password_hash FROM users WHERE email = $1', [email.toLowerCase()]);
+  const { rows } = await query(
+    'SELECT id, password_hash, is_suspended FROM users WHERE email = $1',
+    [email.toLowerCase()]
+  );
   if (!rows.length) throw Object.assign(new Error('Invalid credentials'), { status: 401 });
 
   const ok = await bcrypt.compare(password, rows[0].password_hash);
   if (!ok) throw Object.assign(new Error('Invalid credentials'), { status: 401 });
+
+  if (rows[0].is_suspended) {
+    throw Object.assign(new Error('This account has been suspended for violating WorldBond Terms of Service.'), { status: 403 });
+  }
 
   const userId  = rows[0].id;
   const access  = signAccess(userId);

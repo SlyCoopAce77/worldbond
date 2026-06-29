@@ -53,6 +53,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_ghost    ON profiles(ghost_score);
 ALTER TABLE users    ADD COLUMN IF NOT EXISTS date_of_birth        DATE;
 ALTER TABLE users    ADD COLUMN IF NOT EXISTS signup_ip            TEXT;
 ALTER TABLE users    ADD COLUMN IF NOT EXISTS device_fingerprint   TEXT;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS is_suspended         BOOLEAN DEFAULT FALSE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS gallery_photos       TEXT[]  DEFAULT '{}';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS coin_balance         INTEGER DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS stripe_account_id   TEXT;
