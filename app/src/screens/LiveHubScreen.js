@@ -11,11 +11,11 @@ import { getCountryFlag } from '../utils/countryUtils';
 const BOND_PINK = '#FF0080';
 
 const YEARLY_CHALLENGES = [
-  { key: 'worldStreamer', title: 'World Streamer',  description: 'Go live 100+ times this year — roughly twice a week.',         prize: '500,000 BC',   goal: 100,    unit: 'streams'   },
-  { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Stream to live viewers from 30+ different countries.',          prize: '750,000 BC',   goal: 30,     unit: 'countries' },
-  { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 200+ total hours of live streaming this year.',      prize: '1,000,000 BC', goal: 200,    unit: 'hours'     },
-  { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 10,000 total viewers across all your streams this year.', prize: '1,500,000 BC', goal: 10000,  unit: 'viewers'   },
-  { key: 'giftLegend',    title: 'Gift Legend',     description: 'Receive gifts totaling 500,000+ BC from your viewers.',         prize: '2,000,000 BC', goal: 500000, unit: 'BC'        },
+  { key: 'worldStreamer', title: 'World Streamer',  description: 'Go live 52+ times this year — once a week. Each stream must be at least 30 minutes.', prize: '500,000 BC',   goal: 52,     unit: 'streams'   },
+  { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Stream to live viewers from 20+ different countries this year.',                       prize: '750,000 BC',   goal: 20,     unit: 'countries' },
+  { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 365+ total hours of live streaming this year — roughly 1 hour a day.',      prize: '1,000,000 BC', goal: 365,    unit: 'hours'     },
+  { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 10,000 total viewers across all your streams this year.',                         prize: '1,500,000 BC', goal: 10000,  unit: 'viewers'   },
+  { key: 'giftLegend',    title: 'Gift Legend',     description: 'Receive gifts totaling 500,000+ BC from your viewers this year.',                       prize: '2,000,000 BC', goal: 500000, unit: 'BC'        },
 ];
 
 function bondHeat(stream) {
