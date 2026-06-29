@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS yearly_challenge_progress (
   stamp_wins           INTEGER DEFAULT 0,     -- Globe Trotter: Country Stamp wins
   monument_wins        INTEGER DEFAULT 0,     -- Globe Trotter: Bond Monument wins
   gifts_received_bc    INTEGER DEFAULT 0,     -- Gift Legend: BC received in gifts
+  total_bond_heat      INTEGER DEFAULT 0,     -- Bond Inferno: viewers + gifts×5 accumulated
   updated_at           TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (user_id, year)
 );
@@ -126,6 +127,8 @@ CREATE TABLE IF NOT EXISTS stream_sessions (
   duration_minutes     INTEGER,               -- computed on end
   peak_viewers         INTEGER DEFAULT 0,
   total_unique_viewers INTEGER DEFAULT 0,
+  gift_count           INTEGER DEFAULT 0,
+  bond_heat            INTEGER DEFAULT 0,     -- peak_viewers + gift_count × 5
   counted_for_yearly   BOOLEAN DEFAULT FALSE, -- true only if duration >= 300 min (5 hrs)
   year                 INTEGER NOT NULL,
   created_at           TIMESTAMPTZ DEFAULT NOW()

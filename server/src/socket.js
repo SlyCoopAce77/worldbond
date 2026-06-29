@@ -975,11 +975,12 @@ function setupSocket(io) {
         title:       title || `${user.username}'s Live`,
         category:    category || 'general',
         thumbnail:   thumbnail || null,
-        viewerIds:   new Set(),
-        uniqueViewerIds: new Set(), // all-time unique viewers for this session
-        messages:    [],
-        startedAt:   Date.now(),
-        peakViewers: 0,
+        viewerIds:      new Set(),
+        uniqueViewerIds:new Set(),
+        messages:       [],
+        startedAt:      Date.now(),
+        peakViewers:    0,
+        giftCount:      0,   // incremented on each verified gift received
       };
 
       // Record session start in DB (tamper-proof — server sets started_at)
@@ -1010,30 +1011,30 @@ function setupSocket(io) {
       const qualifies       = durationMinutes >= 300; // 5 hours minimum
 
       if (userId && stream.sessionId) {
-        // Update session record with end time, duration, viewer counts
+        const giftCount = stream.giftCount || 0;
+        const bondHeat  = (stream.peakViewers || 0) + giftCount * 5;
+
+        // Update session record with end time, duration, viewer counts, heat
         await dbQuery(
           `UPDATE stream_sessions
            SET ended_at = NOW(), duration_minutes = $1,
                peak_viewers = $2, total_unique_viewers = $3,
-               counted_for_yearly = $4
-           WHERE id = $5`,
-          [durationMinutes, stream.peakViewers || 0, uniqueViewers, qualifies, stream.sessionId]
+               counted_for_yearly = $4, gift_count = $5, bond_heat = $6
+           WHERE id = $7`,
+          [durationMinutes, stream.peakViewers || 0, uniqueViewers, qualifies,
+           giftCount, bondHeat, stream.sessionId]
         ).catch(e => console.warn('[Stream] session update error:', e.message));
 
-        // Update yearly challenge progress if stream qualifies (5+ hrs)
-        if (qualifies) {
-          await upsertYearlyProgress(userId, {
-            streams_completed: 1,
-            stream_hours:      parseFloat(durationHours.toFixed(2)),
-            total_viewers:     uniqueViewers,
-          });
-        } else {
-          // Always accumulate hours and viewers regardless (for Bond Marathon / Bond Elite)
-          await upsertYearlyProgress(userId, {
-            stream_hours:  parseFloat(durationHours.toFixed(2)),
-            total_viewers: uniqueViewers,
-          });
-        }
+        // Always accumulate hours, viewers, and bond heat (all challenges)
+        const progressUpdate = {
+          stream_hours:    parseFloat(durationHours.toFixed(2)),
+          total_viewers:   uniqueViewers,
+          total_bond_heat: bondHeat,
+        };
+        // World Streamer only counts 5+ hr sessions
+        if (qualifies) progressUpdate.streams_completed = 1;
+
+        await upsertYearlyProgress(userId, progressUpdate);
       }
     }
 
@@ -1156,6 +1157,9 @@ function setupSocket(io) {
         gift:          verifiedGift,
       });
 
+      // Count gift toward session Bond Heat (server-tracked, never client-set)
+      stream.giftCount = (stream.giftCount || 0) + 1;
+
       // Track Gift Legend progress: accumulate BC received for the stream host
       if (stream.hostUserId) {
         upsertYearlyProgress(stream.hostUserId, { gifts_received_bc: verifiedGift.coins });
@@ -1244,7 +1248,7 @@ function setupSocket(io) {
       try {
         const { rows } = await dbQuery(
           `SELECT streams_completed, stream_hours, total_viewers,
-                  stamp_wins, monument_wins, gifts_received_bc
+                  stamp_wins, monument_wins, gifts_received_bc, total_bond_heat
            FROM yearly_challenge_progress
            WHERE user_id = $1 AND year = $2`,
           [user.userId, currentYear()]
@@ -1256,6 +1260,7 @@ function setupSocket(io) {
           bondMarathon:  parseFloat(row.stream_hours || 0),
           bondElite:     row.total_viewers       || 0,
           giftLegend:    row.gifts_received_bc   || 0,
+          bondInferno:   row.total_bond_heat     || 0,
         });
       } catch (e) {
         console.warn('[Yearly] progress fetch error:', e.message);
