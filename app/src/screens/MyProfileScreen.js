@@ -15,6 +15,7 @@ import { getAccessToken } from '../services/authApi';
 import { SERVER_URL } from '../services/socket';
 import { useTheme } from '../context/ThemeContext';
 import { useWallet, BOND_MONUMENTS, STAMP_CAP, MONUMENT_CAP } from '../context/WalletContext';
+import { useChallenge, isStampDropped } from '../context/ChallengeContext';
 import { useBondPass } from '../context/PremiumContext';
 import { getCountryFlag } from '../utils/countryUtils';
 import { stringToColor } from '../utils/apiUtils';
@@ -744,7 +745,8 @@ const ps = StyleSheet.create({
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { colors } = useTheme();
   const { hasBondPass } = useBondPass();
-  const { myStamps, myMonuments } = useWallet();
+  const { myStamps, myMonuments, stamps } = useWallet();
+  const { challenges } = useChallenge();
   const socket = getSocket();
 
   const [profile,         setProfile]         = useState(null);
@@ -932,6 +934,25 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
   const countryFlag = getCountryFlag(countryStr);
   const countryCity = [profile?.city, countryStr].filter(Boolean).join(', ');
 
+  // Filter stamps/monuments: remove any that are dropped (30-day inactivity) or lost in a challenge
+  const activeStamps = myStamps.filter(flag => {
+    if (isStampDropped(stamps[flag])) return false;
+    return !Object.values(challenges).some(
+      ch => ch.monumentId === `stamp_${flag}` &&
+            ch.status === 'resolved' &&
+            ch.winner === 'challenger' &&
+            ch.holderUsername === displayName,
+    );
+  });
+  const activeMonuments = myMonuments.filter(id =>
+    !Object.values(challenges).some(
+      ch => ch.monumentId === id &&
+            ch.status === 'resolved' &&
+            ch.winner === 'challenger' &&
+            ch.holderUsername === displayName,
+    ),
+  );
+
   return (
     <LinearGradient colors={['#080a10', '#07080f', '#050608']} style={{ flex: 1 }}>
     <SafeAreaView style={s.container}>
@@ -1033,12 +1054,12 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </View>
             <Text style={s.statDot}>·</Text>
             <View style={s.stat}>
-              <Text style={s.statNum}>{myStamps.length}</Text>
+              <Text style={s.statNum}>{activeStamps.length}</Text>
               <Text style={s.statLabel}> Stamps</Text>
             </View>
             <Text style={s.statDot}>·</Text>
             <View style={s.stat}>
-              <Text style={s.statNum}>{myMonuments.length}</Text>
+              <Text style={s.statNum}>{activeMonuments.length}</Text>
               <Text style={s.statLabel}> Monuments</Text>
             </View>
           </View>
@@ -1047,8 +1068,8 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
           <PassportSection
             bondCount={matchCount}
             countries={flagsPlanted}
-            myStamps={myStamps}
-            myMonuments={myMonuments}
+            myStamps={activeStamps}
+            myMonuments={activeMonuments}
             hasBondPass={hasBondPass}
             onViewAll={() => navigation.navigate('CountryStampChallenge', {
               stamp: flagsPlanted.length > 0 ? { flag: getCountryFlag(flagsPlanted[0]) } : {},

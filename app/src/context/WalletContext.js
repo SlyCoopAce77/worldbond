@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
+import { isStampDropped } from './ChallengeContext';
 
 const STORAGE_KEY = 'worldbond_wallet';
 const STAMPS_KEY  = 'worldbond_stamps';
@@ -277,8 +279,39 @@ export function WalletProvider({ children }) {
     return true;
   }
 
+  function removeStamp(flag) {
+    setMyStamps(prev => {
+      const next = prev.filter(f => f !== flag);
+      const { balance: b, spent: sp, transactions: txs, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
+      persist(b, sp, txs, next, mm, lp);
+      return next;
+    });
+  }
+
+  function removeMonument(id) {
+    setMyMonuments(prev => {
+      const next = prev.filter(m => m !== id);
+      const { balance: b, spent: sp, transactions: txs, myStamps: ms, lastPayoutTs: lp } = stateRef.current;
+      persist(b, sp, txs, ms, next, lp);
+      return next;
+    });
+  }
+
+  // Subscribe to challenge-loss events emitted by ChallengeContext._resolve()
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('wb_stamp_lost', ({ monumentId }) => {
+      if (monumentId?.startsWith('stamp_')) {
+        removeStamp(monumentId.replace('stamp_', ''));
+      } else if (monumentId) {
+        removeMonument(monumentId);
+      }
+    });
+    return () => sub.remove();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   function claimStamp(countryFlag, username) {
-    const newStamp = { holder: username, coinsEarned: 0, since: Date.now() };
+    const now = Date.now();
+    const newStamp = { holder: username, coinsEarned: 0, since: now, lastActivity: now };
     setStamps(prev => {
       const next = { ...prev, [countryFlag]: newStamp };
       AsyncStorage.setItem(STAMPS_KEY, JSON.stringify(next));
@@ -311,8 +344,17 @@ export function WalletProvider({ children }) {
   function applyStampRoyalty(giftCoins, recipientCountry) {
     const stamp = stamps[recipientCountry];
     if (!stamp || !myStamps.includes(recipientCountry)) return;
+    if (isStampDropped(stamp)) return; // holder went inactive — no royalties
     const royalty = Math.floor(giftCoins * 0.03);
-    if (royalty > 0) earnCoins(royalty, 'stamp_royalty', { country: recipientCountry });
+    if (royalty > 0) {
+      // Refresh lastActivity so the stamp stays alive while holder earns
+      setStamps(prev => {
+        const next = { ...prev, [recipientCountry]: { ...prev[recipientCountry], lastActivity: Date.now() } };
+        AsyncStorage.setItem(STAMPS_KEY, JSON.stringify(next));
+        return next;
+      });
+      earnCoins(royalty, 'stamp_royalty', { country: recipientCountry });
+    }
   }
 
   const totalEarned = transactions
@@ -330,7 +372,7 @@ export function WalletProvider({ children }) {
     <WalletContext.Provider value={{
       balance, spent, transactions, stamps, myStamps, myMonuments,
       totalEarned, monthlyEarned, lastPayoutTs,
-      earnCoins, spendCoins, claimStamp, claimMonument, applyStampRoyalty, recordPayout,
+      earnCoins, spendCoins, claimStamp, claimMonument, removeStamp, removeMonument, applyStampRoyalty, recordPayout,
     }}>
       {children}
     </WalletContext.Provider>

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 
 const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
 
@@ -101,17 +102,22 @@ export function ChallengeProvider({ children }) {
     const hTotal = ch.scores.holder.total;
     const winner = cTotal > hTotal ? 'challenger' : 'holder';
 
-    // Report win to server for Globe Trotter yearly tracking
-    const winType  = ch.monumentId?.startsWith('stamp_') ? 'stamp' : 'monument';
-    const targetId = winType === 'stamp'
+    // Report win to server for Globe Trotter yearly tracking.
+    // Also notify WalletContext if local user lost so the stamp falls off their passport.
+    const winType        = ch.monumentId?.startsWith('stamp_') ? 'stamp' : 'monument';
+    const targetId       = winType === 'stamp'
       ? ch.monumentId.replace('stamp_', '')
       : ch.monumentId;
     const winnerUsername = winner === 'challenger' ? ch.challengerUsername : ch.holderUsername;
-    // We only report server-side; the server validates the 30-day cooldown
+    const loserUsername  = winner === 'challenger' ? ch.holderUsername     : ch.challengerUsername;
     AsyncStorage.getItem('worldbond_auth').then(raw => {
       const auth = raw ? JSON.parse(raw) : null;
       if (auth?.username === winnerUsername) {
         reportChallengeWin(winType, targetId);
+      }
+      if (auth?.username === loserUsername) {
+        // Tell WalletContext to remove this stamp/monument immediately
+        DeviceEventEmitter.emit('wb_stamp_lost', { monumentId: ch.monumentId });
       }
     }).catch(() => {});
 
