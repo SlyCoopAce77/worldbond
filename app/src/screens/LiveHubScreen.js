@@ -15,8 +15,8 @@ const YEARLY_CHALLENGES = [
   { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Win 12 Country Stamps AND 12 Bond Monuments this year — one of each per month. Conquer the globe.',          prize: '750,000 BC',   goal: 24,     unit: 'wins'      },
   { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 365+ total hours of live streaming this year — roughly 1 hour a day.',                            prize: '1,000,000 BC', goal: 365,    unit: 'hours'     },
   { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 10,000 total viewers across all your streams this year.',                                               prize: '1,500,000 BC', goal: 10000,  unit: 'viewers'   },
-  { key: 'giftLegend',    title: 'Gift Legend',     description: 'Receive gifts totaling 500,000+ BC from your viewers this year.',                                             prize: '2,000,000 BC', goal: 500000, unit: 'BC'        },
-  { key: 'bondInferno',   title: 'Bond Inferno',    description: 'Accumulate 50,000 Bond Heat this year. Heat = viewers + gifts ×5. You need both a crowd and their love.',    prize: '2,500,000 BC', goal: 50000,  unit: 'heat'      },
+  { key: 'giftLegend',    title: 'Earned Legend',   description: 'Earn 500,000+ BC in viewer support across your streams this year.',                                          prize: '2,000,000 BC', goal: 500000, unit: 'BC'        },
+  { key: 'bondInferno',   title: 'Bond Inferno',    description: 'Accumulate 50,000 Bond Heat this year. Heat = viewers + support ×5. You need both a crowd and their energy.', prize: '2,500,000 BC', goal: 50000,  unit: 'heat'      },
 ];
 
 function bondHeat(stream) {
@@ -265,7 +265,7 @@ function Leaderboard({ streams }) {
     <View style={lb.wrap}>
       <View style={lb.headingRow}>
         <Text style={lb.heading}>Top Streamers</Text>
-        <Text style={lb.headingSub}>Ranked by viewers and gifts</Text>
+        <Text style={lb.headingSub}>Ranked by viewers and support</Text>
       </View>
 
       {topStreamers.length > 0
