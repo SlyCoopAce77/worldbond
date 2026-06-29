@@ -60,10 +60,7 @@ const IMPRESSION_PROMPTS = [
 ];
 
 const UNLOCK_GATES = [
-  { threshold: 1,  label: 'Photos'      },
-  { threshold: 3,  label: 'Live Stream' },
-  { threshold: 5,  label: 'Groups'      },
-  { threshold: 10, label: 'Leaderboard' },
+  { threshold: 10, label: 'Full Access' },
 ];
 
 const VIBE_TAGS = [
@@ -705,30 +702,27 @@ function PassportSection({ bondCount, countries, myStamps, myMonuments, hasBondP
         <Text style={ps.emptyTxt}>Bond with someone to earn your first country</Text>
       )}
 
-      {nextGate && (
-        <View style={ps.progressWrap}>
-          <View style={ps.progressTrack}>
-            <Animated.View style={[ps.progressFill, { width: `${progress * 100}%` }]} />
-          </View>
-          <Text style={ps.progressLabel}>
-            {nextGate.threshold - bondCount} more bond{nextGate.threshold - bondCount !== 1 ? 's' : ''} to unlock {nextGate.label}
-          </Text>
+      <View style={ps.progressWrap}>
+        <View style={ps.progressTrack}>
+          <Animated.View style={[ps.progressFill, { width: `${Math.min(bondCount / 10, 1) * 100}%` }]} />
         </View>
-      )}
+        <Text style={ps.progressLabel}>
+          {bondCount < 10
+            ? `${10 - bondCount} more bond${10 - bondCount !== 1 ? 's' : ''} to unlock everything`
+            : 'Everything unlocked'}
+        </Text>
+      </View>
 
       <View style={ps.gatesRow}>
-        {UNLOCK_GATES.map((gate, i) => {
-          const on = bondCount >= gate.threshold;
-          return (
-            <View key={i} style={[ps.gate, on && ps.gateOn]}>
-              <View style={[ps.gateDot, on && { backgroundColor: BOND_PINK }]} />
-              <Text style={[ps.gateLabel, on && ps.gateLabelOn]} numberOfLines={1}>{gate.label}</Text>
-              {on
-                ? <Text style={ps.gateCheck}>✓</Text>
-                : <Text style={ps.gateThreshold}>{gate.threshold}</Text>}
-            </View>
-          );
-        })}
+        <View style={[ps.gate, bondCount >= 10 && ps.gateOn]}>
+          <View style={[ps.gateDot, bondCount >= 10 && { backgroundColor: BOND_PINK }]} />
+          <Text style={[ps.gateLabel, bondCount >= 10 && ps.gateLabelOn]} numberOfLines={1}>
+            Full Access
+          </Text>
+          {bondCount >= 10
+            ? <Text style={ps.gateCheck}>✓</Text>
+            : <Text style={ps.gateThreshold}>{bondCount}/10</Text>}
+        </View>
       </View>
     </View>
   );
