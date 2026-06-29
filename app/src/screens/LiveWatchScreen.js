@@ -63,11 +63,12 @@ export default function LiveWatchScreen({ route, navigation }) {
       setFloats(prev => [...prev, { emoji, id }]);
     }
     function onGiftReceived({ senderName, senderCountry, gift, isStampHolder }) {
+      // Cap at 3 visible bursts — oldest auto-displaced when a new one arrives
       const id = `${Date.now()}-${Math.random()}`;
       if (isLegendGift(gift.id)) {
         setDrops(prev => [...prev, { id, senderName, senderCountry, gift, isStampHolder }]);
       } else {
-        setBursts(prev => [...prev, { id, senderName, senderCountry, gift }]);
+        setBursts(prev => [...prev.slice(-2), { id, senderName, senderCountry, gift }]);
       }
     }
     function onLiveEnded({ streamId }) {
@@ -326,7 +327,7 @@ const styles = StyleSheet.create({
   msgText:         { color: '#fff', fontSize: 14, lineHeight: 20 },
   translatedBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
   translatedTxt:   { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  burstZone:    { position: 'absolute', top: height * 0.2, left: 0, right: 0, zIndex: 10 },
+  burstZone:    { position: 'absolute', bottom: 200, left: 0, right: 0, zIndex: 10, maxHeight: height * 0.44, justifyContent: 'flex-end' },
 
   giftStrip:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, gap: 12, borderTopWidth: 1, borderTopColor: '#FFB70022' },
   giftStripText:    { gap: 2 },

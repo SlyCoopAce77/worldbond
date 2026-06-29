@@ -3,7 +3,9 @@ import { View, Text, Animated, StyleSheet, Dimensions } from 'react-native';
 import GiftIcon from './GiftIcon';
 
 const { width: W } = Dimensions.get('window');
-const CARD_W = Math.min(W * 0.84, 348);
+// Cards sit in the bottom-left corner — narrow enough that the streamer
+// stays fully visible on the right side of the screen.
+const CARD_W = Math.min(W * 0.68, 268);
 
 // ── Gift personality map ──────────────────────────────────────────────────────
 // style: which burst animation to use
@@ -50,7 +52,7 @@ function BurstCard({ burst, c, meta, iconAnim }) {
           iconAnim ? { transform: [{ scale: iconAnim }] } : null,
         ]}
       >
-        <GiftIcon id={gift.id} color={c} size={28} />
+        <GiftIcon id={gift.id} color={c} size={24} />
       </Animated.View>
 
       {/* Text block */}
@@ -78,58 +80,58 @@ function BurstCard({ burst, c, meta, iconAnim }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STYLE A — SLIDE  (world_hello, postcard)
-// Shoots from the LEFT. Five horizontal speed-lines flash beside the leading
-// edge as the card arrives, then vanish. Exits back to the right.
+// Sweeps in from the RIGHT side of the screen to its left-corner home.
+// On landing: two quick ring pulses radiate from the icon. Exits right.
+// (Speed lines off the left edge would fly off-screen given the card is
+//  left-anchored, so we use a clean impact ring instead.)
 // ─────────────────────────────────────────────────────────────────────────────
 function SlideBurst({ burst, onDone }) {
   const c    = burst.gift.color || '#FF0080';
   const meta = getMeta(burst.gift.id);
 
-  const slideX    = useRef(new Animated.Value(-CARD_W - 40)).current;
-  const cardOp    = useRef(new Animated.Value(0)).current;
-  const iconScale = useRef(new Animated.Value(0.7)).current;
-  const exitX     = useRef(new Animated.Value(0)).current;
-  const fade      = useRef(new Animated.Value(1)).current;
-
-  // Speed lines — 5 individually declared refs (hooks can't be in loops)
-  const l0 = useRef(new Animated.Value(0)).current;
-  const l1 = useRef(new Animated.Value(0)).current;
-  const l2 = useRef(new Animated.Value(0)).current;
-  const l3 = useRef(new Animated.Value(0)).current;
-  const l4 = useRef(new Animated.Value(0)).current;
-  const lines = [l0, l1, l2, l3, l4];
-
-  const LINE_DEFS = [
-    { width: 52, top: 16, left: -58 },
-    { width: 36, top: 28, left: -42 },
-    { width: 68, top: 40, left: -74 },
-    { width: 44, top: 52, left: -50 },
-    { width: 28, top: 64, left: -34 },
-  ];
+  const slideX     = useRef(new Animated.Value(W + 20)).current;
+  const cardOp     = useRef(new Animated.Value(0)).current;
+  const iconScale  = useRef(new Animated.Value(0.7)).current;
+  const ring1Scale = useRef(new Animated.Value(0.4)).current;
+  const ring1Op    = useRef(new Animated.Value(0)).current;
+  const ring2Scale = useRef(new Animated.Value(0.4)).current;
+  const ring2Op    = useRef(new Animated.Value(0)).current;
+  const exitX      = useRef(new Animated.Value(0)).current;
+  const fade       = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
         Animated.spring(slideX, { toValue: 0, friction: 7, tension: 85, useNativeDriver: true }),
         Animated.timing(cardOp, { toValue: 1, duration: 120, useNativeDriver: true }),
-        Animated.parallel(lines.map((l, i) =>
-          Animated.sequence([
-            Animated.delay(i * 18),
-            Animated.timing(l, { toValue: 0.75, duration: 65,  useNativeDriver: true }),
-            Animated.timing(l, { toValue: 0,    duration: 210, useNativeDriver: true }),
-          ]),
-        )),
       ]),
-      // Icon punch on landing
-      Animated.sequence([
-        Animated.timing(iconScale, { toValue: 1.3,  duration: 90,  useNativeDriver: true }),
-        Animated.spring(iconScale, { toValue: 1,    friction: 5, tension: 160, useNativeDriver: true }),
+      // Landing impact: icon punch + dual rings
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(iconScale, { toValue: 1.3,  duration: 90,  useNativeDriver: true }),
+          Animated.spring(iconScale, { toValue: 1,    friction: 5, tension: 160, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(ring1Op,    { toValue: 1,   duration: 40,  useNativeDriver: true }),
+          Animated.parallel([
+            Animated.timing(ring1Scale, { toValue: 2.4, duration: 380, useNativeDriver: true }),
+            Animated.timing(ring1Op,    { toValue: 0,   duration: 380, useNativeDriver: true }),
+          ]),
+        ]),
+        Animated.sequence([
+          Animated.delay(60),
+          Animated.timing(ring2Op,    { toValue: 0.55, duration: 40,  useNativeDriver: true }),
+          Animated.parallel([
+            Animated.timing(ring2Scale, { toValue: 1.6, duration: 280, useNativeDriver: true }),
+            Animated.timing(ring2Op,    { toValue: 0,   duration: 280, useNativeDriver: true }),
+          ]),
+        ]),
       ]),
       Animated.delay(meta.hold),
-      // Exit right
+      // Exit right — back the way it came
       Animated.parallel([
-        Animated.timing(exitX, { toValue: W + 30, duration: 350, useNativeDriver: true }),
-        Animated.timing(fade,  { toValue: 0,      duration: 250, useNativeDriver: true }),
+        Animated.timing(exitX, { toValue: W + 30, duration: 340, useNativeDriver: true }),
+        Animated.timing(fade,  { toValue: 0,      duration: 240, useNativeDriver: true }),
       ]),
     ]).start(() => onDone(burst.id));
   }, []);
@@ -142,18 +144,8 @@ function SlideBurst({ burst, onDone }) {
         transform: [{ translateX: Animated.add(slideX, exitX) }],
       },
     ]}>
-      {/* Speed lines — absolute, left of card */}
-      {lines.map((l, i) => (
-        <Animated.View key={i} style={{
-          position: 'absolute',
-          opacity: l,
-          height: 2, borderRadius: 1,
-          backgroundColor: c,
-          width: LINE_DEFS[i].width,
-          top: LINE_DEFS[i].top,
-          left: LINE_DEFS[i].left,
-        }} />
-      ))}
+      <Animated.View style={[gb.shockRing, { borderColor: c,        transform: [{ scale: ring1Scale }], opacity: ring1Op }]} />
+      <Animated.View style={[gb.shockRing, { borderColor: c + '80', borderWidth: 1.5, transform: [{ scale: ring2Scale }], opacity: ring2Op }]} />
       <BurstCard burst={burst} c={c} meta={meta} iconAnim={iconScale} />
     </Animated.View>
   );
@@ -617,64 +609,68 @@ export default function GiftBurst({ burst, onDone }) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const gb = StyleSheet.create({
+  // Left-anchored — gifts appear in the bottom-left so the streamer stays
+  // fully visible on the right half of the screen.
   wrap: {
     width: CARD_W,
-    alignSelf: 'center',
-    marginBottom: 12,
+    alignSelf: 'flex-start',
+    marginLeft: 10,
+    marginBottom: 8,
   },
 
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(4,5,16,0.96)',
-    borderRadius: 26,
+    // Semi-transparent so the stream background still reads through
+    backgroundColor: 'rgba(4,5,18,0.82)',
+    borderRadius: 22,
     borderWidth: 1.5,
     overflow: 'visible',
-    paddingVertical: 14,
-    paddingRight: 14,
-    gap: 12,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.65,
-    shadowRadius: 24,
-    elevation: 20,
+    paddingVertical: 11,
+    paddingRight: 12,
+    gap: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 16,
   },
 
-  stripe: { width: 5, alignSelf: 'stretch', borderTopRightRadius: 3, borderBottomRightRadius: 3 },
+  stripe: { width: 4, alignSelf: 'stretch', borderTopRightRadius: 2, borderBottomRightRadius: 2 },
 
   iconCircle: {
-    width: 58, height: 58, borderRadius: 29,
+    width: 50, height: 50, borderRadius: 25,
     borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center',
   },
 
-  info:      { flex: 1, gap: 2 },
-  senderRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  flag:      { fontSize: 13 },
-  sender:    { color: '#fff', fontSize: 13, fontWeight: '900', flex: 1 },
-  giftName:  { color: 'rgba(255,255,255,0.86)', fontSize: 12, fontWeight: '700' },
-  tagline:   { fontSize: 10, fontStyle: 'italic' },
-  tierLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.8, marginTop: 2 },
+  info:      { flex: 1, gap: 1 },
+  senderRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  flag:      { fontSize: 12 },
+  sender:    { color: '#fff', fontSize: 12, fontWeight: '900', flex: 1 },
+  giftName:  { color: 'rgba(255,255,255,0.84)', fontSize: 11, fontWeight: '700' },
+  tagline:   { fontSize: 9, fontStyle: 'italic' },
+  tierLabel: { fontSize: 7.5, fontWeight: '900', letterSpacing: 1.6, marginTop: 2 },
 
   coinBadge: {
-    borderRadius: 13, paddingHorizontal: 9, paddingVertical: 8,
+    borderRadius: 11, paddingHorizontal: 8, paddingVertical: 7,
     borderWidth: 1, alignItems: 'center', gap: 2,
   },
-  coinDot: { width: 7, height: 7, borderRadius: 4 },
-  coinNum: { fontSize: 13, fontWeight: '900' },
-  bc:      { color: 'rgba(255,255,255,0.36)', fontSize: 8, fontWeight: '800', letterSpacing: 0.5 },
+  coinDot: { width: 6, height: 6, borderRadius: 3 },
+  coinNum: { fontSize: 12, fontWeight: '900' },
+  bc:      { color: 'rgba(255,255,255,0.34)', fontSize: 7.5, fontWeight: '800', letterSpacing: 0.5 },
 
-  // Shared ring base for Drop and Orbit bursts
+  // Shared ring base for Drop and Orbit bursts — sits over the icon area
   shockRing: {
     position: 'absolute',
-    width: 60, height: 60, borderRadius: 30,
-    borderWidth: 2.5,
-    left: 2, top: 2,
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 2,
+    left: 3, top: 3,
   },
 
   // Ring base for Pulse burst
   pulseRing: {
     position: 'absolute',
-    width: 62, height: 62, borderRadius: 31,
+    width: 54, height: 54, borderRadius: 27,
     borderWidth: 2,
     left: 3, top: 3,
   },
