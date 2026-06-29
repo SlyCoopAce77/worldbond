@@ -59,9 +59,6 @@ const IMPRESSION_PROMPTS = [
   { key: 'moment', color: '#ffb74d', prompt: 'The moment that left the biggest footprint on me…' },
 ];
 
-const UNLOCK_GATES = [
-  { threshold: 10, label: 'Full Access' },
-];
 
 const VIBE_TAGS = [
   'Deep Talks', 'Travel Plans', 'Language Swap', 'Night Owl',
@@ -562,168 +559,107 @@ const MRZ_1 = 'P<WBONDHOLDER<<<<<<<<<<<<<<<<<<<<<<<<<<';
 const MRZ_2 = 'BC0000000<7WB<<<<<<<<<<<<<<<0000000000';
 
 function PassportSection({ bondCount, countries, myStamps, myMonuments, hasBondPass, onViewAll }) {
-  const allUnlocked = bondCount >= 10;
-
-  const stampCap    = hasBondPass ? STAMP_CAP.bond_pass    : STAMP_CAP.standard;
-  const monumentCap = hasBondPass ? MONUMENT_CAP.bond_pass : MONUMENT_CAP.standard;
-
-  // ── Unlocked: real passport ───────────────────────────────────────────────
-  if (allUnlocked) {
-    const heldMonuments = myMonuments
-      .map(id => BOND_MONUMENTS.find(m => m.id === id))
-      .filter(Boolean);
-
-    return (
-      <LinearGradient colors={['#0d1528', '#06091400']} style={ps.passport}>
-
-        {/* Watermark rings */}
-        <View style={ps.watermark} pointerEvents="none">
-          <View style={ps.wmRing1} />
-          <View style={ps.wmRing2} />
-          <View style={ps.wmRing3} />
-        </View>
-
-        {/* Header */}
-        <View style={ps.phRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={ps.phNation}>WORLDBOND</Text>
-            <Text style={ps.phTitle}>WORLD PASSPORT</Text>
-            <Text style={ps.phIssued}>International Division · All Borders</Text>
-          </View>
-          <View style={ps.sealOuter}>
-            <View style={ps.sealMiddle}>
-              <View style={ps.sealInner}>
-                <Text style={ps.sealTxt}>WB</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={ps.phDivider} />
-
-        {/* Country Stamps */}
-        <View style={ps.phBlock}>
-          <View style={ps.phLabelRow}>
-            <Text style={ps.phSectionLabel}>Country Stamps</Text>
-            <Text style={ps.phCap}>{myStamps.length} / {stampCap}</Text>
-          </View>
-          <View style={ps.stampGrid}>
-            {myStamps.map((flag, i) => (
-              <View
-                key={flag}
-                style={[ps.stampOuter, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}
-              >
-                <View style={ps.stampInner}>
-                  <Text style={ps.stampFlag}>{flag}</Text>
-                  <Text style={ps.stampCert}>CERTIFIED</Text>
-                </View>
-              </View>
-            ))}
-            {Array.from({ length: stampCap - myStamps.length }).map((_, i) => (
-              <View key={`es-${i}`} style={ps.stampEmpty} />
-            ))}
-          </View>
-          {myStamps.length === 0 && (
-            <Text style={ps.phHint}>Win a country stamp challenge to add your first seal</Text>
-          )}
-        </View>
-
-        <View style={ps.phDivider} />
-
-        {/* Monuments */}
-        <View style={ps.phBlock}>
-          <View style={ps.phLabelRow}>
-            <Text style={ps.phSectionLabel}>Monuments</Text>
-            <Text style={ps.phCap}>{heldMonuments.length} / {monumentCap}</Text>
-          </View>
-          <View style={ps.monumentList}>
-            {heldMonuments.map(m => (
-              <View key={m.id} style={ps.monumentBadge}>
-                <View style={ps.monumentAccent} />
-                <Text style={ps.monumentIcon}>{m.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={ps.monumentName}>{m.name}</Text>
-                  <Text style={ps.monumentLoc}>{m.country}  {m.location}</Text>
-                </View>
-                <Text style={ps.visaStamp}>VISA</Text>
-              </View>
-            ))}
-            {Array.from({ length: monumentCap - heldMonuments.length }).map((_, i) => (
-              <View key={`em-${i}`} style={ps.monumentEmpty} />
-            ))}
-          </View>
-          {heldMonuments.length === 0 && (
-            <Text style={ps.phHint}>Win a monument challenge to earn your first visa</Text>
-          )}
-        </View>
-
-        {/* Machine-readable zone */}
-        <View style={ps.mrz}>
-          <Text style={ps.mrzLine}>{MRZ_1}</Text>
-          <Text style={ps.mrzLine}>{MRZ_2}</Text>
-        </View>
-
-      </LinearGradient>
-    );
-  }
-
-  // ── Pre-unlock: progress view ─────────────────────────────────────────────
-  const flags    = countries.slice(0, 8);
-  const extra    = Math.max(0, countries.length - 8);
-  const nextGate = UNLOCK_GATES.find(g => bondCount < g.threshold);
-  const progress = nextGate ? Math.min(bondCount / nextGate.threshold, 1) : 1;
+  const allUnlocked    = bondCount >= 3;
+  const contentOpacity = allUnlocked ? 1 : 0.3 + (bondCount / 3) * 0.7;
+  const stampCap       = hasBondPass ? STAMP_CAP.bond_pass    : STAMP_CAP.standard;
+  const monumentCap    = hasBondPass ? MONUMENT_CAP.bond_pass : MONUMENT_CAP.standard;
+  const heldMonuments  = myMonuments.map(id => BOND_MONUMENTS.find(m => m.id === id)).filter(Boolean);
 
   return (
-    <View style={ps.card}>
-      <View style={ps.cardHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={ps.cardTitle}>World Passport</Text>
-          <Text style={ps.cardSub}>{countries.length} {countries.length === 1 ? 'country' : 'countries'} bonded</Text>
-        </View>
-        <TouchableOpacity onPress={onViewAll} style={ps.viewAllBtn}>
-          <Text style={ps.viewAllTxt}>View All</Text>
-        </TouchableOpacity>
+    <View style={{ marginHorizontal: 20 }}>
+      {/* Passport — always visible, brightens with each bond */}
+      <View style={{ opacity: contentOpacity }}>
+        <LinearGradient colors={['#0d1528', '#06091400']} style={ps.passport}>
+          <View style={ps.watermark} pointerEvents="none">
+            <View style={ps.wmRing1} />
+            <View style={ps.wmRing2} />
+            <View style={ps.wmRing3} />
+          </View>
+          <View style={ps.phRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={ps.phNation}>WORLDBOND</Text>
+              <Text style={ps.phTitle}>WORLD PASSPORT</Text>
+              <Text style={ps.phIssued}>International Division · All Borders</Text>
+            </View>
+            <View style={ps.sealOuter}>
+              <View style={ps.sealMiddle}>
+                <View style={ps.sealInner}>
+                  <Text style={ps.sealTxt}>WB</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+          <View style={ps.phDivider} />
+          <View style={ps.phBlock}>
+            <View style={ps.phLabelRow}>
+              <Text style={ps.phSectionLabel}>Country Stamps</Text>
+              <Text style={ps.phCap}>{myStamps.length} / {stampCap}</Text>
+            </View>
+            <View style={ps.stampGrid}>
+              {myStamps.map((flag, i) => (
+                <View key={flag} style={[ps.stampOuter, { transform: [{ rotate: `${STAMP_ROTATIONS[i % STAMP_ROTATIONS.length]}deg` }] }]}>
+                  <View style={ps.stampInner}>
+                    <Text style={ps.stampFlag}>{flag}</Text>
+                    <Text style={ps.stampCert}>CERTIFIED</Text>
+                  </View>
+                </View>
+              ))}
+              {Array.from({ length: stampCap - myStamps.length }).map((_, i) => (
+                <View key={`es-${i}`} style={ps.stampEmpty} />
+              ))}
+            </View>
+            {myStamps.length === 0 && (
+              <Text style={ps.phHint}>Win a country stamp challenge to add your first seal</Text>
+            )}
+          </View>
+          <View style={ps.phDivider} />
+          <View style={ps.phBlock}>
+            <View style={ps.phLabelRow}>
+              <Text style={ps.phSectionLabel}>Monuments</Text>
+              <Text style={ps.phCap}>{heldMonuments.length} / {monumentCap}</Text>
+            </View>
+            <View style={ps.monumentList}>
+              {heldMonuments.map(m => (
+                <View key={m.id} style={ps.monumentBadge}>
+                  <View style={ps.monumentAccent} />
+                  <Text style={ps.monumentIcon}>{m.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ps.monumentName}>{m.name}</Text>
+                    <Text style={ps.monumentLoc}>{m.country}  {m.location}</Text>
+                  </View>
+                  <Text style={ps.visaStamp}>VISA</Text>
+                </View>
+              ))}
+              {Array.from({ length: monumentCap - heldMonuments.length }).map((_, i) => (
+                <View key={`em-${i}`} style={ps.monumentEmpty} />
+              ))}
+            </View>
+            {heldMonuments.length === 0 && (
+              <Text style={ps.phHint}>Win a monument challenge to earn your first visa</Text>
+            )}
+          </View>
+          <View style={ps.mrz}>
+            <Text style={ps.mrzLine}>{MRZ_1}</Text>
+            <Text style={ps.mrzLine}>{MRZ_2}</Text>
+          </View>
+        </LinearGradient>
       </View>
 
-      {countries.length > 0 ? (
-        <View style={ps.flagGrid}>
-          {flags.map((country, i) => (
-            <View key={i} style={ps.flagChip}>
-              <Text style={ps.flagChipTxt}>{getCountryFlag(country)}</Text>
+      {/* Lock overlay — fades away with each bond, gone at 3 */}
+      {!allUnlocked && (
+        <View style={ps.lockOverlay} pointerEvents="none">
+          <View style={ps.lockBox}>
+            <Text style={ps.lockIcon}>🔒</Text>
+            <Text style={ps.lockLabel}>
+              {bondCount === 0 ? 'Make your first bond to begin' : `${3 - bondCount} more bond${3 - bondCount !== 1 ? 's' : ''} to unlock`}
+            </Text>
+            <View style={ps.lockBar}>
+              <View style={[ps.lockFill, { width: `${(bondCount / 3) * 100}%` }]} />
             </View>
-          ))}
-          {extra > 0 && (
-            <View style={[ps.flagChip, ps.flagChipExtra]}>
-              <Text style={ps.flagChipExtraTxt}>+{extra}</Text>
-            </View>
-          )}
+            <Text style={ps.lockCount}>{bondCount} / 3</Text>
+          </View>
         </View>
-      ) : (
-        <Text style={ps.emptyTxt}>Bond with someone to earn your first country</Text>
       )}
-
-      <View style={ps.progressWrap}>
-        <View style={ps.progressTrack}>
-          <Animated.View style={[ps.progressFill, { width: `${Math.min(bondCount / 10, 1) * 100}%` }]} />
-        </View>
-        <Text style={ps.progressLabel}>
-          {bondCount < 10
-            ? `${10 - bondCount} more bond${10 - bondCount !== 1 ? 's' : ''} to unlock everything`
-            : 'Everything unlocked'}
-        </Text>
-      </View>
-
-      <View style={ps.gatesRow}>
-        <View style={[ps.gate, bondCount >= 10 && ps.gateOn]}>
-          <View style={[ps.gateDot, bondCount >= 10 && { backgroundColor: BOND_PINK }]} />
-          <Text style={[ps.gateLabel, bondCount >= 10 && ps.gateLabelOn]} numberOfLines={1}>
-            Full Access
-          </Text>
-          {bondCount >= 10
-            ? <Text style={ps.gateCheck}>✓</Text>
-            : <Text style={ps.gateThreshold}>{bondCount}/10</Text>}
-        </View>
-      </View>
     </View>
   );
 }
@@ -796,6 +732,14 @@ const ps = StyleSheet.create({
   // Machine-readable zone
   mrz:              { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 18, paddingVertical: 12, gap: 3 },
   mrzLine:          { color: 'rgba(255,255,255,0.09)', fontSize: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', letterSpacing: 1 },
+  // Lock overlay (shown before 3 bonds)
+  lockOverlay:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' },
+  lockBox:          { alignItems: 'center', gap: 8, paddingHorizontal: 24 },
+  lockIcon:         { fontSize: 28 },
+  lockLabel:        { color: '#fff', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  lockBar:          { height: 4, width: 140, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 2, overflow: 'hidden' },
+  lockFill:         { height: 4, backgroundColor: BOND_PINK, borderRadius: 2 },
+  lockCount:        { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' },
 });
 
 // ─── MyProfileScreen ──────────────────────────────────────────────────────────
