@@ -745,7 +745,7 @@ const ps = StyleSheet.create({
 export default function MyProfileScreen({ navigation, user, onLogout }) {
   const { colors } = useTheme();
   const { hasBondPass } = useBondPass();
-  const { myStamps, myMonuments, stamps } = useWallet();
+  const { myStamps, myMonuments, stamps, totalStampWins, totalMonumentWins } = useWallet();
   const { challenges } = useChallenge();
   const socket = getSocket();
 
@@ -1054,12 +1054,12 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
             </View>
             <Text style={s.statDot}>·</Text>
             <View style={s.stat}>
-              <Text style={s.statNum}>{activeStamps.length}</Text>
+              <Text style={s.statNum}>{totalStampWins}</Text>
               <Text style={s.statLabel}> Stamps</Text>
             </View>
             <Text style={s.statDot}>·</Text>
             <View style={s.stat}>
-              <Text style={s.statNum}>{activeMonuments.length}</Text>
+              <Text style={s.statNum}>{totalMonumentWins}</Text>
               <Text style={s.statLabel}> Monuments</Text>
             </View>
           </View>

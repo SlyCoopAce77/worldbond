@@ -189,13 +189,16 @@ const DEMO_MODE = false;
 const WalletContext = createContext(null);
 
 export function WalletProvider({ children }) {
-  const [balance,      setBalance]      = useState(0);
-  const [spent,        setSpent]        = useState(0);
-  const [transactions, setTransactions] = useState([]);
-  const [stamps,        setStamps]        = useState({});
-  const [myStamps,      setMyStamps]      = useState([]);
-  const [myMonuments,   setMyMonuments]   = useState([]);
-  const [lastPayoutTs,  setLastPayoutTs]  = useState(null);
+  const [balance,        setBalance]        = useState(0);
+  const [spent,          setSpent]          = useState(0);
+  const [transactions,   setTransactions]   = useState([]);
+  const [stamps,         setStamps]         = useState({});
+  const [myStamps,       setMyStamps]       = useState([]);
+  const [myMonuments,    setMyMonuments]    = useState([]);
+  const [lastPayoutTs,   setLastPayoutTs]   = useState(null);
+  // All-time win counts — never go down, survive losing a stamp
+  const [totalStampWins,    setTotalStampWins]    = useState(0);
+  const [totalMonumentWins, setTotalMonumentWins] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -210,12 +213,17 @@ export function WalletProvider({ children }) {
         setMyStamps(w.myStamps ?? []);
         setMyMonuments(w.myMonuments ?? []);
         setLastPayoutTs(w.lastPayoutTs ?? null);
+        // Migrate existing users: seed from current holdings if no saved counts yet
+        setTotalStampWins(w.totalStampWins    ?? (w.myStamps    ?? []).length);
+        setTotalMonumentWins(w.totalMonumentWins ?? (w.myMonuments ?? []).length);
       } else if (DEMO_MODE) {
         // Seed demo wallet so all screens have something to show
         setBalance(5000);
         setSpent(1200);
         setMyStamps(['🇺🇸', '🇯🇵']);
         setMyMonuments(['fuji']);
+        setTotalStampWins(2);
+        setTotalMonumentWins(1);
         setTransactions([
           { id: 1, type: 'earn',  amount: 3000, source: 'stream_gift',   ts: Date.now() - 86400000 * 2 },
           { id: 2, type: 'spend', amount: 500,  source: 'gift_sent',     ts: Date.now() - 86400000 },
@@ -228,28 +236,29 @@ export function WalletProvider({ children }) {
     });
   }, []);
 
-  const persist = useCallback((bal, sp, txs, ms, mm, lp) => {
+  const persist = useCallback((bal, sp, txs, ms, mm, lp, tsw, tmw) => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
       balance: bal, spent: sp, transactions: txs,
       myStamps: ms, myMonuments: mm, lastPayoutTs: lp,
+      totalStampWins: tsw, totalMonumentWins: tmw,
     }));
   }, []);
 
   // Mirror all wallet state into a ref so functional updaters always read
   // the latest values — prevents stale closures in earnCoins/claimStamp/claimMonument.
-  const stateRef = useRef({ balance, spent, transactions, myStamps, myMonuments, lastPayoutTs });
+  const stateRef = useRef({ balance, spent, transactions, myStamps, myMonuments, lastPayoutTs, totalStampWins, totalMonumentWins });
   useEffect(() => {
-    stateRef.current = { balance, spent, transactions, myStamps, myMonuments, lastPayoutTs };
-  }, [balance, spent, transactions, myStamps, myMonuments, lastPayoutTs]);
+    stateRef.current = { balance, spent, transactions, myStamps, myMonuments, lastPayoutTs, totalStampWins, totalMonumentWins };
+  }, [balance, spent, transactions, myStamps, myMonuments, lastPayoutTs, totalStampWins, totalMonumentWins]);
 
   function earnCoins(amount, source, meta = {}) {
     const tx = { id: Date.now(), type: 'earn', amount, source, ...meta, ts: Date.now() };
     setBalance(b => {
       const nb = b + amount;
-      const { spent: sp, myStamps: ms, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
+      const { spent: sp, myStamps: ms, myMonuments: mm, lastPayoutTs: lp, totalStampWins: tsw, totalMonumentWins: tmw } = stateRef.current;
       setTransactions(prev => {
         const nt = [tx, ...prev].slice(0, 200);
-        persist(nb, sp, nt, ms, mm, lp);
+        persist(nb, sp, nt, ms, mm, lp, tsw, tmw);
         return nt;
       });
       return nb;
@@ -258,18 +267,18 @@ export function WalletProvider({ children }) {
 
   function spendCoins(amount, source, meta = {}) {
     const currentBalance = stateRef.current.balance;
-    if (currentBalance < amount) return false; // not enough coins — caller handles this
+    if (currentBalance < amount) return false;
 
     const tx = { id: Date.now(), type: 'spend', amount, source, ...meta, ts: Date.now() };
     setBalance(b => {
-      if (b < amount) return b; // double-check inside updater (handles race conditions)
+      if (b < amount) return b;
       const nb = b - amount;
-      const { myStamps: ms, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
+      const { myStamps: ms, myMonuments: mm, lastPayoutTs: lp, totalStampWins: tsw, totalMonumentWins: tmw } = stateRef.current;
       setSpent(s => {
         const ns = s + amount;
         setTransactions(prev => {
           const nt = [tx, ...prev].slice(0, 200);
-          persist(nb, ns, nt, ms, mm, lp);
+          persist(nb, ns, nt, ms, mm, lp, tsw, tmw);
           return nt;
         });
         return ns;
@@ -282,8 +291,8 @@ export function WalletProvider({ children }) {
   function removeStamp(flag) {
     setMyStamps(prev => {
       const next = prev.filter(f => f !== flag);
-      const { balance: b, spent: sp, transactions: txs, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
-      persist(b, sp, txs, next, mm, lp);
+      const { balance: b, spent: sp, transactions: txs, myMonuments: mm, lastPayoutTs: lp, totalStampWins: tsw, totalMonumentWins: tmw } = stateRef.current;
+      persist(b, sp, txs, next, mm, lp, tsw, tmw);
       return next;
     });
   }
@@ -291,23 +300,11 @@ export function WalletProvider({ children }) {
   function removeMonument(id) {
     setMyMonuments(prev => {
       const next = prev.filter(m => m !== id);
-      const { balance: b, spent: sp, transactions: txs, myStamps: ms, lastPayoutTs: lp } = stateRef.current;
-      persist(b, sp, txs, ms, next, lp);
+      const { balance: b, spent: sp, transactions: txs, myStamps: ms, lastPayoutTs: lp, totalStampWins: tsw, totalMonumentWins: tmw } = stateRef.current;
+      persist(b, sp, txs, ms, next, lp, tsw, tmw);
       return next;
     });
   }
-
-  // Subscribe to challenge-loss events emitted by ChallengeContext._resolve()
-  useEffect(() => {
-    const sub = DeviceEventEmitter.addListener('wb_stamp_lost', ({ monumentId }) => {
-      if (monumentId?.startsWith('stamp_')) {
-        removeStamp(monumentId.replace('stamp_', ''));
-      } else if (monumentId) {
-        removeMonument(monumentId);
-      }
-    });
-    return () => sub.remove();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function claimStamp(countryFlag, username) {
     const now = Date.now();
@@ -318,27 +315,67 @@ export function WalletProvider({ children }) {
       return next;
     });
     setMyStamps(prev => {
-      const next = prev.includes(countryFlag) ? prev : [...prev, countryFlag];
-      const { balance: b, spent: sp, transactions: txs, myMonuments: mm, lastPayoutTs: lp } = stateRef.current;
-      persist(b, sp, txs, next, mm, lp);
+      const isNew = !prev.includes(countryFlag);
+      const next  = isNew ? [...prev, countryFlag] : prev;
+      const { balance: b, spent: sp, transactions: txs, myMonuments: mm, lastPayoutTs: lp, totalMonumentWins: tmw } = stateRef.current;
+      if (isNew) {
+        // Increment all-time win counter
+        setTotalStampWins(w => {
+          const nw = w + 1;
+          persist(b, sp, txs, next, mm, lp, nw, tmw);
+          return nw;
+        });
+      } else {
+        const { totalStampWins: tsw } = stateRef.current;
+        persist(b, sp, txs, next, mm, lp, tsw, tmw);
+      }
       return next;
     });
   }
 
   function claimMonument(monumentId) {
     setMyMonuments(prev => {
-      const next = prev.includes(monumentId) ? prev : [...prev, monumentId];
-      const { balance: b, spent: sp, transactions: txs, myStamps: ms, lastPayoutTs: lp } = stateRef.current;
-      persist(b, sp, txs, ms, next, lp);
+      const isNew = !prev.includes(monumentId);
+      const next  = isNew ? [...prev, monumentId] : prev;
+      const { balance: b, spent: sp, transactions: txs, myStamps: ms, lastPayoutTs: lp, totalStampWins: tsw } = stateRef.current;
+      if (isNew) {
+        setTotalMonumentWins(w => {
+          const nw = w + 1;
+          persist(b, sp, txs, ms, next, lp, tsw, nw);
+          return nw;
+        });
+      } else {
+        const { totalMonumentWins: tmw } = stateRef.current;
+        persist(b, sp, txs, ms, next, lp, tsw, tmw);
+      }
       return next;
     });
   }
 
+  // Subscribe to challenge events emitted by ChallengeContext._resolve()
+  useEffect(() => {
+    const wonSub = DeviceEventEmitter.addListener('wb_stamp_won', ({ monumentId, username }) => {
+      if (monumentId?.startsWith('stamp_')) {
+        claimStamp(monumentId.replace('stamp_', ''), username);
+      } else if (monumentId) {
+        claimMonument(monumentId);
+      }
+    });
+    const lostSub = DeviceEventEmitter.addListener('wb_stamp_lost', ({ monumentId }) => {
+      if (monumentId?.startsWith('stamp_')) {
+        removeStamp(monumentId.replace('stamp_', ''));
+      } else if (monumentId) {
+        removeMonument(monumentId);
+      }
+    });
+    return () => { wonSub.remove(); lostSub.remove(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   function recordPayout() {
     const now = Date.now();
     setLastPayoutTs(now);
-    const { balance: b, spent: sp, transactions: txs, myStamps: ms, myMonuments: mm } = stateRef.current;
-    persist(b, sp, txs, ms, mm, now);
+    const { balance: b, spent: sp, transactions: txs, myStamps: ms, myMonuments: mm, totalStampWins: tsw, totalMonumentWins: tmw } = stateRef.current;
+    persist(b, sp, txs, ms, mm, now, tsw, tmw);
   }
 
   function applyStampRoyalty(giftCoins, recipientCountry) {
@@ -371,6 +408,7 @@ export function WalletProvider({ children }) {
   return (
     <WalletContext.Provider value={{
       balance, spent, transactions, stamps, myStamps, myMonuments,
+      totalStampWins, totalMonumentWins,
       totalEarned, monthlyEarned, lastPayoutTs,
       earnCoins, spendCoins, claimStamp, claimMonument, removeStamp, removeMonument, applyStampRoyalty, recordPayout,
     }}>

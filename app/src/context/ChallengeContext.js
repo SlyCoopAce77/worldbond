@@ -114,6 +114,8 @@ export function ChallengeProvider({ children }) {
       const auth = raw ? JSON.parse(raw) : null;
       if (auth?.username === winnerUsername) {
         reportChallengeWin(winType, targetId);
+        // Tell WalletContext to add stamp/monument and record the win
+        DeviceEventEmitter.emit('wb_stamp_won', { monumentId: ch.monumentId, username: winnerUsername });
       }
       if (auth?.username === loserUsername) {
         // Tell WalletContext to remove this stamp/monument immediately
