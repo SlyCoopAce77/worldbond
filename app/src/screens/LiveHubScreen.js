@@ -12,7 +12,7 @@ const BOND_PINK = '#FF0080';
 
 const YEARLY_CHALLENGES = [
   { key: 'worldStreamer', title: 'World Streamer',  description: 'Go live 52+ times this year — once a week. Each stream must be at least 5 hours.',     prize: '500,000 BC',   goal: 52,     unit: 'streams'   },
-  { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Bond with users from 20+ different countries this year. Go global, one connection at a time.', prize: '750,000 BC', goal: 20, unit: 'countries' },
+  { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Win or hold a Country Stamp or Bond Monument in 10+ different countries this year. Claim the world.', prize: '750,000 BC', goal: 10, unit: 'countries' },
   { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 365+ total hours of live streaming this year — roughly 1 hour a day.',      prize: '1,000,000 BC', goal: 365,    unit: 'hours'     },
   { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 10,000 total viewers across all your streams this year.',                         prize: '1,500,000 BC', goal: 10000,  unit: 'viewers'   },
   { key: 'giftLegend',    title: 'Gift Legend',     description: 'Receive gifts totaling 500,000+ BC from your viewers this year.',                       prize: '2,000,000 BC', goal: 500000, unit: 'BC'        },
