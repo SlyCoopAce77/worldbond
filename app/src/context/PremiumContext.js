@@ -14,6 +14,8 @@ export function BondPassProvider({ children }) {
   const purchaseUpdateSub = useRef(null);
   const purchaseErrorSub  = useRef(null);
 
+  const iapReadyRef = useRef(false);
+
   useEffect(() => {
     async function init() {
       // Restore cached state immediately so UI doesn't flash
@@ -27,8 +29,25 @@ export function BondPassProvider({ children }) {
         await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
       }
 
+      // Always register purchase listeners first so we never miss a delivery
+      purchaseUpdateSub.current = RNIap.purchaseUpdatedListener(async (purchase) => {
+        if (purchase.productId !== BOND_PASS_SKU) return;
+        try {
+          await RNIap.finishTransaction({ purchase, isConsumable: false });
+        } catch {}
+        setHasBondPass(true);
+        await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
+      });
+
+      purchaseErrorSub.current = RNIap.purchaseErrorListener((error) => {
+        if (error.code !== 'E_USER_CANCELLED') {
+          console.warn('[BondPass] IAP error:', error.code, error.message);
+        }
+      });
+
       try {
         await RNIap.initConnection();
+        iapReadyRef.current = true;
 
         const subs = await RNIap.getSubscriptions({ skus: [BOND_PASS_SKU] });
         if (subs.length > 0) setProduct(subs[0]);
@@ -43,21 +62,8 @@ export function BondPassProvider({ children }) {
           setHasBondPass(false);
           await AsyncStorage.removeItem(BOND_PASS_KEY);
         }
-
-        purchaseUpdateSub.current = RNIap.purchaseUpdatedListener(async (purchase) => {
-          if (purchase.productId !== BOND_PASS_SKU) return;
-          await RNIap.finishTransaction({ purchase, isConsumable: false });
-          setHasBondPass(true);
-          await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
-        });
-
-        purchaseErrorSub.current = RNIap.purchaseErrorListener((error) => {
-          if (error.code !== 'E_USER_CANCELLED') {
-            console.warn('Bond Pass IAP error:', error.message);
-          }
-        });
       } catch (e) {
-        console.warn('Bond Pass IAP init error:', e);
+        console.warn('[BondPass] IAP init error:', e?.code, e?.message);
       }
     }
 
@@ -71,7 +77,12 @@ export function BondPassProvider({ children }) {
   }, []);
 
   async function subscribeToBondPass() {
-    await RNIap.requestSubscription({ sku: BOND_PASS_SKU });
+    if (!iapReadyRef.current) {
+      // Attempt to reconnect if init failed earlier
+      await RNIap.initConnection();
+      iapReadyRef.current = true;
+    }
+    return RNIap.requestSubscription({ sku: BOND_PASS_SKU });
   }
 
   function cancelBondPass() {

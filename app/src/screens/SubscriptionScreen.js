@@ -58,14 +58,27 @@ export default function SubscriptionScreen({ navigation }) {
 
   async function handleSubscribe() {
     setLoading(true);
+
+    // Safety timeout — reset loading if the store never responds
+    const timeout = setTimeout(() => setLoading(false), 30000);
+
     try {
       await subscribeToBondPass();
-      // Success handled in the useEffect above via purchaseUpdatedListener
+      // On iOS, requestSubscription resolves before the Apple sheet completes.
+      // The actual success arrives via purchaseUpdatedListener → hasBondPass=true → useEffect above.
+      // If it returned null (store unavailable), clear the spinner quickly.
+      clearTimeout(timeout);
+      if (!hasBondPass) setTimeout(() => setLoading(false), 1500);
     } catch (e) {
+      clearTimeout(timeout);
       setLoading(false);
-      if (e.code !== 'E_USER_CANCELLED') {
-        Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
-      }
+      if (e.code === 'E_USER_CANCELLED') return;
+      const msg =
+        e.code === 'E_ITEM_UNAVAILABLE'  ? 'Bond Pass is not available on this device. Please check your App Store account.' :
+        e.code === 'E_NETWORK_ERROR'     ? 'No internet connection. Please try again.' :
+        e.code === 'E_SERVICE_ERROR'     ? 'App Store is temporarily unavailable. Try again later.' :
+                                           `Something went wrong (${e.code ?? 'unknown'}). Please try again.`;
+      Alert.alert('Purchase Failed', msg);
     }
   }
 
