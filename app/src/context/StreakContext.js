@@ -164,10 +164,20 @@ export function StreakProvider({ children }) {
         if (auth?.token && auth?.userId) {
           const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` };
 
-          // If exactly 1 day was missed and shield is available, apply it before checkin
           const localRaw  = await AsyncStorage.getItem(KEY);
           const localData = localRaw ? JSON.parse(localRaw) : {};
           const today     = todayStr();
+
+          // Skip server call entirely if already checked in today
+          if (localData.lastDate === today) {
+            setStreak(localData.streak || 0);
+            setLongest(localData.longest || 0);
+            setLastDate(today);
+            setLoading(false);
+            return;
+          }
+
+          // If exactly 1 day was missed and shield is available, apply it before checkin
           if (localData.lastDate) {
             const diff = Math.round((new Date(today) - new Date(localData.lastDate)) / 86400000);
             const bpRaw = await AsyncStorage.getItem(BP_KEY);
@@ -180,7 +190,12 @@ export function StreakProvider({ children }) {
                   method: 'POST', headers,
                   body: JSON.stringify({ userId: auth.userId }),
                 });
-                if (sr.ok) await markShieldUsed();
+                if (sr.ok) {
+                  await markShieldUsed();
+                } else if (sr.status === 409) {
+                  // Shield already used server-side — sync local state
+                  await markShieldUsed();
+                }
               } catch {}
             }
           }

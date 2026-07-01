@@ -66,6 +66,11 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_longest       INTEGER DEFAU
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_shield_month  VARCHAR(7);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_coins_earned   INTEGER DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_coins_date     DATE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS tagline              VARCHAR(50);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bond_style           VARCHAR(50);
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS vibe_tags            TEXT[]  DEFAULT '{}';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS interests            TEXT[]  DEFAULT '{}';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS cover_photo_url      TEXT;
 
 -- ─── IAP RECEIPT LOG — prevents replay attacks ────────────────────────────────
 CREATE TABLE IF NOT EXISTS iap_receipts (

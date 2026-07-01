@@ -13,16 +13,19 @@ async function upsertProfile(userId, data) {
     display_name, age, gender, country, city, lat, lng,
     language, languages_spoken, bio, photo_url, voice_note_url,
     voice_tone_data, connection_types, gallery_photos,
+    tagline, bond_style, vibe_tags, interests, cover_photo_url,
   } = data;
 
   const { rows } = await query(`
     INSERT INTO profiles
       (user_id, display_name, age, gender, country, city, lat, lng,
        language, languages_spoken, bio, photo_url, voice_note_url,
-       voice_tone_data, connection_types, gallery_photos, last_active)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())
+       voice_tone_data, connection_types, gallery_photos,
+       tagline, bond_style, vibe_tags, interests, cover_photo_url,
+       last_active)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())
     ON CONFLICT (user_id) DO UPDATE SET
-      display_name     = EXCLUDED.display_name,
+      display_name     = COALESCE(EXCLUDED.display_name, profiles.display_name),
       age              = COALESCE(EXCLUDED.age, profiles.age),
       gender           = COALESCE(EXCLUDED.gender, profiles.gender),
       country          = COALESCE(EXCLUDED.country, profiles.country),
@@ -37,6 +40,11 @@ async function upsertProfile(userId, data) {
       voice_tone_data  = COALESCE(EXCLUDED.voice_tone_data, profiles.voice_tone_data),
       connection_types = COALESCE(EXCLUDED.connection_types, profiles.connection_types),
       gallery_photos   = COALESCE(EXCLUDED.gallery_photos, profiles.gallery_photos),
+      tagline          = COALESCE(EXCLUDED.tagline, profiles.tagline),
+      bond_style       = COALESCE(EXCLUDED.bond_style, profiles.bond_style),
+      vibe_tags        = COALESCE(EXCLUDED.vibe_tags, profiles.vibe_tags),
+      interests        = COALESCE(EXCLUDED.interests, profiles.interests),
+      cover_photo_url  = COALESCE(EXCLUDED.cover_photo_url, profiles.cover_photo_url),
       last_active      = NOW(),
       updated_at       = NOW()
     RETURNING *
@@ -45,6 +53,8 @@ async function upsertProfile(userId, data) {
     language || 'en', languages_spoken || [], bio, photo_url,
     voice_note_url, voice_tone_data || {}, connection_types || [],
     gallery_photos || [],
+    tagline || null, bond_style || null, vibe_tags || null, interests || null,
+    cover_photo_url || null,
   ]);
   return rows[0];
 }

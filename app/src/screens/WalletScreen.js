@@ -13,6 +13,7 @@ import {
   getPayoutCooldownMs, getPayoutCooldownDays,
 } from '../context/WalletContext';
 import { getFeaturedFlag, isStampDropped, getNextFeaturedFlag } from '../context/ChallengeContext';
+import { getAccessToken } from '../services/authApi';
 
 const BOND_PINK   = '#FF0080';
 const BOND_GOLD   = '#FFB700';
@@ -265,18 +266,20 @@ export default function WalletScreen({ navigation, route }) {
       await RNIap.initConnection();
       const purchase = await RNIap.requestPurchase({ sku: pack.sku });
       await RNIap.finishTransaction({ purchase, isConsumable: true });
-      // Credit coins on the server
-      await fetch(`${SERVER_URL}/coins/credit`, {
+      const token = await getAccessToken();
+      const creditRes = await fetch(`${SERVER_URL}/coins/credit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           userId: currentUser?.userId,
           sku: pack.sku,
           receipt: purchase.transactionReceipt,
         }),
       });
+      const creditData = await creditRes.json();
       setShowCoinModal(false);
-      Alert.alert('Coins Added', `${pack.coins.toLocaleString()}${pack.bonus ? ` + ${pack.bonus}` : ''} Bond Coins added to your wallet.`);
+      const credited = creditData.credited ?? pack.coins;
+      Alert.alert('Coins Added', `${credited.toLocaleString()} Bond Coins added to your wallet.`);
     } catch (err) {
       if (err.code !== 'E_USER_CANCELLED') {
         Alert.alert('Purchase Failed', 'Something went wrong. Please try again.');
@@ -289,9 +292,10 @@ export default function WalletScreen({ navigation, route }) {
 
   async function handleConnectStripe() {
     try {
+      const token = await getAccessToken();
       const res = await fetch(`${SERVER_URL}/creator/connect-stripe`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ userId: currentUser?.userId, email: currentUser?.email }),
       });
       const { url } = await res.json();
@@ -322,21 +326,23 @@ export default function WalletScreen({ navigation, route }) {
         {
           text: 'Confirm',
           onPress: async () => {
+            if (!currentUser?.userId) {
+              Alert.alert('Error', 'User session expired. Please log in again.');
+              return;
+            }
             try {
               setPayingOut(true);
+              const token = await getAccessToken();
               const res = await fetch(`${SERVER_URL}/creator/payout`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: currentUser?.userId,
-                  stripeAccountId: currentUser.stripeAccountId,
-                  amountCents: Math.floor(parseFloat(availableUSD) * 100),
-                }),
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ userId: currentUser.userId }),
               });
               const data = await res.json();
               if (data.transfer) {
                 recordPayout();
-                Alert.alert('Payout Sent', 'Your funds are on the way. Check your bank in 3–5 business days.');
+                const usd = (data.amountCents / 100).toFixed(2);
+                Alert.alert('Payout Sent', `$${usd} USD is on the way (${data.coinsDeducted.toLocaleString()} BC). Funds arrive in 3–5 business days.`);
               } else {
                 Alert.alert('Payout Failed', data.error || 'Please try again.');
               }

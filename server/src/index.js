@@ -209,7 +209,9 @@ app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req,
 });
 
 // Debug: fire a test notification to all connected clients using a real profile userId
-app.post('/api/debug/notify', async (req, res) => {
+app.post('/api/debug/notify', requireAuth, async (req, res) => {
+  const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!ADMIN_IDS.includes(req.user?.userId)) return res.status(403).json({ error: 'Not authorized.' });
   const ioInstance = req.app.get('io');
   const { type = 'follower' } = req.body;
 
@@ -439,19 +441,29 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
       );
     }
 
-    // ── 9. Execute Stripe transfer ────────────────────────────────────────────
-    const transfer = await stripe.transfers.create({
-      amount: amountCents,
-      currency: 'usd',
-      destination: stripe_account_id,
-      metadata: { userId, coins: coinsToPay, rate: String(payoutRate) },
-    });
-
-    // ── 10. Deduct coins and record cooldown timestamp ────────────────────────
+    // ── 9. Deduct coins first — if Stripe fails we refund; this prevents double-spend ──
     await db(
       `UPDATE profiles SET coin_balance = coin_balance - $1, last_payout_at = NOW() WHERE user_id = $2`,
       [coinsToPay, userId]
     );
+
+    // ── 10. Execute Stripe transfer — refund coins if this fails ─────────────
+    let transfer;
+    try {
+      transfer = await stripe.transfers.create({
+        amount: amountCents,
+        currency: 'usd',
+        destination: stripe_account_id,
+        metadata: { userId, coins: coinsToPay, rate: String(payoutRate) },
+      });
+    } catch (stripeErr) {
+      // Rollback: restore coins and clear cooldown timestamp
+      await db(
+        `UPDATE profiles SET coin_balance = coin_balance + $1, last_payout_at = NULL WHERE user_id = $2`,
+        [coinsToPay, userId]
+      ).catch(() => {});
+      throw stripeErr;
+    }
 
     // ── 11. Immutable audit trail ─────────────────────────────────────────────
     await db(
@@ -743,6 +755,12 @@ setupSocket(io);
 const PORT = process.env.PORT || 3001;
 
 async function start() {
+  if (!APPLE_SHARED_SECRET) {
+    console.error('[Security] APPLE_SHARED_SECRET is not set — IAP receipts will NOT be verified. Set this env var before launch.');
+  }
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.warn('[Security] STRIPE_SECRET_KEY is not set — payouts and Stripe connect are disabled.');
+  }
   if (process.env.DATABASE_URL) {
     try {
       await runMigrations();
