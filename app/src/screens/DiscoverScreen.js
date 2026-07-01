@@ -1534,22 +1534,42 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
           <Text style={st.passLabelTxt}>PASS</Text>
         </Animated.View>
 
-        <LinearGradient colors={[sig.avatarColor + '22', '#08090d', '#000']} style={fp2.cardGrad}>
+        {/* Full-card photo when user has one */}
+        {sig.photo_url && (
+          <Image source={{ uri: sig.photo_url }} style={[StyleSheet.absoluteFill, { borderRadius: 30 }]} resizeMode="cover" />
+        )}
 
-          {/* Avatar + online */}
-          <View style={fp2.avatarZone}>
-            <Avatar photo_url={sig.photo_url} name={sig.name} size={90} />
-            {sig.online && (
-              <View style={fp2.onlinePill}>
-                <View style={fp2.onlineDot} />
-                <Text style={fp2.onlineTxt}>Online now</Text>
-              </View>
-            )}
-          </View>
+        <LinearGradient
+          colors={sig.photo_url
+            ? ['transparent', 'transparent', 'rgba(0,0,0,0.55)', 'rgba(0,0,0,0.96)']
+            : [sig.avatarColor + '22', '#08090d', '#000']
+          }
+          style={[fp2.cardGrad, sig.photo_url && fp2.cardGradPhoto]}
+        >
+          {/* No-photo: centered avatar */}
+          {!sig.photo_url && (
+            <View style={fp2.avatarZone}>
+              <Avatar photo_url={null} name={sig.name} size={90} />
+              {sig.online && (
+                <View style={fp2.onlinePill}>
+                  <View style={fp2.onlineDot} />
+                  <Text style={fp2.onlineTxt}>Online now</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Has photo: online pill floats top-right */}
+          {sig.photo_url && sig.online && (
+            <View style={fp2.onlinePillPhoto}>
+              <View style={fp2.onlineDot} />
+              <Text style={fp2.onlineTxt}>Online now</Text>
+            </View>
+          )}
 
           {/* Name + handle */}
           <Text style={fp2.name}>{sig.name}, {sig.age}</Text>
-          <Text style={fp2.handle}>{sig.username}</Text>
+          <Text style={[fp2.handle, sig.photo_url && fp2.handlePhoto]}>{sig.username}</Text>
           <View style={fp2.locRow}>
             <Text style={{ fontSize: 17 }}>{sig.flag}</Text>
             <Text style={fp2.locTxt}>{sig.country}</Text>
@@ -1877,14 +1897,17 @@ const fp2 = StyleSheet.create({
   card:         { flex: 1, marginHorizontal: 14, marginBottom: 6, borderRadius: 30, overflow: 'hidden',
                   shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 28, shadowOffset: { width: 0, height: 10 } },
   cardGrad:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 20, gap: 8 },
+  cardGradPhoto:{ justifyContent: 'flex-end', paddingBottom: 28 },
 
   avatarZone:   { alignItems: 'center', gap: 10, marginBottom: 4 },
-  onlinePill:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#57f28715', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#57f28730' },
+  onlinePill:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#57f28715', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#57f28730' },
+  onlinePillPhoto: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: '#57f28755', position: 'absolute', top: 20, right: 20 },
   onlineDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#57f287' },
   onlineTxt:    { color: '#57f287', fontSize: 11, fontWeight: '700' },
 
   name:         { color: '#fff', fontSize: 26, fontWeight: '900', textAlign: 'center' },
   handle:       { color: '#444', fontSize: 13, textAlign: 'center', marginTop: -2 },
+  handlePhoto:  { color: 'rgba(255,255,255,0.55)' },
   locRow:       { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   locTxt:       { color: '#777', fontSize: 14, fontWeight: '700' },
 
