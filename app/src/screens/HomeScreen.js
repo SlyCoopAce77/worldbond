@@ -11,6 +11,7 @@ import { stringToColor } from '../utils/apiUtils';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
 import { useWallet, BOND_MONUMENTS } from '../context/WalletContext';
+import { useBondPass } from '../context/PremiumContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
 const { width } = Dimensions.get('window');
@@ -505,7 +506,8 @@ function greeting() {
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation, user }) {
   const { unreadCount } = useNotifications();
-  const { streak, longest, tier: streakTier, milestones, primary } = useStreak();
+  const { streak, longest, tier: streakTier, milestones, primary, shieldAvailable } = useStreak();
+  const { hasBondPass } = useBondPass();
   const { myStamps, balance } = useWallet();
   const socket = getSocket();
 
@@ -818,6 +820,16 @@ export default function HomeScreen({ navigation, user }) {
               longest={longest}
               onPress={() => navigation.navigate('Wallet', { currentUser: user })}
             />
+            {hasBondPass && (
+              <View style={s.shieldRow}>
+                <View style={[s.shieldPill, shieldAvailable ? s.shieldReady : s.shieldSpent]}>
+                  <Text style={s.shieldIcon}>🛡</Text>
+                  <Text style={[s.shieldTxt, shieldAvailable ? s.shieldTxtReady : s.shieldTxtSpent]}>
+                    {shieldAvailable ? 'Streak Shield ready' : 'Shield used this month'}
+                  </Text>
+                </View>
+              </View>
+            )}
           </Animated.View>
         )}
 
@@ -839,7 +851,15 @@ const blp = StyleSheet.create({
 });
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#07080f' },
+  container:       { flex: 1, backgroundColor: '#07080f' },
+  shieldRow:       { marginTop: 10, alignItems: 'flex-start' },
+  shieldPill:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  shieldReady:     { backgroundColor: 'rgba(255,0,128,0.08)', borderColor: BOND_PINK + '50' },
+  shieldSpent:     { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.10)' },
+  shieldIcon:      { fontSize: 13 },
+  shieldTxt:       { fontSize: 12, fontWeight: '700' },
+  shieldTxtReady:  { color: BOND_PINK },
+  shieldTxtSpent:  { color: 'rgba(255,255,255,0.3)' },
 
   // Sticky header
   stickyBar:       { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, backgroundColor: '#07080ff0', borderBottomWidth: 1, borderBottomColor: '#1C1F23' },

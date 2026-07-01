@@ -63,6 +63,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS has_bond_pass        BOOLEAN DEFAU
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_days          INTEGER DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_last_checkin  DATE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_longest       INTEGER DEFAULT 0;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_shield_month  VARCHAR(7);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_coins_earned   INTEGER DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS daily_coins_date     DATE;
 

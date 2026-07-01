@@ -117,44 +117,81 @@ export function formatStreakPrimary(days) {
   return { value: days.toString(), unit: days === 1 ? 'DAY' : 'DAYS' };
 }
 
+const SHIELD_KEY = 'worldbond_streak_shield_v1';
+const BP_KEY     = 'worldbond_bond_pass';
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 const StreakContext = createContext(null);
 
 export function StreakProvider({ children }) {
-  const [streak,   setStreak]   = useState(0);
-  const [longest,  setLongest]  = useState(0);
-  const [lastDate, setLastDate] = useState(null); // 'YYYY-MM-DD'
-  const [loading,  setLoading]  = useState(true);
+  const [streak,         setStreak]         = useState(0);
+  const [longest,        setLongest]        = useState(0);
+  const [lastDate,       setLastDate]       = useState(null);
+  const [loading,        setLoading]        = useState(true);
+  const [shieldAvailable, setShieldAvailable] = useState(false);
 
-  function todayStr() {
-    return new Date().toISOString().split('T')[0];
-  }
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function monthStr() { return new Date().toISOString().slice(0, 7); }
 
   async function save(data) {
-    try {
-      await AsyncStorage.setItem(KEY, JSON.stringify(data));
-    } catch {}
+    try { await AsyncStorage.setItem(KEY, JSON.stringify(data)); } catch {}
+  }
+
+  async function loadShieldState() {
+    const bpRaw     = await AsyncStorage.getItem(BP_KEY);
+    const hasBP     = bpRaw === 'true';
+    if (!hasBP) { setShieldAvailable(false); return false; }
+    const raw  = await AsyncStorage.getItem(SHIELD_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    const avail = data.monthUsed !== monthStr();
+    setShieldAvailable(avail);
+    return avail;
+  }
+
+  async function markShieldUsed() {
+    await AsyncStorage.setItem(SHIELD_KEY, JSON.stringify({ monthUsed: monthStr() }));
+    setShieldAvailable(false);
   }
 
   useEffect(() => {
     async function init() {
+      await loadShieldState();
+
       // Try server-side validated streak first (tamper-proof)
       try {
         const authRaw = await AsyncStorage.getItem('worldbond_auth');
         const auth    = authRaw ? JSON.parse(authRaw) : null;
         if (auth?.token && auth?.userId) {
+          const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` };
+
+          // If exactly 1 day was missed and shield is available, apply it before checkin
+          const localRaw  = await AsyncStorage.getItem(KEY);
+          const localData = localRaw ? JSON.parse(localRaw) : {};
+          const today     = todayStr();
+          if (localData.lastDate) {
+            const diff = Math.round((new Date(today) - new Date(localData.lastDate)) / 86400000);
+            const bpRaw = await AsyncStorage.getItem(BP_KEY);
+            const shieldRaw = await AsyncStorage.getItem(SHIELD_KEY);
+            const shieldData = shieldRaw ? JSON.parse(shieldRaw) : {};
+            const shieldAvail = bpRaw === 'true' && shieldData.monthUsed !== monthStr();
+            if (diff === 2 && shieldAvail) {
+              try {
+                const sr = await fetch(`${SERVER_URL}/streak/use-shield`, {
+                  method: 'POST', headers,
+                  body: JSON.stringify({ userId: auth.userId }),
+                });
+                if (sr.ok) await markShieldUsed();
+              } catch {}
+            }
+          }
+
           const res = await fetch(`${SERVER_URL}/streak/checkin`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
+            method: 'POST', headers,
             body: JSON.stringify({ userId: auth.userId }),
           });
           if (res.ok) {
             const { streak: s, longest: l } = await res.json();
-            const today = todayStr();
-            setStreak(s);
-            setLongest(l);
-            setLastDate(today);
-            setLoading(false);
+            setStreak(s); setLongest(l); setLastDate(today); setLoading(false);
             await save({ streak: s, longest: l, lastDate: today });
             return;
           }
@@ -163,7 +200,7 @@ export function StreakProvider({ children }) {
         // Network offline — fall back to local
       }
 
-      // Offline fallback (local only — not authoritative, but functional)
+      // Offline fallback
       const raw = await AsyncStorage.getItem(KEY);
       let data = {};
       try { if (raw) data = JSON.parse(raw); } catch {}
@@ -181,17 +218,27 @@ export function StreakProvider({ children }) {
           newStreak  = (data.streak || 0) + 1;
           newLongest = Math.max(newStreak, data.longest || 0);
           newDate    = today;
-        } else if (diff > 1) {
+        } else if (diff === 2) {
+          const bpRaw = await AsyncStorage.getItem(BP_KEY);
+          const shieldRaw = await AsyncStorage.getItem(SHIELD_KEY);
+          const shieldData = shieldRaw ? JSON.parse(shieldRaw) : {};
+          if (bpRaw === 'true' && shieldData.monthUsed !== monthStr()) {
+            // Shield absorbs the missed day
+            newStreak  = (data.streak || 0) + 1;
+            newLongest = Math.max(newStreak, data.longest || 0);
+            newDate    = today;
+            await markShieldUsed();
+          } else {
+            newStreak = 1; newDate = today;
+          }
+        } else if (diff > 2) {
           newStreak = 1; newDate = today;
         }
       }
 
       const updated = { streak: newStreak, longest: newLongest, lastDate: newDate };
       await save(updated);
-      setStreak(newStreak);
-      setLongest(newLongest);
-      setLastDate(newDate);
-      setLoading(false);
+      setStreak(newStreak); setLongest(newLongest); setLastDate(newDate); setLoading(false);
     }
 
     init();
@@ -205,6 +252,7 @@ export function StreakProvider({ children }) {
     <StreakContext.Provider value={{
       streak, longest, lastDate, tier,
       milestones, primary, loading,
+      shieldAvailable,
     }}>
       {children}
     </StreakContext.Provider>

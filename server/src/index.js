@@ -596,6 +596,47 @@ app.post('/streak/checkin', requireAuth, async (req, res) => {
   }
 });
 
+// Bond Pass Streak Shield — absorbs exactly 1 missed day per calendar month
+app.post('/streak/use-shield', requireAuth, async (req, res) => {
+  const userId = req.user?.userId || req.body.userId;
+  try {
+    const { query: db } = require('./database/db');
+    const { rows } = await db(
+      `SELECT has_bond_pass, streak_days, streak_last_checkin, streak_longest, streak_shield_month FROM profiles WHERE user_id = $1`,
+      [userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+    const { has_bond_pass, streak_days, streak_last_checkin, streak_longest, streak_shield_month } = rows[0];
+
+    if (!has_bond_pass) return res.status(403).json({ error: 'Bond Pass required.' });
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+    if (streak_shield_month === currentMonth) {
+      return res.status(409).json({ error: 'Shield already used this month.' });
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const lastStr  = streak_last_checkin ? (streak_last_checkin.toISOString?.().slice(0, 10) || String(streak_last_checkin).slice(0, 10)) : null;
+    const diffDays = lastStr ? Math.round((new Date(todayStr) - new Date(lastStr)) / 86400000) : null;
+
+    if (!lastStr || diffDays !== 2) {
+      return res.status(400).json({ error: 'Shield can only cover exactly 1 missed day.' });
+    }
+
+    // Move lastCheckin forward by 1 day (yesterday), so the regular checkin sees a valid streak
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    await db(
+      `UPDATE profiles SET streak_last_checkin = $1, streak_shield_month = $2 WHERE user_id = $3`,
+      [yesterday, currentMonth, userId]
+    );
+
+    res.json({ shieldUsed: true, streak: streak_days, longest: streak_longest });
+  } catch (err) {
+    console.error('[Streak] shield error:', err.message);
+    res.status(500).json({ error: 'Could not apply shield.' });
+  }
+});
+
 // ── Bot / fraud detection: report suspicious account ─────────────────────────
 app.post('/admin/flag-account', requireAuth, async (req, res) => {
   const reporterId = req.user?.userId || req.body.reporterId;

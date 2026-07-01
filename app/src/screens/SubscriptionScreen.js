@@ -10,14 +10,15 @@ import { WorldMark } from '../components/BondLogo';
 const BOND_PINK = '#FF0080';
 
 const PASS_FEATURES = [
+  { text: 'Streak Shield — 1 missed day covered each month' },
   { text: 'Unlimited daily connects'                        },
-  { text: '150-char personal note with every bond request'  },
-  { text: 'Message anyone — bonded or not'                  },
-  { text: '75% gift payout rate (vs 70% standard)'          },
-  { text: '5 Random Connects per day'                       },
-  { text: 'Advanced matching filters (gender, vibe)'        },
-  { text: 'Create and host events'                          },
-  { text: 'Bond Pass badge on your profile'                 },
+  { text: '14-day payout cooldown (vs 30 days standard)'   },
+  { text: '75% gift payout rate (vs 70% standard)'         },
+  { text: '150-char personal note with every bond request' },
+  { text: 'Message anyone — bonded or not'                 },
+  { text: 'Advanced matching filters (gender, vibe)'       },
+  { text: 'Create and host events'                         },
+  { text: 'Bond Pass badge on your profile'                },
 ];
 
 export default function SubscriptionScreen({ navigation }) {
