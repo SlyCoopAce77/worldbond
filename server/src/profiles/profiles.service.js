@@ -9,6 +9,10 @@ async function getProfile(userId) {
 }
 
 async function upsertProfile(userId, data) {
+  if (data.display_name !== undefined && !data.display_name?.trim()) {
+    throw new Error('display_name cannot be empty');
+  }
+
   const {
     display_name, age, gender, country, city, lat, lng,
     language, languages_spoken, bio, photo_url, voice_note_url,

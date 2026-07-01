@@ -26,7 +26,16 @@ export async function logout() {
   if (refresh) {
     axios.post(`${SERVER_URL}/api/auth/logout`, { refreshToken: refresh }).catch(() => {});
   }
-  await AsyncStorage.multiRemove([KEYS.ACCESS, KEYS.REFRESH, KEYS.USER_ID, KEYS.PROFILE]);
+  await AsyncStorage.multiRemove([
+    KEYS.ACCESS, KEYS.REFRESH, KEYS.USER_ID, KEYS.PROFILE,
+    'worldbond_auth',
+    'worldbond_streak_v1',
+    'worldbond_streak_shield_v1',
+    'worldbond_bond_pass',
+    'wb_monument_challenges',
+    'world_impressions',
+    'bond_saved_countries',
+  ]);
 }
 
 export async function getAccessToken() {
@@ -64,15 +73,20 @@ export async function refreshAccessToken() {
   const refreshToken = await AsyncStorage.getItem(KEYS.REFRESH);
   if (!refreshToken) throw new Error('No refresh token');
   const { data } = await axios.post(`${SERVER_URL}/api/auth/refresh`, { refreshToken });
-  await AsyncStorage.setItem(KEYS.ACCESS, data.access);
+  const userId = await AsyncStorage.getItem(KEYS.USER_ID);
+  await AsyncStorage.multiSet([
+    [KEYS.ACCESS, data.access],
+    ['worldbond_auth', JSON.stringify({ token: data.access, userId })],
+  ]);
   return data.access;
 }
 
 async function storeTokens({ userId, access, refresh }) {
   await AsyncStorage.multiSet([
-    [KEYS.ACCESS,  access],
-    [KEYS.REFRESH, refresh],
-    [KEYS.USER_ID, userId],
+    [KEYS.ACCESS,   access],
+    [KEYS.REFRESH,  refresh],
+    [KEYS.USER_ID,  userId],
+    ['worldbond_auth', JSON.stringify({ token: access, userId })],
   ]);
 }
 

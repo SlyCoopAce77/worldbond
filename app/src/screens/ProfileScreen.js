@@ -522,7 +522,7 @@ export default function ProfileScreen({ route, navigation }) {
             <Text style={styles.heroName} numberOfLines={1}>
               {displayName}{bondProfile?.age ? `, ${bondProfile.age}` : ''}
             </Text>
-            {(bondProfile?.is_verified || bondProfile?.verified) && (
+            {bondProfile?.is_id_verified && (
               <View style={styles.verifyBadge}>
                 <Text style={styles.verifyTxt}>✓</Text>
               </View>
