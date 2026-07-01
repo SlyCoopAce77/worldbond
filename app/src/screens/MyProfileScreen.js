@@ -1043,7 +1043,14 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
 
           {/* ── Name + location ── */}
           <View style={s.profileInfo}>
-            <Text style={s.heroName} numberOfLines={1}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
+            <View style={s.nameRow}>
+              <Text style={s.heroName} numberOfLines={1}>{displayName}{profile?.age ? `, ${profile.age}` : ''}</Text>
+              {hasBondPass && (
+                <View style={s.bpBadge}>
+                  <Text style={s.bpBadgeTxt}>✦ Bond Pass</Text>
+                </View>
+              )}
+            </View>
             {countryCity ? <Text style={s.heroLoc}>{countryCity} {countryFlag}</Text> : null}
             {profile?.gender ? <Text style={s.heroGender}>{profile.gender}</Text> : null}
           </View>
@@ -1473,7 +1480,10 @@ const s = StyleSheet.create({
 
   // Profile info
   profileInfo: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, gap: 3 },
+  nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   heroName:    { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: -0.4 },
+  bpBadge:     { flexDirection: 'row', alignItems: 'center', backgroundColor: BOND_PINK + '18', borderRadius: 8, borderWidth: 1, borderColor: BOND_PINK + '55', paddingHorizontal: 8, paddingVertical: 3 },
+  bpBadgeTxt:  { color: BOND_PINK, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   heroLoc:     { color: 'rgba(255,255,255,0.42)', fontSize: 13 },
   heroGender:  { color: 'rgba(255,255,255,0.28)', fontSize: 12 },
 

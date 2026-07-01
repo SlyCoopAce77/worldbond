@@ -527,9 +527,9 @@ export default function ProfileScreen({ route, navigation }) {
                 <Text style={styles.verifyTxt}>✓</Text>
               </View>
             )}
-            {bondProfile?.bond_pass && (
-              <View style={{ backgroundColor: BOND_PINK + '22', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 }}>
-                <Text style={{ color: BOND_PINK, fontSize: 10, fontWeight: '900' }}>PASS</Text>
+            {bondProfile?.has_bond_pass && (
+              <View style={styles.bpBadge}>
+                <Text style={styles.bpBadgeTxt}>✦ Bond Pass</Text>
               </View>
             )}
           </View>
@@ -953,6 +953,8 @@ const styles = StyleSheet.create({
   heroGender:      { color: 'rgba(255,255,255,0.3)', fontSize: 12 },
   verifyBadge:     { width: 20, height: 20, borderRadius: 10, backgroundColor: '#1d9bf0', alignItems: 'center', justifyContent: 'center' },
   verifyTxt:       { color: '#fff', fontSize: 10, fontWeight: '900' },
+  bpBadge:         { flexDirection: 'row', alignItems: 'center', backgroundColor: BOND_PINK + '18', borderRadius: 8, borderWidth: 1, borderColor: BOND_PINK + '55', paddingHorizontal: 8, paddingVertical: 3 },
+  bpBadgeTxt:      { color: BOND_PINK, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
   relBadge:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, alignSelf: 'flex-start', marginTop: 4 },
   relBadgeText:    { fontSize: 12, fontWeight: '700' },
   relDot:          { width: 7, height: 7, borderRadius: 4 },
