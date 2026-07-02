@@ -121,34 +121,33 @@ app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req
         break;
       }
       case 'transfer.reversed': {
-        // Transfer was reversed — refund coins back to the user
+        // Transfer was reversed — refund coins back to the user.
+        // Stripe webhook delivery is "at-least-once", not exactly-once (retries,
+        // manual resends from the dashboard, etc. can redeliver the same event),
+        // so this must be idempotent — the status flip and the refund happen in
+        // a single conditional UPDATE so a duplicate delivery is a no-op instead
+        // of crediting the same coins back twice.
         const transfer = event.data.object;
         const transferId = transfer.id;
         console.log('[Stripe] transfer.reversed:', transferId);
 
-        // Get transfer info to refund coins
-        const txResult = await db(
-          `SELECT user_id, coins_deducted FROM transfer_status WHERE transfer_id = $1`,
+        const claimed = await db(
+          `UPDATE transfer_status SET status = 'refunded', updated_at = NOW()
+           WHERE transfer_id = $1 AND status != 'refunded'
+           RETURNING user_id, coins_deducted`,
           [transferId]
-        );
+        ).catch(e => { console.warn('[Transfer] status update error:', e.message); return { rows: [] }; });
 
-        if (txResult.rows.length > 0) {
-          const { user_id, coins_deducted } = txResult.rows[0];
-
-          // Refund coins to user
+        if (claimed.rows.length > 0) {
+          const { user_id, coins_deducted } = claimed.rows[0];
           await db(
             `UPDATE profiles SET coin_balance = coin_balance + $1 WHERE user_id = $2`,
             [coins_deducted, user_id]
           ).catch(e => console.warn('[Transfer] coin refund error:', e.message));
 
-          // Mark transfer as refunded in status table
-          await db(
-            `UPDATE transfer_status SET status = 'refunded', updated_at = NOW()
-             WHERE transfer_id = $1`,
-            [transferId]
-          ).catch(e => console.warn('[Transfer] status update error:', e.message));
-
           console.log('[Transfer] Refunded', coins_deducted, 'coins (reversal) to user', user_id);
+        } else {
+          console.log('[Transfer] reversal already processed or unknown transfer:', transferId);
         }
         break;
       }
