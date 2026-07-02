@@ -105,6 +105,11 @@ export default function LiveScreen({ route, navigation }) {
     function onLiveEnded() {
       if (isLiveRef.current) navigation.goBack();
     }
+    function onGoLiveError() {
+      clearTimeout(startTimeoutRef.current);
+      setStarting(false);
+      Alert.alert('Could not go live', 'Reconnecting… please try again in a moment.');
+    }
 
     socket.on('live_started',       onLiveStarted);
     socket.on('live_viewer_count',  onViewerCount);
@@ -113,6 +118,7 @@ export default function LiveScreen({ route, navigation }) {
     socket.on('live_reaction',      onReaction);
     socket.on('live_gift_received', onGiftReceived);
     socket.on('live_ended',         onLiveEnded);
+    socket.on('go_live_error',      onGoLiveError);
 
     return () => {
       socket.off('live_started',       onLiveStarted);
@@ -122,6 +128,7 @@ export default function LiveScreen({ route, navigation }) {
       socket.off('live_reaction',      onReaction);
       socket.off('live_gift_received', onGiftReceived);
       socket.off('live_ended',         onLiveEnded);
+      socket.off('go_live_error',      onGoLiveError);
     };
   }, []);
 

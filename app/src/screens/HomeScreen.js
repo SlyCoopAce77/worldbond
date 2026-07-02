@@ -549,7 +549,11 @@ export default function HomeScreen({ navigation, user }) {
       socket.emit('get_users');
       socket.emit('get_icebreaker');
     }
-    if (socket.connected) reg(); else socket.once('connect', reg);
+    // Re-register on every reconnect (not just the first connect) — otherwise
+    // a dropped/restored socket gets a new server-side id that the server
+    // never associates with this user, and go_live (and similar) silently no-op.
+    if (socket.connected) reg();
+    socket.on('connect', reg);
 
     const onUsers = list => setOnlineUsers(list.filter(u => u.socketId !== socket.id));
     const onIce   = ({ question, responses }) => setIcebreaker({ question, responseCount: responses?.length || 0 });

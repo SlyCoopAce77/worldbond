@@ -997,7 +997,10 @@ function setupSocket(io) {
 
     socket.on('go_live', async ({ title, category, thumbnail }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
+      if (!user) {
+        socket.emit('go_live_error', { reason: 'not_registered' });
+        return;
+      }
 
       // End any existing stream from this socket
       if (liveStreams[socket.id]) {
