@@ -1029,8 +1029,8 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
         {/* Stats row */}
         <View style={pv.statsRow}>
           <View style={pv.statItem}>
-            <Text style={pv.statVal}>
-              {(sig.interests || []).slice(0, 3).map(t => t.split(' ')[0]).join(' ') || '✨'}
+            <Text style={pv.statValText} numberOfLines={2}>
+              {(sig.interests || []).slice(0, 3).map(t => t.split(' ')[0]).join(', ') || '✨'}
             </Text>
             <Text style={pv.statLabel}>In Common</Text>
           </View>
@@ -2003,6 +2003,7 @@ const pv = StyleSheet.create({
                  borderRadius: 18, paddingVertical: 16, borderWidth: 1, borderColor: '#1e2028' },
   statItem:    { flex: 1, alignItems: 'center', gap: 4 },
   statVal:     { color: '#fff', fontSize: 20, fontWeight: '900' },
+  statValText: { color: '#fff', fontSize: 13, fontWeight: '600', lineHeight: 16, textAlign: 'center' },
   statLabel:   { color: '#666', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   statDiv:     { width: 1, backgroundColor: '#1e2028' },
 
