@@ -105,12 +105,12 @@ app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req
 
     // Handle transfer events
     switch (event.type) {
-      case 'charge.succeeded': {
-        // Charge succeeded — transfer was sent to creator bank
-        const charge = event.data.object;
-        const transferId = charge.id;
-        console.log('[Stripe] charge.succeeded:', transferId);
-        
+      case 'transfer.created': {
+        // Transfer landed in the creator's connected account balance
+        const transfer = event.data.object;
+        const transferId = transfer.id;
+        console.log('[Stripe] transfer.created:', transferId);
+
         // Update transfer status to completed
         await db(
           `UPDATE transfer_status SET status = 'completed', completed_at = NOW(), updated_at = NOW()
@@ -119,66 +119,34 @@ app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req
         ).catch(e => console.warn('[Transfer] status update error:', e.message));
         break;
       }
-      case 'charge.failed': {
-        // Charge failed — refund coins back to creator
-        const charge = event.data.object;
-        const transferId = charge.id;
-        console.error('[Stripe] charge.failed:', transferId, charge.failure_message);
-        
+      case 'transfer.reversed': {
+        // Transfer was reversed — refund coins back to the user
+        const transfer = event.data.object;
+        const transferId = transfer.id;
+        console.log('[Stripe] transfer.reversed:', transferId);
+
         // Get transfer info to refund coins
         const txResult = await db(
           `SELECT user_id, coins_deducted FROM transfer_status WHERE transfer_id = $1`,
           [transferId]
         );
-        
+
         if (txResult.rows.length > 0) {
           const { user_id, coins_deducted } = txResult.rows[0];
-          
+
           // Refund coins to user
           await db(
             `UPDATE profiles SET coin_balance = coin_balance + $1 WHERE user_id = $2`,
             [coins_deducted, user_id]
           ).catch(e => console.warn('[Transfer] coin refund error:', e.message));
-          
-          // Mark transfer as failed in status table
-          await db(
-            `UPDATE transfer_status SET status = 'failed', stripe_status = $2, updated_at = NOW()
-             WHERE transfer_id = $1`,
-            [transferId, JSON.stringify({ error: charge.failure_message })]
-          ).catch(e => console.warn('[Transfer] status update error:', e.message));
-          
-          console.log('[Transfer] Refunded', coins_deducted, 'coins to user', user_id);
-        }
-        break;
-      }
-      case 'charge.refunded': {
-        // Charge was refunded — restore coins to creator
-        const charge = event.data.object;
-        const transferId = charge.id;
-        console.log('[Stripe] charge.refunded:', transferId);
-        
-        // Get transfer info to refund coins
-        const txResult = await db(
-          `SELECT user_id, coins_deducted FROM transfer_status WHERE transfer_id = $1`,
-          [transferId]
-        );
-        
-        if (txResult.rows.length > 0) {
-          const { user_id, coins_deducted } = txResult.rows[0];
-          
-          // Refund coins to user
-          await db(
-            `UPDATE profiles SET coin_balance = coin_balance + $1 WHERE user_id = $2`,
-            [coins_deducted, user_id]
-          ).catch(e => console.warn('[Transfer] coin refund error:', e.message));
-          
+
           // Mark transfer as refunded in status table
           await db(
             `UPDATE transfer_status SET status = 'refunded', updated_at = NOW()
              WHERE transfer_id = $1`,
             [transferId]
           ).catch(e => console.warn('[Transfer] status update error:', e.message));
-          
+
           console.log('[Transfer] Refunded', coins_deducted, 'coins (reversal) to user', user_id);
         }
         break;
