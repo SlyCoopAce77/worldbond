@@ -581,6 +581,13 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
       [userId, coinsToPay, amountCents, payoutRate, transfer.id, clientIp]
     );
 
+    // ── 12. Track transfer status for webhook updates ────────────────────────────
+    await db(
+      `INSERT INTO transfer_status (transfer_id, user_id, coins_deducted, amount_cents, status)
+       VALUES ($1, $2, $3, $4, 'pending')`,
+      [transfer.id, userId, coinsToPay, amountCents]
+    ).catch(e => console.warn('[Transfer] status insert error:', e.message));
+
     res.json({ transfer: transfer.id, amountCents, coinsDeducted: coinsToPay });
   } catch (err) {
     console.error('[Stripe] payout error:', err.message);
