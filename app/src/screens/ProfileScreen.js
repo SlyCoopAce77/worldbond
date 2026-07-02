@@ -364,7 +364,9 @@ export default function ProfileScreen({ route, navigation }) {
       setBondNote('');
       Alert.alert(
         'Bonded!',
-        `Your Bond request was sent to ${displayName}.`,
+        // The server creates this as an active connection immediately — no
+        // acceptance step exists yet, so the copy shouldn't imply one.
+        `You're now Bonded with ${displayName}.`,
       );
     } catch (err) {
       const msg = err.response?.data?.error || 'Could not connect. Try again.';
