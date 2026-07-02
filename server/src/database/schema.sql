@@ -60,6 +60,19 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS stripe_account_id   TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_payout_at       TIMESTAMPTZ;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_id_verified       BOOLEAN DEFAULT FALSE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS has_bond_pass        BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bond_pass_expires_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bond_pass_receipt_hash TEXT;
+
+-- Binds one Apple subscription (by its stable original_transaction_id, which
+-- survives renewals) to exactly one WorldBond account — prevents a single
+-- legitimate Bond Pass receipt being replayed across many accounts to grant
+-- everyone free premium.
+CREATE TABLE IF NOT EXISTS bond_pass_subscriptions (
+  original_transaction_id  TEXT PRIMARY KEY,
+  user_id                  UUID REFERENCES users(id) ON DELETE CASCADE,
+  expires_at               TIMESTAMPTZ,
+  updated_at               TIMESTAMPTZ DEFAULT NOW()
+);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_days          INTEGER DEFAULT 0;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_last_checkin  DATE;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS streak_longest       INTEGER DEFAULT 0;

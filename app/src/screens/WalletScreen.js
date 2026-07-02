@@ -260,8 +260,8 @@ export default function WalletScreen({ navigation, route }) {
       const creditRes = await fetch(`${SERVER_URL}/coins/credit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        // Identity comes from the auth token — the server derives userId from the JWT.
         body: JSON.stringify({
-          userId: currentUser?.userId,
           sku: pack.sku,
           receipt: purchase.transactionReceipt,
         }),
@@ -286,7 +286,9 @@ export default function WalletScreen({ navigation, route }) {
       const res = await fetch(`${SERVER_URL}/creator/connect-stripe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ userId: currentUser?.userId, email: currentUser?.email }),
+        // Identity comes from the auth token now — the server no longer trusts a
+        // client-supplied userId. Email is passed through as Stripe account contact info only.
+        body: JSON.stringify({ email: currentUser?.email }),
       });
       const { url } = await res.json();
       if (url) Linking.openURL(url);
@@ -326,7 +328,7 @@ export default function WalletScreen({ navigation, route }) {
               const res = await fetch(`${SERVER_URL}/creator/payout`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ userId: currentUser.userId }),
+                // Identity comes from the auth token — the server derives userId from the JWT.
               });
               const data = await res.json();
               if (data.transfer) {

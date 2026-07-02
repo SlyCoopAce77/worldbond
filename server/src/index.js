@@ -39,6 +39,7 @@ setInterval(() => {
 const APPLE_VERIFY_PROD    = 'buy.itunes.apple.com';
 const APPLE_VERIFY_SANDBOX = 'sandbox.itunes.apple.com';
 const APPLE_SHARED_SECRET  = process.env.APPLE_SHARED_SECRET || '';
+const BOND_PASS_SKU        = 'com.worldbond.bondpass.monthly';
 
 function appleVerifyReceipt(receiptData, sandbox = false) {
   return new Promise((resolve, reject) => {
@@ -746,6 +747,164 @@ app.post('/streak/use-shield', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[Streak] shield error:', err.message);
     res.status(500).json({ error: 'Could not apply shield.' });
+  }
+});
+
+// ── Bond Pass: verify Apple subscription receipt server-side ─────────────────
+// The client's local IAP/AsyncStorage state is NOT trusted for feature gating —
+// `has_bond_pass` here is the only source of truth other routes read from.
+function extractBondPassExpiry(appleRes) {
+  const entries = [
+    ...(appleRes?.latest_receipt_info || []),
+    ...(appleRes?.receipt?.in_app || []),
+  ].filter(e => e.product_id === BOND_PASS_SKU);
+
+  if (!entries.length) return { expiresMs: null, originalTransactionId: null };
+
+  // Pick the entry with the furthest-out expiration; ignore ones Apple/Support cancelled.
+  let latestMs = 0;
+  let originalTransactionId = null;
+  for (const e of entries) {
+    if (e.cancellation_date_ms) continue;
+    const expiresMs = parseInt(e.expires_date_ms, 10);
+    if (expiresMs && expiresMs > latestMs) {
+      latestMs = expiresMs;
+      originalTransactionId = e.original_transaction_id || e.transaction_id || null;
+    }
+  }
+  // Fall back to any entry's original_transaction_id even if none are currently
+  // active, so we can still bind/recognize the subscription identity.
+  if (!originalTransactionId) {
+    originalTransactionId = entries[0].original_transaction_id || entries[0].transaction_id || null;
+  }
+  return { expiresMs: latestMs || null, originalTransactionId };
+}
+
+app.post('/subscriptions/verify-bond-pass', requireAuth, async (req, res) => {
+  const userId   = req.userId;
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+  if (!rateLimit(`bondpass_verify:${userId}`, 20, 3600000)) {
+    return res.status(429).json({ error: 'Too many verification requests. Try again later.' });
+  }
+
+  try {
+    const { receipt } = req.body;
+    if (!receipt) return res.status(400).json({ error: 'Purchase receipt required.' });
+
+    const { query: db } = require('./database/db');
+
+    if (!APPLE_SHARED_SECRET) {
+      console.error('[Security] APPLE_SHARED_SECRET is not set — Bond Pass receipts will NOT be verified.');
+      return res.status(503).json({ error: 'Subscription verification temporarily unavailable.' });
+    }
+
+    let appleRes;
+    try {
+      appleRes = await appleVerifyReceipt(receipt, false);
+      // Status 21007 = sandbox receipt sent to production; retry with sandbox
+      if (appleRes.status === 21007) appleRes = await appleVerifyReceipt(receipt, true);
+    } catch (appleErr) {
+      console.warn('[Apple] bond pass verify error:', appleErr.message);
+      return res.status(502).json({ error: 'Could not reach Apple to verify subscription.' });
+    }
+
+    if (appleRes.status !== 0) {
+      await db(
+        `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'invalid_bond_pass_receipt', $2)`,
+        [userId, JSON.stringify({ appleStatus: appleRes.status, clientIp })]
+      );
+      return res.status(400).json({ error: 'Subscription receipt is not valid.' });
+    }
+
+    const { expiresMs, originalTransactionId } = extractBondPassExpiry(appleRes);
+    const active       = !!expiresMs && expiresMs > Date.now();
+    const receiptHash  = crypto.createHash('sha256').update(receipt).digest('hex');
+
+    // ── Prevent one paid subscription being replayed across many accounts ──────
+    // Apple receipts prove a purchase happened on *some* Apple ID, not that it
+    // belongs to this WorldBond account. Bind the subscription's stable
+    // original_transaction_id to whichever account first claims it; reject any
+    // other account trying to claim the same subscription afterwards.
+    // Done as an atomic INSERT ... ON CONFLICT DO NOTHING RETURNING so two
+    // concurrent requests from different accounts can't both pass a
+    // check-then-act race and both end up granted.
+    if (originalTransactionId) {
+      const inserted = await db(
+        `INSERT INTO bond_pass_subscriptions (original_transaction_id, user_id, expires_at)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (original_transaction_id) DO NOTHING
+         RETURNING user_id`,
+        [originalTransactionId, userId, expiresMs ? new Date(expiresMs) : null]
+      );
+
+      let ownerId;
+      if (inserted.rows.length) {
+        ownerId = userId; // we won the race — we own this subscription binding
+      } else {
+        const { rows: existing } = await db(
+          `SELECT user_id FROM bond_pass_subscriptions WHERE original_transaction_id = $1`,
+          [originalTransactionId]
+        );
+        ownerId = existing[0]?.user_id;
+        if (ownerId === userId) {
+          await db(
+            `UPDATE bond_pass_subscriptions SET expires_at = $1, updated_at = NOW() WHERE original_transaction_id = $2`,
+            [expiresMs ? new Date(expiresMs) : null, originalTransactionId]
+          );
+        }
+      }
+
+      if (ownerId !== userId) {
+        await db(
+          `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'bond_pass_receipt_shared', $2)`,
+          [userId, JSON.stringify({ originalTransactionId, clientIp })]
+        );
+        return res.status(409).json({ error: 'This subscription is already linked to a different account.' });
+      }
+    }
+
+    await db(
+      `UPDATE profiles
+       SET has_bond_pass = $1, bond_pass_expires_at = $2, bond_pass_receipt_hash = $3
+       WHERE user_id = $4`,
+      [active, expiresMs ? new Date(expiresMs) : null, receiptHash, userId]
+    );
+
+    res.json({ has_bond_pass: active, expires_at: expiresMs ? new Date(expiresMs).toISOString() : null });
+  } catch (err) {
+    console.error('[BondPass] verify error:', err.message);
+    res.status(500).json({ error: 'Could not verify subscription.' });
+  }
+});
+
+// Authoritative status check — client should reconcile its local cache against this,
+// not the other way around. Auto-lapses the flag once the last known expiry has passed
+// (covers cancellations/non-renewals without needing a fresh receipt every time).
+app.get('/subscriptions/status', requireAuth, async (req, res) => {
+  const userId = req.userId;
+  try {
+    const { query: db } = require('./database/db');
+    const { rows } = await db(
+      `SELECT has_bond_pass, bond_pass_expires_at FROM profiles WHERE user_id = $1`,
+      [userId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+
+    const { has_bond_pass, bond_pass_expires_at } = rows[0];
+    const lapsed = has_bond_pass && bond_pass_expires_at && new Date(bond_pass_expires_at).getTime() < Date.now();
+
+    if (lapsed) {
+      await db(`UPDATE profiles SET has_bond_pass = FALSE WHERE user_id = $1`, [userId]);
+    }
+
+    res.json({
+      has_bond_pass: lapsed ? false : !!has_bond_pass,
+      expires_at: bond_pass_expires_at || null,
+    });
+  } catch (err) {
+    console.error('[BondPass] status error:', err.message);
+    res.status(500).json({ error: 'Could not fetch subscription status.' });
   }
 });
 

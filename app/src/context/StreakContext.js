@@ -186,9 +186,9 @@ export function StreakProvider({ children }) {
             const shieldAvail = bpRaw === 'true' && shieldData.monthUsed !== monthStr();
             if (diff === 2 && shieldAvail) {
               try {
+                // Identity comes from the auth token — the server derives userId from the JWT.
                 const sr = await fetch(`${SERVER_URL}/streak/use-shield`, {
                   method: 'POST', headers,
-                  body: JSON.stringify({ userId: auth.userId }),
                 });
                 if (sr.ok) {
                   await markShieldUsed();
@@ -200,9 +200,9 @@ export function StreakProvider({ children }) {
             }
           }
 
+          // Identity comes from the auth token — the server derives userId from the JWT.
           const res = await fetch(`${SERVER_URL}/streak/checkin`, {
             method: 'POST', headers,
-            body: JSON.stringify({ userId: auth.userId }),
           });
           if (res.ok) {
             const { streak: s, longest: l } = await res.json();

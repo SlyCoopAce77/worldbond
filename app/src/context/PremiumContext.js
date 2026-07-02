@@ -2,11 +2,57 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking } from 'react-native';
 import * as RNIap from 'react-native-iap';
+import { SERVER_URL } from '../services/socket';
 
 const BOND_PASS_KEY = 'worldbond_bond_pass';
 export const BOND_PASS_SKU = 'com.worldbond.bondpass.monthly';
 
 const BondPassContext = createContext(null);
+
+// ── Server is the source of truth for Bond Pass status ───────────────────────
+// Local AsyncStorage / RNIap.getAvailablePurchases() are only used to avoid a UI
+// flash on cold start and to know *which* receipt to submit — the actual
+// has_bond_pass flag that other server routes (payout rate, streak shield, etc.)
+// rely on is only ever set by the server after it verifies the receipt with Apple.
+async function authHeaders() {
+  const raw  = await AsyncStorage.getItem('worldbond_auth');
+  const auth = raw ? JSON.parse(raw) : null;
+  if (!auth?.token) return null;
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` };
+}
+
+// Submits a receipt for server-side Apple verification. Returns the server's
+// authoritative has_bond_pass boolean, or null if the request couldn't complete
+// (e.g. offline) — callers should fall back to cached state, not assume true.
+async function verifyBondPassReceipt(receipt) {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return null;
+    const res = await fetch(`${SERVER_URL}/subscriptions/verify-bond-pass`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ receipt }),
+    });
+    if (!res.ok) return false; // server explicitly rejected the receipt
+    const data = await res.json();
+    return !!data.has_bond_pass;
+  } catch {
+    return null; // network error — unknown, don't clobber cached state
+  }
+}
+
+// Fetches the current server-side subscription status (no receipt needed).
+async function fetchBondPassStatus() {
+  try {
+    const headers = await authHeaders();
+    if (!headers) return null;
+    const res = await fetch(`${SERVER_URL}/subscriptions/status`, { method: 'GET', headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return !!data.has_bond_pass;
+  } catch {
+    return null;
+  }
+}
 
 export function BondPassProvider({ children }) {
   const [hasBondPass, setHasBondPass] = useState(false);
@@ -35,8 +81,20 @@ export function BondPassProvider({ children }) {
         try {
           await RNIap.finishTransaction({ purchase, isConsumable: false });
         } catch {}
+        // Optimistic local update so the UI responds immediately...
         setHasBondPass(true);
         await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
+        // ...but the server's verdict (after verifying the receipt with Apple) wins.
+        const serverActive = await verifyBondPassReceipt(purchase.transactionReceipt);
+        if (serverActive === false) {
+          setHasBondPass(false);
+          await AsyncStorage.removeItem(BOND_PASS_KEY);
+        } else if (serverActive === true) {
+          setHasBondPass(true);
+          await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
+        }
+        // serverActive === null (offline) — keep the optimistic local value;
+        // it will be reconciled against /subscriptions/status next launch.
       });
 
       purchaseErrorSub.current = RNIap.purchaseErrorListener((error) => {
@@ -52,16 +110,34 @@ export function BondPassProvider({ children }) {
         const subs = await RNIap.getSubscriptions({ skus: [BOND_PASS_SKU] });
         if (subs.length > 0) setProduct(subs[0]);
 
-        // Validate active subscription state against the store
-        const purchases = await RNIap.getAvailablePurchases();
-        const active = purchases.some(p => p.productId === BOND_PASS_SKU);
-        if (active) {
+        // The store telling us a purchase exists locally is not sufficient on its
+        // own (it doesn't reflect refunds/chargebacks and can be tampered with on a
+        // compromised device) — always reconcile against the server, which holds
+        // the Apple-verified truth in profiles.has_bond_pass.
+        const purchases  = await RNIap.getAvailablePurchases();
+        const localMatch = purchases.find(p => p.productId === BOND_PASS_SKU);
+
+        let serverActive = await fetchBondPassStatus();
+
+        // Server has no record yet (e.g. verify call never completed after a
+        // previous purchase) but the store has a live purchase — submit it now
+        // so the server can catch up.
+        if (serverActive !== true && localMatch?.transactionReceipt) {
+          const verified = await verifyBondPassReceipt(localMatch.transactionReceipt);
+          if (verified !== null) serverActive = verified;
+        }
+
+        if (serverActive === true) {
           setHasBondPass(true);
           await AsyncStorage.setItem(BOND_PASS_KEY, 'true');
-        } else if (cached !== 'true') {
+        } else if (serverActive === false) {
+          // Server explicitly says no active subscription — trust it over any
+          // stale local cache.
           setHasBondPass(false);
           await AsyncStorage.removeItem(BOND_PASS_KEY);
         }
+        // serverActive === null (offline/unreachable) — keep whatever was
+        // restored from cache above; don't downgrade the user while offline.
       } catch (e) {
         console.warn('[BondPass] IAP init error:', e?.code, e?.message);
       }
