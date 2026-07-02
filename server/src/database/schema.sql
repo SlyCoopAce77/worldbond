@@ -119,9 +119,10 @@ CREATE TABLE IF NOT EXISTS yearly_challenge_progress (
   gifts_received_bc    INTEGER DEFAULT 0,     -- Gift Legend: BC received in gifts
   total_bond_heat      INTEGER DEFAULT 0,     -- Bond Inferno: viewers + gifts×5 accumulated
   updated_at           TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (user_id, year)
+  challenge_period     VARCHAR(10) DEFAULT '2026-H1',  -- format: YYYY-H1 or YYYY-H2
+  PRIMARY KEY (user_id, challenge_period)
 );
-CREATE INDEX IF NOT EXISTS idx_yearly_progress_user ON yearly_challenge_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_yearly_progress_user ON yearly_challenge_progress(user_id, challenge_period);
 
 -- ─── STREAM SESSIONS — tamper-proof record of every live session ──────────────
 CREATE TABLE IF NOT EXISTS stream_sessions (
@@ -139,7 +140,8 @@ CREATE TABLE IF NOT EXISTS stream_sessions (
   year                 INTEGER NOT NULL,
   created_at           TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_stream_sessions_user ON stream_sessions(user_id, year);
+ALTER TABLE stream_sessions ADD COLUMN IF NOT EXISTS challenge_period VARCHAR(10);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_user ON stream_sessions(user_id, challenge_period);
 
 -- ─── CHALLENGE WIN LOG — rate-limited audit of stamp/monument wins ────────────
 CREATE TABLE IF NOT EXISTS challenge_wins (
@@ -150,7 +152,8 @@ CREATE TABLE IF NOT EXISTS challenge_wins (
   won_at      TIMESTAMPTZ DEFAULT NOW(),
   year        INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_challenge_wins_user ON challenge_wins(user_id, year);
+ALTER TABLE challenge_wins ADD COLUMN IF NOT EXISTS challenge_period VARCHAR(10);
+CREATE INDEX IF NOT EXISTS idx_challenge_wins_user ON challenge_wins(user_id, challenge_period);
 -- Prevents recording more than 1 win per target per 30 days (enforced in app logic)
 
 -- ─── EXPERIENCES ─────────────────────────────────────────────────────────────

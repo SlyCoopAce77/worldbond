@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import axios from 'axios';
 import { SERVER_URL } from '../services/socket';
-import { finalizeProfile } from '../services/authApi';
+import { finalizeProfile, saveWalletState } from '../services/authApi';
 import LandingScreen         from './Auth/LandingScreen';
 import LoginScreen           from './Auth/LoginScreen';
 import RegisterScreen        from './Auth/RegisterScreen';
@@ -46,6 +46,15 @@ export default function AuthScreen({ onLogin }) {
         country:          profile.country         || '',
         connection_types: profile.connection_types || [],
       });
+
+      // FIX BUG #1: Save wallet state (coin_balance, stripe_account_id, has_bond_pass)
+      // so WalletContext can sync server truth on mount
+      await saveWalletState({
+        coin_balance:      profile.coin_balance || 0,
+        stripe_account_id: profile.stripe_account_id || null,
+        has_bond_pass:     profile.has_bond_pass || false,
+      });
+
       onLogin(socketProfile);
     } catch (err) {
       // 404 = new user, no profile yet → onboarding

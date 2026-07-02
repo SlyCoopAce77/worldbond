@@ -5,17 +5,26 @@ const { query: dbQuery } = require('./database/db');
 // ── Yearly challenge helpers ───────────────────────────────────────────────────
 function currentYear() { return new Date().getFullYear(); }
 
+// FIX BUG #2: Calculate current challenge period (H1 = Jan-Jun, H2 = Jul-Dec)
+function getCurrentChallengePeriod() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-12
+  const half = month <= 6 ? 'H1' : 'H2';
+  return `${year}-${half}`;
+}
+
 async function upsertYearlyProgress(userId, updates) {
   if (!userId) return;
-  const year = currentYear();
+  const challengePeriod = getCurrentChallengePeriod(); // FIX BUG #2: Use period instead of year
   const cols  = Object.keys(updates);
   const incs  = cols.map(c => `${c} = COALESCE(${c}, 0) + $${cols.indexOf(c) + 3}`).join(', ');
   const vals  = cols.map(c => updates[c]);
   await dbQuery(
-    `INSERT INTO yearly_challenge_progress (user_id, year, ${cols.join(', ')}, updated_at)
+    `INSERT INTO yearly_challenge_progress (user_id, challenge_period, ${cols.join(', ')}, updated_at)
      VALUES ($1, $2, ${vals.map((_, i) => `$${i + 3}`).join(', ')}, NOW())
-     ON CONFLICT (user_id, year) DO UPDATE SET ${incs}, updated_at = NOW()`,
-    [userId, year, ...vals]
+     ON CONFLICT (user_id, challenge_period) DO UPDATE SET ${incs}, updated_at = NOW()`,
+    [userId, challengePeriod, ...vals]
   ).catch(e => console.warn('[Yearly] upsert error:', e.message));
 }
 
@@ -986,9 +995,9 @@ function setupSocket(io) {
       // Record session start in DB (tamper-proof — server sets started_at)
       if (user.userId) {
         dbQuery(
-          `INSERT INTO stream_sessions (id, user_id, stream_socket_id, started_at, year)
+          `INSERT INTO stream_sessions (id, user_id, stream_socket_id, started_at, challenge_period)
            VALUES ($1, $2, $3, NOW(), $4)`,
-          [sessionId, user.userId, socket.id, currentYear()]
+          [sessionId, user.userId, socket.id, getCurrentChallengePeriod()]
         ).catch(e => console.warn('[Stream] session insert error:', e.message));
       }
 

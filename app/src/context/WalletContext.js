@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import { isStampDropped } from './ChallengeContext';
+import { getSavedWalletState } from '../services/authApi';
 
 const STORAGE_KEY = 'worldbond_wallet';
 const STAMPS_KEY  = 'worldbond_stamps';
@@ -204,10 +205,16 @@ export function WalletProvider({ children }) {
     Promise.all([
       AsyncStorage.getItem(STORAGE_KEY),
       AsyncStorage.getItem(STAMPS_KEY),
-    ]).then(([walletRaw, stampsRaw]) => {
+      getSavedWalletState(), // FIX BUG #1: Load server-synced coin balance
+    ]).then(([walletRaw, stampsRaw, savedWalletState]) => {
       if (walletRaw) {
         const w = JSON.parse(walletRaw);
-        setBalance(w.balance ?? 0);
+        // FIX BUG #1: If we have server-synced coin_balance, use it; otherwise use stored local balance
+        const serverCoinBalance = savedWalletState?.coin_balance;
+        const localBalance = w.balance ?? 0;
+        const balance = serverCoinBalance !== undefined && serverCoinBalance !== null ? serverCoinBalance : localBalance;
+        
+        setBalance(balance);
         setSpent(w.spent ?? 0);
         setTransactions(w.transactions ?? []);
         setMyStamps(w.myStamps ?? []);
@@ -230,6 +237,9 @@ export function WalletProvider({ children }) {
           { id: 3, type: 'earn',  amount: 2000, source: 'stamp_royalty', ts: Date.now() - 3600000 },
           { id: 4, type: 'spend', amount: 700,  source: 'gift_sent',     ts: Date.now() - 1800000 },
         ]);
+      } else if (savedWalletState?.coin_balance !== undefined) {
+        // First login: no local storage but server has coins - sync them
+        setBalance(savedWalletState.coin_balance);
       }
       const saved = stampsRaw ? JSON.parse(stampsRaw) : {};
       setStamps({ ...DEMO_STAMPS, ...saved });

@@ -688,7 +688,13 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
 
   try {
     const { query: db } = require('./database/db');
-    const year = new Date().getFullYear();
+    
+    // FIX BUG #2: Calculate current challenge period (H1 = Jan-Jun, H2 = Jul-Dec)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const half = month <= 6 ? 'H1' : 'H2';
+    const challengePeriod = `${year}-${half}`;
 
     // Enforce 30-day cooldown: same user, same target, within 30 days
     const recent = await db(
@@ -701,18 +707,18 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
       return res.status(429).json({ error: 'Already recorded a win for this target in the last 30 days.' });
     }
 
-    // Record the win
+    // Record the win (FIX BUG #2: use challenge_period instead of year)
     await db(
-      `INSERT INTO challenge_wins (user_id, win_type, target_id, year) VALUES ($1, $2, $3, $4)`,
-      [userId, winType, targetId, year]
+      `INSERT INTO challenge_wins (user_id, win_type, target_id, challenge_period) VALUES ($1, $2, $3, $4)`,
+      [userId, winType, targetId, challengePeriod]
     );
 
-    // Update yearly progress counter
+    // Update yearly progress counter (FIX BUG #2: use challenge_period instead of year)
     const col = winType === 'stamp' ? 'stamp_wins' : 'monument_wins';
     await db(
-      `INSERT INTO yearly_challenge_progress (user_id, year, ${col}, updated_at)
+      `INSERT INTO yearly_challenge_progress (user_id, challenge_period, ${col}, updated_at)
        VALUES ($1, $2, 1, NOW())
-       ON CONFLICT (user_id, year) DO UPDATE SET ${col} = yearly_challenge_progress.${col} + 1, updated_at = NOW()`,
+       ON CONFLICT (user_id, challenge_period) DO UPDATE SET ${col} = yearly_challenge_progress.${col} + 1, updated_at = NOW()`,
       [userId, year]
     );
 
@@ -758,8 +764,10 @@ async function start() {
   if (!APPLE_SHARED_SECRET) {
     console.error('[Security] APPLE_SHARED_SECRET is not set — IAP receipts will NOT be verified. Set this env var before launch.');
   }
+  // FIX BUG #3: Require STRIPE_SECRET_KEY for production to prevent silent payment feature degradation
   if (!process.env.STRIPE_SECRET_KEY) {
-    console.warn('[Security] STRIPE_SECRET_KEY is not set — payouts and Stripe connect are disabled.');
+    console.error('[FATAL] STRIPE_SECRET_KEY is required for production. Exiting.');
+    process.exit(1);
   }
   if (process.env.DATABASE_URL) {
     try {

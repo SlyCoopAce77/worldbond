@@ -7,6 +7,7 @@ const KEYS = {
   REFRESH: 'bond_refresh_token',
   USER_ID: 'bond_user_id',
   PROFILE: 'worldbond_user',
+  WALLET:  'worldbond_wallet_state', // New: stores coin_balance, has_bond_pass, stripe_account_id
 };
 
 export async function register(email, password, dateOfBirth) {
@@ -27,7 +28,7 @@ export async function logout() {
     axios.post(`${SERVER_URL}/api/auth/logout`, { refreshToken: refresh }).catch(() => {});
   }
   await AsyncStorage.multiRemove([
-    KEYS.ACCESS, KEYS.REFRESH, KEYS.USER_ID, KEYS.PROFILE,
+    KEYS.ACCESS, KEYS.REFRESH, KEYS.USER_ID, KEYS.PROFILE, KEYS.WALLET,
     'worldbond_auth',
     'worldbond_streak_v1',
     'worldbond_streak_shield_v1',
@@ -53,6 +54,22 @@ export async function getSavedProfile() {
 
 export async function saveSocketProfile(profileData) {
   await AsyncStorage.setItem(KEYS.PROFILE, JSON.stringify(profileData));
+}
+
+// Save wallet state: coin_balance, stripe_account_id, has_bond_pass
+export async function saveWalletState({ coin_balance, stripe_account_id, has_bond_pass }) {
+  await AsyncStorage.setItem(KEYS.WALLET, JSON.stringify({
+    coin_balance: coin_balance || 0,
+    stripe_account_id: stripe_account_id || null,
+    has_bond_pass: has_bond_pass || false,
+    syncedAt: Date.now(),
+  }));
+}
+
+// Load wallet state from storage
+export async function getSavedWalletState() {
+  const raw = await AsyncStorage.getItem(KEYS.WALLET);
+  return raw ? JSON.parse(raw) : null;
 }
 
 // Returns true if a token is in storage (does not validate it server-side)
