@@ -35,10 +35,11 @@ export default function LiveScreen({ route, navigation }) {
   const [viewerJoined, setViewerJoined] = useState(null);
   const [starting,     setStarting]     = useState(false);
 
-  const flatRef      = useRef(null);
-  const timerRef     = useRef(null);
-  const isLiveRef    = useRef(false);
-  const joinFadeAnim = useRef(new Animated.Value(0)).current;
+  const flatRef       = useRef(null);
+  const timerRef      = useRef(null);
+  const isLiveRef     = useRef(false);
+  const joinFadeAnim  = useRef(new Animated.Value(0)).current;
+  const startTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (phase !== 'live') return;
@@ -46,14 +47,29 @@ export default function LiveScreen({ route, navigation }) {
     return () => clearInterval(timerRef.current);
   }, [phase]);
 
+  useEffect(() => () => clearTimeout(startTimeoutRef.current), []);
+
   function startLive() {
     setStarting(true);
     const liveTitle = title.trim() || `${activeUser?.username}'s Live`;
     socket.emit('go_live', { title: liveTitle });
+
+    // The server responds almost instantly once connected — if we don't hear
+    // back in a reasonable window, the socket is likely stuck reconnecting.
+    // Without this, "Starting…" could otherwise hang forever with no feedback.
+    clearTimeout(startTimeoutRef.current);
+    startTimeoutRef.current = setTimeout(() => {
+      setStarting(false);
+      Alert.alert(
+        'Could not go live',
+        'Check your connection and try again.',
+      );
+    }, 8000);
   }
 
   useEffect(() => {
     function onLiveStarted({ streamId: sid }) {
+      clearTimeout(startTimeoutRef.current);
       setStarting(false);
       isLiveRef.current = true;
       setStreamId(sid);
