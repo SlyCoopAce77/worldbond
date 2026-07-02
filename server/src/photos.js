@@ -79,4 +79,11 @@ function deletePhoto(photoId, userId) {
   return true;
 }
 
-module.exports = { addPhoto, getPhotos, getPhotoById, toggleLike, addComment, deletePhoto, toggleEcho };
+function adminDeletePhoto(photoId) {
+  const idx = photos.findIndex(p => p.id === photoId);
+  if (idx === -1) return false;
+  photos.splice(idx, 1);
+  return true;
+}
+
+module.exports = { addPhoto, getPhotos, getPhotoById, toggleLike, addComment, deletePhoto, toggleEcho, adminDeletePhoto };

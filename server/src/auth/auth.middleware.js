@@ -13,4 +13,19 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+function requireAdmin(req, res, next) {
+  const secret = req.headers['x-admin-secret'] || req.headers['admin-secret'] || req.headers['admin_secret'] || req.get('ADMIN_SECRET');
+  const expected = process.env.ADMIN_SECRET;
+
+  if (!expected) {
+    return res.status(500).json({ error: 'Admin secret not configured on server' });
+  }
+
+  if (!secret || secret !== expected) {
+    return res.status(403).json({ error: 'Unauthorized admin access' });
+  }
+
+  next();
+}
+
+module.exports = { requireAuth, requireAdmin };

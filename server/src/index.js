@@ -10,10 +10,10 @@ const multer = require('multer');
 const { setupSocket } = require('./socket');
 const { GROUP_CATEGORIES } = require('./groups');
 const { getCountries, getCitiesInCountry, getPlacesInCity, PLACE_TYPES } = require('./places');
-const { addPhoto, getPhotos } = require('./photos');
+const { addPhoto, getPhotos, adminDeletePhoto } = require('./photos');
 const { addStory, getStoriesGrouped } = require('./stories');
 const { isConfigured: cloudinaryEnabled, uploadBuffer } = require('./cloudinary');
-const { requireAuth } = require('./auth/auth.middleware');
+const { requireAuth, requireAdmin } = require('./auth/auth.middleware');
 
 // ── In-memory rate limiter (no extra packages needed) ─────────────────────────
 const _rlMap = new Map();
@@ -947,6 +947,51 @@ app.post('/api/reports', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[Report] error:', err.message);
     res.status(500).json({ error: 'Could not submit report.' });
+  }
+});
+
+app.get('/admin/reports', requireAdmin, async (req, res) => {
+  try {
+    const { query: db } = require('./database/db');
+    const { rows } = await db(
+      `SELECT * FROM user_reports WHERE resolved = FALSE ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[AdminReports] fetch error:', err.message);
+    res.status(500).json({ error: 'Could not fetch reports.' });
+  }
+});
+
+app.post('/admin/reports/:id/resolve', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { query: db } = require('./database/db');
+    const result = await db(
+      `UPDATE user_reports SET resolved = TRUE WHERE id = $1 RETURNING id`,
+      [id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[AdminReports] resolve error:', err.message);
+    res.status(500).json({ error: 'Could not resolve report.' });
+  }
+});
+
+app.delete('/admin/photos/:photoId', requireAdmin, async (req, res) => {
+  const { photoId } = req.params;
+  try {
+    const success = adminDeletePhoto(photoId);
+    if (!success) {
+      return res.status(404).json({ error: 'Photo not found' });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[AdminPhotos] delete error:', err.message);
+    res.status(500).json({ error: 'Could not delete photo.' });
   }
 });
 
