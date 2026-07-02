@@ -251,7 +251,8 @@ app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, 
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
   try {
-    const { username, userId, country, postCountry, language, mood, caption, filter } = req.body;
+    const userId = req.userId;
+    const { username, country, postCountry, language, mood, caption, filter } = req.body;
     const imageUrl = await resolveImageUrl(req, 'photos');
     const photo = addPhoto({ userId, username, country, postCountry: postCountry || null, language, mood, imageUrl, caption, filter });
 
@@ -271,7 +272,8 @@ app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req,
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
 
   try {
-    const { username, userId, country, language, mood, caption, filter } = req.body;
+    const userId = req.userId;
+    const { username, country, language, mood, caption, filter } = req.body;
     const imageUrl = await resolveImageUrl(req, 'stories');
     const story = addStory({ userId, username, country, language, mood, imageUrl, caption, filter });
 
@@ -770,14 +772,29 @@ app.post('/admin/flag-account', requireAuth, async (req, res) => {
   }
 });
 
-// ── Globe Trotter: record a verified stamp or monument win ────────────────────
-// Called server-side when a challenge resolves. Rate-limited: 1 win per target
-// per user per 30 days — prevents any replay or double-counting.
+// ── Globe Trotter: record a stamp or monument win ─────────────────────────────
+// Rate-limited: 1 win per target per user per 30 days — prevents replay or
+// double-counting. targetId is checked against the known flag/monument lists
+// so at least garbage IDs can't be recorded (the underlying score itself is
+// still computed client-side — see ChallengeContext.js — so this doesn't stop
+// a modified client from claiming a real target it didn't legitimately win).
+const VALID_STAMP_FLAGS = new Set([
+  '🇺🇸','🇧🇷','🇰🇷','🇯🇵','🇩🇪','🇬🇧','🇫🇷','🇪🇸','🇷🇺','🇨🇦','🇲🇽',
+  '🇦🇷','🇵🇭','🇮🇳','🇮🇩','🇹🇷','🇦🇺','🇸🇦','🇵🇱','🇹🇭','🇸🇪','🇳🇱','🇵🇹','🇨🇴',
+]);
+const VALID_MONUMENT_IDS = new Set([
+  'liberty', 'grand_canyon', 'christ', 'amazon', 'gyeongbok', 'fuji', 'fushimi',
+  'gate', 'bigben', 'eiffel', 'sagrada', 'red_square', 'niagara', 'chichen',
+  'taj', 'borobudur', 'hagia', 'opera', 'colosseum', 'great_wall',
+]);
+
 app.post('/challenge/record-win', requireAuth, async (req, res) => {
   const userId  = req.userId;
   const { winType, targetId } = req.body; // winType: 'stamp' | 'monument'
   if (!userId || !winType || !targetId) return res.status(400).json({ error: 'Missing fields.' });
   if (!['stamp', 'monument'].includes(winType)) return res.status(400).json({ error: 'Invalid winType.' });
+  const validTargets = winType === 'stamp' ? VALID_STAMP_FLAGS : VALID_MONUMENT_IDS;
+  if (!validTargets.has(targetId)) return res.status(400).json({ error: 'Unknown target.' });
 
   // Global rate limit: max 2 win recordings per user per hour (prevents burst spam)
   if (!rateLimit(`win:${userId}`, 2, 3600000)) {
