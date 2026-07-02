@@ -233,6 +233,10 @@ app.get('/terms', (req, res) => res.send(`<!DOCTYPE html><html><head><meta chars
 <h2>9. Contact</h2><p>Questions? Email <a href="mailto:support@worldbond.app">support@worldbond.app</a></p>
 <footer>© 2026 WorldBond. All rights reserved.</footer></body></html>`));
 
+app.get('/support', (req, res) => res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Support — WorldBond</title><style>${LEGAL_CSS}</style></head><body>
+<h1>WorldBond Support</h1><p>Need help? Email us at <a href="mailto:support@worldbond.app">support@worldbond.app</a> and we'll get back to you as soon as possible.</p>
+<footer>© 2026 WorldBond. All rights reserved.</footer></body></html>`));
+
 // REST endpoints
 app.get('/health', (req, res) => res.json({ status: 'WorldBond server running' }));
 app.get('/api/groups', (req, res) => res.json(GROUP_CATEGORIES));
