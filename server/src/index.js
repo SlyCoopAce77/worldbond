@@ -313,12 +313,17 @@ app.post('/api/debug/notify', requireAuth, async (req, res) => {
 });
 
 // ── Gift coins: record server-side earn with daily cap ───────────────────────
-// Prevents AI bots from sending infinite gifts to farm royalties.
+// Not called by the app — no client code ties `amount` to a real gift event, so
+// this is admin-only until a verified-gift pipeline exists. Otherwise any caller
+// could self-credit up to DAILY_EARN_CAP coins/day with no economic backing.
 const DAILY_EARN_CAP = 50000; // 50,000 coins per day max ($500 face value)
 
 app.post('/coins/earn', requireAuth, async (req, res) => {
   const userId   = req.userId;
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+  const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!ADMIN_IDS.includes(userId)) return res.status(403).json({ error: 'Not authorized.' });
 
   // Rate limit: max 200 earn events per hour per user
   if (!rateLimit(`earn:${userId}`, 200, 3600000)) {
@@ -586,6 +591,7 @@ app.post('/coins/credit', requireAuth, async (req, res) => {
 
   try {
     const { sku, receipt } = req.body;
+    if (!receipt) return res.status(400).json({ error: 'Purchase receipt required.' });
 
     const coinMap = {
       'com.worldbond.coins.100':  100,
@@ -600,47 +606,45 @@ app.post('/coins/credit', requireAuth, async (req, res) => {
 
     // ── Replay attack prevention ───────────────────────────────────────────────
     // Hash the receipt so we can detect the same Apple transaction being submitted twice.
-    if (receipt) {
-      const receiptHash = crypto.createHash('sha256').update(receipt).digest('hex');
-      try {
+    const receiptHash = crypto.createHash('sha256').update(receipt).digest('hex');
+    try {
+      await db(
+        `INSERT INTO iap_receipts (user_id, receipt_hash, product_id) VALUES ($1, $2, $3)`,
+        [userId, receiptHash, sku]
+      );
+    } catch (dupErr) {
+      // Unique constraint violation = this receipt was already used
+      if (dupErr.code === '23505') {
         await db(
-          `INSERT INTO iap_receipts (user_id, receipt_hash, product_id) VALUES ($1, $2, $3)`,
-          [userId, receiptHash, sku]
+          `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'receipt_replay', $2)`,
+          [userId, JSON.stringify({ sku, receiptHash, clientIp })]
         );
-      } catch (dupErr) {
-        // Unique constraint violation = this receipt was already used
-        if (dupErr.code === '23505') {
-          await db(
-            `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'receipt_replay', $2)`,
-            [userId, JSON.stringify({ sku, receiptHash, clientIp })]
-          );
-          return res.status(409).json({ error: 'This purchase has already been credited.' });
-        }
-        throw dupErr;
+        return res.status(409).json({ error: 'This purchase has already been credited.' });
+      }
+      throw dupErr;
+    }
+
+    // ── Verify receipt with Apple ─────────────────────────────────────────────
+    if (APPLE_SHARED_SECRET) {
+      let appleRes;
+      try {
+        appleRes = await appleVerifyReceipt(receipt, false);
+        // Status 21007 = sandbox receipt sent to production; retry with sandbox
+        if (appleRes.status === 21007) appleRes = await appleVerifyReceipt(receipt, true);
+      } catch (appleErr) {
+        console.warn('[Apple] receipt verify error:', appleErr.message);
+        // If Apple is unreachable, log but don't block (avoid false positives)
       }
 
-      // ── Verify receipt with Apple ─────────────────────────────────────────────
-      if (APPLE_SHARED_SECRET) {
-        let appleRes;
-        try {
-          appleRes = await appleVerifyReceipt(receipt, false);
-          // Status 21007 = sandbox receipt sent to production; retry with sandbox
-          if (appleRes.status === 21007) appleRes = await appleVerifyReceipt(receipt, true);
-        } catch (appleErr) {
-          console.warn('[Apple] receipt verify error:', appleErr.message);
-          // If Apple is unreachable, log but don't block (avoid false positives)
-        }
-
-        if (appleRes && appleRes.status !== 0) {
-          // Apple rejected the receipt
-          await db(
-            `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'invalid_receipt', $2)`,
-            [userId, JSON.stringify({ sku, appleStatus: appleRes.status, clientIp })]
-          );
-          // Remove the receipt hash so they can't claim we already processed it
-          await db(`DELETE FROM iap_receipts WHERE user_id = $1 AND receipt_hash = $2`, [userId, receiptHash]);
-          return res.status(400).json({ error: 'Purchase receipt is not valid.' });
-        }
+      if (appleRes && appleRes.status !== 0) {
+        // Apple rejected the receipt
+        await db(
+          `INSERT INTO fraud_flags (user_id, flag_type, details) VALUES ($1, 'invalid_receipt', $2)`,
+          [userId, JSON.stringify({ sku, appleStatus: appleRes.status, clientIp })]
+        );
+        // Remove the receipt hash so they can't claim we already processed it
+        await db(`DELETE FROM iap_receipts WHERE user_id = $1 AND receipt_hash = $2`, [userId, receiptHash]);
+        return res.status(400).json({ error: 'Purchase receipt is not valid.' });
       }
     }
 
