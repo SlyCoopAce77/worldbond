@@ -216,7 +216,6 @@ export default function WalletScreen({ navigation, route }) {
   } = useWallet();
 
   const [activeTab,      setActiveTab]      = useState('Earnings');
-  const [idVerified,     setIdVerified]     = useState(false);
   const [showCoinModal,  setShowCoinModal]  = useState(false);
   const [purchasing,     setPurchasing]     = useState(false);
   const [payingOut,      setPayingOut]      = useState(false);
@@ -236,15 +235,6 @@ export default function WalletScreen({ navigation, route }) {
 
   const reqs = [
     { id: 'age', label: 'Account 30+ days old', met: currentUser?.created_at ? Date.now() - new Date(currentUser.created_at).getTime() >= 30 * 86400000 : false },
-    {
-      id: 'verify', label: 'Identity verified', met: idVerified,
-      actionLabel: 'Verify ID',
-      onAction: () => Alert.alert(
-        'Identity Verification',
-        'Identity verification will be available in an upcoming update.',
-        [{ text: 'OK' }],
-      ),
-    },
     { id: 'min',      label: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins`, met: balance >= MIN_PAYOUT_COINS },
     {
       id: 'cooldown',

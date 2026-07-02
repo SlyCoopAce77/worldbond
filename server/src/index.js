@@ -451,7 +451,7 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
     // ── 1. Load verified server-side state ─────────────────────────────────────
     const { rows } = await db(
       `SELECT p.coin_balance, p.stripe_account_id, p.has_bond_pass,
-              p.last_payout_at, p.is_id_verified,
+              p.last_payout_at,
               u.created_at
        FROM profiles p
        JOIN users u ON u.id = p.user_id
@@ -462,7 +462,7 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
 
     const {
       coin_balance, stripe_account_id, has_bond_pass,
-      last_payout_at, is_id_verified, created_at,
+      last_payout_at, created_at,
     } = rows[0];
 
     // ── 2. Account age — must be 30+ days old ─────────────────────────────────
@@ -519,10 +519,17 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
     }
 
     // ── 9. Deduct coins first — if Stripe fails we refund; this prevents double-spend ──
-    await db(
-      `UPDATE profiles SET coin_balance = coin_balance - $1, last_payout_at = NOW() WHERE user_id = $2`,
+    // Conditional on coin_balance so two concurrent payout requests can't both
+    // pass the step-3 balance check and each trigger a real Stripe transfer.
+    const deduction = await db(
+      `UPDATE profiles SET coin_balance = coin_balance - $1, last_payout_at = NOW()
+       WHERE user_id = $2 AND coin_balance >= $1
+       RETURNING coin_balance`,
       [coinsToPay, userId]
     );
+    if (!deduction.rows.length) {
+      return res.status(409).json({ error: 'Balance changed — please try again.' });
+    }
 
     // ── 10. Execute Stripe transfer — refund coins if this fails ─────────────
     let transfer;
@@ -543,11 +550,13 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
     }
 
     // ── 11. Immutable audit trail ─────────────────────────────────────────────
+    // Transfer already succeeded at this point — log but don't fail the request
+    // if this insert has trouble, so a DB blip doesn't look like a failed payout.
     await db(
       `INSERT INTO payout_audit (user_id, coins_deducted, amount_cents, payout_rate, stripe_tx_id, ip_address)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [userId, coinsToPay, amountCents, payoutRate, transfer.id, clientIp]
-    );
+    ).catch(e => console.error('[Payout] audit insert error:', e.message));
 
     // ── 12. Track transfer status for webhook updates ────────────────────────────
     await db(
