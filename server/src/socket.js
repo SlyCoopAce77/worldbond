@@ -1,6 +1,29 @@
 const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 const { translateText } = require('./translate');
 const { query: dbQuery } = require('./database/db');
+
+// ── Block-list enforcement for the real-time layer ────────────────────────────
+// The REST API (profiles.routes.js /blocks) has always respected user_blocks.
+// The socket layer never checked it — a blocked (or any) user could grab
+// someone's socketId from a shared group room / live stream and DM or call
+// them directly, completely bypassing the block. This check is used by
+// direct_message and call_user below.
+async function isBlockedEitherWay(userIdA, userIdB) {
+  if (!userIdA || !userIdB) return false; // can't verify — fail open, no worse than before
+  try {
+    const { rows } = await dbQuery(
+      `SELECT 1 FROM user_blocks
+       WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
+       LIMIT 1`,
+      [userIdA, userIdB]
+    );
+    return rows.length > 0;
+  } catch (e) {
+    console.warn('[Blocks] check error:', e.message);
+    return false; // DB hiccup shouldn't silently break messaging
+  }
+}
 
 // ── Yearly challenge helpers ───────────────────────────────────────────────────
 function currentYear() { return new Date().getFullYear(); }
@@ -110,14 +133,26 @@ function setupSocket(io) {
     console.log(`User connected: ${socket.id}`);
 
     // Register user with name, language, and optional social links
-    socket.on('register', ({ username, display_name, language, country, socials, userId, photo_url, gender }) => {
+    // `token` is optional (older app builds don't send one yet) — when present
+    // and valid, the server-verified userId is used instead of whatever the
+    // client claims, closing the identity-spoofing gap for updated clients.
+    socket.on('register', ({ username, display_name, language, country, socials, userId, photo_url, gender, token }) => {
+      let verifiedUserId = null;
+      if (token) {
+        try {
+          verifiedUserId = jwt.verify(token, process.env.JWT_SECRET).sub;
+        } catch {
+          // invalid/expired token — fall back to the unverified claimed userId below
+        }
+      }
       connectedUsers[socket.id] = {
         username:     display_name || username,
         display_name: display_name || username,
         language, country,
         socials:    socials || {},
         socketId:   socket.id,
-        userId,
+        userId:     verifiedUserId || userId,
+        verified:   !!verifiedUserId,
         photo_url,
         gender,
       };
@@ -233,6 +268,10 @@ function setupSocket(io) {
       const recipient = connectedUsers[toSocketId];
       if (!sender || !recipient) return;
 
+      // Respect the block list — same behavior as an offline/unknown recipient
+      // so this doesn't leak whether a block exists.
+      if (await isBlockedEitherWay(sender.userId, recipient.userId)) return;
+
       // Update ghost score when a user responds to a match
       if (matchId && recordResponse && sender.userId) {
         recordResponse(sender.userId, matchId).catch(() => {});
@@ -280,8 +319,15 @@ function setupSocket(io) {
     });
 
     // WebRTC signaling for voice/video calls
-    socket.on('call_user', ({ toSocketId, offer, callType }) => {
-      const caller = connectedUsers[socket.id];
+    socket.on('call_user', async ({ toSocketId, offer, callType }) => {
+      const caller   = connectedUsers[socket.id];
+      const callee   = connectedUsers[toSocketId];
+      if (!caller || !callee) return;
+
+      // Respect the block list — a blocked user shouldn't be able to ring
+      // someone with an unwanted voice/video call invite.
+      if (await isBlockedEitherWay(caller.userId, callee.userId)) return;
+
       io.to(toSocketId).emit('incoming_call', {
         from: socket.id,
         callerName: caller?.username,

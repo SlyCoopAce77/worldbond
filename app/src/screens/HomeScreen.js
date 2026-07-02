@@ -7,6 +7,7 @@ import {
 import { WorldMark } from '../components/BondLogo';
 import LinearGradient from 'react-native-linear-gradient';
 import { getSocket } from '../services/socket';
+import { getAccessToken } from '../services/authApi';
 import { stringToColor } from '../utils/apiUtils';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
@@ -535,11 +536,15 @@ export default function HomeScreen({ navigation, user }) {
 
   useEffect(() => {
     if (!user) return;
-    function reg() {
+    async function reg() {
+      // Sending the access token lets the server verify identity for this
+      // connection instead of just trusting the claimed userId — closes an
+      // identity-spoofing gap in the real-time layer for updated app builds.
+      const token = await getAccessToken().catch(() => null);
       socket.emit('register', {
         username: user.username, display_name: user.display_name || user.username,
         language: user.language, country: user.country,
-        userId: user.userId, photo_url: user.photo_url,
+        userId: user.userId, photo_url: user.photo_url, token,
       });
       socket.emit('get_users');
       socket.emit('get_icebreaker');

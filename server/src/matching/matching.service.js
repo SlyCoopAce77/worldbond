@@ -173,6 +173,18 @@ async function getDailyMatches(userId) {
 // ── Create a real match after mutual interest ─────────────────────────────────
 async function createMatch(userId, targetUserId, connectionType, experienceId) {
   const [u1, u2] = [userId, targetUserId].sort();
+
+  // Never let a match form across a block in either direction — this is the
+  // one unambiguous safety guarantee blocking is supposed to make, regardless
+  // of whatever "mutual interest" flow eventually happens on top of this.
+  const blocked = await query(
+    `SELECT 1 FROM user_blocks
+     WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
+     LIMIT 1`,
+    [u1, u2]
+  );
+  if (blocked.rows.length) return null;
+
   const { rows } = await query(`
     INSERT INTO matches (user1_id, user2_id, connection_type, experience_id)
     VALUES ($1, $2, $3, $4)

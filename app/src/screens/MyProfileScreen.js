@@ -878,7 +878,9 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
     if (updates.display_name || updates.language || updates.country) {
       const updated = { ...user, username: data.display_name, language: data.language, country: data.country };
       await AsyncStorage.setItem('worldbond_user', JSON.stringify(updated));
-      socket.emit('register', updated);
+      // Include the access token so the server can verify this registration's
+      // identity instead of trusting the claimed userId (see HomeScreen.js).
+      socket.emit('register', { ...updated, token });
     }
   }
 
