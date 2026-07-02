@@ -288,7 +288,7 @@ app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req,
 // Debug: fire a test notification to all connected clients using a real profile userId
 app.post('/api/debug/notify', requireAuth, async (req, res) => {
   const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!ADMIN_IDS.includes(req.user?.userId)) return res.status(403).json({ error: 'Not authorized.' });
+  if (!ADMIN_IDS.includes(req.userId)) return res.status(403).json({ error: 'Not authorized.' });
   const ioInstance = req.app.get('io');
   const { type = 'follower' } = req.body;
 
@@ -317,7 +317,7 @@ app.post('/api/debug/notify', requireAuth, async (req, res) => {
 const DAILY_EARN_CAP = 50000; // 50,000 coins per day max ($500 face value)
 
 app.post('/coins/earn', requireAuth, async (req, res) => {
-  const userId   = req.user?.userId || req.body.userId;
+  const userId   = req.userId;
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
   // Rate limit: max 200 earn events per hour per user
@@ -387,7 +387,8 @@ app.post('/coins/earn', requireAuth, async (req, res) => {
 app.post('/creator/connect-stripe', requireAuth, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
   try {
-    const { userId, email } = req.body;
+    const userId = req.userId;
+    const { email } = req.body;
     const { query: db } = require('./database/db');
 
     // Check if creator already has a Stripe account
@@ -433,7 +434,7 @@ const MAX_PAYOUT_COINS = 500000; // $5000 hard cap per payout (manual review abo
 app.post('/creator/payout', requireAuth, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
 
-  const userId    = req.user?.userId || req.body.userId;
+  const userId    = req.userId;
   const clientIp  = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
   // Rate limit: max 3 payout attempts per hour per user (not 3 payouts — 3 attempts)
@@ -575,7 +576,7 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
 // ── Coins: credit after Apple IAP purchase ────────────────────────────────────
 // Verifies receipt with Apple and prevents replay (same receipt used twice).
 app.post('/coins/credit', requireAuth, async (req, res) => {
-  const userId   = req.user?.userId || req.body.userId;
+  const userId   = req.userId;
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 
   // Rate limit: max 20 coin purchases per user per day (generous, avoids abuse)
@@ -658,7 +659,7 @@ app.post('/coins/credit', requireAuth, async (req, res) => {
 // ── Streak: server-side daily check-in ───────────────────────────────────────
 // Prevents users from writing fake streak values to AsyncStorage.
 app.post('/streak/checkin', requireAuth, async (req, res) => {
-  const userId = req.user?.userId || req.body.userId;
+  const userId = req.userId;
 
   // Rate limit: once per hour per user (daily checkin, but allow retries)
   if (!rateLimit(`streak:${userId}`, 3, 3600000)) {
@@ -703,7 +704,7 @@ app.post('/streak/checkin', requireAuth, async (req, res) => {
 
 // Bond Pass Streak Shield — absorbs exactly 1 missed day per calendar month
 app.post('/streak/use-shield', requireAuth, async (req, res) => {
-  const userId = req.user?.userId || req.body.userId;
+  const userId = req.userId;
   try {
     const { query: db } = require('./database/db');
     const { rows } = await db(
@@ -744,7 +745,7 @@ app.post('/streak/use-shield', requireAuth, async (req, res) => {
 
 // ── Bot / fraud detection: report suspicious account ─────────────────────────
 app.post('/admin/flag-account', requireAuth, async (req, res) => {
-  const reporterId = req.user?.userId || req.body.reporterId;
+  const reporterId = req.userId;
   const { targetUserId, flagType, details } = req.body;
   if (!targetUserId || !flagType) return res.status(400).json({ error: 'Missing fields.' });
 
@@ -769,7 +770,7 @@ app.post('/admin/flag-account', requireAuth, async (req, res) => {
 // Called server-side when a challenge resolves. Rate-limited: 1 win per target
 // per user per 30 days — prevents any replay or double-counting.
 app.post('/challenge/record-win', requireAuth, async (req, res) => {
-  const userId  = req.user?.userId;
+  const userId  = req.userId;
   const { winType, targetId } = req.body; // winType: 'stamp' | 'monument'
   if (!userId || !winType || !targetId) return res.status(400).json({ error: 'Missing fields.' });
   if (!['stamp', 'monument'].includes(winType)) return res.status(400).json({ error: 'Invalid winType.' });
@@ -821,7 +822,7 @@ app.post('/admin/suspend-account', requireAuth, async (req, res) => {
   if (!targetUserId || suspend === undefined) return res.status(400).json({ error: 'Missing fields.' });
 
   const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
-  const callerId = req.user?.userId;
+  const callerId = req.userId;
   if (!ADMIN_IDS.includes(callerId)) return res.status(403).json({ error: 'Not authorized.' });
 
   try {
