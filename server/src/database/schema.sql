@@ -95,6 +95,22 @@ CREATE TABLE IF NOT EXISTS payout_audit (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_payout_audit_user ON payout_audit(user_id);
+-- ─── TRANSFER STATUS — tracks Stripe transfer events and status ──────────────────
+CREATE TABLE IF NOT EXISTS transfer_status (
+  transfer_id TEXT PRIMARY KEY,
+  user_id     UUID REFERENCES users(id),
+  coins_deducted INTEGER NOT NULL,
+  amount_cents   INTEGER NOT NULL,
+  status      VARCHAR(20) DEFAULT 'pending', -- pending, completed, failed, refunded
+  stripe_status JSONB DEFAULT '{}', -- Full Stripe response
+  completed_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_status_user ON transfer_status(user_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_status_status ON transfer_status(status);
+
+
 
 -- ─── FRAUD FLAGS — manual and automated review flags ─────────────────────────
 CREATE TABLE IF NOT EXISTS fraud_flags (
@@ -119,10 +135,9 @@ CREATE TABLE IF NOT EXISTS yearly_challenge_progress (
   gifts_received_bc    INTEGER DEFAULT 0,     -- Gift Legend: BC received in gifts
   total_bond_heat      INTEGER DEFAULT 0,     -- Bond Inferno: viewers + gifts×5 accumulated
   updated_at           TIMESTAMPTZ DEFAULT NOW(),
-  challenge_period     VARCHAR(10) DEFAULT '2026-H1',  -- format: YYYY-H1 or YYYY-H2
-  PRIMARY KEY (user_id, challenge_period)
+  PRIMARY KEY (user_id, year)
 );
-CREATE INDEX IF NOT EXISTS idx_yearly_progress_user ON yearly_challenge_progress(user_id, challenge_period);
+CREATE INDEX IF NOT EXISTS idx_yearly_progress_user ON yearly_challenge_progress(user_id);
 
 -- ─── STREAM SESSIONS — tamper-proof record of every live session ──────────────
 CREATE TABLE IF NOT EXISTS stream_sessions (
@@ -140,8 +155,7 @@ CREATE TABLE IF NOT EXISTS stream_sessions (
   year                 INTEGER NOT NULL,
   created_at           TIMESTAMPTZ DEFAULT NOW()
 );
-ALTER TABLE stream_sessions ADD COLUMN IF NOT EXISTS challenge_period VARCHAR(10);
-CREATE INDEX IF NOT EXISTS idx_stream_sessions_user ON stream_sessions(user_id, challenge_period);
+CREATE INDEX IF NOT EXISTS idx_stream_sessions_user ON stream_sessions(user_id, year);
 
 -- ─── CHALLENGE WIN LOG — rate-limited audit of stamp/monument wins ────────────
 CREATE TABLE IF NOT EXISTS challenge_wins (
@@ -152,8 +166,7 @@ CREATE TABLE IF NOT EXISTS challenge_wins (
   won_at      TIMESTAMPTZ DEFAULT NOW(),
   year        INTEGER NOT NULL
 );
-ALTER TABLE challenge_wins ADD COLUMN IF NOT EXISTS challenge_period VARCHAR(10);
-CREATE INDEX IF NOT EXISTS idx_challenge_wins_user ON challenge_wins(user_id, challenge_period);
+CREATE INDEX IF NOT EXISTS idx_challenge_wins_user ON challenge_wins(user_id, year);
 -- Prevents recording more than 1 win per target per 30 days (enforced in app logic)
 
 -- ─── EXPERIENCES ─────────────────────────────────────────────────────────────

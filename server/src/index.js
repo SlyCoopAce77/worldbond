@@ -86,6 +86,115 @@ app.set('io', io);
 
 app.use(cors());
 app.use(express.json());
+// ── STRIPE WEBHOOKS — Must be BEFORE express.json() parser for raw body ─────────
+// We use a separate route with raw body parser to verify Stripe signatures
+app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  if (!sig || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(400).json({ error: 'Webhook not configured' });
+  }
+
+  try {
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+    const { query: db } = require('./database/db');
+
+    // Handle transfer events
+    switch (event.type) {
+      case 'charge.succeeded': {
+        // Charge succeeded — transfer was sent to creator bank
+        const charge = event.data.object;
+        const transferId = charge.id;
+        console.log('[Stripe] charge.succeeded:', transferId);
+        
+        // Update transfer status to completed
+        await db(
+          `UPDATE transfer_status SET status = 'completed', completed_at = NOW(), updated_at = NOW()
+           WHERE transfer_id = $1`,
+          [transferId]
+        ).catch(e => console.warn('[Transfer] status update error:', e.message));
+        break;
+      }
+      case 'charge.failed': {
+        // Charge failed — refund coins back to creator
+        const charge = event.data.object;
+        const transferId = charge.id;
+        console.error('[Stripe] charge.failed:', transferId, charge.failure_message);
+        
+        // Get transfer info to refund coins
+        const txResult = await db(
+          `SELECT user_id, coins_deducted FROM transfer_status WHERE transfer_id = $1`,
+          [transferId]
+        );
+        
+        if (txResult.rows.length > 0) {
+          const { user_id, coins_deducted } = txResult.rows[0];
+          
+          // Refund coins to user
+          await db(
+            `UPDATE profiles SET coin_balance = coin_balance + $1 WHERE user_id = $2`,
+            [coins_deducted, user_id]
+          ).catch(e => console.warn('[Transfer] coin refund error:', e.message));
+          
+          // Mark transfer as failed in status table
+          await db(
+            `UPDATE transfer_status SET status = 'failed', stripe_status = $2, updated_at = NOW()
+             WHERE transfer_id = $1`,
+            [transferId, JSON.stringify({ error: charge.failure_message })]
+          ).catch(e => console.warn('[Transfer] status update error:', e.message));
+          
+          console.log('[Transfer] Refunded', coins_deducted, 'coins to user', user_id);
+        }
+        break;
+      }
+      case 'charge.refunded': {
+        // Charge was refunded — restore coins to creator
+        const charge = event.data.object;
+        const transferId = charge.id;
+        console.log('[Stripe] charge.refunded:', transferId);
+        
+        // Get transfer info to refund coins
+        const txResult = await db(
+          `SELECT user_id, coins_deducted FROM transfer_status WHERE transfer_id = $1`,
+          [transferId]
+        );
+        
+        if (txResult.rows.length > 0) {
+          const { user_id, coins_deducted } = txResult.rows[0];
+          
+          // Refund coins to user
+          await db(
+            `UPDATE profiles SET coin_balance = coin_balance + $1 WHERE user_id = $2`,
+            [coins_deducted, user_id]
+          ).catch(e => console.warn('[Transfer] coin refund error:', e.message));
+          
+          // Mark transfer as refunded in status table
+          await db(
+            `UPDATE transfer_status SET status = 'refunded', updated_at = NOW()
+             WHERE transfer_id = $1`,
+            [transferId]
+          ).catch(e => console.warn('[Transfer] status update error:', e.message));
+          
+          console.log('[Transfer] Refunded', coins_deducted, 'coins (reversal) to user', user_id);
+        }
+        break;
+      }
+      default:
+        console.log('[Stripe] Unhandled event type:', event.type);
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[Stripe] webhook error:', err.message);
+    res.status(400).json({ error: 'Webhook signature verification failed' });
+  }
+});
+
+
 
 // Only serve local uploads when Cloudinary is not configured (dev mode)
 if (!cloudinaryEnabled) {
@@ -689,12 +798,7 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
   try {
     const { query: db } = require('./database/db');
     
-    // FIX BUG #2: Calculate current challenge period (H1 = Jan-Jun, H2 = Jul-Dec)
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const half = month <= 6 ? 'H1' : 'H2';
-    const challengePeriod = `${year}-${half}`;
+    const year = new Date().getFullYear();
 
     // Enforce 30-day cooldown: same user, same target, within 30 days
     const recent = await db(
@@ -707,18 +811,16 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
       return res.status(429).json({ error: 'Already recorded a win for this target in the last 30 days.' });
     }
 
-    // Record the win (FIX BUG #2: use challenge_period instead of year)
     await db(
-      `INSERT INTO challenge_wins (user_id, win_type, target_id, challenge_period) VALUES ($1, $2, $3, $4)`,
-      [userId, winType, targetId, challengePeriod]
+      `INSERT INTO challenge_wins (user_id, win_type, target_id, year) VALUES ($1, $2, $3, $4)`,
+      [userId, winType, targetId, year]
     );
 
-    // Update yearly progress counter (FIX BUG #2: use challenge_period instead of year)
     const col = winType === 'stamp' ? 'stamp_wins' : 'monument_wins';
     await db(
-      `INSERT INTO yearly_challenge_progress (user_id, challenge_period, ${col}, updated_at)
+      `INSERT INTO yearly_challenge_progress (user_id, year, ${col}, updated_at)
        VALUES ($1, $2, 1, NOW())
-       ON CONFLICT (user_id, challenge_period) DO UPDATE SET ${col} = yearly_challenge_progress.${col} + 1, updated_at = NOW()`,
+       ON CONFLICT (user_id, year) DO UPDATE SET ${col} = yearly_challenge_progress.${col} + 1, updated_at = NOW()`,
       [userId, year]
     );
 
@@ -764,10 +866,8 @@ async function start() {
   if (!APPLE_SHARED_SECRET) {
     console.error('[Security] APPLE_SHARED_SECRET is not set — IAP receipts will NOT be verified. Set this env var before launch.');
   }
-  // FIX BUG #3: Require STRIPE_SECRET_KEY for production to prevent silent payment feature degradation
   if (!process.env.STRIPE_SECRET_KEY) {
-    console.error('[FATAL] STRIPE_SECRET_KEY is required for production. Exiting.');
-    process.exit(1);
+    console.warn('[Security] STRIPE_SECRET_KEY is not set — payouts and Stripe connect are disabled.');
   }
   if (process.env.DATABASE_URL) {
     try {
