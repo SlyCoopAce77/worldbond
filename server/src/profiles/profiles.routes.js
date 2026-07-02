@@ -152,4 +152,28 @@ router.post('/me/voice-note', audioUpload.single('audio'), async (req, res) => {
   }
 });
 
+router.delete('/me', async (req, res) => {
+  const userId = req.userId;
+  try {
+    // 1. Null user_id in payout_audit and transfer_status to satisfy foreign key constraints
+    await query('UPDATE payout_audit SET user_id = NULL WHERE user_id = $1', [userId]);
+    await query('UPDATE transfer_status SET user_id = NULL WHERE user_id = $1', [userId]);
+
+    // 2. Delete the user row (which cascades and deletes profile, reports, blocks, refresh_tokens, password_resets, etc.)
+    const result = await query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 3. Clear in-memory photos
+    const { deletePhotosByUser } = require('../photos');
+    deletePhotosByUser(userId);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[DeleteAccount] error:', err.message);
+    res.status(500).json({ error: 'Could not delete account: ' + err.message });
+  }
+});
+
 module.exports = router;

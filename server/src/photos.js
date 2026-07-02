@@ -86,4 +86,12 @@ function adminDeletePhoto(photoId) {
   return true;
 }
 
-module.exports = { addPhoto, getPhotos, getPhotoById, toggleLike, addComment, deletePhoto, toggleEcho, adminDeletePhoto };
+function deletePhotosByUser(userId) {
+  for (let i = photos.length - 1; i >= 0; i--) {
+    if (photos[i].userId === userId) {
+      photos.splice(i, 1);
+    }
+  }
+}
+
+module.exports = { addPhoto, getPhotos, getPhotoById, toggleLike, addComment, deletePhoto, toggleEcho, adminDeletePhoto, deletePhotosByUser };
