@@ -32,7 +32,7 @@ async function upsertYearlyProgress(userId, updates) {
   if (!userId) return;
   const year  = currentYear();
   const cols  = Object.keys(updates);
-  const incs  = cols.map(c => `${c} = COALESCE(${c}, 0) + $${cols.indexOf(c) + 3}`).join(', ');
+  const incs  = cols.map(c => `${c} = COALESCE(yearly_challenge_progress.${c}, 0) + $${cols.indexOf(c) + 3}`).join(', ');
   const vals  = cols.map(c => updates[c]);
   await dbQuery(
     `INSERT INTO yearly_challenge_progress (user_id, year, ${cols.join(', ')}, updated_at)
@@ -137,6 +137,11 @@ function setupSocket(io) {
     // and valid, the server-verified userId is used instead of whatever the
     // client claims, closing the identity-spoofing gap for updated clients.
     socket.on('register', ({ username, display_name, language, country, socials, userId, photo_url, gender, token }) => {
+      const finalName = (display_name || username || '').trim();
+      if (!finalName) {
+        socket.emit('register_error', { reason: 'empty_name' });
+        return;
+      }
       let verifiedUserId = null;
       if (token) {
         try {
@@ -146,8 +151,8 @@ function setupSocket(io) {
         }
       }
       connectedUsers[socket.id] = {
-        username:     display_name || username,
-        display_name: display_name || username,
+        username:     finalName,
+        display_name: finalName,
         language, country,
         socials:    socials || {},
         socketId:   socket.id,
@@ -158,7 +163,7 @@ function setupSocket(io) {
       };
       socket.emit('registered', { socketId: socket.id });
       io.emit('user_list', Object.values(connectedUsers));
-      console.log(`Registered: ${username} (${language}, ${country})`);
+      console.log(`Registered: ${finalName} (${language}, ${country})`);
     });
 
     // Get list of online users
@@ -997,7 +1002,7 @@ function setupSocket(io) {
 
     socket.on('go_live', async ({ title, category, thumbnail }) => {
       const user = connectedUsers[socket.id];
-      if (!user) {
+      if (!user || !user.username) {
         socket.emit('go_live_error', { reason: 'not_registered' });
         return;
       }
