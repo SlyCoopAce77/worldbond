@@ -214,7 +214,7 @@ app.get('/privacy', (req, res) => res.send(`<!DOCTYPE html><html><head><meta cha
 <h2>3. Age Requirement</h2><p>WorldBond is strictly for users 18 years of age and older. We collect date of birth at registration and permanently store it. Users found to be under 18 are permanently banned.</p>
 <h2>4. Data Storage & Security</h2><p>Your data is stored securely on encrypted servers. We use industry-standard security practices to protect your information. Passwords are hashed and never stored in plain text.</p>
 <h2>5. Third-Party Services</h2><p>We use Stripe for payment processing (subject to <a href="https://stripe.com/privacy">Stripe's Privacy Policy</a>). We use Apple In-App Purchase for coin purchases on iOS. We use Google services on Android.</p>
-<h2>6. Your Rights</h2><p>You may request deletion of your account and associated data at any time by contacting us at support@worldbond.app. Account deletion is permanent and irreversible.</p>
+<h2>6. Your Rights</h2><p>You may permanently delete your account and all associated data at any time from within the app via Settings → Delete Account. Account deletion is permanent and irreversible. For assistance, contact us at support@worldbond.app.</p>
 <h2>7. Cookies & Tracking</h2><p>The WorldBond app does not use cookies. We may collect anonymised analytics data to improve the service.</p>
 <h2>8. Changes to This Policy</h2><p>We may update this policy from time to time. We will notify users of significant changes via the app or email.</p>
 <h2>9. Contact</h2><p>Questions? Email us at <a href="mailto:support@worldbond.app">support@worldbond.app</a></p>
