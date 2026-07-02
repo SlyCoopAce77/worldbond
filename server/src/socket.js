@@ -1074,7 +1074,6 @@ function setupSocket(io) {
       });
 
       // Tell host someone joined
-      const viewer = connectedUsers[socket.id];
       io.to(streamId).emit('live_viewer_joined', {
         viewerId: viewer?.userId || socket.id,
         viewerName: viewer?.username || 'Someone',
