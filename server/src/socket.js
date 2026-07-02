@@ -1099,12 +1099,15 @@ function setupSocket(io) {
       console.log(`[Live] ${connectedUsers[socket.id]?.username} ended live`);
     });
 
-    socket.on('join_live', ({ streamId }) => {
+    socket.on('join_live', async ({ streamId }) => {
       const stream = liveStreams[streamId];
       if (!stream) return socket.emit('live_error', 'Stream not found or ended');
+      const viewer = connectedUsers[socket.id];
+      if (await isBlockedEitherWay(viewer?.userId, stream.hostUserId)) {
+        return socket.emit('live_error', 'Stream not found or ended');
+      }
       stream.viewerIds.add(socket.id);
       stream.uniqueViewerIds = stream.uniqueViewerIds || new Set();
-      const viewer = connectedUsers[socket.id];
       if (viewer?.userId) stream.uniqueViewerIds.add(viewer.userId);
       if (stream.viewerIds.size > (stream.peakViewers || 0)) {
         stream.peakViewers = stream.viewerIds.size;
@@ -1146,6 +1149,7 @@ function setupSocket(io) {
       const sender = connectedUsers[socket.id];
       const stream = liveStreams[streamId];
       if (!sender || !stream || !text?.trim()) return;
+      if (await isBlockedEitherWay(sender.userId, stream.hostUserId)) return;
 
       const message = {
         id:           uuidv4(),
@@ -1171,6 +1175,24 @@ function setupSocket(io) {
         }
         s.emit('live_message', { ...message, text: displayText, wasTranslated: displayText !== message.originalText });
       }
+    });
+
+    socket.on('kick_viewer', ({ streamId, viewerSocketId }) => {
+      const stream = liveStreams[streamId];
+      if (!stream) return;
+      if (stream.hostSocketId !== socket.id) return;
+
+      const viewerSocket = io.sockets.sockets.get(viewerSocketId);
+      if (viewerSocket) {
+        viewerSocket.emit('live_kicked', { streamId });
+        viewerSocket.leave(`live:${streamId}`);
+      }
+
+      stream.viewerIds.delete(viewerSocketId);
+
+      io.to(`live:${streamId}`).emit('live_viewer_count', {
+        streamId, count: stream.viewerIds.size,
+      });
     });
 
     socket.on('live_reaction', ({ streamId, emoji }) => {

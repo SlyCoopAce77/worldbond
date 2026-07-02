@@ -136,6 +136,18 @@ CREATE TABLE IF NOT EXISTS fraud_flags (
 );
 CREATE INDEX IF NOT EXISTS idx_fraud_flags_user ON fraud_flags(user_id, resolved);
 
+-- ─── USER REPORTS ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS user_reports (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reporter_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+  target_id    UUID REFERENCES users(id) ON DELETE CASCADE,
+  reason       VARCHAR(50) NOT NULL,
+  context      JSONB DEFAULT '{}',
+  resolved     BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_reports_target ON user_reports(target_id, resolved);
+
 -- ─── YEARLY CHALLENGE PROGRESS (server-authoritative, one row per user per year) ─
 CREATE TABLE IF NOT EXISTS yearly_challenge_progress (
   user_id              UUID REFERENCES users(id) ON DELETE CASCADE,

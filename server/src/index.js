@@ -930,6 +930,26 @@ app.post('/admin/flag-account', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/reports', requireAuth, async (req, res) => {
+  const reporterId = req.userId;
+  const { targetUserId, reason, context } = req.body;
+  if (!targetUserId || !reason) return res.status(400).json({ error: 'Missing fields.' });
+  if (!rateLimit(`report:${reporterId}`, 10, 3600000)) {
+    return res.status(429).json({ error: 'Too many reports.' });
+  }
+  try {
+    const { query: db } = require('./database/db');
+    await db(
+      `INSERT INTO user_reports (reporter_id, target_id, reason, context) VALUES ($1, $2, $3, $4)`,
+      [reporterId, targetUserId, reason, JSON.stringify(context || {})]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Report] error:', err.message);
+    res.status(500).json({ error: 'Could not submit report.' });
+  }
+});
+
 // ── Globe Trotter: record a stamp or monument win ─────────────────────────────
 // Rate-limited: 1 win per target per user per 30 days — prevents replay or
 // double-counting. targetId is checked against the known flag/monument lists

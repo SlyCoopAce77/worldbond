@@ -355,8 +355,20 @@ export default function ChatScreen({ route, navigation }) {
     );
   }
 
-  function confirmReport(reason) {
-    Alert.alert('Report Submitted', 'Thank you. Our team will review this report within 24 hours.', [{ text: 'OK' }]);
+  async function confirmReport(reason) {
+    const targetUserId = otherUser?.userId || otherUser?.user_id;
+    if (!targetUserId) return;
+    try {
+      const headers = await authHeader();
+      await axios.post(`${SERVER_URL}/api/reports`, {
+        targetUserId,
+        reason,
+      }, { headers });
+      Alert.alert('Report Submitted', 'Thank you. Our team will review this report within 24 hours.', [{ text: 'OK' }]);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Could not submit report.';
+      Alert.alert('Error', msg);
+    }
   }
 
   // ── Render message ─────────────────────────────────────────────────────────

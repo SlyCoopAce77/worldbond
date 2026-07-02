@@ -2,11 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, SafeAreaView, KeyboardAvoidingView, Platform,
-  Animated, StatusBar, Dimensions, Image,
+  Animated, StatusBar, Dimensions, Image, Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { getSocket } from '../services/socket';
-import { stringToColor, formatDuration } from '../utils/apiUtils';
+import { getSocket, SERVER_URL } from '../services/socket';
+import { stringToColor, formatDuration, authHeader } from '../utils/apiUtils';
+import axios from 'axios';
 import { useWallet } from '../context/WalletContext';
 import { WorldMark } from '../components/BondLogo';
 import FloatingReaction from '../components/FloatingReaction';
@@ -74,6 +75,12 @@ export default function LiveWatchScreen({ route, navigation }) {
     function onLiveEnded({ streamId }) {
       if (streamId === stream.streamId) setEnded(true);
     }
+    function onKicked({ streamId }) {
+      if (streamId === stream.streamId) {
+        Alert.alert('Kicked', 'You have been kicked from this live stream.');
+        navigation.goBack();
+      }
+    }
 
     socket.emit('join_live', { streamId: stream.streamId });
     socket.on('live_joined',        onJoined);
@@ -82,6 +89,7 @@ export default function LiveWatchScreen({ route, navigation }) {
     socket.on('live_reaction',      onReaction);
     socket.on('live_gift_received', onGiftReceived);
     socket.on('live_ended',         onLiveEnded);
+    socket.on('live_kicked',        onKicked);
 
     return () => {
       socket.emit('leave_live', { streamId: stream.streamId });
@@ -91,6 +99,7 @@ export default function LiveWatchScreen({ route, navigation }) {
       socket.off('live_reaction',      onReaction);
       socket.off('live_gift_received', onGiftReceived);
       socket.off('live_ended',         onLiveEnded);
+      socket.off('live_kicked',        onKicked);
     };
   }, []);
 
@@ -116,6 +125,36 @@ export default function LiveWatchScreen({ route, navigation }) {
   function removeFloat(id)  { setFloats(prev => prev.filter(f => f.id !== id)); }
   function removeBurst(id)  { setBursts(prev => prev.filter(b => b.id !== id)); }
   function removeDrop(id)   { setDrops(prev =>  prev.filter(d => d.id !== id)); }
+
+  function reportStream() {
+    Alert.alert(
+      'Report Stream',
+      'Why are you reporting this live stream?',
+      [
+        { text: 'Spam',                 onPress: () => confirmReport('spam') },
+        { text: 'Harassment',           onPress: () => confirmReport('harassment') },
+        { text: 'Inappropriate content',onPress: () => confirmReport('inappropriate') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
+
+  async function confirmReport(reason) {
+    const targetUserId = stream?.hostUserId;
+    if (!targetUserId) return;
+    try {
+      const headers = await authHeader();
+      await axios.post(`${SERVER_URL}/api/reports`, {
+        targetUserId,
+        reason,
+        context: { streamId: stream?.streamId },
+      }, { headers });
+      Alert.alert('Report Submitted', 'Thank you. Our team will review this stream within 24 hours.', [{ text: 'OK' }]);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Could not submit report.';
+      Alert.alert('Error', msg);
+    }
+  }
 
   const avatarColor = stringToColor(stream?.hostName || '');
 
@@ -182,9 +221,14 @@ export default function LiveWatchScreen({ route, navigation }) {
           </View>
 
           <View style={styles.topRight}>
-            <View style={styles.viewerPill}>
-              <View style={styles.viewerDot} />
-              <Text style={styles.viewerCount}>{viewerCount}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity style={styles.reportBtn} onPress={reportStream}>
+                <Text style={styles.reportText}>🚩</Text>
+              </TouchableOpacity>
+              <View style={styles.viewerPill}>
+                <View style={styles.viewerDot} />
+                <Text style={styles.viewerCount}>{viewerCount}</Text>
+              </View>
             </View>
             <Text style={styles.timerText}>{formatDuration(elapsed)}</Text>
           </View>
@@ -354,4 +398,6 @@ const styles = StyleSheet.create({
   endedSub:      { color: 'rgba(255,255,255,0.45)', fontSize: 14, marginBottom: 20 },
   endedBtn:      { backgroundColor: BOND_PINK, borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
   endedBtnText:  { color: '#fff', fontSize: 15, fontWeight: '700' },
+  reportBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  reportText:    { color: '#fff', fontSize: 16 },
 });

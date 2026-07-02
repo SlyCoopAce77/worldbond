@@ -5,8 +5,9 @@ import {
   Animated, StatusBar, Dimensions, Image, Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { getSocket } from '../services/socket';
+import { getSocket, SERVER_URL } from '../services/socket';
 import { stringToColor, formatDuration } from '../utils/apiUtils';
+
 import { useWallet } from '../context/WalletContext';
 import FloatingReaction from '../components/FloatingReaction';
 import GiftBurst from '../components/GiftBurst';
