@@ -8,6 +8,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useBondPass } from '../context/PremiumContext';
 import { useWallet, MONUMENT_CAP } from '../context/WalletContext';
 import { useChallenge, DAILY_LIMITS, POINT_RATES, ENTRY_FEE, COOLDOWN_MS } from '../context/ChallengeContext';
+import { authHeader } from '../utils/apiUtils';
+import { SERVER_URL } from '../services/socket';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatCountdown(ms) {
@@ -351,17 +353,28 @@ export default function MonumentChallengeScreen({ route, navigation }) {
         {
           text: `Start — ${ENTRY_FEE} Coins`,
           style: 'destructive',
-          onPress: () => {
-            // Deduct entry fee first — if this fails, don't start the challenge
-            const spent = spendCoins(ENTRY_FEE, 'challenge_entry', { monument: monument.name });
-            if (!spent) {
-              Alert.alert('Error', 'Could not deduct entry fee. Check your balance.');
-              return;
-            }
-            const result = initiateChallenge(monument.id, myUsername, monument.holder);
-            if (result.error) {
-              // Refund the entry fee if challenge creation fails
-              Alert.alert('Challenge Error', result.error);
+          onPress: async () => {
+            // Real, Bond Pass-gated, server-verified charge — replaces the old
+            // local-only spendCoins() that never touched real coin_balance.
+            try {
+              const headers = await authHeader();
+              const res = await fetch(`${SERVER_URL}/challenge/entry`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify({ winType: 'monument', targetId: monument.id }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                Alert.alert('Could not start challenge', data.error || 'Please try again.');
+                return;
+              }
+              spendCoins(data.feeCharged, 'challenge_entry', { monument: monument.name });
+              const result = initiateChallenge(monument.id, myUsername, monument.holder);
+              if (result.error) {
+                Alert.alert('Challenge Error', result.error);
+              }
+            } catch {
+              Alert.alert('Network Error', 'Could not reach the server. Try again.');
             }
           },
         },

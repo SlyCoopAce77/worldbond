@@ -12,6 +12,8 @@ import {
   getFeaturedFlag, getNextFeaturedFlag, isStampDropped,
 } from '../context/ChallengeContext';
 import { getFlagName } from '../utils/countryUtils';
+import { authHeader } from '../utils/apiUtils';
+import { SERVER_URL } from '../services/socket';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatCountdown(ms) {
@@ -370,16 +372,28 @@ export default function CountryStampChallengeScreen({ route, navigation }) {
         {
           text: `Start — ${effectiveFee} Coins`,
           style: 'destructive',
-          onPress: () => {
-            // Deduct entry fee first — if this fails, don't start the challenge
-            const spent = spendCoins(effectiveFee, 'challenge_entry', { country: countryName, flag });
-            if (!spent) {
-              Alert.alert('Error', 'Could not deduct entry fee. Check your balance.');
-              return;
-            }
-            const result = initiateStampChallenge(flag, myUsername, stamp.holder);
-            if (result.error) {
-              Alert.alert('Challenge Error', result.error);
+          onPress: async () => {
+            // Real, Bond Pass-gated, server-verified charge — replaces the old
+            // local-only spendCoins() that never touched real coin_balance.
+            try {
+              const headers = await authHeader();
+              const res = await fetch(`${SERVER_URL}/challenge/entry`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify({ winType: 'stamp', targetId: flag }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                Alert.alert('Could not start challenge', data.error || 'Please try again.');
+                return;
+              }
+              spendCoins(data.feeCharged, 'challenge_entry', { country: countryName, flag });
+              const result = initiateStampChallenge(flag, myUsername, stamp.holder);
+              if (result.error) {
+                Alert.alert('Challenge Error', result.error);
+              }
+            } catch {
+              Alert.alert('Network Error', 'Could not reach the server. Try again.');
             }
           },
         },

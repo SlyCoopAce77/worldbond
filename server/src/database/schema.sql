@@ -381,6 +381,46 @@ INSERT INTO bond_monuments (monument_id) VALUES
   ('colosseum'),('great_wall')
 ON CONFLICT (monument_id) DO NOTHING;
 
+-- Needed to know which country's live streams a monument's 2% royalty applies
+-- to (see collectibles.js payCollectibleRoyalties) — not present when the
+-- table was first created.
+ALTER TABLE bond_monuments ADD COLUMN IF NOT EXISTS country VARCHAR(8);
+UPDATE bond_monuments SET country = v.country FROM (VALUES
+  ('liberty','🇺🇸'),('grand_canyon','🇺🇸'),('christ','🇧🇷'),('amazon','🇧🇷'),
+  ('gyeongbok','🇰🇷'),('fuji','🇯🇵'),('fushimi','🇯🇵'),('gate','🇩🇪'),
+  ('bigben','🇬🇧'),('eiffel','🇫🇷'),('sagrada','🇪🇸'),('red_square','🇷🇺'),
+  ('niagara','🇨🇦'),('chichen','🇲🇽'),('taj','🇮🇳'),('borobudur','🇮🇩'),
+  ('hagia','🇹🇷'),('opera','🇦🇺'),('colosseum','🇮🇹'),('great_wall','🇨🇳')
+) AS v(monument_id, country)
+WHERE bond_monuments.monument_id = v.monument_id AND bond_monuments.country IS NULL;
+
+-- ─── YEARLY CHALLENGE ENTRIES — Bond Pass-gated buy-in that locks in real ────
+-- prize eligibility. progress_at_entry snapshots the relevant metric at the
+-- moment of buy-in so only progress made AFTER buying in counts toward the
+-- goal — see yearlyChallenges.js.
+CREATE TABLE IF NOT EXISTS yearly_challenge_entries (
+  user_id           UUID REFERENCES users(id) ON DELETE CASCADE,
+  year              INTEGER NOT NULL,
+  challenge_key     VARCHAR(30) NOT NULL,
+  progress_at_entry NUMERIC DEFAULT 0,
+  bought_in_at      TIMESTAMPTZ DEFAULT NOW(),
+  prize_paid_at     TIMESTAMPTZ,
+  PRIMARY KEY (user_id, year, challenge_key)
+);
+
+-- ─── COIN BURNS — audit log of coins destroyed (not transferred to anyone) ───
+-- Entry fees and yearly buy-ins are burned, not collected as platform
+-- revenue — this table exists purely for accounting/audit visibility.
+CREATE TABLE IF NOT EXISTS coin_burns (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  amount      INTEGER NOT NULL,
+  reason      VARCHAR(50) NOT NULL,
+  meta        JSONB DEFAULT '{}',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_coin_burns_user ON coin_burns(user_id);
+
 -- ─── UPDATED_AT TRIGGER ──────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$

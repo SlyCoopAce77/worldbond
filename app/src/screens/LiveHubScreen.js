@@ -1,22 +1,26 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, SafeAreaView, ScrollView,
-  TouchableOpacity, Animated, RefreshControl,
+  TouchableOpacity, Animated, RefreshControl, Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { getSocket } from '../services/socket';
-import { stringToColor } from '../utils/apiUtils';
+import { getSocket, SERVER_URL } from '../services/socket';
+import { stringToColor, authHeader } from '../utils/apiUtils';
 import { getCountryFlag } from '../utils/countryUtils';
+import { useBondPass } from '../context/PremiumContext';
+import { useWallet } from '../context/WalletContext';
 
 const BOND_PINK = '#FF0080';
 
+// Goal/prize/buyIn must match server/src/yearlyChallenges.js — that's the
+// source of truth for actually paying out; this is display copy only.
 const YEARLY_CHALLENGES = [
-  { key: 'worldStreamer', title: 'World Streamer',  description: 'Go live 52+ times this year — once a week. Each stream must be at least 5 hours.',                          prize: '500,000 BC',   goal: 52,     unit: 'streams'   },
-  { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Win 12 Country Stamps AND 12 Bond Monuments this year — one of each per month. Conquer the globe.',          prize: '750,000 BC',   goal: 24,     unit: 'wins'      },
-  { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 365+ total hours of live streaming this year — roughly 1 hour a day.',                            prize: '1,000,000 BC', goal: 365,    unit: 'hours'     },
-  { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 10,000 total viewers across all your streams this year.',                                               prize: '1,500,000 BC', goal: 10000,  unit: 'viewers'   },
-  { key: 'giftLegend',    title: 'Earned Legend',   description: 'Earn 500,000+ BC in viewer support across your streams this year.',                                          prize: '2,000,000 BC', goal: 500000, unit: 'BC'        },
-  { key: 'bondInferno',   title: 'Bond Inferno',    description: 'Accumulate 50,000 Bond Heat this year. Heat = viewers + support ×5. You need both a crowd and their energy.', prize: '2,500,000 BC', goal: 50000,  unit: 'heat'      },
+  { key: 'worldStreamer', title: 'World Streamer',  description: 'Go live 52+ times this year — once a week. Each stream must be at least 5 hours.',                          prize: '30,000 BC', goal: 52,     unit: 'streams', buyIn: 3000 },
+  { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Win 12 Country Stamps AND 12 Bond Monuments this year — one of each per month. Conquer the globe.',          prize: '20,000 BC', goal: 24,     unit: 'wins',    buyIn: 2000 },
+  { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 365+ total hours of live streaming this year — roughly 1 hour a day.',                            prize: '25,000 BC', goal: 365,    unit: 'hours',   buyIn: 2500 },
+  { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 25,000 total viewers across all your streams this year.',                                              prize: '22,000 BC', goal: 25000,  unit: 'viewers', buyIn: 2000 },
+  { key: 'giftLegend',    title: 'Earned Legend',   description: 'Earn 500,000+ BC in viewer support across your streams this year.',                                          prize: '30,000 BC', goal: 500000, unit: 'BC',      buyIn: 2500 },
+  { key: 'bondInferno',   title: 'Bond Inferno',    description: 'Accumulate 75,000 Bond Heat this year. Heat = viewers + support ×5. You need both a crowd and their energy.', prize: '80,000 BC', goal: 75000,  unit: 'heat',    buyIn: 6000 },
 ];
 
 function bondHeat(stream) {
@@ -161,7 +165,10 @@ const gl = StyleSheet.create({
 });
 
 // ── Yearly Challenges ─────────────────────────────────────────────────────────
-function YearlyChallenge({ challenges, progress }) {
+// Buy-in required before progress counts toward a prize — see
+// server/src/yearlyChallenges.js. hasBondPass gates who can buy in;
+// boughtIn reflects the real, server-tracked entries for this user this year.
+function YearlyChallenge({ challenges, progress, boughtIn, hasBondPass, onBuyIn, buyingIn }) {
   const year = new Date().getFullYear();
   const days = daysLeftInYear();
   const pct  = pctOfYearElapsed();
@@ -179,36 +186,57 @@ function YearlyChallenge({ challenges, progress }) {
             <View style={wc.yearPill}>
               <Text style={wc.yearPillTxt}>{year} CHALLENGES</Text>
             </View>
-            <Text style={wc.headerSub}>Complete any to earn BC</Text>
+            <Text style={wc.headerSub}>Bond Pass members: buy in to compete for real prizes</Text>
           </View>
           <Text style={wc.ends}>{days}d left</Text>
         </View>
 
         {list.map((c, i) => {
-          const current = progress?.[c.key] ?? 0;
-          const goalPct = Math.min((current / c.goal) * 100, 100);
-          const done    = current >= c.goal;
+          const current  = progress?.[c.key] ?? 0;
+          const goalPct  = Math.min((current / c.goal) * 100, 100);
+          const done     = current >= c.goal;
+          const entered  = !!boughtIn?.[c.key];
+
           return (
             <View key={c.key} style={[wc.row, i < list.length - 1 && wc.rowBorder]}>
               <Text style={wc.num}>{i + 1}</Text>
               <View style={wc.info}>
                 <View style={wc.titleRow}>
                   <Text style={wc.title}>{c.title}</Text>
-                  {done && <View style={wc.donePill}><Text style={wc.doneTxt}>DONE</Text></View>}
+                  {entered && done && <View style={wc.donePill}><Text style={wc.doneTxt}>DONE</Text></View>}
+                  {entered && !done && <View style={wc.enteredPill}><Text style={wc.enteredTxt}>ENTERED</Text></View>}
                 </View>
                 <Text style={wc.desc}>{c.description}</Text>
-                <View style={wc.progressRow}>
-                  <View style={wc.progressBg}>
-                    <View style={[wc.progressFill, { width: `${goalPct}%`, backgroundColor: done ? '#22c55e' : BOND_PINK }]} />
+
+                {entered ? (
+                  <View style={wc.progressRow}>
+                    <View style={wc.progressBg}>
+                      <View style={[wc.progressFill, { width: `${goalPct}%`, backgroundColor: done ? '#22c55e' : BOND_PINK }]} />
+                    </View>
+                    <Text style={[wc.progressTxt, done && { color: '#22c55e' }]}>
+                      {fmtNum(current)}/{fmtNum(c.goal)} {c.unit}
+                    </Text>
                   </View>
-                  <Text style={[wc.progressTxt, done && { color: '#22c55e' }]}>
-                    {fmtNum(current)}/{fmtNum(c.goal)} {c.unit}
-                  </Text>
-                </View>
+                ) : (
+                  <TouchableOpacity
+                    style={wc.buyInBtn}
+                    disabled={!hasBondPass || buyingIn === c.key}
+                    onPress={() => onBuyIn?.(c)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={wc.buyInTxt}>
+                      {!hasBondPass
+                        ? '🔒 Bond Pass required to compete'
+                        : buyingIn === c.key
+                          ? 'Buying in…'
+                          : `Buy in — ${c.buyIn.toLocaleString()} BC to compete`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <View style={wc.prizeBox}>
                 <Text style={wc.prizeLabel}>PRIZE</Text>
-                <Text style={[wc.prizeVal, done && { color: '#22c55e' }]}>{c.prize}</Text>
+                <Text style={[wc.prizeVal, done && entered && { color: '#22c55e' }]}>{c.prize}</Text>
               </View>
             </View>
           );
@@ -243,6 +271,10 @@ const wc = StyleSheet.create({
   title:       { color: '#fff', fontSize: 13, fontWeight: '800' },
   donePill:    { backgroundColor: '#22c55e20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: '#22c55e50' },
   doneTxt:     { color: '#22c55e', fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  enteredPill: { backgroundColor: BOND_PINK + '20', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 1, borderWidth: 1, borderColor: BOND_PINK + '50' },
+  enteredTxt:  { color: BOND_PINK, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
+  buyInBtn:    { marginTop: 6, alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: BOND_PINK + '15', borderWidth: 1, borderColor: BOND_PINK + '40' },
+  buyInTxt:    { color: BOND_PINK, fontSize: 11, fontWeight: '800' },
   desc:        { color: 'rgba(255,255,255,0.5)', fontSize: 11, lineHeight: 16 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   progressBg:  { flex: 1, height: 3, backgroundColor: '#ffffff0f', borderRadius: 2 },
@@ -323,10 +355,14 @@ const lb = StyleSheet.create({
 // ── LiveHubScreen ─────────────────────────────────────────────────────────────
 export default function LiveHubScreen({ navigation, user }) {
   const socket = getSocket();
+  const { hasBondPass } = useBondPass();
+  const { spendCoins }  = useWallet();
   const [streams,           setStreams]           = useState([]);
   const [challenge,         setChallenge]         = useState(null);
   const [challengeProgress, setChallengeProgress] = useState({});
   const [refreshing,        setRefreshing]        = useState(false);
+  const [boughtIn,          setBoughtIn]          = useState({});
+  const [buyingIn,          setBuyingIn]          = useState(null);
   const livePulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -336,11 +372,59 @@ export default function LiveHubScreen({ navigation, user }) {
     ])).start();
   }, []);
 
+  async function fetchEntries() {
+    try {
+      const headers = await authHeader();
+      const res = await fetch(`${SERVER_URL}/challenge/yearly/entries`, { headers });
+      if (res.ok) setBoughtIn(await res.json());
+    } catch (err) {
+      console.warn('[LiveHub] entries fetch error:', err.message);
+    }
+  }
+
+  async function handleBuyIn(c) {
+    if (!hasBondPass) return;
+    Alert.alert(
+      `Buy In — ${c.title}`,
+      `${c.buyIn.toLocaleString()} Bond Coins will be burned to lock in your eligibility for the ${c.prize} prize. Only progress made after this counts. Cannot be cancelled.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: `Buy In — ${c.buyIn.toLocaleString()} Coins`,
+          style: 'destructive',
+          onPress: async () => {
+            setBuyingIn(c.key);
+            try {
+              const headers = await authHeader();
+              const res = await fetch(`${SERVER_URL}/challenge/yearly/buy-in`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify({ challengeKey: c.key }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                Alert.alert('Could not buy in', data.error || 'Please try again.');
+                return;
+              }
+              spendCoins(data.feeCharged, 'yearly_buyin', { challengeKey: c.key });
+              setBoughtIn(prev => ({ ...prev, [c.key]: true }));
+            } catch {
+              Alert.alert('Network Error', 'Could not reach the server. Try again.');
+            } finally {
+              setBuyingIn(null);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   useEffect(() => {
     function fetchAll() {
       socket.emit('get_live_streams');
       socket.emit('get_yearly_challenge');
       socket.emit('get_challenge_progress');
+      fetchEntries();
     }
     if (socket.connected) fetchAll();
     else socket.once('connect', fetchAll);
@@ -361,6 +445,7 @@ export default function LiveHubScreen({ navigation, user }) {
     setRefreshing(true);
     socket.emit('get_live_streams');
     socket.emit('get_challenge_progress');
+    fetchEntries();
     setTimeout(() => setRefreshing(false), 900);
   }
 
@@ -393,7 +478,14 @@ export default function LiveHubScreen({ navigation, user }) {
           />
 
           {/* Yearly Challenges */}
-          <YearlyChallenge challenges={challenge} progress={challengeProgress} />
+          <YearlyChallenge
+            challenges={challenge}
+            progress={challengeProgress}
+            boughtIn={boughtIn}
+            hasBondPass={hasBondPass}
+            onBuyIn={handleBuyIn}
+            buyingIn={buyingIn}
+          />
 
           {/* Top Streamers */}
           <Leaderboard streams={streams} />

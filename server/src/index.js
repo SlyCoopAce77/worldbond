@@ -16,6 +16,7 @@ const { isConfigured: cloudinaryEnabled, uploadBuffer } = require('./cloudinary'
 const { requireAuth, requireAdmin } = require('./auth/auth.middleware');
 const { getLiveMonthlyLeaderboard, getPayoutTierFor } = require('./creators');
 const { getAllStamps, getAllMonuments, claimStamp, claimMonument } = require('./collectibles');
+const { buyIntoChallenge, getMyEntries, upsertYearlyProgress } = require('./yearlyChallenges');
 
 // ── In-memory rate limiter (no extra packages needed) ─────────────────────────
 const _rlMap = new Map();
@@ -550,6 +551,22 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
 
     if (amountCents < 100) {
       return res.status(400).json({ error: 'Payout amount too small after rate calculation.' });
+    }
+
+    // ── 7.5. Solvency check — coin purchases come in via Apple IAP, which never
+    // funds this Stripe balance automatically. Someone (you) has to top up
+    // Stripe manually from your Apple payouts. Fail clearly here instead of
+    // letting a confusing raw Stripe "insufficient funds" error reach the user.
+    try {
+      const stripeBalance = await stripe.balance.retrieve();
+      const availableUSD  = stripeBalance.available.find(b => b.currency === 'usd')?.amount ?? 0;
+      if (availableUSD < amountCents) {
+        console.error(`[Payout] Stripe balance too low: have $${(availableUSD / 100).toFixed(2)}, need $${(amountCents / 100).toFixed(2)} for user ${userId}`);
+        return res.status(503).json({ error: 'Payouts are temporarily unavailable. Please try again later.' });
+      }
+    } catch (balErr) {
+      console.error('[Payout] Stripe balance check failed:', balErr.message);
+      return res.status(503).json({ error: 'Payouts are temporarily unavailable. Please try again later.' });
     }
 
     // ── 8. Flag large payouts for manual review but don't block them ──────────
@@ -1103,17 +1120,126 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
     );
 
     const col = winType === 'stamp' ? 'stamp_wins' : 'monument_wins';
-    await db(
-      `INSERT INTO yearly_challenge_progress (user_id, year, ${col}, updated_at)
-       VALUES ($1, $2, 1, NOW())
-       ON CONFLICT (user_id, year) DO UPDATE SET ${col} = yearly_challenge_progress.${col} + 1, updated_at = NOW()`,
-      [userId, year]
-    );
+    await upsertYearlyProgress(userId, { [col]: 1 }); // buy-in-aware, pays Globe Trotter prize if earned
 
     res.json({ ok: true });
   } catch (err) {
     console.error('[Win] record error:', err.message);
     res.status(500).json({ error: 'Could not record win.' });
+  }
+});
+
+// Same rotation formula as getFeaturedFlag() in app/src/context/ChallengeContext.js
+// — duplicated here so the entry fee discount can be verified server-side
+// instead of trusting a client-declared "this is the featured stamp" flag.
+const STAMP_ROTATION = [
+  '🇺🇸','🇧🇷','🇰🇷','🇯🇵','🇩🇪','🇬🇧','🇫🇷','🇪🇸','🇷🇺','🇨🇦','🇲🇽',
+  '🇦🇷','🇵🇭','🇮🇳','🇮🇩','🇹🇷','🇦🇺','🇸🇦','🇵🇱','🇹🇭','🇸🇪','🇳🇱','🇵🇹','🇨🇴',
+];
+function currentFeaturedFlag() {
+  const week = Math.floor(Date.now() / (7 * 86400000));
+  return STAMP_ROTATION[week % STAMP_ROTATION.length];
+}
+
+// ── Stamp/Monument challenge entry fee — real, Bond Pass required ────────────
+// Previously spendCoins('challenge_entry') only touched local AsyncStorage —
+// the coins weren't real and anyone could start a challenge for free.
+app.post('/challenge/entry', requireAuth, async (req, res) => {
+  const userId = req.userId;
+  const { winType, targetId } = req.body;
+  if (!['stamp', 'monument'].includes(winType)) return res.status(400).json({ error: 'Invalid type.' });
+  const validTargets = winType === 'stamp' ? VALID_STAMP_FLAGS : VALID_MONUMENT_IDS;
+  if (!validTargets.has(targetId)) return res.status(400).json({ error: 'Unknown target.' });
+
+  try {
+    const { query: db } = require('./database/db');
+    const { rows } = await db(`SELECT has_bond_pass FROM profiles WHERE user_id = $1`, [userId]);
+    if (!rows.length) return res.status(404).json({ error: 'User not found.' });
+    if (!rows[0].has_bond_pass) return res.status(403).json({ error: 'Bond Pass required to start a challenge.' });
+
+    const isFeatured = winType === 'stamp' && targetId === currentFeaturedFlag();
+    const fee = isFeatured ? 125 : 250;
+
+    const debit = await db(
+      `UPDATE profiles SET coin_balance = coin_balance - $1 WHERE user_id = $2 AND coin_balance >= $1 RETURNING coin_balance`,
+      [fee, userId]
+    );
+    if (!debit.rows.length) return res.status(400).json({ error: `Need ${fee.toLocaleString()} coins to start this challenge.` });
+
+    await db(
+      `INSERT INTO coin_burns (user_id, amount, reason, meta) VALUES ($1, $2, $3, $4)`,
+      [userId, fee, winType === 'stamp' ? 'stamp_challenge_entry' : 'monument_challenge_entry', JSON.stringify({ targetId })]
+    );
+
+    res.json({ ok: true, feeCharged: fee });
+  } catch (err) {
+    console.error('[Challenge] entry fee error:', err.message);
+    res.status(500).json({ error: 'Could not charge entry fee.' });
+  }
+});
+
+// ── Yearly Challenge buy-in — Bond Pass required, locks in real prize eligibility ─
+app.post('/challenge/yearly/buy-in', requireAuth, async (req, res) => {
+  const { challengeKey } = req.body;
+  const result = await buyIntoChallenge(req.userId, challengeKey);
+  if (!result.ok) {
+    const messages = {
+      invalid_challenge:     'Unknown challenge.',
+      not_found:             'User not found.',
+      bond_pass_required:    'Bond Pass required to buy into a yearly challenge.',
+      already_entered:       'You already bought into this challenge this year.',
+      insufficient_balance:  'Not enough coins for this buy-in.',
+      server_error:          'Could not process buy-in.',
+    };
+    const status = result.reason === 'bond_pass_required' ? 403
+      : result.reason === 'already_entered' ? 409
+      : result.reason === 'insufficient_balance' ? 400
+      : 500;
+    return res.status(status).json({ error: messages[result.reason] || 'Could not process buy-in.' });
+  }
+  res.json({ ok: true, feeCharged: result.buyIn });
+});
+
+// ── Which yearly challenges has this user bought into this year? ─────────────
+app.get('/challenge/yearly/entries', requireAuth, async (req, res) => {
+  try {
+    res.json(await getMyEntries(req.userId));
+  } catch (err) {
+    console.error('[Yearly] entries fetch error:', err.message);
+    res.status(500).json({ error: 'Could not load challenge entries.' });
+  }
+});
+
+// ── Admin: Stripe solvency check ───────────────────────────────────────────────
+// Coin purchases come in via Apple IAP, which never funds this Stripe balance
+// automatically — you have to top it up manually from your Apple payouts.
+// This tells you your actual Stripe balance vs. a conservative estimate of
+// what you'd owe if every user with a positive coin balance cashed out today
+// (using the highest possible payout rate, 85%, so this never under-warns).
+app.get('/admin/stripe-health', requireAuth, async (req, res) => {
+  const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!ADMIN_IDS.includes(req.userId)) return res.status(403).json({ error: 'Not authorized.' });
+  if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+
+  try {
+    const { query: db } = require('./database/db');
+    const [stripeBalance, liability] = await Promise.all([
+      stripe.balance.retrieve(),
+      db(`SELECT COALESCE(SUM(coin_balance), 0) AS total_coins FROM profiles WHERE coin_balance > 0`),
+    ]);
+    const availableCents = stripeBalance.available.find(b => b.currency === 'usd')?.amount ?? 0;
+    const totalCoins     = parseInt(liability.rows[0].total_coins, 10);
+    const worstCaseCents = Math.round(totalCoins * 0.85); // 100 coins = $1, monthly_1 rate = 85%
+
+    res.json({
+      stripeAvailableCents:     availableCents,
+      worstCaseLiabilityCents:  worstCaseCents,
+      shortfallCents:           Math.max(0, worstCaseCents - availableCents),
+      totalCoinsOutstanding:    totalCoins,
+    });
+  } catch (err) {
+    console.error('[Admin] stripe-health error:', err.message);
+    res.status(500).json({ error: 'Could not check Stripe balance.' });
   }
 });
 

@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { translateText } = require('./translate');
 const { query: dbQuery } = require('./database/db');
 const { transferGiftCoins } = require('./creators');
+const { payCollectibleRoyalties } = require('./collectibles');
+const { upsertYearlyProgress } = require('./yearlyChallenges');
 
 // ── Block-list enforcement for the real-time layer ────────────────────────────
 // The REST API (profiles.routes.js /blocks) has always respected user_blocks.
@@ -27,21 +29,9 @@ async function isBlockedEitherWay(userIdA, userIdB) {
 }
 
 // ── Yearly challenge helpers ───────────────────────────────────────────────────
+// upsertYearlyProgress now lives in yearlyChallenges.js (buy-in-aware + pays
+// prizes automatically) — imported above.
 function currentYear() { return new Date().getFullYear(); }
-
-async function upsertYearlyProgress(userId, updates) {
-  if (!userId) return;
-  const year  = currentYear();
-  const cols  = Object.keys(updates);
-  const incs  = cols.map(c => `${c} = COALESCE(yearly_challenge_progress.${c}, 0) + $${cols.indexOf(c) + 3}`).join(', ');
-  const vals  = cols.map(c => updates[c]);
-  await dbQuery(
-    `INSERT INTO yearly_challenge_progress (user_id, year, ${cols.join(', ')}, updated_at)
-     VALUES ($1, $2, ${vals.map((_, i) => `$${i + 3}`).join(', ')}, NOW())
-     ON CONFLICT (user_id, year) DO UPDATE SET ${incs}, updated_at = NOW()`,
-    [userId, year, ...vals]
-  ).catch(e => console.warn('[Yearly] upsert error:', e.message));
-}
 
 // ── Whitelisted gift types — server is the source of truth for coin values ────
 // Matches GiftPicker.js GIFTS exactly. Client sends gift.id; server resolves coin value.
@@ -1258,6 +1248,12 @@ function setupSocket(io) {
 
       // Track Gift Legend progress: accumulate BC received for the stream host
       upsertYearlyProgress(stream.hostUserId, { gifts_received_bc: verifiedGift.coins });
+
+      // Pay any active Country Stamp / Bond Monument holders their passive
+      // royalty on this gift — real coins, credited straight to their balance.
+      payCollectibleRoyalties(stream.hostUserId, verifiedGift.coins).catch(e =>
+        console.warn('[Collectibles] royalty error:', e.message)
+      );
     });
 
     // ── FOLLOWS ──
