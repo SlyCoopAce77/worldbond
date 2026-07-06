@@ -8,6 +8,8 @@
 	<string>WorldBond</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -22,6 +24,8 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -33,6 +37,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>WorldBond uses your camera for video calls and profile photos.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WorldBond uses your location to show you people and places nearby.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>WorldBond uses your location to show you people and places nearby.</string>
 	<key>NSMicrophoneUsageDescription</key>
