@@ -13,6 +13,9 @@ import { useTheme } from '../context/ThemeContext';
 
 const BOND_PINK    = '#FF0080';
 const SETTINGS_KEY = 'bond_settings';
+// Must match ADMIN_USER_IDS on the server — this only hides/shows the menu
+// entry, the server independently enforces the real check on every request.
+const ADMIN_USER_ID = '009ae3ff-e3ae-4c6e-8175-5451841a3d94';
 
 const DEFAULTS = {
   showInDiscovery:   true,
@@ -318,6 +321,22 @@ export default function SettingsScreen({ navigation, onLogout }) {
             colors={colors}
           />
         </Card>
+
+        {/* ── Admin (client-side hint only — server enforces ADMIN_USER_IDS regardless) ── */}
+        {profile?.user_id === ADMIN_USER_ID && (
+          <>
+            <Section title="Admin" colors={colors} />
+            <Card colors={colors}>
+              <NavRow
+                sym="$"
+                label="Stripe Health"
+                sublabel="Balance vs. what you owe creators"
+                onPress={() => navigation.navigate('AdminStripe')}
+                colors={colors}
+              />
+            </Card>
+          </>
+        )}
 
         {/* ── Privacy ── */}
         <Section title="Privacy" colors={colors} />

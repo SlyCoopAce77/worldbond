@@ -33,6 +33,7 @@ import LegalScreen from '../screens/LegalScreen';
 import WalletScreen from '../screens/WalletScreen';
 import MonumentChallengeScreen from '../screens/MonumentChallengeScreen';
 import CountryStampChallengeScreen from '../screens/CountryStampChallengeScreen';
+import AdminStripeScreen from '../screens/AdminStripeScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -198,6 +199,9 @@ export default function AppNavigator({ user, onLogout }) {
             <Stack.Screen name="Wallet" component={WalletScreen} />
             <Stack.Screen name="MonumentChallenge"     component={MonumentChallengeScreen} />
             <Stack.Screen name="CountryStampChallenge" component={CountryStampChallengeScreen} />
+
+            {/* Admin (server also enforces ADMIN_USER_IDS — this entry is just UI gating) */}
+            <Stack.Screen name="AdminStripe" component={AdminStripeScreen} />
           </Stack.Navigator>
         </NavigationContainer>
 
