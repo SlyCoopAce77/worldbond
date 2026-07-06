@@ -9,7 +9,6 @@ import { WorldMark } from '../components/BondLogo';
 import { useBondPass } from '../context/PremiumContext';
 import {
   useWallet, coinsToUSD,
-  DEMO_TOP_CREATORS, BOND_MONUMENTS,
   getPayoutCooldownMs, getPayoutCooldownDays,
 } from '../context/WalletContext';
 import { getFeaturedFlag, isStampDropped, getNextFeaturedFlag } from '../context/ChallengeContext';
@@ -21,7 +20,8 @@ const BOND_GOLD   = '#FFB700';
 const BASE_PAYOUT      = 0.70;
 const PASS_PAYOUT      = 0.75;
 const MIN_PAYOUT_COINS = 2500;
-const TOP_CREATOR_COINS_THRESHOLD = 40000;
+// Must match PAYOUT_RATES.monthly_1/2/3 in server/src/creators.js
+const MONTHLY_RANK_PAYOUT = { 1: 0.85, 2: 0.80, 3: 0.75 };
 
 const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
 
@@ -212,21 +212,47 @@ export default function WalletScreen({ navigation, route }) {
   const { hasBondPass } = useBondPass();
   const {
     balance, transactions, myStamps, myMonuments, monthlyEarned,
-    stamps, lastPayoutTs, recordPayout,
+    stamps, monuments, lastPayoutTs, recordPayout,
   } = useWallet();
 
   const [activeTab,      setActiveTab]      = useState('Earnings');
   const [showCoinModal,  setShowCoinModal]  = useState(false);
   const [purchasing,     setPurchasing]     = useState(false);
   const [payingOut,      setPayingOut]      = useState(false);
+  const [topCreators,    setTopCreators]    = useState([]);
+  const [myRank,         setMyRank]         = useState(null);
+  const [creatorsYearMonth, setCreatorsYearMonth] = useState(null);
 
-  const payoutRate    = hasBondPass ? PASS_PAYOUT : BASE_PAYOUT;
-  const availableUSD  = coinsToUSD(Math.floor(balance * payoutRate));
+  // Real server-computed leaderboard — replaces the old hardcoded demo data.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${SERVER_URL}/creators/top-monthly`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        setTopCreators(data.creators || []);
+        setMyRank(data.myRank ?? null);
+        setCreatorsYearMonth(data.yearMonth || null);
+      } catch (err) {
+        console.warn('[Wallet] leaderboard fetch error:', err.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // isTopCreator reflects your real, server-verified rank from last month's
+  // locked leaderboard (see /creator/payout on the server) — not a guess.
+  const isTopCreator   = myRank !== null;
+  const payoutRate     = isTopCreator ? MONTHLY_RANK_PAYOUT[myRank] : (hasBondPass ? PASS_PAYOUT : BASE_PAYOUT);
+  const availableUSD   = coinsToUSD(Math.floor(balance * payoutRate));
   const earned        = transactions.filter(t => t.type === 'earn');
   const spends        = transactions.filter(t => t.type === 'spend');
   const totalEarned   = earned.reduce((sum, t) => sum + t.amount, 0);
 
-  const isTopCreator   = monthlyEarned >= TOP_CREATOR_COINS_THRESHOLD;
   const cooldownMs     = getPayoutCooldownMs(hasBondPass, isTopCreator);
   const cooldownDays   = getPayoutCooldownDays(hasBondPass, isTopCreator);
   const elapsed        = lastPayoutTs ? Date.now() - lastPayoutTs : Infinity;
@@ -516,31 +542,36 @@ export default function WalletScreen({ navigation, route }) {
                 Ranking resets every calendar month. Top 3 earn a bonus payout above the base 70%.
               </Text>
             </View>
-            <CreatorPodium creators={DEMO_TOP_CREATORS} />
 
-            <View style={s.list}>
-              {DEMO_TOP_CREATORS.map(c => (
-                <LinearGradient
-                  key={c.rank}
-                  colors={c.rank === 1 ? ['#1a1400', '#0d0a00'] : ['#131520', '#0e1020']}
-                  style={[s.creatorCard, c.rank === 1 && { borderColor: '#ffd70055' }]}
-                >
-                  <View style={s.creatorLeft}>
-                    <Text style={s.creatorBadge}>#{c.rank} {c.badge.label}</Text>
-                    <Text style={s.creatorName}>{c.username} {c.country}</Text>
-                    <Text style={s.creatorStats}>{c.streams} streams · ~{c.avgViewers} avg viewers</Text>
-                    <CoinRow amount={`${c.coinsEarned.toLocaleString()} earned`} textStyle={s.creatorStats} size={13} />
-                  </View>
-                  <View style={s.creatorRight}>
-                    <Text style={[s.creatorPayout, { color: c.rank === 1 ? '#ffd700' : '#4ade80' }]}>
-                      {Math.round(c.payoutRate * 100)}%
-                    </Text>
-                    <Text style={s.creatorPayoutLbl}>payout</Text>
-                    <Text style={s.creatorUSD}>${c.payoutUSD}</Text>
-                  </View>
-                </LinearGradient>
-              ))}
-            </View>
+            {topCreators.length === 3 && <CreatorPodium creators={topCreators} />}
+
+            {topCreators.length === 0 ? (
+              <Text style={s.emptyTxt}>No gifted streams yet this month — be the first on the board!</Text>
+            ) : (
+              <View style={s.list}>
+                {topCreators.map(c => (
+                  <LinearGradient
+                    key={c.rank}
+                    colors={c.rank === 1 ? ['#1a1400', '#0d0a00'] : ['#131520', '#0e1020']}
+                    style={[s.creatorCard, c.rank === 1 && { borderColor: '#ffd70055' }]}
+                  >
+                    <View style={s.creatorLeft}>
+                      <Text style={s.creatorBadge}>#{c.rank} {c.badge?.label}</Text>
+                      <Text style={s.creatorName}>{c.username} {c.country}</Text>
+                      <Text style={s.creatorStats}>{c.streams} stream{c.streams === 1 ? '' : 's'} this month</Text>
+                      <CoinRow amount={`${c.coinsEarned.toLocaleString()} earned`} textStyle={s.creatorStats} size={13} />
+                    </View>
+                    <View style={s.creatorRight}>
+                      <Text style={[s.creatorPayout, { color: c.rank === 1 ? '#ffd700' : '#4ade80' }]}>
+                        {Math.round(c.payoutRate * 100)}%
+                      </Text>
+                      <Text style={s.creatorPayoutLbl}>payout</Text>
+                      <Text style={s.creatorUSD}>${coinsToUSD(Math.floor(c.coinsEarned * c.payoutRate))}</Text>
+                    </View>
+                  </LinearGradient>
+                ))}
+              </View>
+            )}
 
             {/* Platform comparison */}
             <View style={s.compareCard}>
@@ -664,7 +695,7 @@ export default function WalletScreen({ navigation, route }) {
               </Text>
             </View>
 
-            {BOND_MONUMENTS.map(m => {
+            {monuments.map(m => {
               const isMine    = myMonuments.includes(m.id);
               const unclaimed = !m.holder;
               return (

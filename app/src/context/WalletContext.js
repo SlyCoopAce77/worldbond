@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import { isStampDropped } from './ChallengeContext';
 import { getSavedWalletState } from '../services/authApi';
+import { SERVER_URL } from '../services/socket';
 
 const STORAGE_KEY = 'worldbond_wallet';
 const STAMPS_KEY  = 'worldbond_stamps';
@@ -47,78 +48,43 @@ export function getPayoutCooldownDays(hasBondPass, isTopCreator) {
 // Only countries with active streaming communities (18+, Tier 1 + Tier 2 global markets).
 // Holder earns 3% passive royalty on all gifts sent to streamers from their country.
 // lastActivity tracks when the holder last contributed — if > 30 days ago, stamp is DROPPED.
-const _D = Date.now();
-export const DEMO_STAMPS = {
-  // ── Active holders ──────────────────────────────────────────────────────────
-  '🇺🇸': { holder: 'DeShawn_ATL',   coinsEarned: 14200, since: _D - 86400000 * 12, lastActivity: _D - 86400000 * 12 },
-  '🇧🇷': { holder: 'Lucas_SP',      coinsEarned: 9800,  since: _D - 86400000 * 3,  lastActivity: _D - 86400000 * 3  },
-  '🇰🇷': { holder: 'JiMin_Seoul',   coinsEarned: 21000, since: _D - 86400000 * 20, lastActivity: _D - 86400000 * 20 },
-  '🇯🇵': { holder: 'Yuki_Tokyo',    coinsEarned: 15600, since: _D - 86400000 * 5,  lastActivity: _D - 86400000 * 5  },
-  '🇬🇧': { holder: 'Sarah_London',  coinsEarned: 5400,  since: _D - 86400000 * 8,  lastActivity: _D - 86400000 * 8  },
-  '🇲🇽': { holder: 'Carlos_CDMX',   coinsEarned: 6300,  since: _D - 86400000 * 14, lastActivity: _D - 86400000 * 14 },
-  '🇦🇺': { holder: 'Kai_Sydney',    coinsEarned: 4700,  since: _D - 86400000 * 9,  lastActivity: _D - 86400000 * 9  },
-  '🇮🇩': { holder: 'Budi_Jakarta',  coinsEarned: 5100,  since: _D - 86400000 * 7,  lastActivity: _D - 86400000 * 7  },
-  '🇹🇷': { holder: 'Zeynep_IST',    coinsEarned: 3900,  since: _D - 86400000 * 11, lastActivity: _D - 86400000 * 11 },
-  // ── Dropped — holder went inactive (> 30 days no activity) ─────────────────
-  '🇩🇪': { holder: 'Hans_Berlin',   coinsEarned: 2800,  since: _D - 86400000 * 38, lastActivity: _D - 86400000 * 35 },
-  '🇦🇷': { holder: 'Mateo_BA',      coinsEarned: 1900,  since: _D - 86400000 * 45, lastActivity: _D - 86400000 * 33 },
-  '🇷🇺': { holder: 'Viktor_MSK',    coinsEarned: 3200,  since: _D - 86400000 * 40, lastActivity: _D - 86400000 * 31 },
-  // ── Unclaimed ───────────────────────────────────────────────────────────────
-  '🇫🇷': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇪🇸': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇨🇦': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇮🇳': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇵🇭': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇸🇦': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇵🇱': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇹🇭': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇸🇪': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇳🇱': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇵🇹': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-  '🇨🇴': { holder: null, coinsEarned: 0, since: null, lastActivity: null },
-};
+// Holder/coinsEarned/since/lastActivity are NOT hardcoded here anymore — real
+// current holders come from GET /collectibles (server/src/collectibles.js) and
+// are merged in below, so ownership is globally consistent instead of each
+// device simulating its own fake winners.
+export const STAMP_COUNTRIES = [
+  '🇺🇸','🇧🇷','🇰🇷','🇯🇵','🇬🇧','🇲🇽','🇦🇺','🇮🇩','🇹🇷','🇩🇪',
+  '🇦🇷','🇷🇺','🇫🇷','🇪🇸','🇨🇦','🇮🇳','🇵🇭','🇸🇦','🇵🇱','🇹🇭',
+  '🇸🇪','🇳🇱','🇵🇹','🇨🇴',
+];
+const EMPTY_STAMP = { holder: null, coinsEarned: 0, since: null, lastActivity: null };
 
 // ─── Bond Monuments — 1-of-1 per famous world location ───────────────────────
 // Holder earns 2% of all gifts sent during any stream from that region.
 // Can be claimed (if empty) or challenged via 7-day gifting contest.
+// Static metadata only (id/name/icon/country/location) — holder/coinsEarned
+// come from the server, merged reactively in WalletProvider below.
 export const BOND_MONUMENTS = [
-  // ── United States ──────────────────────────────────────────────────────────
-  { id: 'liberty',     name: 'Statue of Liberty',    icon: '🗽', country: '🇺🇸', location: 'New York, USA',              holder: 'DeShawn_ATL',  coinsEarned: 9200  },
-  { id: 'grand_canyon',name: 'Grand Canyon',          icon: '🏜️', country: '🇺🇸', location: 'Arizona, USA',               holder: null,           coinsEarned: 0     },
-  // ── Brazil ─────────────────────────────────────────────────────────────────
-  { id: 'christ',      name: 'Christ the Redeemer',   icon: '⛪', country: '🇧🇷', location: 'Rio de Janeiro, Brazil',     holder: null,           coinsEarned: 0     },
-  { id: 'amazon',      name: 'Amazon River',          icon: '🌿', country: '🇧🇷', location: 'Amazon, Brazil',             holder: 'Lucas_SP',     coinsEarned: 5100  },
-  // ── South Korea ────────────────────────────────────────────────────────────
-  { id: 'gyeongbok',   name: 'Gyeongbokgung Palace',  icon: '🏯', country: '🇰🇷', location: 'Seoul, South Korea',         holder: 'JiMin_Seoul',  coinsEarned: 11400 },
-  // ── Japan ──────────────────────────────────────────────────────────────────
-  { id: 'fuji',        name: 'Mount Fuji',            icon: '🗻', country: '🇯🇵', location: 'Shizuoka, Japan',            holder: 'Yuki_Tokyo',   coinsEarned: 15600 },
-  { id: 'fushimi',     name: 'Fushimi Inari Shrine',  icon: '⛩️', country: '🇯🇵', location: 'Kyoto, Japan',               holder: null,           coinsEarned: 0     },
-  // ── Germany ────────────────────────────────────────────────────────────────
-  { id: 'gate',        name: 'Brandenburg Gate',      icon: '🏛️', country: '🇩🇪', location: 'Berlin, Germany',            holder: null,           coinsEarned: 0     },
-  // ── United Kingdom ─────────────────────────────────────────────────────────
-  { id: 'bigben',      name: 'Big Ben',               icon: '🕰️', country: '🇬🇧', location: 'London, UK',                 holder: 'Sarah_London', coinsEarned: 7800  },
-  // ── France ─────────────────────────────────────────────────────────────────
-  { id: 'eiffel',      name: 'Eiffel Tower',          icon: '🗼', country: '🇫🇷', location: 'Paris, France',              holder: 'Amélie_Paris', coinsEarned: 12400 },
-  // ── Spain ──────────────────────────────────────────────────────────────────
-  { id: 'sagrada',     name: 'Sagrada Família',       icon: '🕍', country: '🇪🇸', location: 'Barcelona, Spain',           holder: null,           coinsEarned: 0     },
-  // ── Russia ─────────────────────────────────────────────────────────────────
-  { id: 'red_square',  name: 'Red Square',            icon: '🏰', country: '🇷🇺', location: 'Moscow, Russia',             holder: null,           coinsEarned: 0     },
-  // ── Canada ─────────────────────────────────────────────────────────────────
-  { id: 'niagara',     name: 'Niagara Falls',         icon: '🌊', country: '🇨🇦', location: 'Ontario, Canada',            holder: null,           coinsEarned: 0     },
-  // ── Mexico ─────────────────────────────────────────────────────────────────
-  { id: 'chichen',     name: 'Chichen Itza',          icon: '🗿', country: '🇲🇽', location: 'Yucatán, Mexico',            holder: 'Carlos_CDMX',  coinsEarned: 4400  },
-  // ── India ──────────────────────────────────────────────────────────────────
-  { id: 'taj',         name: 'Taj Mahal',             icon: '🕌', country: '🇮🇳', location: 'Agra, India',                holder: 'Priya_Mumbai', coinsEarned: 7300  },
-  // ── Indonesia ──────────────────────────────────────────────────────────────
-  { id: 'borobudur',   name: 'Borobudur',             icon: '☸️', country: '🇮🇩', location: 'Java, Indonesia',            holder: null,           coinsEarned: 0     },
-  // ── Turkey ─────────────────────────────────────────────────────────────────
-  { id: 'hagia',       name: 'Hagia Sophia',          icon: '🌙', country: '🇹🇷', location: 'Istanbul, Turkey',           holder: null,           coinsEarned: 0     },
-  // ── Australia ──────────────────────────────────────────────────────────────
-  { id: 'opera',       name: 'Sydney Opera House',    icon: '🎭', country: '🇦🇺', location: 'Sydney, Australia',          holder: null,           coinsEarned: 0     },
-  // ── Italy ──────────────────────────────────────────────────────────────────
-  { id: 'colosseum',   name: 'Colosseum',             icon: '🏟️', country: '🇮🇹', location: 'Rome, Italy',                holder: 'Marco_Roma',   coinsEarned: 8900  },
-  // ── China ──────────────────────────────────────────────────────────────────
-  { id: 'great_wall',  name: 'Great Wall',            icon: '🧱', country: '🇨🇳', location: 'Beijing, China',             holder: null,           coinsEarned: 0     },
+  { id: 'liberty',      name: 'Statue of Liberty',    icon: '🗽', country: '🇺🇸', location: 'New York, USA'          },
+  { id: 'grand_canyon', name: 'Grand Canyon',         icon: '🏜️', country: '🇺🇸', location: 'Arizona, USA'           },
+  { id: 'christ',       name: 'Christ the Redeemer',  icon: '⛪', country: '🇧🇷', location: 'Rio de Janeiro, Brazil' },
+  { id: 'amazon',       name: 'Amazon River',         icon: '🌿', country: '🇧🇷', location: 'Amazon, Brazil'         },
+  { id: 'gyeongbok',    name: 'Gyeongbokgung Palace', icon: '🏯', country: '🇰🇷', location: 'Seoul, South Korea'     },
+  { id: 'fuji',         name: 'Mount Fuji',           icon: '🗻', country: '🇯🇵', location: 'Shizuoka, Japan'        },
+  { id: 'fushimi',      name: 'Fushimi Inari Shrine', icon: '⛩️', country: '🇯🇵', location: 'Kyoto, Japan'           },
+  { id: 'gate',         name: 'Brandenburg Gate',     icon: '🏛️', country: '🇩🇪', location: 'Berlin, Germany'        },
+  { id: 'bigben',       name: 'Big Ben',              icon: '🕰️', country: '🇬🇧', location: 'London, UK'             },
+  { id: 'eiffel',       name: 'Eiffel Tower',         icon: '🗼', country: '🇫🇷', location: 'Paris, France'          },
+  { id: 'sagrada',      name: 'Sagrada Família',      icon: '🕍', country: '🇪🇸', location: 'Barcelona, Spain'       },
+  { id: 'red_square',   name: 'Red Square',           icon: '🏰', country: '🇷🇺', location: 'Moscow, Russia'         },
+  { id: 'niagara',      name: 'Niagara Falls',        icon: '🌊', country: '🇨🇦', location: 'Ontario, Canada'        },
+  { id: 'chichen',      name: 'Chichen Itza',         icon: '🗿', country: '🇲🇽', location: 'Yucatán, Mexico'        },
+  { id: 'taj',          name: 'Taj Mahal',            icon: '🕌', country: '🇮🇳', location: 'Agra, India'            },
+  { id: 'borobudur',    name: 'Borobudur',            icon: '☸️', country: '🇮🇩', location: 'Java, Indonesia'        },
+  { id: 'hagia',        name: 'Hagia Sophia',         icon: '🌙', country: '🇹🇷', location: 'Istanbul, Turkey'       },
+  { id: 'opera',        name: 'Sydney Opera House',   icon: '🎭', country: '🇦🇺', location: 'Sydney, Australia'      },
+  { id: 'colosseum',    name: 'Colosseum',            icon: '🏟️', country: '🇮🇹', location: 'Rome, Italy'            },
+  { id: 'great_wall',   name: 'Great Wall',           icon: '🧱', country: '🇨🇳', location: 'Beijing, China'         },
 ];
 
 // ─── Payout Structure ─────────────────────────────────────────────────────────
@@ -154,33 +120,9 @@ export const PAYOUT_RATES = {
   platform_cut:     PLATFORM_CUT,
 };
 
-export const CREATOR_BADGE = {
-  1: { label: 'Bond Creator of the Month', color: '#ffd700', icon: '🥇' },
-  2: { label: 'Bond Elite Creator',         color: '#c0c0c0', icon: '🥈' },
-  3: { label: 'Rising Bond Star',           color: '#cd7f32', icon: '🥉' },
-};
-
-// Demo data: coins × payout_rate / COINS_PER_DOLLAR = USD
-export const DEMO_TOP_CREATORS = [
-  {
-    rank: 1, username: 'JiMin_Seoul',  country: '🇰🇷',
-    coinsEarned: 87400, streams: 23, avgViewers: 1240,
-    payoutRate: 0.85, badge: CREATOR_BADGE[1],
-    payoutUSD: +(87400 * 0.85 / 100).toFixed(2),
-  },
-  {
-    rank: 2, username: 'Amara_Lagos',  country: '🇳🇬',
-    coinsEarned: 62100, streams: 18, avgViewers: 890,
-    payoutRate: 0.80, badge: CREATOR_BADGE[2],
-    payoutUSD: +(62100 * 0.80 / 100).toFixed(2),
-  },
-  {
-    rank: 3, username: 'DeShawn_ATL',  country: '🇺🇸',
-    coinsEarned: 45800, streams: 15, avgViewers: 670,
-    payoutRate: 0.75, badge: CREATOR_BADGE[3],
-    payoutUSD: +(45800 * 0.75 / 100).toFixed(2),
-  },
-];
+// Real top-creator data now comes from GET /creators/top-monthly
+// (server/src/creators.js), backed by the gift_earnings ledger — see
+// WalletScreen.js's Creators tab. No more hardcoded demo leaderboard here.
 
 // ── DEMO MODE — must match flag in App.js ─────────────────────────────────────
 const DEMO_MODE = false;
@@ -242,9 +184,54 @@ export function WalletProvider({ children }) {
         setBalance(savedWalletState.coin_balance);
       }
       const saved = stampsRaw ? JSON.parse(stampsRaw) : {};
-      setStamps({ ...DEMO_STAMPS, ...saved });
+      const blank = Object.fromEntries(STAMP_COUNTRIES.map(flag => [flag, EMPTY_STAMP]));
+      setStamps({ ...blank, ...saved });
     });
   }, []);
+
+  const [monumentHolders, setMonumentHolders] = useState({}); // id -> { holder, coinsEarned }
+
+  // Real, server-authoritative ownership — replaces the old hardcoded fake
+  // holders. Two different devices can no longer each believe they own the
+  // same 1-of-1 collectible, since this reflects the single DB row for it.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${SERVER_URL}/collectibles`);
+        const data = await res.json();
+        if (data.stamps) {
+          setStamps(prev => {
+            const next = { ...prev };
+            for (const s of data.stamps) {
+              next[s.flag] = {
+                holder:       s.holder_name || null,
+                coinsEarned:  s.coins_earned || 0,
+                since:        s.claimed_at ? new Date(s.claimed_at).getTime() : null,
+                lastActivity: s.last_activity ? new Date(s.last_activity).getTime() : null,
+              };
+            }
+            return next;
+          });
+        }
+        if (data.monuments) {
+          const map = {};
+          for (const m of data.monuments) {
+            map[m.monument_id] = { holder: m.holder_name || null, coinsEarned: m.coins_earned || 0 };
+          }
+          setMonumentHolders(map);
+        }
+      } catch (err) {
+        console.warn('[Wallet] collectibles fetch error:', err.message);
+      }
+    })();
+  }, []);
+
+  // BOND_MONUMENTS metadata merged with real, live holder data.
+  const monuments = BOND_MONUMENTS.map(m => ({
+    ...m,
+    holder:      monumentHolders[m.id]?.holder ?? null,
+    coinsEarned: monumentHolders[m.id]?.coinsEarned ?? 0,
+  }));
 
   const persist = useCallback((bal, sp, txs, ms, mm, lp, tsw, tmw) => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -417,7 +404,7 @@ export function WalletProvider({ children }) {
 
   return (
     <WalletContext.Provider value={{
-      balance, spent, transactions, stamps, myStamps, myMonuments,
+      balance, spent, transactions, stamps, monuments, myStamps, myMonuments,
       totalStampWins, totalMonumentWins,
       totalEarned, monthlyEarned, lastPayoutTs,
       earnCoins, spendCoins, claimStamp, claimMonument, removeStamp, removeMonument, applyStampRoyalty, recordPayout,

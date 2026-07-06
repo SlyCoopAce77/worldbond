@@ -22,7 +22,7 @@ const REACTIONS = ['❤️', '🔥', '😂', '👍', '😮'];
 export default function LiveWatchScreen({ route, navigation }) {
   const { stream, currentUser } = route.params || {};
   const socket = getSocket();
-  const { balance, spendCoins } = useWallet();
+  const { balance, spendCoins, earnCoins } = useWallet();
 
   const [messages,    setMessages]    = useState([]);
   const [viewerCount, setViewerCount] = useState(stream?.viewerCount || 0);
@@ -81,6 +81,13 @@ export default function LiveWatchScreen({ route, navigation }) {
         navigation.goBack();
       }
     }
+    function onGiftError({ reason, coins }) {
+      if (reason === 'insufficient_balance' && coins) {
+        // Server rejected the transfer — refund the optimistic local deduction
+        earnCoins(coins, 'live_gift_refund');
+        Alert.alert('Gift not sent', "You don't have enough coins for that gift.");
+      }
+    }
 
     socket.emit('join_live', { streamId: stream.streamId });
     socket.on('live_joined',        onJoined);
@@ -88,6 +95,7 @@ export default function LiveWatchScreen({ route, navigation }) {
     socket.on('live_message',       onMessage);
     socket.on('live_reaction',      onReaction);
     socket.on('live_gift_received', onGiftReceived);
+    socket.on('live_gift_error',    onGiftError);
     socket.on('live_ended',         onLiveEnded);
     socket.on('live_kicked',        onKicked);
 
@@ -98,6 +106,7 @@ export default function LiveWatchScreen({ route, navigation }) {
       socket.off('live_message',       onMessage);
       socket.off('live_reaction',      onReaction);
       socket.off('live_gift_received', onGiftReceived);
+      socket.off('live_gift_error',    onGiftError);
       socket.off('live_ended',         onLiveEnded);
       socket.off('live_kicked',        onKicked);
     };

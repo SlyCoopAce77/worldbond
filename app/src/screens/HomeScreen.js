@@ -11,7 +11,7 @@ import { getAccessToken } from '../services/authApi';
 import { stringToColor } from '../utils/apiUtils';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
-import { useWallet, BOND_MONUMENTS } from '../context/WalletContext';
+import { useWallet } from '../context/WalletContext';
 import { useBondPass } from '../context/PremiumContext';
 import { getCountryFlag } from '../utils/countryUtils';
 
@@ -322,7 +322,7 @@ function MonumentCard({ monument, onPress }) {
   );
 }
 
-function MonumentTeaser({ onPress, onViewAll }) {
+function MonumentTeaser({ monuments, onPress, onViewAll }) {
   return (
     <View style={mte.wrap}>
       <TouchableOpacity onPress={onViewAll} activeOpacity={0.8} style={mte.header}>
@@ -334,7 +334,7 @@ function MonumentTeaser({ onPress, onViewAll }) {
       </TouchableOpacity>
       <FlatList
         horizontal
-        data={BOND_MONUMENTS}
+        data={monuments}
         keyExtractor={m => m.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ gap: 10 }}
@@ -509,7 +509,7 @@ export default function HomeScreen({ navigation, user }) {
   const { unreadCount } = useNotifications();
   const { streak, longest, tier: streakTier, milestones, primary, shieldAvailable } = useStreak();
   const { hasBondPass } = useBondPass();
-  const { myStamps, balance } = useWallet();
+  const { myStamps, balance, monuments } = useWallet();
   const socket = getSocket();
 
   const [onlineUsers,  setOnlineUsers]  = useState([]);
@@ -752,6 +752,7 @@ export default function HomeScreen({ navigation, user }) {
         {/* ── Bond Monuments ── */}
         <Animated.View style={[s.section, sect(3)]}>
           <MonumentTeaser
+            monuments={monuments}
             onPress={monument => navigation.navigate('MonumentChallenge', { monument, currentUser: user })}
             onViewAll={() => navigation.navigate('Wallet')}
           />

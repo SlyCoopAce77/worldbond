@@ -14,6 +14,8 @@ const { addPhoto, getPhotos, adminDeletePhoto } = require('./photos');
 const { addStory, getStoriesGrouped } = require('./stories');
 const { isConfigured: cloudinaryEnabled, uploadBuffer } = require('./cloudinary');
 const { requireAuth, requireAdmin } = require('./auth/auth.middleware');
+const { getLiveMonthlyLeaderboard, getPayoutTierFor } = require('./creators');
+const { getAllStamps, getAllMonuments, claimStamp, claimMonument } = require('./collectibles');
 
 // ── In-memory rate limiter (no extra packages needed) ─────────────────────────
 const _rlMap = new Map();
@@ -437,6 +439,31 @@ app.get('/creator/stripe-refresh', async (req, res) => {
   res.send('<html><body style="background:#000;color:#fff;font-family:sans-serif;text-align:center;padding-top:100px"><h2>Session expired</h2><p>Please go back to the Bond app and try connecting again.</p></body></html>');
 });
 
+// ── Top Creators leaderboard — real, server-computed monthly ranking ─────────
+// Backed by gift_earnings (see creators.js) — no demo/hardcoded data.
+// Auth is optional: with a valid token we also tell the caller their own
+// locked rank from last month (drives their payout-rate estimate client-side).
+app.get('/creators/top-monthly', async (req, res) => {
+  try {
+    const creators = await getLiveMonthlyLeaderboard(3);
+
+    let myRank = null;
+    const header = req.headers.authorization;
+    if (header?.startsWith('Bearer ')) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const { sub: userId } = jwt.verify(header.slice(7), process.env.JWT_SECRET);
+        myRank = (await getPayoutTierFor(userId, false)).rank;
+      } catch { /* no/invalid token — just skip myRank */ }
+    }
+
+    res.json({ yearMonth: new Date().toISOString().slice(0, 7), creators, myRank });
+  } catch (err) {
+    console.error('[Creators] leaderboard error:', err.message);
+    res.status(500).json({ error: 'Could not load leaderboard.' });
+  }
+});
+
 // ── Stripe: pay out a creator ─────────────────────────────────────────────────
 // All amounts computed server-side. Client cannot set the payout value.
 const MIN_PAYOUT_COINS = 2500;   // 2500 coins = $25 minimum
@@ -488,9 +515,11 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `Minimum ${MIN_PAYOUT_COINS.toLocaleString()} coins required to cash out.` });
     }
 
+    // ── 3.5. Payout tier — real rank from last month's locked leaderboard ─────
+    const { rank: topCreatorRank, payoutRate, cooldownDays } = await getPayoutTierFor(userId, has_bond_pass);
+
     // ── 4. Payout cooldown (server-enforced, not client) ──────────────────────
     if (last_payout_at) {
-      const cooldownDays = has_bond_pass ? 14 : 30;
       const elapsed      = Date.now() - new Date(last_payout_at).getTime();
       const cooldownMs   = cooldownDays * 86400000;
       if (elapsed < cooldownMs) {
@@ -514,8 +543,9 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
     }
 
     // ── 7. Compute payout server-side — client amount is ignored ──────────────
+    // payoutRate already resolved in step 3.5 from the real locked monthly rank
+    // (85%/80%/75% for last month's #1/#2/#3) or the base/bond_pass rate.
     const coinsToPay   = Math.min(coin_balance, MAX_PAYOUT_COINS);
-    const payoutRate   = has_bond_pass ? 0.75 : 0.70;
     const amountCents  = Math.floor(coinsToPay * payoutRate); // 100 coins = $1 = 100 cents
 
     if (amountCents < 100) {
@@ -577,7 +607,7 @@ app.post('/creator/payout', requireAuth, async (req, res) => {
       [transfer.id, userId, coinsToPay, amountCents]
     ).catch(e => console.warn('[Transfer] status insert error:', e.message));
 
-    res.json({ transfer: transfer.id, amountCents, coinsDeducted: coinsToPay });
+    res.json({ transfer: transfer.id, amountCents, coinsDeducted: coinsToPay, payoutRate, topCreatorRank });
   } catch (err) {
     console.error('[Stripe] payout error:', err.message);
     res.status(500).json({ error: err.message });
@@ -999,6 +1029,18 @@ app.delete('/admin/photos/:photoId', requireAdmin, async (req, res) => {
   }
 });
 
+// ── Real, server-authoritative holders for Country Stamps & Bond Monuments ───
+// Replaces the old DEMO_STAMPS/BOND_MONUMENTS hardcoded holder data in the app.
+app.get('/collectibles', async (req, res) => {
+  try {
+    const [stamps, monuments] = await Promise.all([getAllStamps(), getAllMonuments()]);
+    res.json({ stamps, monuments });
+  } catch (err) {
+    console.error('[Collectibles] fetch error:', err.message);
+    res.status(500).json({ error: 'Could not load collectibles.' });
+  }
+});
+
 // ── Globe Trotter: record a stamp or monument win ─────────────────────────────
 // Rate-limited: 1 win per target per user per 30 days — prevents replay or
 // double-counting. targetId is checked against the known flag/monument lists
@@ -1042,6 +1084,17 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
     );
     if (recent.rowCount > 0) {
       return res.status(429).json({ error: 'Already recorded a win for this target in the last 30 days.' });
+    }
+
+    // Real, globally-consistent ownership transfer — this is the actual grant.
+    // Without this, ownership only ever lived in the winning device's local
+    // AsyncStorage, so two different users' phones could each believe they
+    // held the same 1-of-1 flag/monument.
+    const transfer = winType === 'stamp'
+      ? await claimStamp(targetId, userId)
+      : await claimMonument(targetId, userId);
+    if (!transfer.ok) {
+      return res.status(409).json({ error: 'Someone else already holds this — it is not eligible to be claimed right now.' });
     }
 
     await db(

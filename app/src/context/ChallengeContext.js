@@ -4,17 +4,24 @@ import { DeviceEventEmitter } from 'react-native';
 
 const SERVER_URL = 'https://worldbond-server-production.up.railway.app';
 
+// Returns true only if the server actually granted real ownership — the
+// caller must not update local "I own this" state unless this is true, or
+// local state can claim a win the server rejected (e.g. someone else still
+// legitimately holds it).
 async function reportChallengeWin(winType, targetId) {
   try {
     const authRaw = await AsyncStorage.getItem('worldbond_auth');
     const auth    = authRaw ? JSON.parse(authRaw) : null;
-    if (!auth?.token) return;
-    await fetch(`${SERVER_URL}/challenge/record-win`, {
+    if (!auth?.token) return false;
+    const res = await fetch(`${SERVER_URL}/challenge/record-win`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.token}` },
       body: JSON.stringify({ winType, targetId }),
     });
-  } catch {}
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 const KEY = 'wb_monument_challenges';
@@ -110,12 +117,16 @@ export function ChallengeProvider({ children }) {
       : ch.monumentId;
     const winnerUsername = winner === 'challenger' ? ch.challengerUsername : ch.holderUsername;
     const loserUsername  = winner === 'challenger' ? ch.holderUsername     : ch.challengerUsername;
-    AsyncStorage.getItem('worldbond_auth').then(raw => {
+    AsyncStorage.getItem('worldbond_auth').then(async raw => {
       const auth = raw ? JSON.parse(raw) : null;
       if (auth?.username === winnerUsername) {
-        reportChallengeWin(winType, targetId);
-        // Tell WalletContext to add stamp/monument and record the win
-        DeviceEventEmitter.emit('wb_stamp_won', { monumentId: ch.monumentId, username: winnerUsername });
+        const granted = await reportChallengeWin(winType, targetId);
+        // Only reflect the win locally if the server actually granted real
+        // ownership — otherwise local state would claim a win the server
+        // rejected (e.g. someone else's stamp hadn't actually gone inactive).
+        if (granted) {
+          DeviceEventEmitter.emit('wb_stamp_won', { monumentId: ch.monumentId, username: winnerUsername });
+        }
       }
       if (auth?.username === loserUsername) {
         // Tell WalletContext to remove this stamp/monument immediately

@@ -578,71 +578,31 @@ function SignalBars({ count, activeCount, color, size = 4 }) {
   );
 }
 
-const DEMO_SIGNALS = [
-  {
-    id: 'd1', name: 'Kenji',  initials: 'KT', age: 26, flag: '🇯🇵', country: 'Japan',    username: '@kenji_tokyo',
-    trail: ['🇯🇵', '🇧🇷', '🇳🇬', '🇮🇳'], strength: 91, freq: 'cultural',  online: true,
-    tagline: 'Exploring world music and art',   avatarColor: '#6C47FF',
-    bio: 'Music producer & culture traveller. I\'ve played in bands across 3 continents and still searching for the perfect beat. Let\'s talk art, food, and everything in between.',
-    interests: ['Music', 'Art', 'Travel', 'Food', 'Culture'],
-    photos: [null, null, null],
-    impressions: { give: 'Anime and the idea that storytelling can be art', draw: 'Every person I meet knows something I don\'t', moment: 'Performing live in Lagos — the crowd knew every word' },
-  },
-  {
-    id: 'd2', name: 'Amara',  initials: 'AL', age: 23, flag: '🇳🇬', country: 'Nigeria',  username: '@amara_lagos',
-    trail: ['🇳🇬', '🇬🇭', '🇵🇹', '🇸🇪'], strength: 78, freq: 'friends',   online: true,
-    tagline: 'Looking for genuine connection',    avatarColor: '#00b894',
-    bio: 'Software engineer by day, storyteller by night. I believe every person carries a unique world inside them — I want to hear yours.',
-    interests: ['Tech', 'Books', 'Nature', 'Writing'],
-    photos: [null, null, null],
-    impressions: { give: 'Afrobeats — a rhythm the whole world now moves to', draw: 'I love hearing the story behind the person', moment: 'Writing my first app at 3am and watching it run' },
-  },
-  {
-    id: 'd3', name: 'Lucas',  initials: 'LS', age: 29, flag: '🇧🇷', country: 'Brazil',   username: '@lucas_sp',
-    trail: ['🇧🇷', '🇦🇷', '🇯🇵', '🇺🇸'], strength: 72, freq: 'adventure', online: false,
-    tagline: 'Digital nomad · always moving',   avatarColor: '#e17055',
-    bio: 'Remote designer living out of a backpack. Currently in Asia, was in Europe last month. Ask me about the best street food anywhere in the world.',
-    interests: ['Travel', 'Design', 'Street Food', 'Photography'],
-    photos: [null, null, null],
-    impressions: { give: 'Carnival — a celebration the world copies but can\'t replicate', draw: 'I collect moments, not things', moment: 'Getting lost in Tokyo with no data and finding my way by instinct' },
-  },
-  {
-    id: 'd4', name: 'Sofia',  initials: 'SS', age: 25, flag: '🇸🇪', country: 'Sweden',   username: '@sofia_stockholm',
-    trail: ['🇸🇪', '🇩🇪', '🇫🇷', '🇮🇳'], strength: 65, freq: 'cultural',  online: true,
-    tagline: 'Language nerd · speaks 4 languages', avatarColor: '#0984e3',
-    bio: 'Fluent in Swedish, German, French and Hindi. Learning Mandarin. I think language is the most beautiful bridge between cultures.',
-    interests: ['Languages', 'Literature', 'Classical Music', 'Mindfulness'],
-    photos: [null, null, null],
-    impressions: { give: 'Fika — the art of slowing down over coffee', draw: 'A new language is a new way of thinking', moment: 'The first time I dreamed in a foreign language' },
-  },
-  {
-    id: 'd5', name: 'Priya',  initials: 'PM', age: 24, flag: '🇮🇳', country: 'India',    username: '@priya_mumbai',
-    trail: ['🇮🇳', '🇦🇪', '🇬🇧', '🇧🇷'], strength: 60, freq: 'romantic',  online: false,
-    tagline: 'Coffee lover · global art explorer', avatarColor: '#e91e63',
-    bio: 'Architect with a passion for public art installations. My dream is to leave something beautiful in every city I visit. Coffee is my love language.',
-    interests: ['Architecture', 'Coffee', 'Art', 'Cities', 'Photography'],
-    photos: [null, null, null],
-    impressions: { give: 'The concept of zero — mathematics owes us', draw: 'Cities tell the story of their people through buildings', moment: 'Standing inside the Pantheon and realising someone built this without computers' },
-  },
-  {
-    id: 'd6', name: 'Yusuf',  initials: 'YC', age: 28, flag: '🇪🇬', country: 'Egypt',    username: '@yusuf_cairo',
-    trail: ['🇪🇬', '🇸🇦', '🇹🇷', '🇩🇪'], strength: 54, freq: 'friends',   online: true,
-    tagline: 'History buff · open to all cultures', avatarColor: '#fdcb6e',
-    bio: 'Archaeologist working on digs across the Middle East. History isn\'t just the past — it\'s the map to understanding every culture alive today.',
-    interests: ['History', 'Archaeology', 'Architecture', 'Culture'],
-    photos: [null, null, null],
-    impressions: { give: 'Writing — one of the oldest technologies that still runs the world', draw: 'History is never finished — there\'s always more to uncover', moment: 'Holding a 3,000-year-old artefact and feeling time collapse' },
-  },
-  {
-    id: 'd7', name: 'Lucia',  initials: 'LC', age: 22, flag: '🇲🇽', country: 'Mexico',   username: '@lucia_cdmx',
-    trail: ['🇲🇽', '🇨🇴', '🇪🇸', '🇯🇵'], strength: 49, freq: 'adventure', online: true,
-    tagline: 'Salsa and street food enthusiast', avatarColor: '#a29bfe',
-    bio: 'Dance instructor & foodie. Salsa is my therapy and tacos are my religion. Looking for people who want to actually experience life, not just scroll through it.',
-    interests: ['Dance', 'Food', 'Latin Music', 'Adventure'],
-    photos: [null, null, null],
-    impressions: { give: 'Mezcal and the tradition of gathering around a shared cup', draw: 'People who are fully present — no phones, just connection', moment: 'Teaching a complete stranger to salsa at a street festival and watching them fall in love with it' },
-  },
-];
+// Maps a row from GET /api/matches/daily (real, server-scored candidate) into
+// the card shape this screen renders. No fabricated fields — anything the
+// profiles table doesn't actually track (handle, "world footprint" trail of
+// visited countries, freeform Q&A impressions) is left blank/empty and the
+// corresponding UI section hides itself rather than showing a fake value.
+function mapMatchToSignal(m) {
+  return {
+    id:              m.matched_user_id,
+    name:            m.display_name,
+    age:             m.age,
+    flag:            getCountryFlag(m.country),
+    country:         m.country,
+    username:        null,
+    trail:           [],
+    strength:        Math.round(m.compatibility_score || 0),
+    online:          m.last_active ? (Date.now() - new Date(m.last_active).getTime() < 10 * 60 * 1000) : false,
+    tagline:         m.tagline || '',
+    avatarColor:     stringToColor(m.display_name || ''),
+    bio:             m.bio || '',
+    interests:       m.interests || [],
+    photos:          (m.gallery_photos || []).slice(0, 3),
+    photo_url:       m.photo_url,
+    connectionTypes: m.connection_types || [],
+  };
+}
 
 const GENDER_OPTIONS_FP = [
   { id: 'everyone', label: 'Everyone', color: BOND_PINK },
@@ -1019,7 +979,7 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
         {/* Identity */}
         <View style={pv.identity}>
           <Text style={pv.name}>{sig.name}, {sig.age}</Text>
-          <Text style={pv.handle}>{sig.username}</Text>
+          {sig.username ? <Text style={pv.handle}>{sig.username}</Text> : null}
           <View style={pv.locRow}>
             <Text style={{ fontSize: 18 }}>{sig.flag}</Text>
             <Text style={pv.locTxt}>{sig.country}</Text>
@@ -1036,8 +996,8 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
           </View>
           <View style={pv.statDiv} />
           <View style={pv.statItem}>
-            <Text style={pv.statVal}>{sig.trail.length}</Text>
-            <Text style={pv.statLabel}>Countries</Text>
+            <Text style={pv.statVal}>{sig.strength}%</Text>
+            <Text style={pv.statLabel}>Match</Text>
           </View>
           <View style={pv.statDiv} />
           <View style={pv.statItem}>
@@ -1079,9 +1039,11 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
         )}
 
         {/* Tagline */}
-        <View style={pv.taglineBox}>
-          <Text style={pv.taglineTxt}>"{sig.tagline}"</Text>
-        </View>
+        {sig.tagline ? (
+          <View style={pv.taglineBox}>
+            <Text style={pv.taglineTxt}>"{sig.tagline}"</Text>
+          </View>
+        ) : null}
 
         {/* Interests */}
         {sig.interests?.length > 0 && (
@@ -1096,23 +1058,25 @@ function ProfileView({ sig, onClose, onNext, onBond }) {
         )}
 
         {/* World Footprint */}
-        <View style={pv.section}>
-          <Text style={pv.sectionLabel}>WORLD FOOTPRINT</Text>
-          <View style={pv.trail}>
-            {sig.trail.map((flag, i) => (
-              <React.Fragment key={i}>
-                <View style={[pv.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
-                  <Text style={pv.trailFlag}>{flag}</Text>
-                </View>
-                {i < sig.trail.length - 1 && (
-                  <View style={pv.trailConnector}>
-                    <View style={pv.trailDot} /><View style={pv.trailLine} /><View style={pv.trailDot} />
+        {sig.trail.length > 0 && (
+          <View style={pv.section}>
+            <Text style={pv.sectionLabel}>WORLD FOOTPRINT</Text>
+            <View style={pv.trail}>
+              {sig.trail.map((flag, i) => (
+                <React.Fragment key={i}>
+                  <View style={[pv.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
+                    <Text style={pv.trailFlag}>{flag}</Text>
                   </View>
-                )}
-              </React.Fragment>
-            ))}
+                  {i < sig.trail.length - 1 && (
+                    <View style={pv.trailConnector}>
+                      <View style={pv.trailDot} /><View style={pv.trailLine} /><View style={pv.trailDot} />
+                    </View>
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
       </ScrollView>
 
@@ -1157,10 +1121,29 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showProfile,     setShowProfile]     = useState(false);
   const [showUpgrade,     setShowUpgrade]     = useState(false);
+  const [dailyMatches,    setDailyMatches]    = useState([]);
+  const [matchesLoading,  setMatchesLoading]  = useState(true);
 
   // Load today's bond usage from storage
   useEffect(() => {
     AsyncStorage.getItem(todayKey()).then(v => setBondsUsed(v ? parseInt(v, 10) : 0));
+  }, []);
+
+  // Real, server-scored candidates for today — replaces the old hardcoded demo list.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = await authHeader();
+        const res = await axios.get(`${SERVER_URL}/api/matches/daily`, { headers });
+        if (!cancelled) setDailyMatches((res.data || []).map(mapMatchToSignal));
+      } catch (err) {
+        console.warn('[Discover] daily matches fetch error:', err.message);
+      } finally {
+        if (!cancelled) setMatchesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const bondsLeft   = isUnlimited ? Infinity : Math.max(0, bondsPerDay - bondsUsed);
@@ -1195,10 +1178,10 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
   // Build ordered card pool based on tier
   const cardPool = useMemo(() => {
-    const pool = [...DEMO_SIGNALS];
+    const pool = [...dailyMatches];
     if (hasBondPass) pool.sort((a, b) => b.strength - a.strength);
     return pool;
-  }, [hasBondPass]);
+  }, [hasBondPass, dailyMatches]);
 
   const socket      = getSocket();
   const matchScaleA = useRef(new Animated.Value(0.7)).current;
@@ -1224,7 +1207,7 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     useRef(new Animated.Value(0.07)).current,
   ];
 
-  const sig = cardPool[cardIndex % cardPool.length];
+  const sig = cardPool.length > 0 ? cardPool[cardIndex % cardPool.length] : null;
 
   // Swipe gesture
   const pan     = useRef(new Animated.ValueXY()).current;
@@ -1326,10 +1309,21 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
   }, [state, hasBondPass]);
 
   function doNext()    { setCardIndex(i => i + 1); }
-  function doConnect() {
+  async function doConnect() {
     if (outOfBonds) { setShowUpgrade(true); return; }
+    const target = sig;
     consumeBond();
     doNext();
+    if (!target?.id) return;
+    try {
+      const headers = await authHeader();
+      await axios.post(`${SERVER_URL}/api/matches`, {
+        targetUserId:   target.id,
+        connectionType: target.connectionTypes?.[0] || 'friendship',
+      }, { headers });
+    } catch (err) {
+      console.warn('[Discover] create match error:', err.message);
+    }
   }
   function disconnect() {
     socket.emit('leave_random_connect');
@@ -1473,6 +1467,22 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
     ? [genderFilter !== 'everyone' && genderMeta.label, reachFilter !== 'worldwide' && reachMeta.label, countryMeta && countryMeta.name].filter(Boolean).join(' · ')
     : 'Filters';
 
+  if (matchesLoading) {
+    return (
+      <View style={st.lockScreen}>
+        <ActivityIndicator color={BOND_PINK} size="large" />
+        <Text style={[st.lockSub, { marginTop: 16 }]}>Finding your matches…</Text>
+      </View>
+    );
+  }
+  if (!sig) {
+    return (
+      <View style={st.lockScreen}>
+        <Text style={st.lockTitle}>No matches yet</Text>
+        <Text style={st.lockSub}>Check back tomorrow for new curated matches — or try Instant Connect above.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -1569,35 +1579,37 @@ function RandomTab({ user, navigation, onMatch, switchTab }) {
 
           {/* Name + handle */}
           <Text style={fp2.name}>{sig.name}, {sig.age}</Text>
-          <Text style={[fp2.handle, sig.photo_url && fp2.handlePhoto]}>{sig.username}</Text>
+          {sig.username ? <Text style={[fp2.handle, sig.photo_url && fp2.handlePhoto]}>{sig.username}</Text> : null}
           <View style={fp2.locRow}>
             <Text style={{ fontSize: 17 }}>{sig.flag}</Text>
             <Text style={fp2.locTxt}>{sig.country}</Text>
           </View>
 
           {/* ── World Footprint Trail ── */}
-          <View style={fp2.trailWrap}>
-            <Text style={fp2.trailLabel}>WORLD FOOTPRINT</Text>
-            <View style={fp2.trail}>
-              {sig.trail.map((flag, i) => (
-                <React.Fragment key={i}>
-                  <View style={[fp2.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
-                    <Text style={fp2.trailFlag}>{flag}</Text>
-                  </View>
-                  {i < sig.trail.length - 1 && (
-                    <View style={fp2.trailConnector}>
-                      <View style={fp2.trailDot} />
-                      <View style={fp2.trailLine} />
-                      <View style={fp2.trailDot} />
+          {sig.trail.length > 0 && (
+            <View style={fp2.trailWrap}>
+              <Text style={fp2.trailLabel}>WORLD FOOTPRINT</Text>
+              <View style={fp2.trail}>
+                {sig.trail.map((flag, i) => (
+                  <React.Fragment key={i}>
+                    <View style={[fp2.trailNode, i === 0 && { borderColor: sig.avatarColor, borderWidth: 2 }]}>
+                      <Text style={fp2.trailFlag}>{flag}</Text>
                     </View>
-                  )}
-                </React.Fragment>
-              ))}
+                    {i < sig.trail.length - 1 && (
+                      <View style={fp2.trailConnector}>
+                        <View style={fp2.trailDot} />
+                        <View style={fp2.trailLine} />
+                        <View style={fp2.trailDot} />
+                      </View>
+                    )}
+                  </React.Fragment>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Tagline */}
-          <Text style={fp2.tagline}>"{sig.tagline}"</Text>
+          {sig.tagline ? <Text style={fp2.tagline}>"{sig.tagline}"</Text> : null}
 
           {/* Tap hint */}
           <TouchableOpacity onPress={() => setShowProfile(true)} activeOpacity={0.7} style={fp2.profileHint}>

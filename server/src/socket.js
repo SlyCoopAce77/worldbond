@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
 const { translateText } = require('./translate');
 const { query: dbQuery } = require('./database/db');
+const { transferGiftCoins } = require('./creators');
 
 // ── Block-list enforcement for the real-time layer ────────────────────────────
 // The REST API (profiles.routes.js /blocks) has always respected user_blocks.
@@ -1210,7 +1211,7 @@ function setupSocket(io) {
       });
     });
 
-    socket.on('live_gift', ({ streamId, gift }) => {
+    socket.on('live_gift', async ({ streamId, gift }) => {
       const sender = connectedUsers[socket.id];
       const stream = liveStreams[streamId];
       if (!sender || !stream) return;
@@ -1225,6 +1226,26 @@ function setupSocket(io) {
       // Always use the server-side coin value, never the client-sent value
       const verifiedGift = { ...catalogGift };
 
+      // Real coins only move for JWT-verified senders gifting a real, distinct
+      // host — an unverified socket-claimed identity can't be trusted to debit.
+      if (!sender.verified || !sender.userId || !stream.hostUserId || stream.hostUserId === sender.userId) {
+        return;
+      }
+
+      const transfer = await transferGiftCoins({
+        senderId:        sender.userId,
+        recipientId:     stream.hostUserId,
+        coins:           verifiedGift.coins,
+        giftId:          verifiedGift.id,
+        streamSessionId: stream.sessionId,
+      });
+      if (!transfer.ok) {
+        if (transfer.reason === 'insufficient_balance') {
+          socket.emit('live_gift_error', { reason: 'insufficient_balance', giftId: verifiedGift.id, coins: verifiedGift.coins });
+        }
+        return;
+      }
+
       io.to(`live:${streamId}`).emit('live_gift_received', {
         senderId:      socket.id,
         senderName:    sender.username,
@@ -1236,9 +1257,7 @@ function setupSocket(io) {
       stream.giftCount = (stream.giftCount || 0) + 1;
 
       // Track Gift Legend progress: accumulate BC received for the stream host
-      if (stream.hostUserId) {
-        upsertYearlyProgress(stream.hostUserId, { gifts_received_bc: verifiedGift.coins });
-      }
+      upsertYearlyProgress(stream.hostUserId, { gifts_received_bc: verifiedGift.coins });
     });
 
     // ── FOLLOWS ──

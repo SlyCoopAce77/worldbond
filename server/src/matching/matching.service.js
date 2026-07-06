@@ -129,7 +129,8 @@ async function getDailyMatches(userId) {
   const { rows: existing } = await query(`
     SELECT dm.*, p.display_name, p.photo_url, p.voice_note_url, p.bio,
            p.country, p.city, p.language, p.languages_spoken,
-           p.connection_types, p.ghost_score, p.age, p.gender
+           p.connection_types, p.ghost_score, p.age, p.gender,
+           p.tagline, p.interests, p.gallery_photos, p.last_active
     FROM daily_matches dm
     JOIN profiles p ON p.user_id = dm.matched_user_id
     WHERE dm.user_id = $1 AND dm.shown_date = CURRENT_DATE

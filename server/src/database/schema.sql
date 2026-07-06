@@ -318,6 +318,69 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ─── GIFT EARNINGS — timestamped ledger of every real coin transfer from a ────
+-- live-stream gift (sender → recipient). This is the source of truth for
+-- "top 3 monthly streamers" ranking and for streamer payout balances.
+-- stream_session_id is informational only (no FK) — the stream_sessions row
+-- for a just-started stream is inserted fire-and-forget and may not have
+-- landed yet when the first gift of that stream arrives.
+CREATE TABLE IF NOT EXISTS gift_earnings (
+  id                 BIGSERIAL PRIMARY KEY,
+  recipient_user_id  UUID REFERENCES users(id) ON DELETE CASCADE,
+  sender_user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  stream_session_id  UUID,
+  gift_id            VARCHAR(50) NOT NULL,
+  coins              INTEGER NOT NULL,
+  created_at         TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_gift_earnings_recipient_month ON gift_earnings(recipient_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_gift_earnings_month           ON gift_earnings(created_at);
+
+-- ─── MONTHLY TOP CREATORS — locked-in top 3 earners for a completed month ────
+-- Computed lazily (see creators.js) the first time it's requested after the
+-- month ends, then frozen — so a streamer's payout rate for a given month
+-- can never be gamed by earning more after the fact.
+CREATE TABLE IF NOT EXISTS monthly_top_creators (
+  year_month    VARCHAR(7) NOT NULL,  -- e.g. '2026-07'
+  rank          INTEGER NOT NULL CHECK (rank BETWEEN 1 AND 3),
+  user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+  coins_earned  INTEGER NOT NULL,
+  locked_at     TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (year_month, rank)
+);
+
+-- ─── COUNTRY STAMPS — 1-of-1 collectible per country, real global ownership ──
+-- Previously simulated entirely on-device (DEMO_STAMPS in WalletContext.js),
+-- meaning two different users' phones could each believe they held the same
+-- flag. This table is the single source of truth for who actually holds one.
+CREATE TABLE IF NOT EXISTS country_stamps (
+  flag           VARCHAR(8) PRIMARY KEY,
+  holder_id      UUID REFERENCES users(id) ON DELETE SET NULL,
+  coins_earned   INTEGER DEFAULT 0,
+  claimed_at     TIMESTAMPTZ,
+  last_activity  TIMESTAMPTZ
+);
+INSERT INTO country_stamps (flag) VALUES
+  ('🇺🇸'),('🇧🇷'),('🇰🇷'),('🇯🇵'),('🇬🇧'),('🇲🇽'),('🇦🇺'),('🇮🇩'),('🇹🇷'),('🇩🇪'),
+  ('🇦🇷'),('🇷🇺'),('🇫🇷'),('🇪🇸'),('🇨🇦'),('🇮🇳'),('🇵🇭'),('🇸🇦'),('🇵🇱'),('🇹🇭'),
+  ('🇸🇪'),('🇳🇱'),('🇵🇹'),('🇨🇴')
+ON CONFLICT (flag) DO NOTHING;
+
+-- ─── BOND MONUMENTS — 1-of-1 collectible per famous world landmark ───────────
+CREATE TABLE IF NOT EXISTS bond_monuments (
+  monument_id    VARCHAR(50) PRIMARY KEY,
+  holder_id      UUID REFERENCES users(id) ON DELETE SET NULL,
+  coins_earned   INTEGER DEFAULT 0,
+  claimed_at     TIMESTAMPTZ,
+  last_activity  TIMESTAMPTZ
+);
+INSERT INTO bond_monuments (monument_id) VALUES
+  ('liberty'),('grand_canyon'),('christ'),('amazon'),('gyeongbok'),('fuji'),
+  ('fushimi'),('gate'),('bigben'),('eiffel'),('sagrada'),('red_square'),
+  ('niagara'),('chichen'),('taj'),('borobudur'),('hagia'),('opera'),
+  ('colosseum'),('great_wall')
+ON CONFLICT (monument_id) DO NOTHING;
+
 -- ─── UPDATED_AT TRIGGER ──────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$
