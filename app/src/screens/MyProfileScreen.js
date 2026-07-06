@@ -17,7 +17,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useWallet, BOND_MONUMENTS, STAMP_CAP, MONUMENT_CAP } from '../context/WalletContext';
 import { useChallenge, isStampDropped } from '../context/ChallengeContext';
 import { useBondPass } from '../context/PremiumContext';
-import { getCountryFlag } from '../utils/countryUtils';
+import { getCountryFlag, getCountryName } from '../utils/countryUtils';
 import { stringToColor } from '../utils/apiUtils';
 const { width } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
@@ -45,13 +45,17 @@ const STREAM_CATS = [
   { id: 'culture', label: 'Culture' },
 ];
 
-const STREAM_REGION_CODES = {
-  africa:   ['NG','GH','ZA','KE','EG','SN','CI','TZ','ET','MA','CM','TN','DZ','SD','UG','RW'],
-  asia:     ['CN','JP','KR','IN','PH','TH','ID','VN','MY','SG','BD','PK','MM','KH','LK','NP'],
-  europe:   ['GB','FR','DE','IT','ES','NL','SE','NO','PL','UA','RU','TR','PT','GR','RO','HU'],
-  americas: ['US','CA','MX','BR','CO','AR','PE','CL','EC','DO','CU','JM','HT','BO','VE'],
-  mideast:  ['SA','AE','OM','QA','KW','BH','IQ','LB','JO','IL','SY','YE','PS','IR'],
-  pacific:  ['AU','NZ','FJ','PG','WS','TO','VU','KI','FM','PW'],
+// A live stream's hostCountry is a country NAME (e.g. "🇯🇵 Japan", from the
+// onboarding country picker), never a 2-letter ISO code — this used to be
+// compared against ISO codes below and could never match, so selecting any
+// region silently showed zero streams regardless of who was actually live.
+const STREAM_REGION_COUNTRIES = {
+  africa:   ['nigeria','ghana','south africa','kenya','egypt','senegal','ivory coast','tanzania','ethiopia','morocco','cameroon','tunisia','algeria','zambia','zimbabwe','angola','mozambique','madagascar'],
+  asia:     ['china','japan','south korea','india','philippines','thailand','indonesia','vietnam','malaysia','singapore','bangladesh','pakistan','myanmar','cambodia','sri lanka','nepal','taiwan','hong kong','mongolia','laos'],
+  europe:   ['united kingdom','france','germany','italy','spain','netherlands','sweden','norway','poland','ukraine','russia','turkey','portugal','greece','romania','hungary','denmark','finland','switzerland','austria','belgium','czech republic','slovakia','croatia','serbia','bulgaria','ireland','scotland','wales'],
+  americas: ['united states','canada','mexico','brazil','colombia','argentina','peru','chile','ecuador','dominican republic','cuba','jamaica','haiti','bolivia','venezuela','paraguay','uruguay','puerto rico','trinidad and tobago','panama','costa rica','guatemala','honduras','el salvador','nicaragua'],
+  mideast:  ['saudi arabia','united arab emirates','oman','qatar','kuwait','bahrain','iraq','lebanon','jordan','israel','iran'],
+  pacific:  ['australia','new zealand'],
 };
 
 const IMPRESSION_PROMPTS = [
@@ -1223,7 +1227,7 @@ export default function MyProfileScreen({ navigation, user, onLogout }) {
         let visible = liveStreams.filter(st => {
           if (q && !(st.hostName || '').toLowerCase().includes(q) && !(st.title || '').toLowerCase().includes(q)) return false;
           if (filterCat !== 'all' && (st.category || '').toLowerCase() !== filterCat) return false;
-          if (liveRegion !== 'all' && !(STREAM_REGION_CODES[liveRegion] || []).includes((st.hostCountry || '').toUpperCase())) return false;
+          if (liveRegion !== 'all' && !(STREAM_REGION_COUNTRIES[liveRegion] || []).includes(getCountryName(st.hostCountry).toLowerCase())) return false;
           return true;
         });
         visible.sort((a, b) => ((b.viewerCount || 0) + (b.giftCount || 0) * 5) - ((a.viewerCount || 0) + (a.giftCount || 0) * 5));
