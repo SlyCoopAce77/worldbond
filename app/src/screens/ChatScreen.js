@@ -194,9 +194,15 @@ export default function ChatScreen({ route, navigation }) {
 
   // ── Socket listeners ───────────────────────────────────────────────────────
 
+  const otherUserId = otherUser?.userId || otherUser?.user_id;
+
   useEffect(() => {
-    if (!otherUser?.socketId) return;
-    socket.emit('get_dm_history', { otherSocketId: otherUser.socketId });
+    // A real userId is enough to load history and receive messages even
+    // while otherUser is offline — socketId alone used to gate this whole
+    // effect, so opening a chat with anyone not online *right now* showed a
+    // permanently empty conversation with no way to send or receive.
+    if (!otherUserId) return;
+    socket.emit('get_dm_history', { otherUserId, otherSocketId: otherUser.socketId });
 
     function onDmHistory(msgs) { setMessages(msgs || []); }
     function onDirectMessage(msg) {
@@ -238,7 +244,7 @@ export default function ChatScreen({ route, navigation }) {
       socket.off('user_list',           onUserList);
       clearTimeout(typingTimer.current);
     };
-  }, [otherUser?.socketId]);
+  }, [otherUserId]);
 
   useEffect(() => {
     if (messages.length > 0 || otherTyping) {
@@ -268,6 +274,7 @@ export default function ChatScreen({ route, navigation }) {
     socket.emit('stop_typing', { toSocketId: otherUser.socketId });
     socket.emit('direct_message', {
       toSocketId: otherUser.socketId,
+      toUserId: otherUserId,
       text: text.trim(),
       matchId,
       replyTo: replyTo
@@ -283,7 +290,7 @@ export default function ChatScreen({ route, navigation }) {
   }
 
   function sendStarter(q) {
-    socket.emit('direct_message', { toSocketId: otherUser.socketId, text: q, matchId });
+    socket.emit('direct_message', { toSocketId: otherUser.socketId, toUserId: otherUserId, text: q, matchId });
   }
 
   async function pickAndSendPhoto() {
@@ -304,6 +311,7 @@ export default function ChatScreen({ route, navigation }) {
       });
       socket.emit('direct_message', {
         toSocketId: otherUser.socketId,
+        toUserId: otherUserId,
         text:     'Photo',
         imageUrl: data.imageUrl,
         matchId,

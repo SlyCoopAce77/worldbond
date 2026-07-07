@@ -809,7 +809,10 @@ export default function ProfileScreen({ route, navigation }) {
           {bondUserId && (
             <TouchableOpacity
               style={styles.messageActionBtn}
-              onPress={() => navigation.navigate('Chat', { user: profileUser, bondUserId })}
+              onPress={() => navigation.navigate('Chat', {
+                otherUser: { ...profileUser, userId: bondUserId || profileUser?.userId || profileUser?.user_id },
+                currentUser: null,
+              })}
               activeOpacity={0.8}
             >
               <Text style={styles.messageActionTxt}>Message</Text>

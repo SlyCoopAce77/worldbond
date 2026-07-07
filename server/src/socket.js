@@ -81,7 +81,7 @@ const {
   postVenueEvent, getVenueEvents, getAllUpcomingEvents,
   setVenueLive, getVenueLiveStatus, getAllLiveVenues,
 } = require('./places');
-const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment, deleteResponse: deleteIcebreakerResponse } = require('./icebreaker');
+const { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment: addIcebreakerComment, likeComment: likeIcebreakerComment, deleteComment: deleteIcebreakerComment, deleteResponse: deleteIcebreakerResponse, getResponseOwner, getCommentOwner } = require('./icebreaker');
 const { createEvent, getEvents, getEventById, joinEvent, leaveEvent, addEventMessage, getEventMessages } = require('./events');
 const { createCulturalPost, likePost, getCulturalPosts } = require('./culturalPosts');
 const { createPulse, getActivePulsesForSpot, getAllActivePulses, removePulse } = require('./pulses');
@@ -105,13 +105,30 @@ function findSocketId(userId) {
 
 const countryFlags    = {};   // country -> Set of socketIds who planted flag
 const socketCountries = {};   // socketId -> Set of countries (for cleanup on disconnect)
-const directMessageHistory = {};
 const randomConnectQueue = []; // users waiting for a random match
 const randomConnectTimers = {}; // socketId -> timeout handle
 const liveStreams = {};        // streamId -> stream object
 
-function getDMKey(userA, userB) {
-  return [userA, userB].sort().join('::');
+// Direct messages persist to the real `messages` table now (previously kept
+// only in memory, keyed by ephemeral socket.id — history was lost on every
+// reconnect, and messages to an offline recipient were silently dropped
+// since connectedUsers[toSocketId] didn't exist for them).
+// A `matches` row is the FK messages hangs off; DMs implicitly create one
+// between the two real users the first time they message each other, same
+// as swiping right in Discover does explicitly.
+async function getOrCreateMatchId(userIdA, userIdB) {
+  const [u1, u2] = [userIdA, userIdB].sort();
+  const existing = await dbQuery(`SELECT id FROM matches WHERE user1_id = $1 AND user2_id = $2`, [u1, u2]);
+  if (existing.rows.length) return existing.rows[0].id;
+  const inserted = await dbQuery(
+    `INSERT INTO matches (user1_id, user2_id, connection_type) VALUES ($1, $2, 'friendship')
+     ON CONFLICT (user1_id, user2_id) DO NOTHING RETURNING id`,
+    [u1, u2]
+  );
+  if (inserted.rows.length) return inserted.rows[0].id;
+  // Race: another concurrent message from the same pair inserted first
+  const retry = await dbQuery(`SELECT id FROM matches WHERE user1_id = $1 AND user2_id = $2`, [u1, u2]);
+  return retry.rows[0]?.id || null;
 }
 
 // Strip leading flag emoji so "🇯🇵 Japan" and "Japan" key the same bucket
@@ -260,29 +277,49 @@ function setupSocket(io) {
     });
 
     // Send direct message to another user
-    socket.on('direct_message', async ({ toSocketId, text, matchId, replyTo, imageUrl }) => {
+    // toUserId is the real, stable recipient identity (new clients send this
+    // directly). Older clients only send toSocketId — we resolve their real
+    // userId from that if they're currently online, but if they're offline
+    // the message used to just vanish (connectedUsers[toSocketId] didn't
+    // exist). Now it persists either way and delivers in real time only if
+    // they happen to be connected.
+    socket.on('direct_message', async ({ toSocketId, toUserId, text, matchId, replyTo, imageUrl }) => {
       const sender = connectedUsers[socket.id];
-      const recipient = connectedUsers[toSocketId];
-      if (!sender || !recipient) return;
+      if (!sender?.userId || !text?.trim()) return;
+
+      const recipientUserId = toUserId || connectedUsers[toSocketId]?.userId;
+      if (!recipientUserId || recipientUserId === sender.userId) return;
 
       // Respect the block list — same behavior as an offline/unknown recipient
       // so this doesn't leak whether a block exists.
-      if (await isBlockedEitherWay(sender.userId, recipient.userId)) return;
+      if (await isBlockedEitherWay(sender.userId, recipientUserId)) return;
 
       // Update ghost score when a user responds to a match
-      if (matchId && recordResponse && sender.userId) {
+      if (matchId && recordResponse) {
         recordResponse(sender.userId, matchId).catch(() => {});
       }
 
+      // Recipient's language for translation — from their live session if
+      // online, otherwise their saved profile (works even while offline).
+      const liveRecipient = connectedUsers[toSocketId]?.userId === recipientUserId
+        ? connectedUsers[toSocketId]
+        : Object.values(connectedUsers).find(u => u.userId === recipientUserId);
+      let recipientLanguage = liveRecipient?.language;
+      if (!liveRecipient) {
+        const { rows } = await dbQuery(`SELECT language FROM profiles WHERE user_id = $1`, [recipientUserId]);
+        recipientLanguage = rows[0]?.language;
+      }
+
       let translatedText = text;
-      if (recipient.language && recipient.language !== sender.language) {
-        const result = await translateText(text, recipient.language);
+      if (recipientLanguage && recipientLanguage !== sender.language) {
+        const result = await translateText(text, recipientLanguage);
         translatedText = result.translatedText;
       }
 
       const message = {
         id: uuidv4(),
-        senderId: socket.id,
+        senderId: socket.id, // matches the currently-live client's isMine check (=== socket.id)
+        senderUserId: sender.userId,
         senderName: sender.username,
         senderCountry: sender.country,
         originalText: text,
@@ -293,26 +330,75 @@ function setupSocket(io) {
         ...(imageUrl && { imageUrl }),
       };
 
-      const dmKey = getDMKey(socket.id, toSocketId);
-      if (!directMessageHistory[dmKey]) directMessageHistory[dmKey] = [];
-      directMessageHistory[dmKey].push(message);
-      if (directMessageHistory[dmKey].length > 100) directMessageHistory[dmKey].shift();
+      const matchRowId = await getOrCreateMatchId(sender.userId, recipientUserId);
+      if (matchRowId) {
+        await dbQuery(
+          `INSERT INTO messages (id, match_id, sender_id, content, content_type, original_content, meta)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [message.id, matchRowId, sender.userId, translatedText, imageUrl ? 'image' : 'text', text,
+           JSON.stringify({ replyTo: replyTo || null, imageUrl: imageUrl || null })]
+        ).catch(e => console.warn('[DM] persist error:', e.message));
+      }
 
-      // Send to recipient (translated) and back to sender (original)
-      io.to(toSocketId).emit('direct_message', message);
-      io.to(toSocketId).emit('new_message_notif', {
-        fromId: socket.id,
-        fromName: sender.username,
-        fromCountry: sender.country,
-        preview: (imageUrl ? '📷 Photo' : text).slice(0, 60),
-      });
+      // Real-time delivery if the recipient happens to be online right now —
+      // the message is already saved regardless, so they'll see it via
+      // get_dm_history next time they open the chat either way.
+      const recipientSocketId = findSocketId(recipientUserId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('direct_message', message);
+        io.to(recipientSocketId).emit('new_message_notif', {
+          fromId: socket.id,
+          fromName: sender.username,
+          fromCountry: sender.country,
+          preview: (imageUrl ? '📷 Photo' : text).slice(0, 60),
+        });
+      }
       socket.emit('direct_message', { ...message, text });
     });
 
-    // Get DM history between two users
-    socket.on('get_dm_history', ({ otherSocketId }) => {
-      const dmKey = getDMKey(socket.id, otherSocketId);
-      socket.emit('dm_history', directMessageHistory[dmKey] || []);
+    // Get DM history between two users — real, persisted history now (was
+    // in-memory keyed by ephemeral socket.id before, lost on every reconnect).
+    // senderId in the response is shimmed to match the CURRENTLY-LIVE app
+    // build's isMine check (item.senderId === socket.id): the viewer's own
+    // historical messages get the viewer's current socket.id, everyone
+    // else's get their real (non-matching) userId. A future client build
+    // should switch to comparing senderUserId instead and drop this shim.
+    socket.on('get_dm_history', async ({ otherSocketId, otherUserId }) => {
+      const viewer = connectedUsers[socket.id];
+      if (!viewer?.userId) return socket.emit('dm_history', []);
+
+      const recipientUserId = otherUserId || connectedUsers[otherSocketId]?.userId;
+      if (!recipientUserId) return socket.emit('dm_history', []);
+
+      const matchRowId = await getOrCreateMatchId(viewer.userId, recipientUserId);
+      if (!matchRowId) return socket.emit('dm_history', []);
+
+      const { rows } = await dbQuery(
+        `SELECT m.id, m.sender_id AS "senderUserId", p.display_name AS "senderName", p.country AS "senderCountry",
+                m.original_content AS "originalText", m.content AS text, m.meta,
+                EXTRACT(EPOCH FROM m.created_at) * 1000 AS timestamp
+         FROM messages m
+         JOIN profiles p ON p.user_id = m.sender_id
+         WHERE m.match_id = $1
+         ORDER BY m.created_at ASC
+         LIMIT 200`,
+        [matchRowId]
+      ).catch(() => ({ rows: [] }));
+
+      const history = rows.map(r => ({
+        id: r.id,
+        senderId: r.senderUserId === viewer.userId ? socket.id : r.senderUserId,
+        senderUserId: r.senderUserId,
+        senderName: r.senderName,
+        senderCountry: r.senderCountry,
+        originalText: r.originalText,
+        text: r.text,
+        wasTranslated: r.originalText !== r.text,
+        timestamp: Number(r.timestamp),
+        ...(r.meta?.replyTo  && { replyTo: r.meta.replyTo }),
+        ...(r.meta?.imageUrl && { imageUrl: r.meta.imageUrl }),
+      }));
+      socket.emit('dm_history', history);
     });
 
     // WebRTC signaling for voice/video calls
@@ -634,6 +720,8 @@ function setupSocket(io) {
     socket.on('like_icebreaker_response', async ({ responseId }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId) return;
+      const ownerId = await getResponseOwner(responseId);
+      if (ownerId && user.userId && await isBlockedEitherWay(user.userId, ownerId)) return;
       const { index } = getTodaysQuestion();
       await likeResponse(index, responseId, user.userId || socket.id);
       const responses = await getResponses(index);
@@ -655,6 +743,8 @@ function setupSocket(io) {
     socket.on('add_icebreaker_comment', async ({ responseId, text }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId || !text?.trim()) return;
+      const ownerId = await getResponseOwner(responseId);
+      if (ownerId && user.userId && await isBlockedEitherWay(user.userId, ownerId)) return;
       const { index } = getTodaysQuestion();
       await addIcebreakerComment(index, responseId, {
         userId:    user.userId || socket.id,
@@ -684,6 +774,8 @@ function setupSocket(io) {
     socket.on('like_icebreaker_comment', async ({ responseId, commentId }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId || !commentId) return;
+      const ownerId = await getCommentOwner(commentId);
+      if (ownerId && user.userId && await isBlockedEitherWay(user.userId, ownerId)) return;
       const { index } = getTodaysQuestion();
       await likeIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
       const responses = await getResponses(index);
@@ -905,6 +997,8 @@ function setupSocket(io) {
     socket.on('like_photo', async ({ photoId }) => {
       const user = connectedUsers[socket.id];
       if (!user?.userId || !photoId) return;
+      const target = await getPhotoById(photoId);
+      if (target?.userId && await isBlockedEitherWay(user.userId, target.userId)) return;
       const photo = await toggleLike(photoId, user.userId, user.username);
       if (photo) {
         io.emit('photo_updated', photo);
@@ -926,6 +1020,8 @@ function setupSocket(io) {
     socket.on('comment_photo', async ({ photoId, text }) => {
       const user = connectedUsers[socket.id];
       if (!user?.userId || !text?.trim()) return;
+      const target = await getPhotoById(photoId);
+      if (target?.userId && await isBlockedEitherWay(user.userId, target.userId)) return;
       const photo = await addComment(photoId, {
         userId: user.userId,
         username: user.username,
@@ -961,6 +1057,8 @@ function setupSocket(io) {
       const user = connectedUsers[socket.id];
       if (!user?.userId || !photoId) return;
       const uid = user.userId;
+      const target = await getPhotoById(photoId);
+      if (target?.userId && await isBlockedEitherWay(uid, target.userId)) return;
       const photo = await toggleEcho(photoId, uid, user.username, user.country);
       if (photo) {
         io.emit('photo_updated', photo);
@@ -988,6 +1086,8 @@ function setupSocket(io) {
     socket.on('view_story', async ({ storyId }) => {
       const user = connectedUsers[socket.id];
       if (!user?.userId || !storyId) return;
+      const target = await getStoryById(storyId);
+      if (target?.userId && await isBlockedEitherWay(user.userId, target.userId)) return;
       await viewStory(storyId, user.userId);
     });
 

@@ -256,6 +256,9 @@ app.get('/api/stories', async (req, res) => res.json(await getStoriesGrouped()))
 // Photo upload
 app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
+  if (!rateLimit(`photo_upload:${req.userId}`, 20, 3600000)) {
+    return res.status(429).json({ error: 'Too many uploads. Try again later.' });
+  }
 
   try {
     const userId = req.userId;
@@ -277,6 +280,9 @@ app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, 
 // Story upload
 app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided' });
+  if (!rateLimit(`story_upload:${req.userId}`, 20, 3600000)) {
+    return res.status(429).json({ error: 'Too many uploads. Try again later.' });
+  }
 
   try {
     const userId = req.userId;
@@ -1150,6 +1156,9 @@ app.post('/challenge/entry', requireAuth, async (req, res) => {
   if (!['stamp', 'monument'].includes(winType)) return res.status(400).json({ error: 'Invalid type.' });
   const validTargets = winType === 'stamp' ? VALID_STAMP_FLAGS : VALID_MONUMENT_IDS;
   if (!validTargets.has(targetId)) return res.status(400).json({ error: 'Unknown target.' });
+  if (!rateLimit(`challenge_entry:${userId}`, 10, 3600000)) {
+    return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+  }
 
   try {
     const { query: db } = require('./database/db');
@@ -1181,6 +1190,9 @@ app.post('/challenge/entry', requireAuth, async (req, res) => {
 // ── Yearly Challenge buy-in — Bond Pass required, locks in real prize eligibility ─
 app.post('/challenge/yearly/buy-in', requireAuth, async (req, res) => {
   const { challengeKey } = req.body;
+  if (!rateLimit(`yearly_buyin:${req.userId}`, 10, 3600000)) {
+    return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+  }
   const result = await buyIntoChallenge(req.userId, challengeKey);
   if (!result.ok) {
     const messages = {

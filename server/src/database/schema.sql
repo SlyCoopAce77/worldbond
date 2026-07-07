@@ -263,6 +263,9 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_match_id ON messages(match_id);
+-- Holds replyTo/imageUrl — direct_message was never actually persisted here
+-- before (in-memory, keyed by ephemeral socket.id) until this fix.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}';
 
 -- ─── DAILY MATCH QUEUE ───────────────────────────────────────────────────────
 -- 5 AI-curated matches shown per user per day

@@ -337,6 +337,16 @@ async function addResponse(questionIndex, response) {
   );
 }
 
+async function getResponseOwner(responseId) {
+  const { rows } = await db(`SELECT user_id FROM icebreaker_responses WHERE id = $1`, [responseId]);
+  return rows[0]?.user_id || null;
+}
+
+async function getCommentOwner(commentId) {
+  const { rows } = await db(`SELECT user_id FROM icebreaker_comments WHERE id = $1`, [commentId]);
+  return rows[0]?.user_id || null;
+}
+
 async function likeResponse(questionIndex, responseId, likerId) {
   const existing = await db(`SELECT 1 FROM icebreaker_response_likes WHERE response_id = $1 AND user_id = $2`, [responseId, likerId]);
   if (existing.rows.length) {
@@ -423,4 +433,4 @@ async function getResponses(questionIndex, viewerId) {
   }));
 }
 
-module.exports = { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment, likeComment, deleteComment, deleteResponse };
+module.exports = { getTodaysQuestion, addResponse, getResponses, likeResponse, addComment, likeComment, deleteComment, deleteResponse, getResponseOwner, getCommentOwner };
