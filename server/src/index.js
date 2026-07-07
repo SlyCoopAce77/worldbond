@@ -250,8 +250,8 @@ app.get('/api/places/:country/:city', (req, res) => {
     .map(p => ({ ...p, typeInfo: PLACE_TYPES[p.type] || { icon: '📍', label: p.type } }));
   res.json(places);
 });
-app.get('/api/photos', (req, res) => res.json(getPhotos()));
-app.get('/api/stories', (req, res) => res.json(getStoriesGrouped()));
+app.get('/api/photos', async (req, res) => res.json(await getPhotos()));
+app.get('/api/stories', async (req, res) => res.json(await getStoriesGrouped()));
 
 // Photo upload
 app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, res) => {
@@ -261,11 +261,11 @@ app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, 
     const userId = req.userId;
     const { username, country, postCountry, language, mood, caption, filter } = req.body;
     const imageUrl = await resolveImageUrl(req, 'photos');
-    const photo = addPhoto({ userId, username, country, postCountry: postCountry || null, language, mood, imageUrl, caption, filter });
+    const photo = await addPhoto({ userId, username, country, postCountry: postCountry || null, language, mood, imageUrl, caption, filter });
 
     const ioInstance = req.app.get('io');
     ioInstance.emit('new_photo', photo);
-    ioInstance.emit('photos_feed', getPhotos());
+    ioInstance.emit('photos_feed', await getPhotos());
 
     res.json(photo);
   } catch (err) {
@@ -282,10 +282,10 @@ app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req,
     const userId = req.userId;
     const { username, country, language, mood, caption, filter } = req.body;
     const imageUrl = await resolveImageUrl(req, 'stories');
-    const story = addStory({ userId, username, country, language, mood, imageUrl, caption, filter });
+    const story = await addStory({ userId, username, country, language, mood, imageUrl, caption, filter });
 
     const ioInstance = req.app.get('io');
-    ioInstance.emit('stories_updated', getStoriesGrouped());
+    ioInstance.emit('stories_updated', await getStoriesGrouped());
 
     res.json(story);
   } catch (err) {
@@ -1035,7 +1035,7 @@ app.post('/admin/reports/:id/resolve', requireAdmin, async (req, res) => {
 app.delete('/admin/photos/:photoId', requireAdmin, async (req, res) => {
   const { photoId } = req.params;
   try {
-    const success = adminDeletePhoto(photoId);
+    const success = await adminDeletePhoto(photoId);
     if (!success) {
       return res.status(404).json({ error: 'Photo not found' });
     }

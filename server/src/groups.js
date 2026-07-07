@@ -1,3 +1,5 @@
+const { query: db } = require('./database/db');
+
 const GROUP_CATEGORIES = [
   {
     id: 'daily-chat',
@@ -92,25 +94,31 @@ const GROUP_CATEGORIES = [
   },
 ];
 
-const activeRooms = {};
+// Message history is real/persisted (below). "Who's currently in the room"
+// is live presence, not durable data — that's still derived on demand from
+// the socket.io room membership in socket.js, same as before.
 
-function getOrCreateRoom(categoryId, roomName) {
-  const key = `${categoryId}:${roomName}`;
-  if (!activeRooms[key]) {
-    activeRooms[key] = { members: new Set(), messages: [] };
-  }
-  return activeRooms[key];
+async function addMessageToRoom(categoryId, roomName, message) {
+  await db(
+    `INSERT INTO group_messages (id, category_id, room_name, sender_id, sender_name, sender_country, sender_language, sender_photo, text, image_url, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, to_timestamp($11 / 1000.0))`,
+    [message.id, categoryId, roomName, message.senderUserId || null, message.senderName, message.senderCountry,
+     message.senderLanguage, message.senderPhoto || null, message.originalText, message.imageUrl || null, message.timestamp]
+  );
 }
 
-function addMessageToRoom(categoryId, roomName, message) {
-  const room = getOrCreateRoom(categoryId, roomName);
-  room.messages.push(message);
-  if (room.messages.length > 100) room.messages.shift();
+async function getRoomHistory(categoryId, roomName) {
+  const { rows } = await db(
+    `SELECT id, sender_id AS "senderUserId", sender_name AS "senderName", sender_country AS "senderCountry",
+            sender_language AS "senderLanguage", sender_photo AS "senderPhoto", text AS "originalText",
+            image_url AS "imageUrl", EXTRACT(EPOCH FROM created_at) * 1000 AS timestamp
+     FROM group_messages
+     WHERE category_id = $1 AND room_name = $2
+     ORDER BY created_at ASC
+     LIMIT 100`,
+    [categoryId, roomName]
+  );
+  return rows.map(r => ({ ...r, timestamp: Number(r.timestamp) }));
 }
 
-function getRoomHistory(categoryId, roomName) {
-  const key = `${categoryId}:${roomName}`;
-  return activeRooms[key]?.messages || [];
-}
-
-module.exports = { GROUP_CATEGORIES, getOrCreateRoom, addMessageToRoom, getRoomHistory };
+module.exports = { GROUP_CATEGORIES, addMessageToRoom, getRoomHistory };

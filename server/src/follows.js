@@ -1,27 +1,33 @@
-// follows[followerId] = Set of userIds they follow
-const follows = {};
+const { query: db } = require('./database/db');
 
-function followUser(followerId, targetUserId) {
-  if (!follows[followerId]) follows[followerId] = new Set();
-  follows[followerId].add(targetUserId);
+async function followUser(followerId, targetUserId) {
+  await db(
+    `INSERT INTO user_follows (follower_id, followee_id) VALUES ($1, $2)
+     ON CONFLICT (follower_id, followee_id) DO NOTHING`,
+    [followerId, targetUserId]
+  );
 }
 
-function unfollowUser(followerId, targetUserId) {
-  follows[followerId]?.delete(targetUserId);
+async function unfollowUser(followerId, targetUserId) {
+  await db(`DELETE FROM user_follows WHERE follower_id = $1 AND followee_id = $2`, [followerId, targetUserId]);
 }
 
-function isFollowing(followerId, targetUserId) {
-  return follows[followerId]?.has(targetUserId) ?? false;
+async function isFollowing(followerId, targetUserId) {
+  const { rows } = await db(
+    `SELECT 1 FROM user_follows WHERE follower_id = $1 AND followee_id = $2`,
+    [followerId, targetUserId]
+  );
+  return rows.length > 0;
 }
 
-function getFollowing(userId) {
-  return Array.from(follows[userId] || []);
+async function getFollowing(userId) {
+  const { rows } = await db(`SELECT followee_id FROM user_follows WHERE follower_id = $1`, [userId]);
+  return rows.map(r => r.followee_id);
 }
 
-function getFollowers(userId) {
-  return Object.entries(follows)
-    .filter(([, targets]) => targets.has(userId))
-    .map(([followerId]) => followerId);
+async function getFollowers(userId) {
+  const { rows } = await db(`SELECT follower_id FROM user_follows WHERE followee_id = $1`, [userId]);
+  return rows.map(r => r.follower_id);
 }
 
 module.exports = { followUser, unfollowUser, isFollowing, getFollowing, getFollowers };

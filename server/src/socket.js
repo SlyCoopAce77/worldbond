@@ -171,7 +171,7 @@ function setupSocket(io) {
     socket.on('join_group', async ({ categoryId, roomName }) => {
       const roomKey = `${categoryId}:${roomName}`;
       socket.join(roomKey);
-      const history = getRoomHistory(categoryId, roomName);
+      const history = await getRoomHistory(categoryId, roomName);
       socket.emit('group_history', { categoryId, roomName, messages: history });
 
       // Broadcast updated member list to everyone in the room
@@ -218,6 +218,7 @@ function setupSocket(io) {
       const message = {
         id: uuidv4(),
         senderId: socket.id,
+        senderUserId: sender.userId || null,
         senderName: sender.username,
         senderCountry: sender.country,
         senderLanguage: sender.language,
@@ -227,7 +228,7 @@ function setupSocket(io) {
         ...(imageUrl && { imageUrl }),
       };
 
-      addMessageToRoom(categoryId, roomName, message);
+      await addMessageToRoom(categoryId, roomName, message);
       const roomKey = `${categoryId}:${roomName}`;
 
       // Get all sockets in the room and send each a translated version
@@ -606,11 +607,11 @@ function setupSocket(io) {
 
     // ── DAILY ICEBREAKER ──
 
-    socket.on('get_icebreaker', () => {
+    socket.on('get_icebreaker', async () => {
       const user = connectedUsers[socket.id];
       const { index, question } = getTodaysQuestion();
       const viewerId = user?.userId || socket.id;
-      const responses = getResponses(index, viewerId);
+      const responses = await getResponses(index, viewerId);
       socket.emit('icebreaker_data', { index, question, responses });
     });
 
@@ -618,7 +619,7 @@ function setupSocket(io) {
       const user = connectedUsers[socket.id];
       if (!user || !text?.trim()) return;
       const { index } = getTodaysQuestion();
-      addResponse(index, {
+      await addResponse(index, {
         userId:    user.userId || socket.id,
         username:  user.username,
         country:   user.country,
@@ -626,16 +627,16 @@ function setupSocket(io) {
         photo_url: user.photo_url || null,
         text:      text.trim(),
       });
-      const responses = getResponses(index);
+      const responses = await getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
     });
 
-    socket.on('like_icebreaker_response', ({ responseId }) => {
+    socket.on('like_icebreaker_response', async ({ responseId }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId) return;
       const { index } = getTodaysQuestion();
-      likeResponse(index, responseId, user.userId || socket.id);
-      const responses = getResponses(index);
+      await likeResponse(index, responseId, user.userId || socket.id);
+      const responses = await getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
       // Notify response owner
       const resp = responses.find(r => r.id === responseId);
@@ -651,11 +652,11 @@ function setupSocket(io) {
       }
     });
 
-    socket.on('add_icebreaker_comment', ({ responseId, text }) => {
+    socket.on('add_icebreaker_comment', async ({ responseId, text }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId || !text?.trim()) return;
       const { index } = getTodaysQuestion();
-      addIcebreakerComment(index, responseId, {
+      await addIcebreakerComment(index, responseId, {
         userId:    user.userId || socket.id,
         username:  user.username,
         country:   user.country,
@@ -663,7 +664,7 @@ function setupSocket(io) {
         photo_url: user.photo_url || null,
         text:      text.trim(),
       });
-      const responses = getResponses(index);
+      const responses = await getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
       // Notify response owner
       const resp = responses.find(r => r.id === responseId);
@@ -680,33 +681,33 @@ function setupSocket(io) {
       }
     });
 
-    socket.on('like_icebreaker_comment', ({ responseId, commentId }) => {
+    socket.on('like_icebreaker_comment', async ({ responseId, commentId }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId || !commentId) return;
       const { index } = getTodaysQuestion();
-      likeIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
-      const responses = getResponses(index);
+      await likeIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
+      const responses = await getResponses(index);
       io.emit('icebreaker_responses', { index, responses });
     });
 
-    socket.on('delete_icebreaker_comment', ({ responseId, commentId }) => {
+    socket.on('delete_icebreaker_comment', async ({ responseId, commentId }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId || !commentId) return;
       const { index } = getTodaysQuestion();
-      const deleted = deleteIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
+      const deleted = await deleteIcebreakerComment(index, responseId, commentId, user.userId || socket.id);
       if (deleted) {
-        const responses = getResponses(index);
+        const responses = await getResponses(index);
         io.emit('icebreaker_responses', { index, responses });
       }
     });
 
-    socket.on('delete_icebreaker_response', ({ responseId }) => {
+    socket.on('delete_icebreaker_response', async ({ responseId }) => {
       const user = connectedUsers[socket.id];
       if (!user || !responseId) return;
       const { index } = getTodaysQuestion();
-      const deleted = deleteIcebreakerResponse(index, responseId, user.userId || socket.id);
+      const deleted = await deleteIcebreakerResponse(index, responseId, user.userId || socket.id);
       if (deleted) {
-        const responses = getResponses(index);
+        const responses = await getResponses(index);
         io.emit('icebreaker_responses', { index, responses });
       }
     });
@@ -808,35 +809,36 @@ function setupSocket(io) {
 
     // ── VIRTUAL EVENTS ──
 
-    socket.on('get_events', () => {
-      socket.emit('events_list', getEvents());
+    socket.on('get_events', async () => {
+      socket.emit('events_list', await getEvents());
     });
 
-    socket.on('create_event', ({ title, type, description, scheduledFor, maxAttendees, language }) => {
+    socket.on('create_event', async ({ title, type, description, scheduledFor, maxAttendees, language }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
-      const event = createEvent({ title, type, description, scheduledFor, maxAttendees, language, hostId: socket.id, hostName: user.username, hostCountry: user.country });
-      io.emit('events_list', getEvents());
+      if (!user?.userId) return;
+      const event = await createEvent({ title, type, description, scheduledFor, maxAttendees, language, hostUserId: user.userId, hostName: user.username, hostCountry: user.country });
+      io.emit('events_list', await getEvents());
       socket.emit('event_created', event);
     });
 
-    socket.on('join_event', ({ eventId }) => {
+    socket.on('join_event', async ({ eventId }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
-      const event = joinEvent(eventId, user);
+      if (!user?.userId) return;
+      const event = await joinEvent(eventId, user);
       if (!event) return socket.emit('event_error', 'Event full or not found');
       socket.join(`event:${eventId}`);
-      const history = getEventMessages(eventId);
+      const history = await getEventMessages(eventId);
       socket.emit('event_history', { eventId, messages: history });
       io.to(`event:${eventId}`).emit('event_updated', event);
-      io.emit('events_list', getEvents());
+      io.emit('events_list', await getEvents());
     });
 
-    socket.on('leave_event', ({ eventId }) => {
-      leaveEvent(eventId, socket.id);
+    socket.on('leave_event', async ({ eventId }) => {
+      const userId = connectedUsers[socket.id]?.userId;
+      await leaveEvent(eventId, userId);
       socket.leave(`event:${eventId}`);
-      io.to(`event:${eventId}`).emit('event_updated', getEventById(eventId));
-      io.emit('events_list', getEvents());
+      io.to(`event:${eventId}`).emit('event_updated', await getEventById(eventId));
+      io.emit('events_list', await getEvents());
     });
 
     socket.on('event_message', async ({ eventId, text }) => {
@@ -846,13 +848,14 @@ function setupSocket(io) {
       const message = {
         id: uuidv4(),
         senderId: socket.id,
+        senderUserId: sender.userId || null,
         senderName: sender.username,
         senderCountry: sender.country,
         senderLanguage: sender.language,
         originalText: text,
         timestamp: Date.now(),
       };
-      addEventMessage(eventId, message);
+      await addEventMessage(eventId, message);
 
       const socketsInRoom = await io.in(`event:${eventId}`).fetchSockets();
       for (const s of socketsInRoom) {
@@ -869,40 +872,48 @@ function setupSocket(io) {
 
     // ── CULTURAL POSTS ──
 
-    socket.on('get_cultural_posts', () => {
-      socket.emit('cultural_posts', getCulturalPosts());
+    socket.on('get_cultural_posts', async () => {
+      socket.emit('cultural_posts', await getCulturalPosts());
     });
 
-    socket.on('submit_cultural_post', ({ text, emoji, category }) => {
+    // userId must be the real, verified account id (not socket.id) — it's a
+    // UUID foreign key into users(id) now that posts are persisted.
+    socket.on('submit_cultural_post', async ({ text, emoji, category }) => {
       const user = connectedUsers[socket.id];
-      if (!user || !text?.trim()) return;
-      createCulturalPost({ userId: socket.id, username: user.username, country: user.country, language: user.language, text: text.trim(), emoji, category });
-      io.emit('cultural_posts', getCulturalPosts());
+      if (!user?.userId || !text?.trim()) return;
+      await createCulturalPost({ userId: user.userId, username: user.username, country: user.country, language: user.language, text: text.trim(), emoji, category });
+      io.emit('cultural_posts', await getCulturalPosts());
     });
 
-    socket.on('like_cultural_post', ({ postId }) => {
-      likePost(postId, socket.id);
-      io.emit('cultural_posts', getCulturalPosts());
+    socket.on('like_cultural_post', async ({ postId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user?.userId || !postId) return;
+      await likePost(postId, user.userId);
+      io.emit('cultural_posts', await getCulturalPosts());
     });
 
     // ── PHOTOS ──
 
-    socket.on('get_photos', () => {
-      socket.emit('photos_feed', getPhotos());
+    socket.on('get_photos', async () => {
+      socket.emit('photos_feed', await getPhotos());
     });
 
-    socket.on('like_photo', ({ photoId }) => {
+    // All of these require a real, verified userId now — photo_likes/
+    // photo_comments/photo_echos are UUID foreign keys into users(id), and a
+    // raw socket.id (used previously) would never match on delete/ownership
+    // checks anyway.
+    socket.on('like_photo', async ({ photoId }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
-      const photo = toggleLike(photoId, socket.id, user.username);
+      if (!user?.userId || !photoId) return;
+      const photo = await toggleLike(photoId, user.userId, user.username);
       if (photo) {
         io.emit('photo_updated', photo);
         // Notify owner (skip self-likes)
-        if (photo.userId && photo.userId !== (user.userId || socket.id)) {
+        if (photo.userId && photo.userId !== user.userId) {
           const ownerSid = findSocketId(photo.userId);
           if (ownerSid) {
             io.to(ownerSid).emit('photo_liked', {
-              fromId: user.userId || socket.id,
+              fromId: user.userId,
               fromName: user.username,
               fromCountry: user.country,
               photoId,
@@ -914,9 +925,9 @@ function setupSocket(io) {
 
     socket.on('comment_photo', async ({ photoId, text }) => {
       const user = connectedUsers[socket.id];
-      if (!user || !text?.trim()) return;
-      const photo = addComment(photoId, {
-        userId: socket.id,
+      if (!user?.userId || !text?.trim()) return;
+      const photo = await addComment(photoId, {
+        userId: user.userId,
         username: user.username,
         country: user.country,
         text: text.trim(),
@@ -924,11 +935,11 @@ function setupSocket(io) {
       if (photo) {
         io.emit('photo_updated', photo);
         // Notify owner (skip self-comments)
-        if (photo.userId && photo.userId !== (user.userId || socket.id)) {
+        if (photo.userId && photo.userId !== user.userId) {
           const ownerSid = findSocketId(photo.userId);
           if (ownerSid) {
             io.to(ownerSid).emit('photo_commented', {
-              fromId: user.userId || socket.id,
+              fromId: user.userId,
               fromName: user.username,
               fromCountry: user.country,
               photoId,
@@ -939,16 +950,18 @@ function setupSocket(io) {
       }
     });
 
-    socket.on('delete_photo', ({ photoId }) => {
-      const deleted = deletePhoto(photoId, socket.id);
-      if (deleted) io.emit('photos_feed', getPhotos());
+    socket.on('delete_photo', async ({ photoId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user?.userId || !photoId) return;
+      const deleted = await deletePhoto(photoId, user.userId);
+      if (deleted) io.emit('photos_feed', await getPhotos());
     });
 
-    socket.on('echo_photo', ({ photoId }) => {
+    socket.on('echo_photo', async ({ photoId }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
-      const uid = user.userId || socket.id;
-      const photo = toggleEcho(photoId, uid, user.username, user.country);
+      if (!user?.userId || !photoId) return;
+      const uid = user.userId;
+      const photo = await toggleEcho(photoId, uid, user.username, user.country);
       if (photo) {
         io.emit('photo_updated', photo);
         // Notify owner (skip self-echos)
@@ -968,19 +981,21 @@ function setupSocket(io) {
 
     // ── STORIES ──
 
-    socket.on('get_stories', () => {
-      socket.emit('stories_updated', getStoriesGrouped());
+    socket.on('get_stories', async () => {
+      socket.emit('stories_updated', await getStoriesGrouped());
     });
 
-    socket.on('view_story', ({ storyId }) => {
+    socket.on('view_story', async ({ storyId }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
-      viewStory(storyId, socket.id);
+      if (!user?.userId || !storyId) return;
+      await viewStory(storyId, user.userId);
     });
 
-    socket.on('delete_story', ({ storyId }) => {
-      const deleted = deleteStory(storyId, socket.id);
-      if (deleted) io.emit('stories_updated', getStoriesGrouped());
+    socket.on('delete_story', async ({ storyId }) => {
+      const user = connectedUsers[socket.id];
+      if (!user?.userId || !storyId) return;
+      const deleted = await deleteStory(storyId, user.userId);
+      if (deleted) io.emit('stories_updated', await getStoriesGrouped());
     });
 
     // ── LIVE STREAMS ──
@@ -1258,14 +1273,15 @@ function setupSocket(io) {
 
     // ── FOLLOWS ──
 
-    socket.on('follow_user', ({ targetUserId }) => {
+    // followerId requires a real, verified userId — a raw socket.id isn't a
+    // followable account and can't be stored in user_follows (UUID FK).
+    socket.on('follow_user', async ({ targetUserId }) => {
       const user = connectedUsers[socket.id];
-      if (!user) return;
-      const followerId = user.userId || socket.id;
-      if (targetUserId === followerId) return;
-      followUser(followerId, targetUserId);
-      socket.emit('follow_status', { targetUserId, following: true, followersCount: getFollowers(targetUserId).length });
-      socket.emit('following_list', { following: getFollowing(followerId) });
+      if (!user?.userId || !targetUserId || targetUserId === user.userId) return;
+      const followerId = user.userId;
+      await followUser(followerId, targetUserId);
+      socket.emit('follow_status', { targetUserId, following: true, followersCount: (await getFollowers(targetUserId)).length });
+      socket.emit('following_list', { following: await getFollowing(followerId) });
       // Notify the target if online
       const targetSocket = Object.values(connectedUsers).find(u => (u.userId || u.socketId) === targetUserId);
       if (targetSocket) {
@@ -1273,31 +1289,35 @@ function setupSocket(io) {
       }
     });
 
-    socket.on('unfollow_user', ({ targetUserId }) => {
+    socket.on('unfollow_user', async ({ targetUserId }) => {
       const user = connectedUsers[socket.id];
-      const followerId = user?.userId || socket.id;
-      unfollowUser(followerId, targetUserId);
-      socket.emit('follow_status', { targetUserId, following: false, followersCount: getFollowers(targetUserId).length });
-      socket.emit('following_list', { following: getFollowing(followerId) });
+      if (!user?.userId || !targetUserId) return;
+      const followerId = user.userId;
+      await unfollowUser(followerId, targetUserId);
+      socket.emit('follow_status', { targetUserId, following: false, followersCount: (await getFollowers(targetUserId)).length });
+      socket.emit('following_list', { following: await getFollowing(followerId) });
     });
 
-    socket.on('get_follow_status', ({ targetUserId }) => {
-      const followerId = connectedUsers[socket.id]?.userId || socket.id;
+    socket.on('get_follow_status', async ({ targetUserId }) => {
+      const followerId = connectedUsers[socket.id]?.userId;
+      if (!followerId || !targetUserId) return;
       socket.emit('follow_status', {
         targetUserId,
-        following: isFollowing(followerId, targetUserId),
-        followersCount: getFollowers(targetUserId).length,
-        followingCount: getFollowing(targetUserId).length,
+        following: await isFollowing(followerId, targetUserId),
+        followersCount: (await getFollowers(targetUserId)).length,
+        followingCount: (await getFollowing(targetUserId)).length,
       });
     });
 
-    socket.on('get_followers', ({ userId }) => {
-      socket.emit('followers_list', { userId, followers: getFollowers(userId) });
+    socket.on('get_followers', async ({ userId }) => {
+      if (!userId) return;
+      socket.emit('followers_list', { userId, followers: await getFollowers(userId) });
     });
 
-    socket.on('get_following', () => {
-      const followerId = connectedUsers[socket.id]?.userId || socket.id;
-      socket.emit('following_list', { following: getFollowing(followerId) });
+    socket.on('get_following', async () => {
+      const followerId = connectedUsers[socket.id]?.userId;
+      if (!followerId) return;
+      socket.emit('following_list', { following: await getFollowing(followerId) });
     });
 
     // ── COUNTRY FLAGS (Plant / Uproot) ─────────────────────────────────

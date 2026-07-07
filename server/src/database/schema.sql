@@ -421,6 +421,181 @@ CREATE TABLE IF NOT EXISTS coin_burns (
 );
 CREATE INDEX IF NOT EXISTS idx_coin_burns_user ON coin_burns(user_id);
 
+-- ─── VIRTUAL EVENTS — previously in-memory, wiped on every restart/deploy ────
+CREATE TABLE IF NOT EXISTS virtual_events (
+  id             UUID PRIMARY KEY,
+  title          TEXT NOT NULL,
+  type           VARCHAR(30) NOT NULL,
+  description    TEXT,
+  scheduled_for  BIGINT NOT NULL,
+  max_attendees  INTEGER DEFAULT 20,
+  language       VARCHAR(10) DEFAULT 'any',
+  host_user_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+  host_name      TEXT,
+  host_country   TEXT,
+  status         VARCHAR(20) DEFAULT 'upcoming',
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS event_attendees (
+  event_id   UUID REFERENCES virtual_events(id) ON DELETE CASCADE,
+  user_id    UUID REFERENCES users(id) ON DELETE CASCADE,
+  username   TEXT,
+  country    TEXT,
+  joined_at  TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (event_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS event_messages (
+  id              UUID PRIMARY KEY,
+  event_id        UUID REFERENCES virtual_events(id) ON DELETE CASCADE,
+  sender_id       UUID REFERENCES users(id),
+  sender_name     TEXT,
+  sender_country  TEXT,
+  sender_language TEXT,
+  text            TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_event_messages_event ON event_messages(event_id, created_at);
+
+-- ─── GROUP CHAT MESSAGES — categories/rooms are a fixed static list ──────────
+-- (see groups.js GROUP_CATEGORIES), only message history needs persisting.
+CREATE TABLE IF NOT EXISTS group_messages (
+  id              UUID PRIMARY KEY,
+  category_id     VARCHAR(50) NOT NULL,
+  room_name       VARCHAR(50) NOT NULL,
+  sender_id       UUID REFERENCES users(id),
+  sender_name     TEXT,
+  sender_country  TEXT,
+  sender_language TEXT,
+  sender_photo    TEXT,
+  text            TEXT,
+  image_url       TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_group_messages_room ON group_messages(category_id, room_name, created_at);
+
+-- ─── ICEBREAKER — daily question responses, comments, and likes ─────────────
+-- user_id is TEXT (not a FK) because the existing code falls back to a raw
+-- socket.id when a connection doesn't have a verified userId yet.
+CREATE TABLE IF NOT EXISTS icebreaker_responses (
+  id              UUID PRIMARY KEY,
+  question_index  INTEGER NOT NULL,
+  user_id         TEXT NOT NULL,
+  username        TEXT,
+  country         TEXT,
+  language        TEXT,
+  photo_url       TEXT,
+  text            TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (question_index, user_id)
+);
+CREATE TABLE IF NOT EXISTS icebreaker_response_likes (
+  response_id  UUID REFERENCES icebreaker_responses(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL,
+  PRIMARY KEY (response_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS icebreaker_comments (
+  id            UUID PRIMARY KEY,
+  response_id   UUID REFERENCES icebreaker_responses(id) ON DELETE CASCADE,
+  user_id       TEXT,
+  username      TEXT,
+  country       TEXT,
+  language      TEXT,
+  photo_url     TEXT,
+  text          TEXT,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS icebreaker_comment_likes (
+  comment_id  UUID REFERENCES icebreaker_comments(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  PRIMARY KEY (comment_id, user_id)
+);
+
+-- ─── CULTURAL POSTS ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS cultural_posts (
+  id          UUID PRIMARY KEY,
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  username    TEXT,
+  country     TEXT,
+  language    TEXT,
+  text        TEXT,
+  emoji       TEXT DEFAULT '🌍',
+  category    VARCHAR(30) DEFAULT 'daily life',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS cultural_post_likes (
+  post_id  UUID REFERENCES cultural_posts(id) ON DELETE CASCADE,
+  user_id  UUID REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (post_id, user_id)
+);
+
+-- ─── PHOTOS ───────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS user_photos (
+  id            UUID PRIMARY KEY,
+  user_id       UUID REFERENCES users(id) ON DELETE CASCADE,
+  username      TEXT,
+  country       TEXT,
+  post_country  TEXT,
+  language      TEXT,
+  mood          TEXT,
+  image_url     TEXT NOT NULL,
+  caption       TEXT,
+  filter        VARCHAR(20) DEFAULT 'normal',
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS photo_likes (
+  photo_id  UUID REFERENCES user_photos(id) ON DELETE CASCADE,
+  user_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+  username  TEXT,
+  PRIMARY KEY (photo_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS photo_comments (
+  id          UUID PRIMARY KEY,
+  photo_id    UUID REFERENCES user_photos(id) ON DELETE CASCADE,
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  username    TEXT,
+  country     TEXT,
+  text        TEXT,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS photo_echos (
+  photo_id  UUID REFERENCES user_photos(id) ON DELETE CASCADE,
+  user_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+  username  TEXT,
+  country   TEXT,
+  PRIMARY KEY (photo_id, user_id)
+);
+
+-- ─── STORIES — 24h TTL, filtered by expires_at instead of an in-memory sweep ─
+CREATE TABLE IF NOT EXISTS user_stories (
+  id          UUID PRIMARY KEY,
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  username    TEXT,
+  country     TEXT,
+  language    TEXT,
+  mood        TEXT,
+  image_url   TEXT NOT NULL,
+  caption     TEXT,
+  filter      VARCHAR(20) DEFAULT 'normal',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  expires_at  TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS story_viewers (
+  story_id  UUID REFERENCES user_stories(id) ON DELETE CASCADE,
+  user_id   UUID REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (story_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_stories_expires ON user_stories(expires_at);
+
+-- ─── FOLLOWS ──────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS user_follows (
+  follower_id  UUID REFERENCES users(id) ON DELETE CASCADE,
+  followee_id  UUID REFERENCES users(id) ON DELETE CASCADE,
+  created_at   TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (follower_id, followee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_follows_followee ON user_follows(followee_id);
+
 -- ─── UPDATED_AT TRIGGER ──────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$

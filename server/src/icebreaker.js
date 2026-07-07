@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+const { query: db } = require('./database/db');
 
 // ─── Question bank ────────────────────────────────────────────────────────────
 // Designed to be viral, globally relatable, drama-starting, funny, and adult.
@@ -313,9 +314,6 @@ const QUESTIONS = [
   "If you could change one thing about the culture you grew up in, what would it be — and would that change really be an improvement?",
 ];
 
-// Track responses per question (keyed by question index)
-const questionResponses = {};
-
 function getTodaysQuestionIndex() {
   const now = new Date();
   const start = new Date(2024, 0, 1); // Jan 1 2024 = day 0
@@ -328,84 +326,100 @@ function getTodaysQuestion() {
   return { index: idx, question: QUESTIONS[idx] };
 }
 
-function addResponse(questionIndex, response) {
-  if (!questionResponses[questionIndex]) questionResponses[questionIndex] = [];
-  const existing = questionResponses[questionIndex].findIndex(r => r.userId === response.userId);
-  if (existing !== -1) {
-    questionResponses[questionIndex][existing] = {
-      ...questionResponses[questionIndex][existing],
-      ...response,
-      updatedAt: Date.now(),
-    };
+async function addResponse(questionIndex, response) {
+  const { userId, username, country, language, photo_url, text } = response;
+  await db(
+    `INSERT INTO icebreaker_responses (id, question_index, user_id, username, country, language, photo_url, text)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (question_index, user_id) DO UPDATE
+       SET username = $4, country = $5, language = $6, photo_url = $7, text = $8, updated_at = NOW()`,
+    [uuidv4(), questionIndex, userId, username, country, language, photo_url || null, text]
+  );
+}
+
+async function likeResponse(questionIndex, responseId, likerId) {
+  const existing = await db(`SELECT 1 FROM icebreaker_response_likes WHERE response_id = $1 AND user_id = $2`, [responseId, likerId]);
+  if (existing.rows.length) {
+    await db(`DELETE FROM icebreaker_response_likes WHERE response_id = $1 AND user_id = $2`, [responseId, likerId]);
   } else {
-    questionResponses[questionIndex].push({
-      id: uuidv4(), ...response, likes: 0, likedBy: [], createdAt: Date.now(),
-    });
+    await db(`INSERT INTO icebreaker_response_likes (response_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [responseId, likerId]);
   }
 }
 
-function likeResponse(questionIndex, responseId, likerId) {
-  const list = questionResponses[questionIndex] || [];
-  const r = list.find(r => r.id === responseId);
-  if (!r) return;
-  if (r.likedBy.includes(likerId)) {
-    r.likedBy = r.likedBy.filter(id => id !== likerId);
-    r.likes = Math.max(0, r.likes - 1);
+async function addComment(questionIndex, responseId, comment) {
+  const { userId, username, country, language, photo_url, text } = comment;
+  await db(
+    `INSERT INTO icebreaker_comments (id, response_id, user_id, username, country, language, photo_url, text)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [uuidv4(), responseId, userId, username, country, language, photo_url || null, text]
+  );
+}
+
+async function likeComment(questionIndex, responseId, commentId, likerId) {
+  const existing = await db(`SELECT 1 FROM icebreaker_comment_likes WHERE comment_id = $1 AND user_id = $2`, [commentId, likerId]);
+  if (existing.rows.length) {
+    await db(`DELETE FROM icebreaker_comment_likes WHERE comment_id = $1 AND user_id = $2`, [commentId, likerId]);
   } else {
-    r.likedBy.push(likerId);
-    r.likes++;
+    await db(`INSERT INTO icebreaker_comment_likes (comment_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [commentId, likerId]);
   }
 }
 
-function addComment(questionIndex, responseId, comment) {
-  const list = questionResponses[questionIndex] || [];
-  const r = list.find(r => r.id === responseId);
-  if (!r) return;
-  if (!r.comments) r.comments = [];
-  r.comments.push({ id: uuidv4(), ...comment, likes: 0, likedBy: [], createdAt: Date.now() });
+async function deleteComment(questionIndex, responseId, commentId, requesterId) {
+  const { rowCount } = await db(
+    `DELETE FROM icebreaker_comments WHERE id = $1 AND response_id = $2 AND user_id = $3`,
+    [commentId, responseId, requesterId]
+  );
+  return rowCount > 0;
 }
 
-function likeComment(questionIndex, responseId, commentId, likerId) {
-  const list = questionResponses[questionIndex] || [];
-  const r = list.find(r => r.id === responseId);
-  if (!r || !r.comments) return;
-  const c = r.comments.find(c => c.id === commentId);
-  if (!c) return;
-  if (c.likedBy.includes(likerId)) {
-    c.likedBy = c.likedBy.filter(id => id !== likerId);
-    c.likes = Math.max(0, c.likes - 1);
-  } else {
-    c.likedBy.push(likerId);
-    c.likes++;
+async function deleteResponse(questionIndex, responseId, requesterId) {
+  const { rowCount } = await db(
+    `DELETE FROM icebreaker_responses WHERE id = $1 AND question_index = $2 AND user_id = $3`,
+    [responseId, questionIndex, requesterId]
+  );
+  return rowCount > 0;
+}
+
+async function getResponses(questionIndex, viewerId) {
+  const { rows } = await db(
+    `SELECT r.id, r.user_id AS "userId", r.username, r.country, r.language, r.photo_url, r.text,
+            EXTRACT(EPOCH FROM r.created_at) * 1000 AS "createdAt",
+            EXTRACT(EPOCH FROM r.updated_at) * 1000 AS "updatedAt",
+            COUNT(DISTINCT rl.user_id)::INTEGER AS likes,
+            COALESCE(bool_or(rl.user_id = $2), false) AS "likedByMe"
+     FROM icebreaker_responses r
+     LEFT JOIN icebreaker_response_likes rl ON rl.response_id = r.id
+     WHERE r.question_index = $1
+     GROUP BY r.id
+     ORDER BY r.created_at DESC`,
+    [questionIndex, viewerId || null]
+  );
+
+  const responseIds = rows.map(r => r.id);
+  let commentsByResponse = {};
+  if (responseIds.length) {
+    const { rows: commentRows } = await db(
+      `SELECT c.id, c.response_id AS "responseId", c.user_id AS "userId", c.username, c.country, c.language, c.photo_url, c.text,
+              EXTRACT(EPOCH FROM c.created_at) * 1000 AS "createdAt",
+              COUNT(DISTINCT cl.user_id)::INTEGER AS likes,
+              COALESCE(bool_or(cl.user_id = $2), false) AS "likedByMe"
+       FROM icebreaker_comments c
+       LEFT JOIN icebreaker_comment_likes cl ON cl.comment_id = c.id
+       WHERE c.response_id = ANY($1)
+       GROUP BY c.id
+       ORDER BY c.created_at ASC`,
+      [responseIds, viewerId || null]
+    );
+    for (const c of commentRows) {
+      (commentsByResponse[c.responseId] ||= []).push({ ...c, createdAt: Number(c.createdAt) });
+    }
   }
-}
 
-function deleteComment(questionIndex, responseId, commentId, requesterId) {
-  const list = questionResponses[questionIndex] || [];
-  const r = list.find(r => r.id === responseId);
-  if (!r || !r.comments) return false;
-  const idx = r.comments.findIndex(c => c.id === commentId && c.userId === requesterId);
-  if (idx === -1) return false;
-  r.comments.splice(idx, 1);
-  return true;
-}
-
-function deleteResponse(questionIndex, responseId, requesterId) {
-  const list = questionResponses[questionIndex] || [];
-  const idx = list.findIndex(r => r.id === responseId && r.userId === requesterId);
-  if (idx === -1) return false;
-  list.splice(idx, 1);
-  return true;
-}
-
-function getResponses(questionIndex, viewerId) {
-  return (questionResponses[questionIndex] || []).slice().reverse().map(({ likedBy, comments, ...rest }) => ({
-    ...rest,
-    likedByMe: viewerId ? likedBy.includes(viewerId) : false,
-    comments: (comments || []).map(({ likedBy: cLikedBy, ...c }) => ({
-      ...c,
-      likedByMe: viewerId ? (cLikedBy || []).includes(viewerId) : false,
-    })),
+  return rows.map(r => ({
+    ...r,
+    createdAt: Number(r.createdAt),
+    updatedAt: Number(r.updatedAt),
+    comments: (commentsByResponse[r.id] || []).map(({ responseId, ...c }) => c),
   }));
 }
 

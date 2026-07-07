@@ -165,9 +165,10 @@ router.delete('/me', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // 3. Clear in-memory photos
+    // 3. Photos already cascade-deleted via user_photos' FK to users(id),
+    // this is now just a redundant safety net.
     const { deletePhotosByUser } = require('../photos');
-    deletePhotosByUser(userId);
+    await deletePhotosByUser(userId);
 
     res.json({ ok: true });
   } catch (err) {

@@ -1,58 +1,62 @@
 const { v4: uuidv4 } = require('uuid');
+const { query: db } = require('./database/db');
 
 const STORY_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-const stories = [];
-
-function addStory({ userId, username, country, language, mood, imageUrl, caption, filter }) {
-  const story = {
-    id: uuidv4(),
-    userId,
-    username,
-    country,
-    language,
-    mood: mood || '',
-    imageUrl,
-    caption: caption || '',
-    filter: filter || 'normal',
-    viewers: [],
-    createdAt: Date.now(),
-    expiresAt: Date.now() + STORY_TTL,
-  };
-  stories.unshift(story);
-  return story;
+async function addStory({ userId, username, country, language, mood, imageUrl, caption, filter }) {
+  const id = uuidv4();
+  await db(
+    `INSERT INTO user_stories (id, user_id, username, country, language, mood, image_url, caption, filter, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + INTERVAL '${STORY_TTL / 1000} seconds')`,
+    [id, userId, username, country, language, mood || '', imageUrl, caption || '', filter || 'normal']
+  );
+  return getStoryById(id);
 }
 
-function getStories() {
-  const now = Date.now();
-  // Remove expired stories in place
-  for (let i = stories.length - 1; i >= 0; i--) {
-    if (stories[i].expiresAt < now) stories.splice(i, 1);
-  }
-  return stories;
+async function getStories() {
+  const { rows } = await db(
+    `SELECT s.id, s.user_id AS "userId", s.username, s.country, s.language, s.mood,
+            s.image_url AS "imageUrl", s.caption, s.filter,
+            EXTRACT(EPOCH FROM s.created_at) * 1000 AS "createdAt",
+            EXTRACT(EPOCH FROM s.expires_at) * 1000 AS "expiresAt",
+            COALESCE((SELECT json_agg(v.user_id) FROM story_viewers v WHERE v.story_id = s.id), '[]') AS viewers
+     FROM user_stories s
+     WHERE s.expires_at > NOW()
+     ORDER BY s.created_at DESC`
+  );
+  return rows.map(r => ({ ...r, createdAt: Number(r.createdAt), expiresAt: Number(r.expiresAt) }));
 }
 
-function getStoryById(id) {
-  return stories.find(s => s.id === id && s.expiresAt > Date.now()) || null;
+async function getStoryById(id) {
+  const { rows } = await db(
+    `SELECT s.id, s.user_id AS "userId", s.username, s.country, s.language, s.mood,
+            s.image_url AS "imageUrl", s.caption, s.filter,
+            EXTRACT(EPOCH FROM s.created_at) * 1000 AS "createdAt",
+            EXTRACT(EPOCH FROM s.expires_at) * 1000 AS "expiresAt",
+            COALESCE((SELECT json_agg(v.user_id) FROM story_viewers v WHERE v.story_id = s.id), '[]') AS viewers
+     FROM user_stories s
+     WHERE s.id = $1 AND s.expires_at > NOW()`,
+    [id]
+  );
+  if (!rows.length) return null;
+  return { ...rows[0], createdAt: Number(rows[0].createdAt), expiresAt: Number(rows[0].expiresAt) };
 }
 
-function viewStory(storyId, userId) {
-  const story = getStoryById(storyId);
+async function viewStory(storyId, userId) {
+  const story = await getStoryById(storyId);
   if (!story) return null;
-  if (!story.viewers.includes(userId)) story.viewers.push(userId);
-  return story;
+  await db(`INSERT INTO story_viewers (story_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [storyId, userId]);
+  return getStoryById(storyId);
 }
 
-function deleteStory(storyId, userId) {
-  const idx = stories.findIndex(s => s.id === storyId && s.userId === userId);
-  if (idx === -1) return false;
-  stories.splice(idx, 1);
-  return true;
+async function deleteStory(storyId, userId) {
+  const { rowCount } = await db(`DELETE FROM user_stories WHERE id = $1 AND user_id = $2`, [storyId, userId]);
+  return rowCount > 0;
 }
 
 // Group stories by user so each user's bubble shows their latest
-function getStoriesGrouped() {
-  const active = getStories();
+async function getStoriesGrouped() {
+  const active = await getStories();
   const map = {};
   for (const s of active) {
     if (!map[s.userId]) {

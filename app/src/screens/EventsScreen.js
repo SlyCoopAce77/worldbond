@@ -23,133 +23,6 @@ const STAGE_TYPES = {
   stories:  { icon: '📖', label: 'Stories',      color: '#ffcc02' },
 };
 
-const NOW = Date.now();
-
-// ── Demo stages ───────────────────────────────────────────────────────────────
-const DEMO_STAGES = [
-  // Live now
-  {
-    id: 'stage_001', title: 'Bollywood Dance Party 🕺',
-    type: 'cultural', hostUsername: 'Priya_Mumbai', hostCountry: '🇮🇳',
-    viewerCount: 1832,
-    isPro: true, isLive: true,
-    startedAt: NOW - 35 * 60000, scheduledFor: null, stampCountry: '🇮🇳',
-  },
-  {
-    id: 'stage_002', title: 'Seoul Street Kitchen 🍜',
-    type: 'kitchen', hostUsername: 'JiMin_Seoul', hostCountry: '🇰🇷',
-    viewerCount: 1247,
-    isPro: true, isLive: true,
-    startedAt: NOW - 58 * 60000, scheduledFor: null, stampCountry: '🇰🇷',
-  },
-  {
-    id: 'stage_003', title: 'Afrobeats Session 🎶',
-    type: 'music', hostUsername: 'Amara_Lagos', hostCountry: '🇳🇬',
-    viewerCount: 847,
-    isPro: true, isLive: true,
-    startedAt: NOW - 22 * 60000, scheduledFor: null, stampCountry: '🇳🇬',
-  },
-  {
-    id: 'stage_004', title: 'Tango Masterclass 💃',
-    type: 'cultural', hostUsername: 'Sofia_Buenos', hostCountry: '🇦🇷',
-    viewerCount: 709,
-    isPro: true, isLive: true,
-    startedAt: NOW - 45 * 60000, scheduledFor: null, stampCountry: '🇦🇷',
-  },
-  {
-    id: 'stage_005', title: 'Japanese Calligraphy 🖌️',
-    type: 'create', hostUsername: 'Yuki_Tokyo', hostCountry: '🇯🇵',
-    viewerCount: 612,
-    isPro: false, isLive: true,
-    startedAt: NOW - 70 * 60000, scheduledFor: null, stampCountry: '🇯🇵',
-  },
-  {
-    id: 'stage_006', title: 'Istanbul Street Tour 🕌',
-    type: 'travel', hostUsername: 'Emre_Istanbul', hostCountry: '🇹🇷',
-    viewerCount: 445,
-    isPro: false, isLive: true,
-    startedAt: NOW - 15 * 60000, scheduledFor: null, stampCountry: '🇹🇷',
-  },
-  {
-    id: 'stage_007', title: 'Tea Ceremony Live 🍵',
-    type: 'cultural', hostUsername: 'Wei_Shanghai', hostCountry: '🇨🇳',
-    viewerCount: 567,
-    isPro: false, isLive: true,
-    startedAt: NOW - 90 * 60000, scheduledFor: null, stampCountry: '🇨🇳',
-  },
-  {
-    id: 'stage_008', title: 'Samba Workshop 🥁',
-    type: 'music', hostUsername: 'Lucas_Rio', hostCountry: '🇧🇷',
-    viewerCount: 389,
-    isPro: true, isLive: true,
-    startedAt: NOW - 30 * 60000, scheduledFor: null, stampCountry: '🇧🇷',
-  },
-  {
-    id: 'stage_009', title: 'French Cooking Class 🥐',
-    type: 'kitchen', hostUsername: 'Amélie_Paris', hostCountry: '🇫🇷',
-    viewerCount: 241,
-    isPro: false, isLive: true,
-    startedAt: NOW - 50 * 60000, scheduledFor: null, stampCountry: '🇫🇷',
-  },
-  {
-    id: 'stage_010', title: 'Spanish Exchange Night 🗣️',
-    type: 'language', hostUsername: 'Carlos_CDMX', hostCountry: '🇲🇽',
-    viewerCount: 334,
-    isPro: false, isLive: true,
-    startedAt: NOW - 25 * 60000, scheduledFor: null, stampCountry: '🇲🇽',
-  },
-  {
-    id: 'stage_011', title: 'Kente Weaving Live 🧵',
-    type: 'create', hostUsername: 'Ama_Accra', hostCountry: '🇬🇭',
-    viewerCount: 223,
-    isPro: false, isLive: true,
-    startedAt: NOW - 40 * 60000, scheduledFor: null, stampCountry: '🇬🇭',
-  },
-  {
-    id: 'stage_012', title: 'Ubuntu Philosophy Talk 📖',
-    type: 'stories', hostUsername: 'Thabo_Joburg', hostCountry: '🇿🇦',
-    viewerCount: 198,
-    isPro: false, isLive: true,
-    startedAt: NOW - 65 * 60000, scheduledFor: null, stampCountry: '🇿🇦',
-  },
-  // Upcoming
-  {
-    id: 'stage_013', title: 'Cairo Night Market 🌙',
-    type: 'travel', hostUsername: 'Ahmed_Cairo', hostCountry: '🇪🇬',
-    viewerCount: 0,
-    isPro: false, isLive: false,
-    startedAt: null, scheduledFor: NOW + 2 * 3600000, stampCountry: '🇪🇬',
-  },
-  {
-    id: 'stage_014', title: 'Nairobi Code Night 💻',
-    type: 'tech', hostUsername: 'Wanjiru_Nairobi', hostCountry: '🇰🇪',
-    viewerCount: 0,
-    isPro: true, isLive: false,
-    startedAt: null, scheduledFor: NOW + 4 * 3600000, stampCountry: '🇰🇪',
-  },
-  {
-    id: 'stage_015', title: 'Bali Sunrise Yoga 🧘',
-    type: 'mindful', hostUsername: 'Dewi_Bali', hostCountry: '🇮🇩',
-    viewerCount: 0,
-    isPro: false, isLive: false,
-    startedAt: null, scheduledFor: NOW + 8 * 3600000, stampCountry: '🇮🇩',
-  },
-  {
-    id: 'stage_016', title: 'Lisbon Jazz Night 🎷',
-    type: 'music', hostUsername: 'Pedro_Lisboa', hostCountry: '🇵🇹',
-    viewerCount: 0,
-    isPro: true, isLive: false,
-    startedAt: null, scheduledFor: NOW + 24 * 3600000, stampCountry: '🇵🇹',
-  },
-  {
-    id: 'stage_017', title: 'Montreal Comedy Night 😂',
-    type: 'comedy', hostUsername: 'Marie_Montreal', hostCountry: '🇨🇦',
-    viewerCount: 0,
-    isPro: false, isLive: false,
-    startedAt: null, scheduledFor: NOW + 28 * 3600000, stampCountry: '🇨🇦',
-  },
-];
-
 // ── Schedule options (Pro-exclusive) ─────────────────────────────────────────
 const SCHEDULE_OPTIONS = [
   { label: 'In 1 hour',  mins: 60 },
@@ -581,7 +454,10 @@ const cm = StyleSheet.create({
 export default function EventsScreen({ navigation, route }) {
   const { hasBondPass } = useBondPass();
   const user = route?.params?.currentUser || route?.params?.user || null;
-  const [stages, setStages] = useState(DEMO_STAGES);
+  // Real events only — no demo data merged in. Previously DEMO_STAGES stayed
+  // in this list forever since their fake ids never matched a real event's
+  // UUID, so users always saw ~10 fictional "live" people mixed with real ones.
+  const [stages, setStages] = useState([]);
   const [filter, setFilter] = useState('all');
   const [createVisible, setCreateVisible] = useState(false);
 
@@ -591,13 +467,7 @@ export default function EventsScreen({ navigation, route }) {
     else socket.once('connect', () => socket.emit('get_events'));
 
     socket.on('events_list', list => {
-      if (list?.length) {
-        setStages(prev => {
-          const serverIds = new Set(list.map(e => e.id));
-          const demos = prev.filter(d => !serverIds.has(d.id));
-          return [...list.map(mapServerStage), ...demos];
-        });
-      }
+      setStages((list || []).map(mapServerStage));
     });
     socket.on('event_updated', updated => {
       setStages(prev =>
@@ -830,6 +700,13 @@ export default function EventsScreen({ navigation, route }) {
           </>
         )}
 
+        {filteredStages.length === 0 && (
+          <View style={s.emptyState}>
+            <Text style={s.emptyTitle}>No events yet</Text>
+            <Text style={s.emptySub}>Be the first to schedule one — tap Create below.</Text>
+          </View>
+        )}
+
         <View style={s.bottomPad} />
       </ScrollView>
 
@@ -887,6 +764,9 @@ const s = StyleSheet.create({
     color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: '800',
     letterSpacing: 1, marginHorizontal: 16, marginBottom: 14, marginTop: 8,
   },
+  emptyState:     { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32, gap: 6 },
+  emptyTitle:     { color: 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: '800' },
+  emptySub:       { color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center' },
   filterRow:      { marginBottom: 18 },
   filterContent:  { paddingHorizontal: 16, gap: 8 },
   filterChip:     {
