@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const { requireAuth } = require('../auth/auth.middleware');
 const { getDailyMatches, createMatch, getMatches } = require('./matching.service');
+const { findSocketId } = require('../socket');
+const { query: db } = require('../database/db');
 
 const router = Router();
 router.use(requireAuth);
@@ -33,6 +35,20 @@ router.post('/', async (req, res) => {
   try {
     const match = await createMatch(req.userId, targetUserId, connectionType, experienceId);
     if (!match) return res.status(409).json({ error: 'Match already exists' });
+
+    // Notify the other side if they're online — previously nothing told
+    // them a match had formed at all.
+    const targetSid = findSocketId(targetUserId);
+    if (targetSid) {
+      const { rows } = await db(`SELECT display_name, country FROM profiles WHERE user_id = $1`, [req.userId]);
+      const ioInstance = req.app.get('io');
+      ioInstance.to(targetSid).emit('bond_formed', {
+        userId: req.userId,
+        username: rows[0]?.display_name || 'Someone',
+        country: rows[0]?.country || null,
+      });
+    }
+
     res.status(201).json(match);
   } catch (err) {
     res.status(500).json({ error: err.message });

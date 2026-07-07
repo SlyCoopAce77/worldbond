@@ -1,17 +1,24 @@
 const { v4: uuidv4 } = require('uuid');
 const { query: db } = require('./database/db');
 
+// Must match STAGE_TYPES in app/src/screens/EventsScreen.js — the create-event
+// modal there submits one of these ids directly. They used to be two totally
+// different taxonomies (watch_party/game_night/... vs cultural/kitchen/...),
+// so every created event's type failed to match anything on both ends and
+// silently fell back to a generic default in both directions.
 const EVENT_TYPES = [
-  { id: 'watch_party', label: 'Watch Party', icon: '🎬' },
-  { id: 'game_night', label: 'Game Night', icon: '🎮' },
-  { id: 'cooking', label: 'Cook Together', icon: '🍳' },
-  { id: 'study', label: 'Study Together', icon: '📚' },
-  { id: 'music', label: 'Music Sharing', icon: '🎵' },
-  { id: 'language', label: 'Language Practice', icon: '🗣️' },
-  { id: 'travel_talk', label: 'Travel Stories', icon: '✈️' },
-  { id: 'workout', label: 'Workout Together', icon: '💪' },
-  { id: 'art', label: 'Art & Drawing', icon: '🎨' },
-  { id: 'just_chill', label: 'Just Chill', icon: '😎' },
+  { id: 'cultural', label: 'Cultural',   icon: '🌍' },
+  { id: 'language', label: 'Language',   icon: '🗣️' },
+  { id: 'music',    label: 'Music',      icon: '🎵' },
+  { id: 'kitchen',  label: 'Kitchen',    icon: '🍳' },
+  { id: 'comedy',   label: 'Comedy',     icon: '😂' },
+  { id: 'gaming',   label: 'Gaming',     icon: '🎮' },
+  { id: 'fitness',  label: 'Fitness',    icon: '💪' },
+  { id: 'mindful',  label: 'Mindfulness',icon: '🧘' },
+  { id: 'travel',   label: 'Travel Live',icon: '✈️' },
+  { id: 'create',   label: 'Create',     icon: '🎨' },
+  { id: 'tech',     label: 'Tech',       icon: '💻' },
+  { id: 'stories',  label: 'Stories',    icon: '📖' },
 ];
 
 const SELECT_EVENT = `
@@ -29,7 +36,7 @@ const SELECT_EVENT = `
 `;
 
 function hydrate(row) {
-  const typeInfo = EVENT_TYPES.find(t => t.id === row.type) || EVENT_TYPES[EVENT_TYPES.length - 1];
+  const typeInfo = EVENT_TYPES.find(t => t.id === row.type) || EVENT_TYPES[0]; // 'cultural'
   return { ...row, typeInfo, createdAt: Number(row.createdAt), scheduledFor: Number(row.scheduledFor) };
 }
 

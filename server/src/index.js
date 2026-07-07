@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const multer = require('multer');
-const { setupSocket } = require('./socket');
+const { setupSocket, findSocketId } = require('./socket');
 const { GROUP_CATEGORIES } = require('./groups');
 const { getCountries, getCitiesInCountry, getPlacesInCity, PLACE_TYPES } = require('./places');
 const { addPhoto, getPhotos, adminDeletePhoto } = require('./photos');
@@ -298,33 +298,6 @@ app.post('/api/stories/upload', requireAuth, upload.single('photo'), async (req,
     console.error('Story upload error:', err.message);
     res.status(500).json({ error: 'Image upload failed' });
   }
-});
-
-// Debug: fire a test notification to all connected clients using a real profile userId
-app.post('/api/debug/notify', requireAuth, async (req, res) => {
-  const ADMIN_IDS = (process.env.ADMIN_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (!ADMIN_IDS.includes(req.userId)) return res.status(403).json({ error: 'Not authorized.' });
-  const ioInstance = req.app.get('io');
-  const { type = 'follower' } = req.body;
-
-  // Grab a real userId from the profiles table so tapping the notification navigates to a real profile
-  let realUserId = null;
-  try {
-    const { query: dbQuery } = require('./database/db');
-    const { rows } = await dbQuery('SELECT user_id FROM profiles ORDER BY last_active DESC NULLS LAST LIMIT 1');
-    if (rows[0]) realUserId = rows[0].user_id;
-  } catch {}
-
-  const uid = realUserId || 'test-user';
-  const events = {
-    follower: ['new_follower',       { followerId: uid, followerName: 'Yuki', followerCountry: 'Japan 🇯🇵' }],
-    gift:     ['gift_received',      { senderId: uid, senderName: 'Carlos', senderCountry: 'Brazil 🇧🇷', gift: { emoji: '🌹', name: 'Rose' } }],
-    random:   ['random_match',       { matchedUser: { userId: uid, username: 'Sofia', country: 'Italy 🇮🇹' } }],
-    live:     ['live_viewer_joined', { viewerId: uid, viewerName: 'Amara', viewerCountry: 'Nigeria 🇳🇬', count: 7 }],
-  };
-  const ev = events[type] || events.follower;
-  ioInstance.emit(ev[0], ev[1]);
-  res.json({ ok: true, fired: ev[0], userId: uid });
 });
 
 // ── Gift coins: record server-side earn with daily cap ───────────────────────
@@ -1079,6 +1052,17 @@ const VALID_MONUMENT_IDS = new Set([
   'gate', 'bigben', 'eiffel', 'sagrada', 'red_square', 'niagara', 'chichen',
   'taj', 'borobudur', 'hagia', 'opera', 'colosseum', 'great_wall',
 ]);
+// Display names for notifications — must match BOND_MONUMENTS in
+// app/src/context/WalletContext.js
+const MONUMENT_NAMES = {
+  liberty: 'Statue of Liberty', grand_canyon: 'Grand Canyon', christ: 'Christ the Redeemer',
+  amazon: 'Amazon River', gyeongbok: 'Gyeongbokgung Palace', fuji: 'Mount Fuji',
+  fushimi: 'Fushimi Inari Shrine', gate: 'Brandenburg Gate', bigben: 'Big Ben',
+  eiffel: 'Eiffel Tower', sagrada: 'Sagrada Família', red_square: 'Red Square',
+  niagara: 'Niagara Falls', chichen: 'Chichen Itza', taj: 'Taj Mahal',
+  borobudur: 'Borobudur', hagia: 'Hagia Sophia', opera: 'Sydney Opera House',
+  colosseum: 'Colosseum', great_wall: 'Great Wall',
+};
 
 app.post('/challenge/record-win', requireAuth, async (req, res) => {
   const userId  = req.userId;
@@ -1127,6 +1111,30 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
 
     const col = winType === 'stamp' ? 'stamp_wins' : 'monument_wins';
     await upsertYearlyProgress(userId, { [col]: 1 }); // buy-in-aware, pays Globe Trotter prize if earned
+
+    // Notify the winner and whoever just lost it — these are real ownership
+    // transfers now (see collectibles.js), previously nothing told either
+    // side anything actually happened.
+    const ioInstance = req.app.get('io');
+    const targetName = winType === 'stamp' ? targetId : (MONUMENT_NAMES[targetId] || targetId);
+    const winnerSid = findSocketId(userId);
+    if (winnerSid) {
+      ioInstance.to(winnerSid).emit(
+        winType === 'stamp' ? 'stamp_won' : 'monument_won',
+        winType === 'stamp' ? { stampName: targetName } : { monumentName: targetName }
+      );
+    }
+    if (transfer.previousHolderId) {
+      const loserSid = findSocketId(transfer.previousHolderId);
+      if (loserSid) {
+        const { rows: winnerRows } = await db(`SELECT display_name FROM profiles WHERE user_id = $1`, [userId]);
+        const winnerName = winnerRows[0]?.display_name || 'Someone';
+        ioInstance.to(loserSid).emit(
+          winType === 'stamp' ? 'stamp_lost' : 'monument_lost',
+          winType === 'stamp' ? { stampName: targetName, winnerName } : { monumentName: targetName, winnerName }
+        );
+      }
+    }
 
     res.json({ ok: true });
   } catch (err) {

@@ -1366,9 +1366,14 @@ function setupSocket(io) {
 
       // Pay any active Country Stamp / Bond Monument holders their passive
       // royalty on this gift — real coins, credited straight to their balance.
-      payCollectibleRoyalties(stream.hostUserId, verifiedGift.coins).catch(e =>
-        console.warn('[Collectibles] royalty error:', e.message)
-      );
+      payCollectibleRoyalties(stream.hostUserId, verifiedGift.coins)
+        .then(payments => {
+          for (const p of payments) {
+            const holderSid = findSocketId(p.holderId);
+            if (holderSid) io.to(holderSid).emit('royalty_received', { amount: p.amount, source: p.source });
+          }
+        })
+        .catch(e => console.warn('[Collectibles] royalty error:', e.message));
     });
 
     // ── FOLLOWS ──
@@ -1512,4 +1517,4 @@ function setupSocket(io) {
   });
 }
 
-module.exports = { setupSocket };
+module.exports = { setupSocket, findSocketId };

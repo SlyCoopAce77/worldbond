@@ -49,17 +49,22 @@ function fmtScheduled(ts) {
 }
 
 function mapServerStage(e) {
+  // Server never sends isLive/viewerCount/startedAt directly — derive them
+  // from the real fields (status, scheduledFor, attendees) instead of the
+  // old `e.isLive !== false` fallback, which was always true since the
+  // field never existed, so every event showed as permanently "LIVE".
+  const isLive = e.status !== 'ended' && (e.scheduledFor || 0) <= Date.now();
   return {
     id:           e.id,
     title:        e.title || 'Live Stage',
     type:         STAGE_TYPES[e.type] ? e.type : 'cultural',
     hostUsername: e.hostName || e.username || 'Anonymous',
     hostCountry:  e.hostCountry || '🌍',
-    viewerCount:  e.viewerCount || 0,
+    viewerCount:  (e.attendees || []).length,
     isPro:        e.isPro || false,
     isReserved:   e.isReserved || false,
-    isLive:       e.isLive !== false,
-    startedAt:    e.startedAt || Date.now(),
+    isLive,
+    startedAt:    isLive ? (e.scheduledFor || Date.now()) : null,
     scheduledFor: e.scheduledFor || null,
     stampCountry: e.hostCountry || '🌍',
   };

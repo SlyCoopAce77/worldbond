@@ -27,8 +27,13 @@ async function getAllMonuments() {
 
 // Atomically transfers a stamp/monument to userId if it's unclaimed, the
 // current holder has gone inactive (30+ days), or userId already holds it
-// (renewal). Returns { ok: true } or { ok: false, reason: 'already_held' }.
+// (renewal). Returns { ok: true, previousHolderId } or { ok: false, reason: 'already_held' }.
+// previousHolderId lets the caller notify whoever just lost it (null if it
+// was unclaimed or a renewal by the same user).
 async function claimCollectible(table, idColumn, id, userId) {
+  const before = await db(`SELECT holder_id FROM ${table} WHERE ${idColumn} = $1`, [id]);
+  const previousHolderId = before.rows[0]?.holder_id || null;
+
   const { rows } = await db(
     `UPDATE ${table}
      SET holder_id = $1, claimed_at = NOW(), last_activity = NOW(), coins_earned = 0
@@ -37,7 +42,8 @@ async function claimCollectible(table, idColumn, id, userId) {
      RETURNING ${idColumn}`,
     [userId, id]
   );
-  return rows.length ? { ok: true } : { ok: false, reason: 'already_held' };
+  if (!rows.length) return { ok: false, reason: 'already_held' };
+  return { ok: true, previousHolderId: previousHolderId !== userId ? previousHolderId : null };
 }
 
 const claimStamp    = (flag, userId)       => claimCollectible('country_stamps', 'flag', flag, userId);
@@ -61,12 +67,15 @@ const COUNTRY_NAME_TO_FLAG = {
 // coin_balance. This is the real replacement for the dead client-side
 // applyStampRoyalty — best-effort, called after a gift transfer already
 // succeeded, so failures here must never roll back the underlying gift.
+// Returns the list of payments made so the caller can notify recipients —
+// this function stays free of socket/io concerns on purpose.
 async function payCollectibleRoyalties(recipientId, giftCoins) {
-  if (!recipientId || !giftCoins) return;
+  const payments = [];
+  if (!recipientId || !giftCoins) return payments;
   const { rows } = await db(`SELECT country FROM profiles WHERE user_id = $1`, [recipientId]);
   const countryName = rows[0]?.country?.trim().toLowerCase();
   const flag = countryName ? COUNTRY_NAME_TO_FLAG[countryName] : null;
-  if (!flag) return;
+  if (!flag) return payments;
 
   // Country Stamp — 3%, only pays if the holder is still "active"
   // (matches isStampDropped in ChallengeContext.js: >30 days idle = dropped).
@@ -83,6 +92,7 @@ async function payCollectibleRoyalties(recipientId, giftCoins) {
     if (stamp.rows[0]?.holder_id) {
       await db(`UPDATE profiles SET coin_balance = COALESCE(coin_balance, 0) + $1 WHERE user_id = $2`,
         [stampCut, stamp.rows[0].holder_id]);
+      payments.push({ holderId: stamp.rows[0].holder_id, amount: stampCut, source: `${flag} stamp royalty` });
     }
   }
 
@@ -99,8 +109,11 @@ async function payCollectibleRoyalties(recipientId, giftCoins) {
     for (const m of monuments.rows) {
       await db(`UPDATE profiles SET coin_balance = COALESCE(coin_balance, 0) + $1 WHERE user_id = $2`,
         [monumentCut, m.holder_id]);
+      payments.push({ holderId: m.holder_id, amount: monumentCut, source: 'monument royalty' });
     }
   }
+
+  return payments;
 }
 
 module.exports = { getAllStamps, getAllMonuments, claimStamp, claimMonument, payCollectibleRoyalties };
