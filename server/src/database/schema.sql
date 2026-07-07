@@ -450,7 +450,7 @@ CREATE TABLE IF NOT EXISTS event_attendees (
 CREATE TABLE IF NOT EXISTS event_messages (
   id              UUID PRIMARY KEY,
   event_id        UUID REFERENCES virtual_events(id) ON DELETE CASCADE,
-  sender_id       UUID REFERENCES users(id),
+  sender_id       UUID REFERENCES users(id) ON DELETE SET NULL,
   sender_name     TEXT,
   sender_country  TEXT,
   sender_language TEXT,
@@ -465,7 +465,7 @@ CREATE TABLE IF NOT EXISTS group_messages (
   id              UUID PRIMARY KEY,
   category_id     VARCHAR(50) NOT NULL,
   room_name       VARCHAR(50) NOT NULL,
-  sender_id       UUID REFERENCES users(id),
+  sender_id       UUID REFERENCES users(id) ON DELETE SET NULL,
   sender_name     TEXT,
   sender_country  TEXT,
   sender_language TEXT,
@@ -475,6 +475,19 @@ CREATE TABLE IF NOT EXISTS group_messages (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_group_messages_room ON group_messages(category_id, room_name, created_at);
+
+-- sender_id was created without ON DELETE SET NULL on both tables above —
+-- fixed here for databases where they already exist (account deletion would
+-- otherwise fail with a foreign-key violation for any user who'd sent an
+-- event/group message, matching CASCADE on messages.sender_id everywhere else).
+DO $$ BEGIN
+  ALTER TABLE event_messages DROP CONSTRAINT IF EXISTS event_messages_sender_id_fkey;
+  ALTER TABLE event_messages ADD CONSTRAINT event_messages_sender_id_fkey
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL;
+  ALTER TABLE group_messages DROP CONSTRAINT IF EXISTS group_messages_sender_id_fkey;
+  ALTER TABLE group_messages ADD CONSTRAINT group_messages_sender_id_fkey
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL;
+END $$;
 
 -- ─── ICEBREAKER — daily question responses, comments, and likes ─────────────
 -- user_id is TEXT (not a FK) because the existing code falls back to a raw
