@@ -45,6 +45,10 @@
 	<string>WorldBond uses your microphone for voice calls, live streams, and voice notes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>WorldBond accesses your photos so you can share them in chats and set your profile picture.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

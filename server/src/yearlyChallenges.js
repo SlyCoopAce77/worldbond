@@ -1,4 +1,5 @@
 const { query: db, pool } = require('./database/db');
+const { sendPush } = require('./push');
 
 // Must match the display copy in app/src/screens/LiveHubScreen.js
 const YEARLY_CHALLENGES = {
@@ -123,6 +124,7 @@ async function checkAndPayPrizes(userId, progressRow) {
 
     await db(`UPDATE profiles SET coin_balance = COALESCE(coin_balance, 0) + $1 WHERE user_id = $2`, [def.prize, userId]);
     console.log(`[Yearly] Paid ${def.prize} BC prize for ${key} to user ${userId}`);
+    sendPush(userId, { title: 'Yearly Challenge won!', body: `You just earned ${def.prize.toLocaleString()} BC for completing a yearly challenge` });
   }
 }
 

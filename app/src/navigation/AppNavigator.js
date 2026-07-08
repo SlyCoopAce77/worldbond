@@ -34,6 +34,9 @@ import WalletScreen from '../screens/WalletScreen';
 import MonumentChallengeScreen from '../screens/MonumentChallengeScreen';
 import CountryStampChallengeScreen from '../screens/CountryStampChallengeScreen';
 import AdminStripeScreen from '../screens/AdminStripeScreen';
+import PhotoFeedScreen from '../screens/PhotoFeedScreen';
+import GroupsScreen from '../screens/GroupsScreen';
+import GroupChatScreen from '../screens/GroupChatScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -202,6 +205,11 @@ export default function AppNavigator({ user, onLogout }) {
 
             {/* Admin (server also enforces ADMIN_USER_IDS — this entry is just UI gating) */}
             <Stack.Screen name="AdminStripe" component={AdminStripeScreen} />
+
+            {/* Photos / Groups — real backends that previously had no screen */}
+            <Stack.Screen name="PhotoFeed" component={PhotoFeedScreen} />
+            <Stack.Screen name="Groups"    component={GroupsScreen} />
+            <Stack.Screen name="GroupChat" component={GroupChatScreen} />
           </Stack.Navigator>
         </NavigationContainer>
 

@@ -3,6 +3,7 @@ const { requireAuth } = require('../auth/auth.middleware');
 const { getDailyMatches, createMatch, getMatches } = require('./matching.service');
 const { findSocketId } = require('../socket');
 const { query: db } = require('../database/db');
+const { sendPush } = require('../push');
 
 const router = Router();
 router.use(requireAuth);
@@ -36,18 +37,20 @@ router.post('/', async (req, res) => {
     const match = await createMatch(req.userId, targetUserId, connectionType, experienceId);
     if (!match) return res.status(409).json({ error: 'Match already exists' });
 
-    // Notify the other side if they're online — previously nothing told
-    // them a match had formed at all.
+    // Notify the other side, in-app if online and via push either way —
+    // previously nothing told them a match had formed at all.
+    const { rows } = await db(`SELECT display_name, country FROM profiles WHERE user_id = $1`, [req.userId]);
+    const myName = rows[0]?.display_name || 'Someone';
     const targetSid = findSocketId(targetUserId);
     if (targetSid) {
-      const { rows } = await db(`SELECT display_name, country FROM profiles WHERE user_id = $1`, [req.userId]);
       const ioInstance = req.app.get('io');
       ioInstance.to(targetSid).emit('bond_formed', {
         userId: req.userId,
-        username: rows[0]?.display_name || 'Someone',
+        username: myName,
         country: rows[0]?.country || null,
       });
     }
+    sendPush(targetUserId, { title: 'New Bond', body: `${myName} bonded with you` });
 
     res.status(201).json(match);
   } catch (err) {

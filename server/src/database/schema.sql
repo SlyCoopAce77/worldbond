@@ -612,6 +612,21 @@ CREATE TABLE IF NOT EXISTS user_follows (
 );
 CREATE INDEX IF NOT EXISTS idx_user_follows_followee ON user_follows(followee_id);
 
+-- ─── DEVICE TOKENS — for real push notifications (APNs) ──────────────────────
+-- Reaches users when the app is backgrounded/killed, unlike every socket.io
+-- notification elsewhere in this schema which only works while connected.
+-- UNIQUE(token): a token gets reassigned to whoever most recently registered
+-- it (e.g. a different account logging in on the same device).
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+  token       TEXT NOT NULL UNIQUE,
+  platform    VARCHAR(10) DEFAULT 'ios',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+
 -- ─── UPDATED_AT TRIGGER ──────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER AS $$

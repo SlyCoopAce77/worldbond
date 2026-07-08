@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Must be "production" to match the App Store distribution provisioning
+	     profile used by the Release config — a "development" value here would
+	     fail code signing against that profile. If you build a Debug config to
+	     a physical device for local push testing, Xcode's capability editor
+	     will offer to regenerate this as "development" for that build. -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>

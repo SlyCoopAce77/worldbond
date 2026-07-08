@@ -1076,6 +1076,8 @@ PODS:
     - React-perflogger (= 0.73.2)
   - RNCAsyncStorage (1.24.0):
     - React-Core
+  - RNCPushNotificationIOS (1.12.0):
+    - React-Core
   - RNGestureHandler (2.31.2):
     - glog
     - RCT-Folly (= 2022.05.16.00)
@@ -1156,6 +1158,7 @@ DEPENDENCIES:
   - React-utils (from `../node_modules/react-native/ReactCommon/react/utils`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNCPushNotificationIOS (from `../node_modules/@react-native-community/push-notification-ios`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNIap (from `../node_modules/react-native-iap`)
   - RNScreens (from `../node_modules/react-native-screens`)
@@ -1277,6 +1280,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNCPushNotificationIOS:
+    :path: "../node_modules/@react-native-community/push-notification-ios"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
   RNIap:
@@ -1346,6 +1351,7 @@ SPEC CHECKSUMS:
   React-utils: dd1e04ea7105dc58637939b50f1a74a5dd634ec4
   ReactCommon: 35e3b6a1c75d462acb0155e38e627b98d5bf586b
   RNCAsyncStorage: b6410dead2732b5c72a7fdb1ecb5651bbcf4674b
+  RNCPushNotificationIOS: 85957a0534fd1309b4c028ccbe5b1baf9ab5cf57
   RNGestureHandler: 00bdee09fadaa19f114f84aa82a47d0ddcdbc67d
   RNIap: 65051c94a29a17bd8356bcf16a878821862eecd0
   RNScreens: b12996ef8ef492d56d126400e8aef6e613c13ef6

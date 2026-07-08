@@ -6,14 +6,18 @@ import {
 } from 'react-native';
 import { WorldMark } from '../components/BondLogo';
 import LinearGradient from 'react-native-linear-gradient';
-import { getSocket } from '../services/socket';
+import { launchImageLibrary } from 'react-native-image-picker';
+import axios from 'axios';
+import { getSocket, SERVER_URL } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
-import { stringToColor } from '../utils/apiUtils';
+import { authHeader, stringToColor } from '../utils/apiUtils';
 import { useNotifications } from '../context/NotificationsContext';
 import { useStreak } from '../context/StreakContext';
 import { useWallet } from '../context/WalletContext';
 import { useBondPass } from '../context/PremiumContext';
 import { getCountryFlag } from '../utils/countryUtils';
+import StoriesBar from '../components/StoriesBar';
+import StoryViewer from '../components/StoryViewer';
 
 const { width } = Dimensions.get('window');
 const BOND_PINK = '#FF0080';
@@ -516,6 +520,9 @@ export default function HomeScreen({ navigation, user }) {
   const [icebreaker,   setIcebreaker]   = useState({ question: '', responseCount: 0 });
   const [liveStreams,  setLiveStreams]   = useState([]);
   const [refreshing,   setRefreshing]   = useState(false);
+  const [stories,      setStories]      = useState([]);
+  const [viewingStory, setViewingStory] = useState(null);
+  const [postingStory, setPostingStory] = useState(false);
 
   const scrollY     = useRef(new Animated.Value(0)).current;
   const hdrOpacity  = scrollY.interpolate({ inputRange: [0, 80],  outputRange: [0, 1], extrapolate: 'clamp' });
@@ -555,17 +562,20 @@ export default function HomeScreen({ navigation, user }) {
     if (socket.connected) reg();
     socket.on('connect', reg);
 
-    const onUsers = list => setOnlineUsers(list.filter(u => u.socketId !== socket.id));
-    const onIce   = ({ question, responses }) => setIcebreaker({ question, responseCount: responses?.length || 0 });
-    const onCall  = ({ from, callerName, callerCountry, offer, callType }) =>
+    const onUsers  = list => setOnlineUsers(list.filter(u => u.socketId !== socket.id));
+    const onIce    = ({ question, responses }) => setIcebreaker({ question, responseCount: responses?.length || 0 });
+    const onCall   = ({ from, callerName, callerCountry, offer, callType }) =>
       navigation.navigate('Call', { mode: 'incoming', from, callerName, callerCountry, offer, callType });
-    const onLive  = streams => setLiveStreams(streams);
+    const onLive    = streams => setLiveStreams(streams);
+    const onStories = groups => setStories(groups || []);
 
     socket.on('user_list',       onUsers);
     socket.on('icebreaker_data', onIce);
     socket.on('incoming_call',   onCall);
     socket.on('live_streams',    onLive);
+    socket.on('stories_updated', onStories);
     socket.emit('get_live_streams');
+    socket.emit('get_stories');
     runEntryAnim();
 
     return () => {
@@ -574,6 +584,7 @@ export default function HomeScreen({ navigation, user }) {
       socket.off('icebreaker_data',onIce);
       socket.off('incoming_call',  onCall);
       socket.off('live_streams',   onLive);
+      socket.off('stories_updated',onStories);
     };
   }, [runEntryAnim]);
 
@@ -583,9 +594,40 @@ export default function HomeScreen({ navigation, user }) {
       socket.emit('get_users');
       socket.emit('get_icebreaker');
       socket.emit('get_live_streams');
+      socket.emit('get_stories');
     }
     await new Promise(r => setTimeout(r, 1000));
     setRefreshing(false);
+  }
+
+  async function onAddStory() {
+    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.75 });
+    if (!result.assets?.[0]?.uri || postingStory) return;
+    const asset = result.assets[0];
+    setPostingStory(true);
+    try {
+      const headers  = await authHeader();
+      const formData = new FormData();
+      formData.append('photo', { uri: asset.uri, type: asset.type || 'image/jpeg', name: asset.fileName || 'story.jpg' });
+      formData.append('username', user?.display_name || user?.username || '');
+      formData.append('country',  user?.country || '');
+      formData.append('language', user?.language || '');
+      await axios.post(`${SERVER_URL}/api/stories/upload`, formData, { headers, timeout: 30000 });
+      // stories_updated broadcast (server) refreshes the tray for everyone, including us
+    } catch {
+      // silently fall through — a failed story upload shouldn't interrupt Home
+    } finally {
+      setPostingStory(false);
+    }
+  }
+
+  function onViewStory(storyId) {
+    socket.emit('view_story', { storyId });
+  }
+
+  function onDeleteStory(storyId) {
+    socket.emit('delete_story', { storyId });
+    setViewingStory(null);
   }
 
   const firstName   = (user?.display_name || user?.username || 'Bond').split(' ')[0];
@@ -682,6 +724,34 @@ export default function HomeScreen({ navigation, user }) {
             </SafeAreaView>
           </LinearGradient>
         </Animated.View>
+
+        {/* ── Stories ── */}
+        <StoriesBar
+          stories={stories}
+          currentUserId={user?.userId}
+          onAddStory={onAddStory}
+          onStoryPress={setViewingStory}
+        />
+
+        {/* ── Quick access: World Feed / Groups ── */}
+        <View style={qa.row}>
+          <TouchableOpacity
+            style={qa.tile}
+            onPress={() => navigation.navigate('PhotoFeed', { currentUser: user })}
+            activeOpacity={0.85}
+          >
+            <Text style={qa.icon}>🌍</Text>
+            <Text style={qa.label}>World Feed</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={qa.tile}
+            onPress={() => navigation.navigate('Groups', { currentUser: user })}
+            activeOpacity={0.85}
+          >
+            <Text style={qa.icon}>💬</Text>
+            <Text style={qa.label}>Groups</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* ── Bonds Live pill ── */}
         {liveStreams.length > 0 && (() => {
@@ -844,9 +914,25 @@ export default function HomeScreen({ navigation, user }) {
         )}
 
       </Animated.ScrollView>
+
+      <StoryViewer
+        visible={!!viewingStory}
+        storyGroup={viewingStory}
+        currentUserId={user?.userId}
+        onClose={() => setViewingStory(null)}
+        onDelete={onDeleteStory}
+        onViewStory={onViewStory}
+      />
     </View>
   );
 }
+
+const qa = StyleSheet.create({
+  row:   { flexDirection: 'row', gap: 10, marginHorizontal: 20, marginTop: 4, marginBottom: 4 },
+  tile:  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#12131a', borderRadius: 14, paddingVertical: 14, borderWidth: 1, borderColor: '#ffffff0f' },
+  icon:  { fontSize: 18 },
+  label: { color: '#fff', fontSize: 13, fontWeight: '700' },
+});
 
 const blp = StyleSheet.create({
   wrap:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginTop: 14, marginBottom: 4, backgroundColor: '#0f0f1a', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#ffffff10' },

@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const multer = require('multer');
 const { setupSocket, findSocketId } = require('./socket');
+const { registerDeviceToken, sendPush } = require('./push');
 const { GROUP_CATEGORIES } = require('./groups');
 const { getCountries, getCitiesInCountry, getPlacesInCity, PLACE_TYPES } = require('./places');
 const { addPhoto, getPhotos, adminDeletePhoto } = require('./photos');
@@ -252,6 +253,22 @@ app.get('/api/places/:country/:city', (req, res) => {
 });
 app.get('/api/photos', async (req, res) => res.json(await getPhotos()));
 app.get('/api/stories', async (req, res) => res.json(await getStoriesGrouped()));
+
+// Register (or reassign) a device's APNs token for real push notifications
+app.post('/api/push/register-token', requireAuth, async (req, res) => {
+  const { token, platform } = req.body;
+  if (!token) return res.status(400).json({ error: 'token required' });
+  if (!rateLimit(`push_register:${req.userId}`, 20, 3600000)) {
+    return res.status(429).json({ error: 'Too many requests. Try again later.' });
+  }
+  try {
+    await registerDeviceToken(req.userId, token, platform || 'ios');
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[Push] register-token error:', err.message);
+    res.status(500).json({ error: 'Could not register device token.' });
+  }
+});
 
 // Photo upload
 app.post('/api/photos/upload', requireAuth, upload.single('photo'), async (req, res) => {
@@ -1124,16 +1141,24 @@ app.post('/challenge/record-win', requireAuth, async (req, res) => {
         winType === 'stamp' ? { stampName: targetName } : { monumentName: targetName }
       );
     }
+    sendPush(userId, {
+      title: winType === 'stamp' ? 'Stamp challenge won' : 'Monument challenge won',
+      body: winType === 'stamp' ? `You now hold the ${targetName} stamp` : `You successfully claimed ${targetName}`,
+    });
     if (transfer.previousHolderId) {
       const loserSid = findSocketId(transfer.previousHolderId);
+      const { rows: winnerRows } = await db(`SELECT display_name FROM profiles WHERE user_id = $1`, [userId]);
+      const winnerName = winnerRows[0]?.display_name || 'Someone';
       if (loserSid) {
-        const { rows: winnerRows } = await db(`SELECT display_name FROM profiles WHERE user_id = $1`, [userId]);
-        const winnerName = winnerRows[0]?.display_name || 'Someone';
         ioInstance.to(loserSid).emit(
           winType === 'stamp' ? 'stamp_lost' : 'monument_lost',
           winType === 'stamp' ? { stampName: targetName, winnerName } : { monumentName: targetName, winnerName }
         );
       }
+      sendPush(transfer.previousHolderId, {
+        title: winType === 'stamp' ? 'Stamp challenge lost' : 'Monument challenge lost',
+        body: `${winnerName} claimed your ${targetName}`,
+      });
     }
 
     res.json({ ok: true });

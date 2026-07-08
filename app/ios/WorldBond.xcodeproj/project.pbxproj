@@ -277,17 +277,28 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond/Pods-WorldBond-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond/Pods-WorldBond-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WorldBond/Pods-WorldBond-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		A1B2C3D4E5F607182934A5B6 /* Generate Hermes dSYM */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Hermes dSYM";
 			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WorldBond/Pods-WorldBond-frameworks.sh\"\n";
+			shellScript = "HERMES_FRAMEWORK=\"${PODS_ROOT}/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework/ios-arm64/hermes.framework/hermes\"\nif [ \"$PLATFORM_NAME\" = \"iphoneos\" ] && [ -f \"$HERMES_FRAMEWORK\" ] && [ -n \"$DWARF_DSYM_FOLDER_PATH\" ]; then\n  mkdir -p \"$DWARF_DSYM_FOLDER_PATH\"\n  xcrun dsymutil \"$HERMES_FRAMEWORK\" -o \"$DWARF_DSYM_FOLDER_PATH/hermes.framework.dSYM\" || true\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 		A55EABD7B0C7F3A422A6CC61 /* [CP] Check Pods Manifest.lock */ = {
@@ -342,13 +353,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond-WorldBondTests/Pods-WorldBond-WorldBondTests-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond-WorldBondTests/Pods-WorldBond-WorldBondTests-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -363,13 +370,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond/Pods-WorldBond-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond/Pods-WorldBond-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -384,32 +387,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond-WorldBondTests/Pods-WorldBond-WorldBondTests-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-WorldBond-WorldBondTests/Pods-WorldBond-WorldBondTests-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
-			outputPaths = (
-			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-WorldBond-WorldBondTests/Pods-WorldBond-WorldBondTests-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		A1B2C3D4E5F607182934A5B6 /* Generate Hermes dSYM */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Generate Hermes dSYM";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "HERMES_FRAMEWORK=\"${PODS_ROOT}/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework/ios-arm64/hermes.framework/hermes\"\nif [ \"$PLATFORM_NAME\" = \"iphoneos\" ] && [ -f \"$HERMES_FRAMEWORK\" ] && [ -n \"$DWARF_DSYM_FOLDER_PATH\" ]; then\n  mkdir -p \"$DWARF_DSYM_FOLDER_PATH\"\n  xcrun dsymutil \"$HERMES_FRAMEWORK\" -o \"$DWARF_DSYM_FOLDER_PATH/hermes.framework.dSYM\" || true\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -504,6 +488,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WorldBond/WorldBond.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = Y924K4N23C;
@@ -533,11 +518,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = WorldBond/WorldBond.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = Y924K4N23C;
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "WorldBond App Store";
 				INFOPLIST_FILE = WorldBond/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -551,6 +536,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.worldbond.app;
 				PRODUCT_NAME = WorldBond;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "WorldBond App Store";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};

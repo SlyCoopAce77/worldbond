@@ -4,6 +4,7 @@ const { translateText } = require('./translate');
 const { query: dbQuery } = require('./database/db');
 const { transferGiftCoins } = require('./creators');
 const { payCollectibleRoyalties } = require('./collectibles');
+const { sendPush } = require('./push');
 const { upsertYearlyProgress } = require('./yearlyChallenges');
 
 // ── Block-list enforcement for the real-time layer ────────────────────────────
@@ -353,6 +354,9 @@ function setupSocket(io) {
           preview: (imageUrl ? '📷 Photo' : text).slice(0, 60),
         });
       }
+      // Push regardless of online status — this is exactly the case where a
+      // message would otherwise silently sit unseen until they reopen the app.
+      sendPush(recipientUserId, { title: sender.username, body: (imageUrl ? '📷 Photo' : text).slice(0, 100) });
       socket.emit('direct_message', { ...message, text });
     });
 
@@ -768,6 +772,7 @@ function setupSocket(io) {
             preview: text.trim().slice(0, 60),
           });
         }
+        sendPush(resp.userId, { title: 'Reply on your answer', body: `${user.username}: ${text.trim().slice(0, 80)}` });
       }
     });
 
@@ -1358,6 +1363,14 @@ function setupSocket(io) {
         gift:          verifiedGift,
       });
 
+      // Personal notification to the host — the room broadcast above is just
+      // the visual burst everyone sees, this is the "you got real coins" alert.
+      const hostSid = findSocketId(stream.hostUserId);
+      if (hostSid) {
+        io.to(hostSid).emit('gift_received', { senderId: sender.userId, senderName: sender.username, senderCountry: sender.country, gift: verifiedGift });
+      }
+      sendPush(stream.hostUserId, { title: 'Gift Received', body: `${sender.username} sent you ${verifiedGift.name} during your Live` });
+
       // Count gift toward session Bond Heat (server-tracked, never client-set)
       stream.giftCount = (stream.giftCount || 0) + 1;
 
@@ -1371,6 +1384,7 @@ function setupSocket(io) {
           for (const p of payments) {
             const holderSid = findSocketId(p.holderId);
             if (holderSid) io.to(holderSid).emit('royalty_received', { amount: p.amount, source: p.source });
+            sendPush(p.holderId, { title: 'Bond Coins earned', body: `+${p.amount} BC from ${p.source}` });
           }
         })
         .catch(e => console.warn('[Collectibles] royalty error:', e.message));
@@ -1387,11 +1401,12 @@ function setupSocket(io) {
       await followUser(followerId, targetUserId);
       socket.emit('follow_status', { targetUserId, following: true, followersCount: (await getFollowers(targetUserId)).length });
       socket.emit('following_list', { following: await getFollowing(followerId) });
-      // Notify the target if online
+      // Notify the target if online, and always push (reaches them even offline)
       const targetSocket = Object.values(connectedUsers).find(u => (u.userId || u.socketId) === targetUserId);
       if (targetSocket) {
         io.to(targetSocket.socketId).emit('new_follower', { followerId, followerName: user.username, followerCountry: user.country });
       }
+      sendPush(targetUserId, { title: 'New Follower', body: `${user.username} started following you` });
     });
 
     socket.on('unfollow_user', async ({ targetUserId }) => {

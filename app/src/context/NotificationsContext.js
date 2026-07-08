@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getSocket } from '../services/socket';
+import PushNotificationIOS from '@react-native-community/push-notification-ios';
+import { getSocket, SERVER_URL } from '../services/socket';
+import { getAccessToken } from '../services/authApi';
 
 const NotificationsContext = createContext(null);
 
@@ -29,6 +32,45 @@ export function NotificationsProvider({ children }) {
     if (!ready) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, MAX)));
   }, [notifications, ready]);
+
+  // Push notifications (APNs) — reaches the user when the app is backgrounded
+  // or killed, unlike everything below which is socket-only and only works
+  // while the app is open and connected.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+
+    async function registerToken(token) {
+      try {
+        const accessToken = await getAccessToken();
+        if (!accessToken) return; // not logged in yet — register once we are
+        await fetch(`${SERVER_URL}/api/push/register-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ token, platform: 'ios' }),
+        });
+      } catch (err) {
+        console.warn('[Push] token registration failed:', err.message);
+      }
+    }
+
+    PushNotificationIOS.addEventListener('register', registerToken);
+    PushNotificationIOS.addEventListener('registrationError', err => {
+      console.warn('[Push] registration error:', err.message);
+    });
+    PushNotificationIOS.addEventListener('notification', notification => {
+      // The native side (willPresentNotification in AppDelegate.mm) already
+      // shows the banner — this just needs to complete the iOS callback.
+      notification.finish(PushNotificationIOS.FetchResult.NoData);
+    });
+
+    PushNotificationIOS.requestPermissions({ alert: true, badge: true, sound: true });
+
+    return () => {
+      PushNotificationIOS.removeEventListener('register');
+      PushNotificationIOS.removeEventListener('registrationError');
+      PushNotificationIOS.removeEventListener('notification');
+    };
+  }, []);
 
   useEffect(() => {
     const socket = getSocket();
