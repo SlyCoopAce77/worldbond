@@ -124,8 +124,10 @@ app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req
         ).catch(e => console.warn('[Transfer] status update error:', e.message));
         break;
       }
-      case 'transfer.reversed': {
-        // Transfer was reversed — refund coins back to the user.
+      case 'transfer.reversed':
+      case 'transfer.canceled': {
+        // Transfer was reversed or canceled — either way the creator never
+        // actually received the money, so refund coins back to the user.
         // Stripe webhook delivery is "at-least-once", not exactly-once (retries,
         // manual resends from the dashboard, etc. can redeliver the same event),
         // so this must be idempotent — the status flip and the refund happen in
@@ -133,7 +135,7 @@ app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req
         // of crediting the same coins back twice.
         const transfer = event.data.object;
         const transferId = transfer.id;
-        console.log('[Stripe] transfer.reversed:', transferId);
+        console.log(`[Stripe] ${event.type}:`, transferId);
 
         const claimed = await db(
           `UPDATE transfer_status SET status = 'refunded', updated_at = NOW()
@@ -149,9 +151,9 @@ app.post('/webhooks/stripe', express.raw({type: 'application/json'}), async (req
             [coins_deducted, user_id]
           ).catch(e => console.warn('[Transfer] coin refund error:', e.message));
 
-          console.log('[Transfer] Refunded', coins_deducted, 'coins (reversal) to user', user_id);
+          console.log('[Transfer] Refunded', coins_deducted, `coins (${event.type}) to user`, user_id);
         } else {
-          console.log('[Transfer] reversal already processed or unknown transfer:', transferId);
+          console.log('[Transfer] refund already processed or unknown transfer:', transferId);
         }
         break;
       }
