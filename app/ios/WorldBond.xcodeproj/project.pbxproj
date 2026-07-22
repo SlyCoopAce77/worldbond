@@ -490,7 +490,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = WorldBond/WorldBond.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = Y924K4N23C;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = WorldBond/Info.plist;
@@ -521,7 +521,7 @@
 				CODE_SIGN_ENTITLEMENTS = WorldBond/WorldBond.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = Y924K4N23C;
 				INFOPLIST_FILE = WorldBond/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

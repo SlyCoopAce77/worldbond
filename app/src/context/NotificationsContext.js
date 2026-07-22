@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import PushNotificationIOS from '@react-native-community/push-notification-ios';
 import { getSocket, SERVER_URL } from '../services/socket';
 import { getAccessToken } from '../services/authApi';
 
@@ -38,6 +37,22 @@ export function NotificationsProvider({ children }) {
   // while the app is open and connected.
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
+
+    // Loaded lazily (not a static import) and guarded — the native module
+    // backing this package isn't always linked (e.g. a build assembled
+    // without the native push changes), and that package constructs a
+    // NativeEventEmitter at import time with no null-check, which crashes
+    // the entire app on launch rather than just disabling push. A static
+    // `import` can't be try/caught since it runs before any code does, so
+    // this has to be a runtime require() instead.
+    let PushNotificationIOS;
+    try {
+      PushNotificationIOS = require('@react-native-community/push-notification-ios').default;
+      if (!PushNotificationIOS) throw new Error('module resolved to null');
+    } catch (err) {
+      console.warn('[Push] native module unavailable, skipping push setup:', err.message);
+      return;
+    }
 
     async function registerToken(token) {
       try {
