@@ -5,7 +5,7 @@ const { query: dbQuery } = require('./database/db');
 const { transferGiftCoins } = require('./creators');
 const { payCollectibleRoyalties } = require('./collectibles');
 const { sendPush } = require('./push');
-const { upsertYearlyProgress } = require('./yearlyChallenges');
+const { upsertYearlyProgress, YEARLY_CHALLENGES } = require('./yearlyChallenges');
 
 // ── Block-list enforcement for the real-time layer ────────────────────────────
 // The REST API (profiles.routes.js /blocks) has always respected user_blocks.
@@ -110,6 +110,53 @@ const randomConnectQueue = []; // users waiting for a random match
 const randomConnectTimers = {}; // socketId -> timeout handle
 const liveStreams = {};        // streamId -> stream object
 
+// ── Per-socket reaction rate limiter ──
+const socketReactionCounts = {};
+const REACTION_RATE_LIMIT  = 60; // max 60 reactions per minute per sender
+const REACTION_WINDOW_MS   = 60000;
+
+function checkReactionRate(socketId) {
+  const now   = Date.now();
+  const entry = socketReactionCounts[socketId];
+  if (!entry || now - entry.windowStart > REACTION_WINDOW_MS) {
+    socketReactionCounts[socketId] = { count: 1, windowStart: now };
+    return true;
+  }
+  if (entry.count >= REACTION_RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+// ── Viewer count helpers ──
+function getStreamViewerCount(stream) {
+  if (!stream || !stream.viewerIds) return 0;
+  const userIds = new Set();
+  let guestCount = 0;
+  for (const sid of stream.viewerIds) {
+    const user = connectedUsers[sid];
+    if (user?.userId) {
+      userIds.add(user.userId);
+    } else {
+      guestCount++;
+    }
+  }
+  return userIds.size + guestCount;
+}
+
+const viewerCountDebounces = {};
+function broadcastViewerCount(io, streamId) {
+  if (viewerCountDebounces[streamId]) return;
+  viewerCountDebounces[streamId] = setTimeout(() => {
+    delete viewerCountDebounces[streamId];
+    const stream = liveStreams[streamId];
+    if (!stream) return;
+    const count = getStreamViewerCount(stream);
+    io.to(`live:${streamId}`).emit('live_viewer_count', {
+      streamId, count,
+    });
+  }, 1000);
+}
+
 // Direct messages persist to the real `messages` table now (previously kept
 // only in memory, keyed by ephemeral socket.id — history was lost on every
 // reconnect, and messages to an offline recipient were silently dropped
@@ -173,6 +220,26 @@ function setupSocket(io) {
       socket.emit('registered', { socketId: socket.id });
       io.emit('user_list', Object.values(connectedUsers));
       console.log(`Registered: ${finalName} (${language}, ${country})`);
+
+      // Check if this registered user has an active stream that was temporarily disconnected
+      const activeUserId = verifiedUserId || userId;
+      if (activeUserId) {
+        const existingStream = Object.values(liveStreams).find(s => s.hostUserId === activeUserId);
+        if (existingStream) {
+          if (existingStream.disconnectTimeout) {
+            clearTimeout(existingStream.disconnectTimeout);
+            delete existingStream.disconnectTimeout;
+            console.log(`[Live] Host ${existingStream.hostName} reconnect grace period cleared`);
+          }
+          // Update host socket details
+          existingStream.hostSocketId = socket.id;
+          socket.join(`live:${existingStream.streamId}`);
+          
+          // Let client know the stream is resumed
+          socket.emit('live_resumed', { streamId: existingStream.streamId });
+          console.log(`[Live] Host resumed stream ${existingStream.streamId} on new socket ${socket.id}`);
+        }
+      }
     });
 
     // Get list of online users
@@ -1107,7 +1174,7 @@ function setupSocket(io) {
 
     socket.on('get_live_streams', () => {
       socket.emit('live_streams', Object.values(liveStreams).map(s => ({
-        ...s, viewerCount: s.viewerIds.size,
+        ...s, viewerCount: getStreamViewerCount(s),
       })));
     });
 
@@ -1118,19 +1185,40 @@ function setupSocket(io) {
         return;
       }
 
-      // End any existing stream from this socket
-      if (liveStreams[socket.id]) {
-        const prev = liveStreams[socket.id];
-        io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
-        delete liveStreams[socket.id];
+      const existing = Object.values(liveStreams).find(s => s.hostUserId === user.userId || s.hostSocketId === socket.id);
+
+      // Reconnect resume: a stream still inside its disconnect grace period
+      // (see the 'disconnect' handler) means the host dropped and came back
+      // within the window — reattach to the SAME stream instead of ending it,
+      // so viewers never see live_ended and chat history stays intact (same
+      // streamId/sessionId). Without this, the 20s grace period only delayed
+      // the stream's death rather than actually preventing it, since nothing
+      // reconnected the new socket to the existing stream object.
+      if (existing && existing.disconnectTimeout) {
+        clearTimeout(existing.disconnectTimeout);
+        existing.disconnectTimeout = null;
+        existing.hostSocketId = socket.id;
+        socket.join(`live:${existing.streamId}`);
+        socket.emit('live_started', { streamId: existing.streamId, resumed: true });
+        console.log(`[Live] ${user.username} resumed stream ${existing.streamId} after reconnect`);
+        return;
+      }
+
+      // Otherwise, end any existing (still fully-connected) stream from this
+      // socket or user before starting a genuinely new one.
+      if (existing) {
+        await finalizeStream(existing);
+        io.to(`live:${existing.streamId}`).emit('live_ended', { streamId: existing.streamId });
+        delete liveStreams[existing.streamId];
         // Remove old viewers from room
-        const prevSockets = await io.in(`live:${socket.id}`).fetchSockets();
-        prevSockets.forEach(s => s.leave(`live:${socket.id}`));
+        const prevSockets = await io.in(`live:${existing.streamId}`).fetchSockets();
+        prevSockets.forEach(s => s.leave(`live:${existing.streamId}`));
       }
 
       const sessionId = uuidv4();
-      liveStreams[socket.id] = {
-        streamId:    socket.id,
+      const streamId = uuidv4();
+      liveStreams[streamId] = {
+        streamId,
         sessionId,
         hostSocketId: socket.id,
         hostName:    user.username,
@@ -1142,6 +1230,8 @@ function setupSocket(io) {
         thumbnail:   thumbnail || null,
         viewerIds:      new Set(),
         uniqueViewerIds:new Set(),
+        kickedUserIds:  new Set(),
+        kickedSocketIds: new Set(),
         messages:       [],
         startedAt:      Date.now(),
         peakViewers:    0,
@@ -1157,12 +1247,12 @@ function setupSocket(io) {
         ).catch(e => console.warn('[Stream] session insert error:', e.message));
       }
 
-      socket.join(`live:${socket.id}`);
+      socket.join(`live:${streamId}`);
       io.emit('live_streams', Object.values(liveStreams).map(s => ({
-        ...s, viewerCount: s.viewerIds.size,
+        ...s, viewerCount: getStreamViewerCount(s),
       })));
-      socket.emit('live_started', { streamId: socket.id });
-      console.log(`[Live] ${user.username} went live`);
+      socket.emit('live_started', { streamId });
+      console.log(`[Live] ${user.username} went live (streamId: ${streamId})`);
     });
 
     // Shared stream-end logic — called from end_live and disconnect
@@ -1204,13 +1294,14 @@ function setupSocket(io) {
     }
 
     socket.on('end_live', async () => {
-      const stream = liveStreams[socket.id];
+      const stream = Object.values(liveStreams).find(s => s.hostSocketId === socket.id);
       if (!stream) return;
+      if (stream.disconnectTimeout) clearTimeout(stream.disconnectTimeout);
       await finalizeStream(stream);
-      io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
-      delete liveStreams[socket.id];
+      io.to(`live:${stream.streamId}`).emit('live_ended', { streamId: stream.streamId });
+      delete liveStreams[stream.streamId];
       io.emit('live_streams', Object.values(liveStreams).map(s => ({
-        ...s, viewerCount: s.viewerIds.size,
+        ...s, viewerCount: getStreamViewerCount(s),
       })));
       console.log(`[Live] ${connectedUsers[socket.id]?.username} ended live`);
     });
@@ -1218,35 +1309,67 @@ function setupSocket(io) {
     socket.on('join_live', async ({ streamId }) => {
       const stream = liveStreams[streamId];
       if (!stream) return socket.emit('live_error', 'Stream not found or ended');
+      
       const viewer = connectedUsers[socket.id];
+      if (stream.kickedSocketIds?.has(socket.id) || (viewer?.userId && stream.kickedUserIds?.has(viewer.userId))) {
+        return socket.emit('live_error', 'You have been kicked from this stream.');
+      }
+
       if (await isBlockedEitherWay(viewer?.userId, stream.hostUserId)) {
         return socket.emit('live_error', 'Stream not found or ended');
       }
+
       stream.viewerIds.add(socket.id);
       stream.uniqueViewerIds = stream.uniqueViewerIds || new Set();
       if (viewer?.userId) stream.uniqueViewerIds.add(viewer.userId);
-      if (stream.viewerIds.size > (stream.peakViewers || 0)) {
-        stream.peakViewers = stream.viewerIds.size;
+
+      const activeCount = getStreamViewerCount(stream);
+      if (activeCount > (stream.peakViewers || 0)) {
+        stream.peakViewers = activeCount;
       }
+      
       socket.join(`live:${streamId}`);
 
       // Send recent messages + stream info
+      // Fallback to fetch from database if in-memory messages array is empty (e.g. after a restart)
+      let history = stream.messages.slice(-50);
+      if (history.length === 0) {
+        try {
+          const { rows } = await dbQuery(
+            `SELECT id, sender_name AS "senderName", sender_country AS "senderCountry", text AS "originalText", created_at
+             FROM live_stream_messages
+             WHERE session_id = $1
+             ORDER BY created_at DESC
+             LIMIT 50`,
+            [stream.sessionId]
+          );
+          history = rows.reverse().map(r => ({
+            id: r.id,
+            senderId: null,
+            senderName: r.senderName,
+            senderCountry: r.senderCountry,
+            originalText: r.originalText,
+            timestamp: new Date(r.created_at).getTime(),
+          }));
+        } catch (e) {
+          console.warn('[Stream] failed to fetch message history:', e.message);
+        }
+      }
+
       socket.emit('live_joined', {
-        stream: { ...stream, viewerCount: stream.viewerIds.size },
-        messages: stream.messages.slice(-50),
+        stream: { ...stream, viewerCount: activeCount },
+        messages: history,
       });
 
-      // Notify everyone of updated viewer count
-      io.to(`live:${streamId}`).emit('live_viewer_count', {
-        streamId, count: stream.viewerIds.size,
-      });
+      // Notify everyone of updated viewer count (debounced)
+      broadcastViewerCount(io, streamId);
 
-      // Tell host someone joined
-      io.to(streamId).emit('live_viewer_joined', {
+      // Tell host someone joined (send specifically to the host's current socket)
+      io.to(stream.hostSocketId).emit('live_viewer_joined', {
         viewerId: viewer?.userId || socket.id,
         viewerName: viewer?.username || 'Someone',
         viewerCountry: viewer?.country || '',
-        count: stream.viewerIds.size,
+        count: activeCount,
       });
     });
 
@@ -1254,9 +1377,7 @@ function setupSocket(io) {
       const stream = liveStreams[streamId];
       if (stream) {
         stream.viewerIds.delete(socket.id);
-        io.to(`live:${streamId}`).emit('live_viewer_count', {
-          streamId, count: stream.viewerIds.size,
-        });
+        broadcastViewerCount(io, streamId);
       }
       socket.leave(`live:${streamId}`);
     });
@@ -1267,8 +1388,9 @@ function setupSocket(io) {
       if (!sender || !stream || !text?.trim()) return;
       if (await isBlockedEitherWay(sender.userId, stream.hostUserId)) return;
 
+      const messageId = uuidv4();
       const message = {
-        id:           uuidv4(),
+        id:           messageId,
         senderId:     socket.id,
         senderName:   sender.username,
         senderCountry:sender.country,
@@ -1278,6 +1400,21 @@ function setupSocket(io) {
 
       stream.messages.push(message);
       if (stream.messages.length > 200) stream.messages.shift();
+
+      // Persist to database asynchronously
+      dbQuery(
+        `INSERT INTO live_stream_messages (id, stream_id, session_id, sender_id, sender_name, sender_country, text)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          messageId,
+          stream.streamId,
+          stream.sessionId,
+          sender.userId || null,
+          sender.username,
+          sender.country || null,
+          text.trim()
+        ]
+      ).catch(e => console.warn('[Stream] message persist error:', e.message));
 
       // Translate for each recipient in the room
       const socketsInRoom = await io.in(`live:${streamId}`).fetchSockets();
@@ -1298,6 +1435,16 @@ function setupSocket(io) {
       if (!stream) return;
       if (stream.hostSocketId !== socket.id) return;
 
+      const viewer = connectedUsers[viewerSocketId];
+      if (viewer) {
+        if (viewer.userId) {
+          stream.kickedUserIds = stream.kickedUserIds || new Set();
+          stream.kickedUserIds.add(viewer.userId);
+        }
+        stream.kickedSocketIds = stream.kickedSocketIds || new Set();
+        stream.kickedSocketIds.add(viewerSocketId);
+      }
+
       const viewerSocket = io.sockets.sockets.get(viewerSocketId);
       if (viewerSocket) {
         viewerSocket.emit('live_kicked', { streamId });
@@ -1305,15 +1452,13 @@ function setupSocket(io) {
       }
 
       stream.viewerIds.delete(viewerSocketId);
-
-      io.to(`live:${streamId}`).emit('live_viewer_count', {
-        streamId, count: stream.viewerIds.size,
-      });
+      broadcastViewerCount(io, streamId);
     });
 
     socket.on('live_reaction', ({ streamId, emoji }) => {
       const user = connectedUsers[socket.id];
       if (!user || !liveStreams[streamId]) return;
+      if (!checkReactionRate(socket.id)) return;
       io.to(`live:${streamId}`).emit('live_reaction', {
         emoji,
         fromName: user.username,
@@ -1468,8 +1613,15 @@ function setupSocket(io) {
 
     // ── Yearly challenge progress (server-authoritative) ──────────────────────
     socket.on('get_yearly_challenge', () => {
-      // Challenges are defined client-side; server just confirms the channel is live
-      socket.emit('yearly_challenge', null);
+      const clientChallenges = [
+        { key: 'worldStreamer', title: 'World Streamer',  description: 'Go live 52+ times this year — once a week. Each stream must be at least 5 hours.',                          prize: `${YEARLY_CHALLENGES.worldStreamer.prize.toLocaleString()} BC`, goal: YEARLY_CHALLENGES.worldStreamer.goal,     unit: 'streams', buyIn: YEARLY_CHALLENGES.worldStreamer.buyIn },
+        { key: 'globeTrotter',  title: 'Globe Trotter',   description: 'Win 12 Country Stamps AND 12 Bond Monuments this year — one of each per month. Conquer the globe.',          prize: `${YEARLY_CHALLENGES.globeTrotter.prize.toLocaleString()} BC`, goal: YEARLY_CHALLENGES.globeTrotter.goal,     unit: 'wins',    buyIn: YEARLY_CHALLENGES.globeTrotter.buyIn },
+        { key: 'bondMarathon',  title: 'Bond Marathon',   description: 'Accumulate 365+ total hours of live streaming this year — roughly 1 hour a day.',                            prize: `${YEARLY_CHALLENGES.bondMarathon.prize.toLocaleString()} BC`, goal: YEARLY_CHALLENGES.bondMarathon.goal,    unit: 'hours',   buyIn: YEARLY_CHALLENGES.bondMarathon.buyIn },
+        { key: 'bondElite',     title: 'Bond Elite',      description: 'Reach 25,000 total viewers across all your streams this year.',                                              prize: `${YEARLY_CHALLENGES.bondElite.prize.toLocaleString()} BC`, goal: YEARLY_CHALLENGES.bondElite.goal,  unit: 'viewers', buyIn: YEARLY_CHALLENGES.bondElite.buyIn },
+        { key: 'giftLegend',    title: 'Earned Legend',   description: 'Earn 500,000+ BC in viewer support across your streams this year.',                                          prize: `${YEARLY_CHALLENGES.giftLegend.prize.toLocaleString()} BC`, goal: YEARLY_CHALLENGES.giftLegend.goal, unit: 'BC',      buyIn: YEARLY_CHALLENGES.giftLegend.buyIn },
+        { key: 'bondInferno',   title: 'Bond Inferno',    description: 'Accumulate 75,000 Bond Heat this year. Heat = viewers + support ×5. You need both a crowd and their energy.', prize: `${YEARLY_CHALLENGES.bondInferno.prize.toLocaleString()} BC`, goal: YEARLY_CHALLENGES.bondInferno.goal,  unit: 'heat',    buyIn: YEARLY_CHALLENGES.bondInferno.buyIn },
+      ];
+      socket.emit('yearly_challenge', clientChallenges);
     });
 
     socket.on('get_challenge_progress', async () => {
@@ -1500,22 +1652,28 @@ function setupSocket(io) {
 
     socket.on('disconnect', async () => {
       delete socketGiftCounts[socket.id]; // clean up rate tracker
-      // End live stream if host disconnects — finalize session stats
-      if (liveStreams[socket.id]) {
-        await finalizeStream(liveStreams[socket.id]);
-        io.to(`live:${socket.id}`).emit('live_ended', { streamId: socket.id });
-        delete liveStreams[socket.id];
-        io.emit('live_streams', Object.values(liveStreams).map(s => ({
-          ...s, viewerCount: s.viewerIds.size,
-        })));
+      delete socketReactionCounts[socket.id]; // clean up rate tracker
+
+      // Check if host disconnected
+      const hostStream = Object.values(liveStreams).find(s => s.hostSocketId === socket.id);
+      if (hostStream) {
+        console.log(`[Live] Host disconnected, starting 20s grace period for stream ${hostStream.streamId}`);
+        hostStream.disconnectTimeout = setTimeout(async () => {
+          await finalizeStream(hostStream);
+          io.to(`live:${hostStream.streamId}`).emit('live_ended', { streamId: hostStream.streamId });
+          delete liveStreams[hostStream.streamId];
+          io.emit('live_streams', Object.values(liveStreams).map(s => ({
+            ...s, viewerCount: getStreamViewerCount(s),
+          })));
+          console.log(`[Live] Stream ${hostStream.streamId} ended after disconnect grace period.`);
+        }, 20000);
       }
+
       // Remove as viewer from any stream
       Object.values(liveStreams).forEach(stream => {
         if (stream.viewerIds.has(socket.id)) {
           stream.viewerIds.delete(socket.id);
-          io.to(`live:${stream.streamId}`).emit('live_viewer_count', {
-            streamId: stream.streamId, count: stream.viewerIds.size,
-          });
+          broadcastViewerCount(io, stream.streamId);
         }
       });
       delete connectedUsers[socket.id];

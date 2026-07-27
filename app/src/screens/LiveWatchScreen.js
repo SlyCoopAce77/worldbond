@@ -96,6 +96,16 @@ export default function LiveWatchScreen({ route, navigation }) {
       navigation.goBack();
     }
 
+    // A network blip drops us from the room server-side with no error shown
+    // (unlike the host, viewers don't get a grace period — they're just
+    // removed from viewerIds immediately on disconnect). Re-joining on
+    // reconnect gets the viewer count and room membership right again;
+    // harmless to also fire on the very first connect since join_live is
+    // idempotent.
+    function onReconnect() {
+      socket.emit('join_live', { streamId: stream.streamId });
+    }
+
     socket.emit('join_live', { streamId: stream.streamId });
     socket.on('live_joined',        onJoined);
     socket.on('live_viewer_count',  onViewerCount);
@@ -104,6 +114,7 @@ export default function LiveWatchScreen({ route, navigation }) {
     socket.on('live_gift_received', onGiftReceived);
     socket.on('live_gift_error',    onGiftError);
     socket.on('live_ended',         onLiveEnded);
+    socket.on('connect',            onReconnect);
     socket.on('live_kicked',        onKicked);
     socket.on('live_error',         onError);
 
@@ -118,6 +129,7 @@ export default function LiveWatchScreen({ route, navigation }) {
       socket.off('live_ended',         onLiveEnded);
       socket.off('live_kicked',        onKicked);
       socket.off('live_error',         onError);
+      socket.off('connect',            onReconnect);
     };
   }, []);
 

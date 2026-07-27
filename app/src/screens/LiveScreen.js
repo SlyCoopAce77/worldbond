@@ -111,6 +111,20 @@ export default function LiveScreen({ route, navigation }) {
       setStarting(false);
       Alert.alert('Could not go live', 'Reconnecting… please try again in a moment.');
     }
+    // A network blip mid-broadcast drops the socket — the server holds the
+    // stream open for a 20s grace period, but only actually resumes it if we
+    // re-emit go_live once reconnected (see server's go_live handler). The
+    // short delay gives the app's own global re-registration (which sets
+    // connectedUsers[socket.id] server-side) a moment to land first, since
+    // otherwise this could race ahead of it and get rejected as unregistered.
+    function onReconnect() {
+      if (!isLiveRef.current) return;
+      setTimeout(() => {
+        if (isLiveRef.current) {
+          socket.emit('go_live', { title: title.trim() || `${activeUser?.username}'s Live` });
+        }
+      }, 1500);
+    }
 
     socket.on('live_started',       onLiveStarted);
     socket.on('live_viewer_count',  onViewerCount);
@@ -120,6 +134,7 @@ export default function LiveScreen({ route, navigation }) {
     socket.on('live_gift_received', onGiftReceived);
     socket.on('live_ended',         onLiveEnded);
     socket.on('go_live_error',      onGoLiveError);
+    socket.on('connect',            onReconnect);
 
     return () => {
       socket.off('live_started',       onLiveStarted);
@@ -130,6 +145,7 @@ export default function LiveScreen({ route, navigation }) {
       socket.off('live_gift_received', onGiftReceived);
       socket.off('live_ended',         onLiveEnded);
       socket.off('go_live_error',      onGoLiveError);
+      socket.off('connect',            onReconnect);
     };
   }, []);
 
