@@ -88,6 +88,13 @@ export default function LiveWatchScreen({ route, navigation }) {
         Alert.alert('Gift not sent', "You don't have enough coins for that gift.");
       }
     }
+    function onError(message) {
+      // Sent when join_live fails (stream ended, not found, or blocked) —
+      // without this the screen just sits frozen with no chat/viewer count
+      // and no way out except manually backing out.
+      Alert.alert('Live', message || 'This stream is no longer available.');
+      navigation.goBack();
+    }
 
     socket.emit('join_live', { streamId: stream.streamId });
     socket.on('live_joined',        onJoined);
@@ -98,6 +105,7 @@ export default function LiveWatchScreen({ route, navigation }) {
     socket.on('live_gift_error',    onGiftError);
     socket.on('live_ended',         onLiveEnded);
     socket.on('live_kicked',        onKicked);
+    socket.on('live_error',         onError);
 
     return () => {
       socket.emit('leave_live', { streamId: stream.streamId });
@@ -109,6 +117,7 @@ export default function LiveWatchScreen({ route, navigation }) {
       socket.off('live_gift_error',    onGiftError);
       socket.off('live_ended',         onLiveEnded);
       socket.off('live_kicked',        onKicked);
+      socket.off('live_error',         onError);
     };
   }, []);
 

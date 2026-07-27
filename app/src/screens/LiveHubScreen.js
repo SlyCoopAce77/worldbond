@@ -289,7 +289,7 @@ const wc = StyleSheet.create({
 });
 
 // ── Leaderboard (top streamers only) ─────────────────────────────────────────
-function Leaderboard({ streams }) {
+function Leaderboard({ streams, navigation, user }) {
   const topStreamers = [...streams].sort((a, b) => bondHeat(b) - bondHeat(a)).slice(0, 10);
 
   return (
@@ -304,7 +304,12 @@ function Leaderboard({ streams }) {
             const flag  = st.hostCountry ? getCountryFlag(st.hostCountry) : '';
             const color = stringToColor(st.hostName || '');
             return (
-              <View key={st.streamId} style={[lb.row, i === topStreamers.length - 1 && lb.rowLast]}>
+              <TouchableOpacity
+                key={st.streamId}
+                style={[lb.row, i === topStreamers.length - 1 && lb.rowLast]}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('LiveWatch', { stream: st, currentUser: user })}
+              >
                 <Text style={[lb.rank, i < 3 && lb.rankTop]}>{i + 1}</Text>
                 <View style={[lb.avatar, { backgroundColor: color }]}>
                   <Text style={lb.avatarTxt}>{(st.hostName || '?')[0].toUpperCase()}</Text>
@@ -317,7 +322,7 @@ function Leaderboard({ streams }) {
                   <Text style={lb.viewerTxt}>{fmtNum(st.viewerCount || 0)}</Text>
                   <Text style={lb.viewerLabel}>viewers</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         : (
@@ -488,7 +493,7 @@ export default function LiveHubScreen({ navigation, user }) {
           />
 
           {/* Top Streamers */}
-          <Leaderboard streams={streams} />
+          <Leaderboard streams={streams} navigation={navigation} user={user} />
         </ScrollView>
       </SafeAreaView>
     </View>
