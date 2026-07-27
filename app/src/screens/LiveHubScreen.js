@@ -125,12 +125,12 @@ function GoLiveCard({ liveCount, onPress }) {
           <View style={gl.statusRow}>
             <View style={gl.statusDot} />
             <Text style={gl.statusTxt}>
-              {liveCount > 0 ? `${liveCount} people streaming now` : 'Be the first live today'}
+              {liveCount > 0 ? `${liveCount} people live now` : 'Be the first live today'}
             </Text>
           </View>
           <Text style={gl.headline}>Share Your World</Text>
           <Text style={gl.sub}>
-            Go live and connect with viewers from every corner of the globe.
+            Go live and chat with people from every corner of the globe.
           </Text>
         </View>
       </View>
@@ -138,7 +138,7 @@ function GoLiveCard({ liveCount, onPress }) {
       <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={gl.btnWrap}>
         <LinearGradient colors={[BOND_PINK, '#CC0060']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={gl.btn}>
           <View style={gl.btnDot} />
-          <Text style={gl.btnTxt}>Start Broadcast</Text>
+          <Text style={gl.btnTxt}>Go Live</Text>
         </LinearGradient>
       </TouchableOpacity>
     </LinearGradient>
