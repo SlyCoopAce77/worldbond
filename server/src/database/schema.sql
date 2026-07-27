@@ -626,6 +626,17 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+CREATE TABLE IF NOT EXISTS live_stream_messages (
+  id              UUID PRIMARY KEY,
+  stream_id       UUID NOT NULL,
+  session_id      UUID NOT NULL REFERENCES stream_sessions(id) ON DELETE CASCADE,
+  sender_id       UUID REFERENCES users(id) ON DELETE SET NULL,
+  sender_name     TEXT,
+  sender_country  TEXT,
+  text            TEXT NOT NULL,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_live_stream_messages_session ON live_stream_messages(session_id, created_at);
 
 -- ─── UPDATED_AT TRIGGER ──────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_updated_at()

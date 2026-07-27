@@ -1331,8 +1331,12 @@ async function start() {
   if (process.env.DATABASE_URL) {
     try {
       await runMigrations();
+      // Clean up stale stream sessions from previous server runs
+      const { query } = require('./database/db');
+      await query('UPDATE stream_sessions SET ended_at = NOW() WHERE ended_at IS NULL');
+      console.log('[Stream] Closed stale stream sessions on startup');
     } catch (err) {
-      console.error('[DB] Migration failed:', err.message);
+      console.error('[DB] Migration/cleanup failed:', err.message);
     }
   } else {
     console.warn('[DB] DATABASE_URL not set — Bond persistent features disabled');

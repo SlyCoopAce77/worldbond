@@ -103,6 +103,11 @@ export function BondPassProvider({ children }) {
         }
       });
 
+      // Local StoreKit connection is best-effort only (product info + "which
+      // receipt to submit") — it must never gate the server reconciliation
+      // below, or a StoreKit hiccup would make an active paying subscriber
+      // incorrectly appear as free.
+      let localMatch = null;
       try {
         await RNIap.initConnection();
         iapReadyRef.current = true;
@@ -110,13 +115,17 @@ export function BondPassProvider({ children }) {
         const subs = await RNIap.getSubscriptions({ skus: [BOND_PASS_SKU] });
         if (subs.length > 0) setProduct(subs[0]);
 
+        const purchases = await RNIap.getAvailablePurchases();
+        localMatch = purchases.find(p => p.productId === BOND_PASS_SKU);
+      } catch (e) {
+        console.warn('[BondPass] IAP init error:', e?.code, e?.message);
+      }
+
+      try {
         // The store telling us a purchase exists locally is not sufficient on its
         // own (it doesn't reflect refunds/chargebacks and can be tampered with on a
         // compromised device) — always reconcile against the server, which holds
         // the Apple-verified truth in profiles.has_bond_pass.
-        const purchases  = await RNIap.getAvailablePurchases();
-        const localMatch = purchases.find(p => p.productId === BOND_PASS_SKU);
-
         let serverActive = await fetchBondPassStatus();
 
         // Server has no record yet (e.g. verify call never completed after a
@@ -139,7 +148,7 @@ export function BondPassProvider({ children }) {
         // serverActive === null (offline/unreachable) — keep whatever was
         // restored from cache above; don't downgrade the user while offline.
       } catch (e) {
-        console.warn('[BondPass] IAP init error:', e?.code, e?.message);
+        console.warn('[BondPass] server reconciliation error:', e?.message);
       }
     }
 
